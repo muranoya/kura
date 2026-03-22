@@ -1,6 +1,6 @@
-# kinko Desktop App
+# kura Desktop App
 
-Tauri v2 + TypeScript/React で実装されたkinkoのデスクトップアプリケーション。
+Tauri v2 + TypeScript/React で実装されたkuraのデスクトップアプリケーション。
 
 ## ディレクトリ構成
 

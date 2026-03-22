@@ -1,4 +1,4 @@
-# kinko - Release Build Guide
+# kura - Release Build Guide
 
 サーバ不要、自分一人のための、運用コストゼロのパスワードマネージャー
 
@@ -75,18 +75,3 @@ just help
 # Justfile のレシピを一覧表示
 just --list
 ```
-
-## プロジェクト構造
-
-```
-kinko/
-├── justfile              # ビルド管理
-├── vault-core/           # Rust コアライブラリ
-├── mobile/               # Flutter (iOS/Android)
-├── desktop/              # Tauri (macOS/Windows/Linux)
-└── extension/            # TypeScript ブラウザ拡張
-```
-
-## ライセンス
-
-詳細は CLAUDE.md を参照してください。

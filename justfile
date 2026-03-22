@@ -1,6 +1,3 @@
-# kinko - Release Build Helper
-# プロジェクトのリリースビルドを管理するjustfile
-
 set shell := ["zsh", "-c"]
 set positional-arguments := true
 
@@ -111,9 +108,9 @@ default: help
 @release-all: check-dependencies
 	echo ""
 	echo "╔━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╗"
-	echo "║                    kinko Release Build                     ║"
-	echo "║              Building all apps: iOS, Android,              ║"
-	echo "║             Desktop (macOS/Windows/Linux), Extension       ║"
+	echo "║                    kura Release Build                  ║"
+	echo "║             Building all apps: iOS, Android,           ║"
+	echo "║         Desktop (macOS/Windows/Linux), Extension       ║"
 	echo "╚━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╝"
 	just release-mobile
 	just release-desktop
@@ -138,7 +135,7 @@ default: help
 # ヘルプ表示
 @help:
 	echo ""
-	echo "kinko - Release Build Helper"
+	echo "kura - Release Build Helper"
 	echo ""
 	echo "Usage:"
 	echo "  📱 Mobile:"
