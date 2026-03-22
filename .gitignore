@@ -1,0 +1,4 @@
+*.swp
+/target/
+node_modules/
+/.claude/

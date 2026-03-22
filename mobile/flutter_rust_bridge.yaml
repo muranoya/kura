@@ -1,0 +1,14 @@
+# Flutter Rust Bridge configuration for kura vault_core FFI bindings
+
+# Rust root directory
+rust_root: "../vault-core"
+
+# Rust input module (source of truth)
+rust_input: "crate::api"
+
+# Dart output directory (generated code will be placed here)
+dart_output: "lib/bridge"
+
+# Enable mobile feature
+rust_features:
+  - mobile

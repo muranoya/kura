@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "identifier": "main-capability",
+  "description": "Capability for main Tauri window",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:default",
+    "core:app:default",
+    "dialog:default",
+    "shell:default",
+    "store:default",
+    "clipboard-manager:default"
+  ]
+}

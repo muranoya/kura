@@ -1,0 +1,171 @@
+kura ブラウザ拡張機能 - ディレクトリ構造
+
+extension/
+├── manifest.json                          # MV3 マニフェスト
+├── package.json                           # npm 依存関係
+├── vite.config.ts                         # Vite ビルド設定
+├── tsconfig.json                          # TypeScript 設定
+├── Makefile                               # ビルドスクリプト
+│
+├── src/
+│   ├── popup/
+│   │   ├── index.html                     # ポップアップ HTML (350px幅)
+│   │   ├── index.css                      # 共通スタイル (CSS変数)
+│   │   ├── main.tsx                       # React エントリーポイント
+│   │   ├── App.tsx                        # HashRouter + 状態ベースルーティング
+│   │   │
+│   │   ├── screens/                       # 画面コンポーネント
+│   │   │   ├── onboarding/
+│   │   │   │   ├── Welcome.tsx            # onb-01: ウェルカム
+│   │   │   │   ├── StorageSetup.tsx       # onb-02: S3設定
+│   │   │   │   ├── MasterPassword.tsx     # onb-03: パスワード設定
+│   │   │   │   └── RecoveryKey.tsx        # onb-04: リカバリーキー
+│   │   │   │
+│   │   │   ├── auth/
+│   │   │   │   ├── Lock.tsx               # auth-01: ロック解除
+│   │   │   │   └── Recovery.tsx           # auth-02: リカバリー
+│   │   │   │
+│   │   │   ├── entries/
+│   │   │   │   ├── EntryList.tsx          # entry-01: 一覧
+│   │   │   │   ├── EntryDetail.tsx        # entry-02: 詳細
+│   │   │   │   ├── EntryEdit.tsx          # entry-03: 編集
+│   │   │   │   ├── EntryCreate.tsx        # entry-04: 作成
+│   │   │   │   └── Trash.tsx              # entry-05: ゴミ箱
+│   │   │   │
+│   │   │   ├── sync/
+│   │   │   │   ├── SyncStatus.tsx         # sync-01: 同期状態
+│   │   │   │   └── ConflictResolver.tsx   # sync-02: コンフリクト解決
+│   │   │   │
+│   │   │   ├── labels/
+│   │   │   │   └── LabelManager.tsx       # label-01: ラベル管理
+│   │   │   │
+│   │   │   └── settings/
+│   │   │       └── Settings.tsx           # settings-01: 設定
+│   │   │
+│   │   └── components/                    # 共有コンポーネント
+│   │       ├── CopyButton.tsx             # コピー (フィードバック付き)
+│   │       ├── SecretField.tsx            # パスワード表示/非表示
+│   │       ├── SyncIndicator.tsx          # 同期状態インジケーター
+│   │       ├── TotpDisplay.tsx            # TOTP + カウントダウン
+│   │       ├── PasswordStrength.tsx       # パスワード強度表示
+│   │       ├── RecoveryKeyInput.tsx       # リカバリーキー自動フォーマット
+│   │       └── EntryTypeIcon.tsx          # エントリータイプアイコン
+│   │
+│   ├── background/
+│   │   ├── index.ts                       # Service Worker (IPC ハブ)
+│   │   │                                  # - 40個のメッセージハンドラー実装
+│   │   ├── offscreen.ts                   # Offscreen Document (クリップボード)
+│   │   └── offscreen.html                 # Offscreen HTML
+│   │
+│   ├── shared/
+│   │   ├── types.ts                       # TypeScript 型定義
+│   │   ├── messages.ts                    # Type-safe メッセージプロトコル
+│   │   ├── storage.ts                     # chrome.storage.local wrapper
+│   │   └── constants.ts                   # 定数
+│   │
+│   └── vault/
+│       ├── index.ts                       # WASM wrapper functions
+│       │                                  # - unlockVault, createEntry等
+│       │                                  # - 全40+個の API ラッパー
+│       └── types.ts                       # WASM 関連型定義
+│
+├── wasm/                                  # wasm-pack 出力 (ビルド後)
+│   ├── vault_core.js                      # WASM JS バインディング
+│   ├── vault_core_bg.wasm                 # バイナリ
+│   └── vault_core.d.ts                    # TypeScript 型定義
+│
+├── dist/                                  # Vite ビルド出力
+│   ├── popup/
+│   ├── background/
+│   ├── manifest.json
+│   └── icons/
+│
+├── icons/                                 # 拡張機能アイコン
+│   ├── icon-16.png
+│   ├── icon-48.png
+│   └── icon-128.png
+│
+├── ドキュメント
+├── IMPLEMENTATION.md                      # 詳細実装仕様
+├── README_QUICKSTART.md                   # クイックスタート
+├── NEXT_PHASE.md                          # Phase 3 チェックリスト
+├── SUMMARY.md                             # 実装サマリー
+└── DIRECTORY_STRUCTURE.txt                # このファイル
+
+---
+
+ファイル統計:
+
+TypeScript/TSX: 32個
+  - UI画面コンポーネント: 24個
+  - バックエンド/ユーティリティ: 8個
+
+設定ファイル: 5個
+  - manifest.json, package.json, vite.config.ts, tsconfig.json, Makefile
+
+スタイル: 1個
+  - index.css
+
+ドキュメント: 3個
+  - IMPLEMENTATION.md, README_QUICKSTART.md, NEXT_PHASE.md
+
+HTML: 2個
+  - index.html (popup), offscreen.html
+
+その他: 1個
+  - SUMMARY.md, DIRECTORY_STRUCTURE.txt
+
+合計: 44個以上のファイル, 約3,900行のコード
+
+---
+
+ビルドコマンド:
+
+make install    # npm 依存のインストール
+make wasm       # vault-core WASM ビルド
+make dev        # 開発モード (HMR付き)
+make build      # 本番ビルド
+make clean      # クリーンアップ
+make package    # ZIP パッケージ化
+
+---
+
+ルーティング:
+
+起動時フロー:
+1. chrome.storage.local で vaultBytes 確認
+2. 未存在 → /onboarding (Welcome)
+3. 存在 → Service Worker に IS_UNLOCKED メッセージ
+4. false → /auth/lock (ロック画面)
+5. true → /entries (エントリ一覧)
+
+ルートパス:
+/ → onb-01 (Welcome)
+/onb/storage → onb-02 (StorageSetup)
+/onb/password → onb-03 (MasterPassword)
+/onb/recovery → onb-04 (RecoveryKey)
+/auth/lock → auth-01 (Lock)
+/auth/recovery → auth-02 (Recovery)
+/entries → entry-01 (EntryList)
+/entries/create → entry-04 (EntryCreate)
+/entries/:id → entry-02 (EntryDetail)
+/entries/:id/edit → entry-03 (EntryEdit)
+/trash → entry-05 (Trash)
+/sync → sync-01 (SyncStatus)
+/sync/conflict-resolver → sync-02 (ConflictResolver)
+/labels → label-01 (LabelManager)
+/settings → settings-01 (Settings)
+
+---
+
+メッセージハンドラー (40個): src/background/index.ts
+
+認証 (5): IS_UNLOCKED, UNLOCK, RECOVER, LOCK, CREATE_VAULT
+エントリ (9): LIST_ENTRIES, GET_ENTRY, CREATE_ENTRY, UPDATE_ENTRY, DELETE_ENTRY, RESTORE_ENTRY, PURGE_ENTRY, SET_FAVORITE, LIST_TRASH
+ラベル (4): LIST_LABELS, CREATE_LABEL, DELETE_LABEL, SET_ENTRY_LABELS
+同期 (4): SYNC, GET_SYNC_STATUS, GET_SYNC_CONFLICTS, RESOLVE_SYNC_CONFLICTS
+設定 (3): GET_SETTINGS, SAVE_SETTINGS, CLIPBOARD_COPIED
+
+---
+
+次フェーズ (Phase 3) でやることは NEXT_PHASE.md を参照
