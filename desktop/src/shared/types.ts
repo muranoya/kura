@@ -42,6 +42,7 @@ export interface EntryFilter {
   type?: EntryType
   labelId?: string
   includeTrash?: boolean
+  onlyFavorites?: boolean
 }
 
 // Storage config for S3

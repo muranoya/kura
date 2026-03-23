@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { confirm as showConfirmDialog } from '@tauri-apps/plugin-dialog'
 import * as commands from '../../commands'
 import { clearStorage } from '../../shared/storage'
 import { Button } from '../../components/ui/button'
@@ -8,6 +7,7 @@ import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Separator } from '../../components/ui/separator'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Lock } from 'lucide-react'
 
 export default function LockScreen() {
@@ -15,6 +15,7 @@ export default function LockScreen() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
 
   const handleUnlock = useCallback(async () => {
     if (!password) {
@@ -32,24 +33,23 @@ export default function LockScreen() {
     }
   }, [password])
 
-  const handleLogout = useCallback(async () => {
-    const confirmed = await showConfirmDialog('ログアウトすると、設定とキャッシュが削除されます。\nよろしいですか？', {
-      title: 'ログアウト',
-      kind: 'warning',
-    })
-    if (confirmed) {
-      try {
-        // Clear local storage and cache
-        await clearStorage()
+  const handleLogout = useCallback(() => {
+    setShowLogoutDialog(true)
+  }, [])
 
-        // Delete vault file
-        await commands.deleteVaultFile()
+  const handleLogoutConfirm = useCallback(async () => {
+    try {
+      // Clear local storage and cache
+      await clearStorage()
 
-        // Page reload to reinitialize the app
-        window.location.href = '/'
-      } catch (err) {
-        setError(`ログアウト失敗: ${err}`)
-      }
+      // Delete vault file
+      await commands.deleteVaultFile()
+
+      // Page reload to reinitialize the app
+      window.location.href = '/'
+    } catch (err) {
+      setError(`ログアウト失敗: ${err}`)
+      setShowLogoutDialog(false)
     }
   }, [])
 
@@ -113,18 +113,24 @@ export default function LockScreen() {
         {/* ログアウトセクション */}
         <div className="mt-8">
           <Separator className="mb-6" />
-          <h3 className="text-sm font-semibold text-text-primary mb-3">その他のオプション</h3>
           <Button
             variant="destructive"
             onClick={handleLogout}
-            className="w-full mb-2"
+            className="w-full"
           >
             ログアウト
           </Button>
-          <p className="text-xs text-text-muted">
-            設定とローカルキャッシュを削除し、初期設定から再開します
-          </p>
         </div>
+
+        <ConfirmDialog
+          open={showLogoutDialog}
+          title="ログアウト"
+          description="設定とローカルキャッシュを削除し、初期設定から再開します。この操作は取り消せません。よろしいですか？"
+          confirmText="ログアウト"
+          isDangerous={true}
+          onConfirm={handleLogoutConfirm}
+          onCancel={() => setShowLogoutDialog(false)}
+        />
       </div>
     </div>
   )

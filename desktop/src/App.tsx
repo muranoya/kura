@@ -5,6 +5,7 @@ import Welcome from './screens/onboarding/Welcome'
 import StorageSetup from './screens/onboarding/StorageSetup'
 import MasterPassword from './screens/onboarding/MasterPassword'
 import RecoveryKey from './screens/onboarding/RecoveryKey'
+import UnlockExistingVault from './screens/onboarding/UnlockExistingVault'
 import Lock from './screens/auth/Lock'
 import Recovery from './screens/auth/Recovery'
 import EntryList from './screens/entries/EntryList'
@@ -76,6 +77,7 @@ export default function App() {
             <Route path="/onb/storage" element={<StorageSetup />} />
             <Route path="/onb/password" element={<MasterPassword />} />
             <Route path="/onb/recovery" element={<RecoveryKey />} />
+            <Route path="/onb/unlock-existing" element={<UnlockExistingVault />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         )}
@@ -93,10 +95,11 @@ export default function App() {
         {appState === 'unlocked' && (
           <Route path="*" element={
             <div className="flex h-screen bg-bg-base">
-              <Sidebar setAppState={setAppState} />
+              <Sidebar />
               <div className="flex-1 overflow-auto bg-bg-base">
                 <Routes>
                   <Route path="/entries" element={<EntryList />} />
+                  <Route path="/favorites" element={<EntryList onlyFavorites={true} />} />
                   <Route path="/entries/create" element={<EntryCreate />} />
                   <Route path="/entries/:id" element={<EntryDetail />} />
                   <Route path="/entries/:id/edit" element={<EntryEdit />} />

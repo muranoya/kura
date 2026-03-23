@@ -7,9 +7,10 @@ pub async fn list_entries(
     entry_type: Option<String>,
     label_id: Option<String>,
     include_trash: bool,
+    only_favorites: bool,
 ) -> Result<Vec<serde_json::Value>, String> {
     tokio::task::spawn_blocking(move || {
-        let rows = api_list_entries(search_query, entry_type, label_id, include_trash)?;
+        let rows = api_list_entries(search_query, entry_type, label_id, include_trash, only_favorites)?;
         Ok(rows
             .into_iter()
             .map(|r| {

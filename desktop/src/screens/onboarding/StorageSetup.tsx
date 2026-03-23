@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { saveToStorage } from '../../shared/storage'
+import { downloadVault } from '../../commands'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
@@ -16,6 +17,7 @@ export default function StorageSetup() {
   const [secretAccessKey, setSecretAccessKey] = useState('')
   const [endpoint, setEndpoint] = useState('')
   const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleNext = async () => {
     if (!region || !bucket || !accessKeyId || !secretAccessKey) {
@@ -37,7 +39,20 @@ export default function StorageSetup() {
     }
 
     await saveToStorage('s3Config', config)
-    navigate('/onb/password')
+
+    // Check if vault file exists on S3
+    setIsLoading(true)
+    try {
+      const vaultExists = await downloadVault(JSON.stringify(config))
+      if (vaultExists) {
+        navigate('/onb/unlock-existing')
+      } else {
+        navigate('/onb/password')
+      }
+    } catch (err) {
+      setError(`ストレージへのアクセスに失敗しました: ${err instanceof Error ? err.message : String(err)}`)
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -156,12 +171,15 @@ export default function StorageSetup() {
                   variant="secondary"
                   onClick={() => navigate('/')}
                   className="flex-1"
+                  disabled={isLoading}
                 >
                   戻る
                 </Button>
                 <Button
                   onClick={handleNext}
                   className="flex-1"
+                  disabled={isLoading}
+                  isLoading={isLoading}
                 >
                   次へ
                 </Button>
@@ -169,16 +187,6 @@ export default function StorageSetup() {
             </div>
           </CardContent>
         </Card>
-
-        {/* ヒント */}
-        <div className="mt-6 p-4 bg-accent-subtle rounded-lg border border-accent/20">
-          <h4 className="text-sm font-medium text-accent mb-2">💡 ヒント</h4>
-          <ul className="text-xs text-text-secondary space-y-1">
-            <li>• AWS S3 を使用する場合は <code className="bg-bg-surface px-1.5 py-0.5 rounded">ap-northeast-1</code> などのリージョンを指定</li>
-            <li>• Cloudflare R2 や MinIO など S3 互換のサービスにも対応</li>
-            <li>• IAM ユーザーのアクセスキーを使用することを推奨</li>
-          </ul>
-        </div>
       </div>
     </div>
   )

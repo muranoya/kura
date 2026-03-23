@@ -1,13 +1,9 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import * as commands from '../commands'
-import { Button } from './ui/button'
 import { Separator } from './ui/separator'
-import { KeyRound, Tags, RefreshCw, Settings, Trash2, Lock } from 'lucide-react'
+import { KeyRound, Star, Tags, RefreshCw, Settings, Trash2 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
-interface SidebarProps {
-  setAppState: (state: 'locked' | 'unlocked') => void
-}
+interface SidebarProps {}
 
 interface NavItem {
   icon: React.ReactNode
@@ -17,19 +13,15 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { icon: <KeyRound size={18} />, label: '全てのアイテム', path: '/entries' },
+  { icon: <Star size={18} />, label: 'お気に入り', path: '/favorites' },
   { icon: <Tags size={18} />, label: 'ラベル', path: '/labels' },
   { icon: <RefreshCw size={18} />, label: '同期', path: '/sync' },
   { icon: <Settings size={18} />, label: '設定', path: '/settings' },
 ]
 
-export default function Sidebar({ setAppState }: SidebarProps) {
+export default function Sidebar({}: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
-
-  const handleLock = async () => {
-    await commands.lockVault()
-    setAppState('locked')
-  }
 
   return (
     <div className="flex flex-col w-sidebar h-screen bg-bg-sidebar border-r border-border">
@@ -79,19 +71,6 @@ export default function Sidebar({ setAppState }: SidebarProps) {
           <Trash2 size={18} />
           <span>ゴミ箱</span>
         </button>
-
-        <Separator className="my-2" />
-
-        {/* ロックボタン */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleLock}
-          className="w-full gap-2 justify-start"
-        >
-          <Lock size={18} />
-          <span>ロック</span>
-        </Button>
       </div>
     </div>
   )

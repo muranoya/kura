@@ -189,10 +189,12 @@ impl UnlockedVault {
             created_at: now,
             updated_at: now,
             deleted_at: None,
+            purged_at: None,
             is_favorite: false,
             label_ids: label_ids.clone(),
             typed_value: data.typed_value.clone(),
             notes: data.notes.clone(),
+            custom_fields: data.custom_fields.clone(),
         };
 
         self.contents.entries.insert(id.clone(), vault_entry.clone());
@@ -217,6 +219,7 @@ impl UnlockedVault {
         entry.name = name;
         entry.typed_value = data.typed_value.clone();
         entry.notes = data.notes.clone();
+        entry.custom_fields = data.custom_fields.clone();
         entry.updated_at = chrono::Utc::now().timestamp();
 
         Ok(())
@@ -238,10 +241,30 @@ impl UnlockedVault {
         Ok(())
     }
 
-    /// Permanently delete entry
+    /// Permanently delete entry (converts to tombstone)
+    /// Clears sensitive data and marks as purged for sync-safe deletion
     pub fn purge_entry(&mut self, id: &str) -> Result<()> {
-        self.contents.entries.remove(id)
+        use chrono::Utc;
+
+        let entry = self.contents.entries.get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
+
+        let now = Utc::now().timestamp();
+
+        // Ensure entry is marked as deleted first
+        if entry.deleted_at.is_none() {
+            entry.deleted_at = Some(now);
+        }
+
+        // Convert to tombstone: clear sensitive data and mark as purged
+        entry.purged_at = Some(now);
+        entry.updated_at = now;
+        entry.name = String::new();
+        entry.typed_value = serde_json::Value::Null;
+        entry.notes = None;
+        entry.custom_fields = None;
+        entry.label_ids.clear();
+
         Ok(())
     }
 
@@ -268,14 +291,23 @@ impl UnlockedVault {
     /// Create label
     pub fn create_label(&mut self, name: String) -> Result<Label> {
         let id = uuid::Uuid::new_v4().to_string();
-        self.contents.labels.insert(id.clone(), LabelValue { name: name.clone() });
+        self.contents.labels.insert(id.clone(), LabelValue {
+            name: name.clone(),
+            deleted_at: None,
+        });
         Ok(Label { id, name })
     }
 
-    /// Delete label
+    /// Delete label (converts to tombstone)
+    /// Marks label as deleted for sync-safe deletion, removes from entries
     pub fn delete_label(&mut self, id: &str) -> Result<()> {
-        self.contents.labels.remove(id)
+        use chrono::Utc;
+
+        let label = self.contents.labels.get_mut(id)
             .ok_or_else(|| VaultError::LabelNotFound(id.to_string()))?;
+
+        let now = Utc::now().timestamp();
+        label.deleted_at = Some(now);
 
         // Remove label_id from all entries
         for entry in self.contents.entries.values_mut() {
@@ -389,7 +421,7 @@ impl UnlockedVault {
         storage.upload(&file_bytes, self.etag.as_deref()).await
     }
 
-    /// Sync with remote storage
+    /// Sync with remote storage (auto-merge using LWW + Tombstone strategy)
     pub async fn sync(&mut self, storage: &dyn StorageBackend) -> Result<crate::sync::SyncResult> {
         // Download remote version
         let (remote_bytes, remote_etag) = match storage.download().await? {
@@ -406,16 +438,19 @@ impl UnlockedVault {
         let remote_vault_file = VaultFile::from_bytes(&remote_bytes)?;
         let remote_contents = crate::crypto::encryption::decrypt_vault(&remote_vault_file.encrypted_vault, &self.dek)?;
 
-        // Detect conflicts
-        let conflicts = crate::sync::detect_conflicts(&self.contents.entries, &remote_contents.entries)?;
+        // Auto-merge local and remote using LWW + Tombstone strategy
+        let merge_result = crate::sync::auto_merge(&self.contents, &remote_contents)?;
 
-        if !conflicts.is_empty() {
-            return Ok(crate::sync::SyncResult::with_conflicts(conflicts));
-        }
+        // Apply merged state to current vault
+        self.contents.entries = merge_result.merged_entries;
+        self.contents.labels = merge_result.merged_labels;
+        self.etag = Some(remote_etag.clone());
 
-        // No conflicts - merge entries
-        self.etag = Some(remote_etag);
-        Ok(crate::sync::SyncResult::success(self.etag.clone()))
+        // Push merged state back to remote
+        let new_etag = self.push(storage).await?;
+        self.etag = Some(new_etag.clone());
+
+        Ok(crate::sync::SyncResult::success(Some(new_etag)))
     }
 
     /// Resolve sync conflicts

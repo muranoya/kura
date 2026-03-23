@@ -46,6 +46,7 @@ pub fn run() {
             // Sync
             commands::sync::sync_vault,
             commands::sync::push_vault,
+            commands::sync::download_vault,
             commands::sync::resolve_conflict,
             // Storage
             commands::storage::read_vault_file,

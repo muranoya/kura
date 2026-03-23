@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import { getFromStorage } from '../../shared/storage'
@@ -9,7 +9,7 @@ import { Badge } from '../../components/ui/badge'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { EmptyState } from '../../components/layout/EmptyState'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { KeyRound, Building2, Terminal, FileText, CreditCard, Star, Plus, Trash2 } from 'lucide-react'
+import { KeyRound, Building2, Terminal, FileText, CreditCard, Star, Plus, Trash2, Search, X } from 'lucide-react'
 
 const getEntryIcon = (type: string) => {
   switch (type) {
@@ -40,28 +40,53 @@ const getTypeLabel = (type: string): string => {
   return labels[type] || type
 }
 
-export default function EntryList() {
+interface EntryListProps {
+  onlyFavorites?: boolean
+}
+
+export default function EntryList({ onlyFavorites = false }: EntryListProps) {
   const navigate = useNavigate()
   const [entries, setEntries] = useState<EntryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     loadEntries()
-  }, [])
+  }, [onlyFavorites, searchQuery])
 
   const loadEntries = async () => {
     try {
       setLoading(true)
-      const data = await commands.listEntries()
+      console.log('DEBUG: loadEntries called with onlyFavorites=', onlyFavorites, 'searchQuery=', searchQuery)
+      const data = await commands.listEntries({ onlyFavorites, searchQuery: searchQuery || undefined })
+      console.log('DEBUG: received entries count=', data.length, 'filter onlyFavorites=', onlyFavorites, 'searchQuery=', searchQuery)
       setEntries(data)
     } catch (err) {
-      setError(`エントリ読み込み失敗: ${err}`)
+      setError(`アイテム読み込み失敗: ${err}`)
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+
+    // Debounceを使ってタイピング中の過剰なAPI呼び出しを防ぐ
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      // loadEntriesはuseEffectで自動的に呼ばれるので、ここでは何もしない
+    }, 300)
+  }
+
+  const clearSearch = () => {
+    setSearchQuery('')
   }
 
   const handleFavorite = async (id: string, currentFavorite: boolean) => {
@@ -76,11 +101,12 @@ export default function EntryList() {
         await commands.pushVault(JSON.stringify(s3Config))
       }
 
-      setEntries(entries.map(e =>
+      const updated = entries.map(e =>
         e.id === id ? { ...e, isFavorite: !currentFavorite } : e
-      ))
+      )
+      setEntries(updated)
     } catch (err) {
-      setError(`お気に入い変更失敗: ${err}`)
+      setError(`お気に入り変更失敗: ${err}`)
     }
   }
 
@@ -97,6 +123,7 @@ export default function EntryList() {
         await commands.pushVault(JSON.stringify(s3Config))
       }
 
+      // お気に入りビューで削除された場合、リストから削除する
       setEntries(entries.filter(e => e.id !== deleteTargetId))
       setDeleteDialogOpen(false)
       setDeleteTargetId(null)
@@ -113,19 +140,46 @@ export default function EntryList() {
   return (
     <div className="h-full flex flex-col bg-bg-base">
       <PageHeader
-        title="エントリ一覧"
+        title={onlyFavorites ? 'お気に入り' : 'アイテム一覧'}
         action={
-          <Button
-            onClick={() => navigate('/entries/create')}
-            className="gap-2"
-          >
-            <Plus size={18} />
-            <span>新規作成</span>
-          </Button>
+          !onlyFavorites && (
+            <Button
+              onClick={() => navigate('/entries/create')}
+              className="gap-2"
+            >
+              <Plus size={18} />
+              <span>新規作成</span>
+            </Button>
+          )
         }
       />
 
       <div className="flex-1 overflow-auto p-6">
+        {/* 検索ボックス */}
+        {!onlyFavorites && (
+          <div className="mb-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted" size={18} />
+              <input
+                type="text"
+                placeholder="名前、メモ、カスタムフィールド名で検索..."
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="w-full pl-10 pr-10 py-2 rounded-md border border-border-primary bg-bg-input text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
+              />
+              {searchQuery && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
+                  title="検索をクリア"
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* エラーメッセージ */}
         {error && (
           <div className="mb-6 p-4 rounded-md bg-danger/10 border border-danger/20">
@@ -137,17 +191,23 @@ export default function EntryList() {
           <EmptyState
             icon="⏳"
             title="読み込み中..."
-            description="エントリを読み込んでいます"
+            description="アイテムを読み込んでいます"
           />
         ) : entries.length === 0 ? (
           <EmptyState
-            icon="🔑"
-            title="エントリがありません"
-            description="新規作成ボタンからエントリを追加してください"
+            icon={onlyFavorites ? '⭐' : '🔑'}
+            title={onlyFavorites ? 'お気に入りがありません' : 'アイテムがありません'}
+            description={
+              onlyFavorites
+                ? 'お気に入りに登録したアイテムがここに表示されます'
+                : '新規作成ボタンからアイテムを追加してください'
+            }
             action={
-              <Button onClick={() => navigate('/entries/create')}>
-                最初のエントリを作成
-              </Button>
+              !onlyFavorites && (
+                <Button onClick={() => navigate('/entries/create')}>
+                  最初のアイテムを作成
+                </Button>
+              )
             }
           />
         ) : (

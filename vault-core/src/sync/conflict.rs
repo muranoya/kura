@@ -47,10 +47,12 @@ mod tests {
             created_at: 1000,
             updated_at: 1000,
             deleted_at: None,
+            purged_at: None,
             is_favorite: false,
             label_ids: vec![],
             typed_value: serde_json::json!({}),
             notes: None,
+            custom_fields: None,
         }
     }
 

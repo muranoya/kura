@@ -43,6 +43,7 @@ export async function listEntries(filter?: EntryFilter): Promise<EntryRow[]> {
     entryType: filter?.type ?? null,
     labelId: filter?.labelId ?? null,
     includeTrash: filter?.includeTrash ?? false,
+    onlyFavorites: filter?.onlyFavorites ?? false,
   })
 }
 
@@ -198,6 +199,10 @@ export async function syncVault(storageConfig: string): Promise<{
 
 export async function pushVault(storageConfig: string): Promise<void> {
   return invoke<void>('push_vault', { storageConfig })
+}
+
+export async function downloadVault(storageConfig: string): Promise<boolean> {
+  return invoke<boolean>('download_vault', { storageConfig })
 }
 
 export async function resolveConflict(id: string, resolution: string): Promise<void> {

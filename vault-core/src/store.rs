@@ -23,6 +23,9 @@ pub struct VaultContents {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LabelValue {
     pub name: String,
+    /// Tombstone marker for deleted labels (no soft-delete for labels)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub deleted_at: Option<i64>,
 }
 
 /// Entry value in the vault
@@ -34,10 +37,17 @@ pub struct VaultEntry {
     pub created_at: i64,
     pub updated_at: i64,
     pub deleted_at: Option<i64>,
+    /// Tombstone marker for purged entries. Combined with deleted_at:
+    /// - (None, None) = active
+    /// - (Some, None) = soft-deleted (in trash)
+    /// - (Some, Some) = purged (tombstone)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub purged_at: Option<i64>,
     pub is_favorite: bool,
     pub label_ids: Vec<String>,
     pub typed_value: serde_json::Value,
     pub notes: Option<String>,
+    pub custom_fields: Option<Vec<crate::models::entry_data::CustomField>>,
 }
 
 impl VaultContents {

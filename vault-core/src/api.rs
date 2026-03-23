@@ -184,6 +184,7 @@ pub fn api_list_entries(
     entry_type: Option<String>,
     label_id: Option<String>,
     include_trash: bool,
+    only_favorites: bool,
 ) -> Result<Vec<DartEntryRow>, String> {
     let session = VAULT_SESSION.lock().unwrap();
     let unlocked = match session.as_ref() {
@@ -203,6 +204,10 @@ pub fn api_list_entries(
 
     if let Some(l) = label_id {
         filter = filter.with_label(l);
+    }
+
+    if only_favorites {
+        filter = filter.favorites_only();
     }
 
     let entries = unlocked.list_entries(&filter)
@@ -665,6 +670,61 @@ pub async fn api_push(storage_config: String) -> Result<(), String> {
         }
 
         Ok(())
+    }
+
+    #[cfg(not(feature = "storage-s3"))]
+    {
+        Err("S3 support not compiled in".to_string())
+    }
+}
+
+/// S3からVaultをダウンロードしてセッションにロード
+#[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
+pub async fn api_download(storage_config: String) -> Result<bool, String> {
+    // Parse storage config as JSON map first
+    let mut config_map: serde_json::Map<String, serde_json::Value> =
+        serde_json::from_str(&storage_config)
+            .map_err(|e| format!("Failed to parse S3 config: {}", e))?;
+
+    // Add default key if not present
+    if !config_map.contains_key("key") {
+        config_map.insert("key".to_string(), serde_json::Value::String("vault.json".to_string()));
+    }
+
+    // Now parse into S3Config
+    let s3_config: S3Config = serde_json::from_value(serde_json::Value::Object(config_map))
+        .map_err(|e| format!("Failed to parse S3 config: {}", e))?;
+
+    s3_config.validate()
+        .map_err(|e| format!("Invalid S3 config: {}", e))?;
+
+    // Create S3 storage backend and download
+    #[cfg(feature = "storage-s3")]
+    {
+        use crate::storage::StorageBackend;
+        let s3_storage = crate::storage::s3::S3Storage::new(s3_config)
+            .await
+            .map_err(|e| format!("Failed to create S3 storage: {}", e))?;
+
+        match s3_storage.download()
+            .await
+            .map_err(|e| format!("S3 download failed: {}", e))?
+        {
+            Some((vault_bytes, etag)) => {
+                // Load vault into session
+                let locked_vault = LockedVault::open(vault_bytes, Some(etag))
+                    .map_err(|e| format!("Failed to open vault: {}", e))?;
+
+                let mut session = VAULT_SESSION.lock().unwrap();
+                *session = Some(SessionState::Locked(locked_vault));
+
+                Ok(true)
+            }
+            None => {
+                // File does not exist
+                Ok(false)
+            }
+        }
     }
 
     #[cfg(not(feature = "storage-s3"))]
