@@ -452,6 +452,19 @@ pub fn api_delete_label(id: String) -> Result<(), String> {
     }
 }
 
+/// ラベル名変更
+#[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
+pub fn api_rename_label(id: String, new_name: String) -> Result<(), String> {
+    let mut session = VAULT_SESSION.lock().unwrap();
+
+    if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
+        unlocked.rename_label(&id, new_name)
+            .map_err(|e| format!("Failed to rename label: {}", e))
+    } else {
+        Err("Vault not unlocked".to_string())
+    }
+}
+
 /// エントリにラベルを紐付け
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_set_entry_labels(entry_id: String, label_ids: Vec<String>) -> Result<(), String> {

@@ -266,3 +266,160 @@ fn test_change_master_password() {
         "Should not unlock with old password after change"
     );
 }
+
+#[test]
+fn test_delete_label_removes_label_id_from_entry() {
+    let master_password = "password";
+    let locked = LockedVault::create_new(master_password).expect("Failed to create vault");
+    let mut unlocked = locked.unlock(master_password).expect("Failed to unlock");
+
+    // Create label
+    let label = unlocked
+        .create_label("test_label".to_string())
+        .expect("Failed to create label");
+
+    // Create entry with the label
+    let entry = unlocked
+        .create_entry(
+            "Test Entry".to_string(),
+            EntryType::Login,
+            EntryData::new_login(
+                Some("https://example.com".to_string()),
+                "user".to_string(),
+                "password".to_string(),
+                None,
+                None,
+            ),
+            vec![label.id.clone()],
+        )
+        .expect("Failed to create entry");
+
+    let entry_id = entry.id.clone();
+
+    // Verify entry has the label
+    let entry_before = unlocked
+        .get_entry(&entry_id)
+        .expect("Failed to get entry")
+        .expect("Entry not found");
+    assert_eq!(entry_before.labels.len(), 1, "Entry should have 1 label");
+    assert_eq!(entry_before.labels[0], label.id, "Entry should have the created label");
+
+    // Delete label
+    unlocked
+        .delete_label(&label.id)
+        .expect("Failed to delete label");
+
+    // Verify entry no longer has the label
+    let entry_after = unlocked
+        .get_entry(&entry_id)
+        .expect("Failed to get entry")
+        .expect("Entry not found");
+    assert_eq!(entry_after.labels.len(), 0, "Entry should have no labels after label deletion");
+}
+
+#[test]
+fn test_delete_label_affects_all_entries_with_label() {
+    let master_password = "password";
+    let locked = LockedVault::create_new(master_password).expect("Failed to create vault");
+    let mut unlocked = locked.unlock(master_password).expect("Failed to unlock");
+
+    // Create two labels
+    let label_to_delete = unlocked
+        .create_label("to_delete".to_string())
+        .expect("Failed to create label");
+
+    let other_label = unlocked
+        .create_label("other".to_string())
+        .expect("Failed to create label");
+
+    // Create entry 1 with label_to_delete
+    let entry1 = unlocked
+        .create_entry(
+            "Entry 1".to_string(),
+            EntryType::Login,
+            EntryData::new_login(
+                Some("https://example1.com".to_string()),
+                "user1".to_string(),
+                "pass1".to_string(),
+                None,
+                None,
+            ),
+            vec![label_to_delete.id.clone()],
+        )
+        .expect("Failed to create entry 1");
+
+    // Create entry 2 with both labels
+    let entry2 = unlocked
+        .create_entry(
+            "Entry 2".to_string(),
+            EntryType::Login,
+            EntryData::new_login(
+                Some("https://example2.com".to_string()),
+                "user2".to_string(),
+                "pass2".to_string(),
+                None,
+                None,
+            ),
+            vec![label_to_delete.id.clone(), other_label.id.clone()],
+        )
+        .expect("Failed to create entry 2");
+
+    // Create entry 3 with other_label only (should not be affected)
+    let entry3 = unlocked
+        .create_entry(
+            "Entry 3".to_string(),
+            EntryType::Login,
+            EntryData::new_login(
+                Some("https://example3.com".to_string()),
+                "user3".to_string(),
+                "pass3".to_string(),
+                None,
+                None,
+            ),
+            vec![other_label.id.clone()],
+        )
+        .expect("Failed to create entry 3");
+
+    let entry1_id = entry1.id.clone();
+    let entry2_id = entry2.id.clone();
+    let entry3_id = entry3.id.clone();
+
+    // Delete the label
+    unlocked
+        .delete_label(&label_to_delete.id)
+        .expect("Failed to delete label");
+
+    // Verify entry 1 has no labels
+    let entry1_after = unlocked
+        .get_entry(&entry1_id)
+        .expect("Failed to get entry 1")
+        .expect("Entry 1 not found");
+    assert_eq!(entry1_after.labels.len(), 0, "Entry 1 should have no labels");
+
+    // Verify entry 2 only has other_label
+    let entry2_after = unlocked
+        .get_entry(&entry2_id)
+        .expect("Failed to get entry 2")
+        .expect("Entry 2 not found");
+    assert_eq!(entry2_after.labels.len(), 1, "Entry 2 should have 1 label");
+    assert_eq!(entry2_after.labels[0], other_label.id, "Entry 2 should only have other_label");
+
+    // Verify entry 3 is unaffected
+    let entry3_after = unlocked
+        .get_entry(&entry3_id)
+        .expect("Failed to get entry 3")
+        .expect("Entry 3 not found");
+    assert_eq!(entry3_after.labels.len(), 1, "Entry 3 should still have 1 label");
+    assert_eq!(entry3_after.labels[0], other_label.id, "Entry 3 should still have other_label");
+}
+
+#[test]
+fn test_delete_label_not_found_returns_error() {
+    let master_password = "password";
+    let locked = LockedVault::create_new(master_password).expect("Failed to create vault");
+    let mut unlocked = locked.unlock(master_password).expect("Failed to unlock");
+
+    // Try to delete non-existent label
+    let result = unlocked.delete_label("non_existent_label_id");
+    assert!(result.is_err(), "Should return error when deleting non-existent label");
+}

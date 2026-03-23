@@ -1,4 +1,6 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { CustomField, CustomFieldType, Label } from '../../shared/types'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -8,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Plus, Trash2 } from 'lucide-react'
+import { getEntryTypeLabel } from '../../shared/constants'
 
 export interface EntryFormProps {
   mode: 'create' | 'edit'
@@ -27,6 +30,44 @@ export interface EntryFormProps {
   error?: string
 }
 
+const markdownComponents = {
+  h1: ({ children }: any) => <h1 className="text-2xl font-bold text-text-primary mt-4 mb-2">{children}</h1>,
+  h2: ({ children }: any) => <h2 className="text-xl font-bold text-text-primary mt-3 mb-2">{children}</h2>,
+  h3: ({ children }: any) => <h3 className="text-lg font-bold text-text-primary mt-2 mb-2">{children}</h3>,
+  p: ({ children }: any) => <p className="text-text-primary mb-3 leading-relaxed">{children}</p>,
+  ul: ({ children }: any) => <ul className="list-disc list-inside text-text-primary mb-3 space-y-1">{children}</ul>,
+  ol: ({ children }: any) => <ol className="list-decimal list-inside text-text-primary mb-3 space-y-1">{children}</ol>,
+  li: ({ children }: any) => <li className="text-text-primary">{children}</li>,
+  code: ({ inline, children }: any) =>
+    inline ? (
+      <code className="bg-bg-elevated px-1.5 py-0.5 rounded text-sm font-mono text-text-primary">{children}</code>
+    ) : (
+      <code className="block bg-bg-elevated p-3 rounded text-sm font-mono text-text-primary overflow-x-auto mb-3">{children}</code>
+    ),
+  pre: ({ children }: any) => <pre className="bg-bg-elevated p-3 rounded text-sm font-mono text-text-primary overflow-x-auto mb-3">{children}</pre>,
+  blockquote: ({ children }: any) => (
+    <blockquote className="border-l-4 border-accent pl-3 py-1 text-text-secondary italic mb-3">{children}</blockquote>
+  ),
+  a: ({ href, children }: any) => (
+    <a href={href} className="text-accent hover:text-accent-hover underline break-all" target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  ),
+  strong: ({ children }: any) => <strong className="font-bold text-text-primary">{children}</strong>,
+  em: ({ children }: any) => <em className="italic text-text-primary">{children}</em>,
+  hr: () => <hr className="border-border my-4" />,
+  table: ({ children }: any) => (
+    <table className="border-collapse border border-border w-full mb-3 text-sm">
+      {children}
+    </table>
+  ),
+  thead: ({ children }: any) => <thead className="bg-bg-elevated">{children}</thead>,
+  tbody: ({ children }: any) => <tbody>{children}</tbody>,
+  tr: ({ children }: any) => <tr className="border border-border">{children}</tr>,
+  th: ({ children }: any) => <th className="border border-border p-2 text-text-primary font-bold text-left">{children}</th>,
+  td: ({ children }: any) => <td className="border border-border p-2 text-text-primary">{children}</td>,
+}
+
 export default function EntryForm({
   mode,
   entryType,
@@ -44,6 +85,8 @@ export default function EntryForm({
   onSelectedLabelIdsChange,
   error,
 }: EntryFormProps) {
+  const [secureNotePreviewMode, setSecureNotePreviewMode] = useState(false)
+
   const updateTypedValue = useCallback((key: string, value: any) => {
     onTypedValueChange(key, value)
   }, [onTypedValueChange])
@@ -167,14 +210,50 @@ export default function EntryForm({
         )
       case 'secure_note':
         return (
-          <div>
-            <UILabel htmlFor="content">内容</UILabel>
-            <Textarea
-              id="content"
-              value={v.content || ''}
-              onChange={(e) => updateTypedValue('content', e.target.value)}
-              className="min-h-64"
-            />
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <UILabel htmlFor="content">内容</UILabel>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSecureNotePreviewMode(false)}
+                    className={`px-3 py-1 text-sm rounded transition-colors ${
+                      !secureNotePreviewMode
+                        ? 'bg-accent text-text-primary'
+                        : 'bg-bg-elevated text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    編集
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSecureNotePreviewMode(true)}
+                    className={`px-3 py-1 text-sm rounded transition-colors ${
+                      secureNotePreviewMode
+                        ? 'bg-accent text-text-primary'
+                        : 'bg-bg-elevated text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    プレビュー
+                  </button>
+                </div>
+              </div>
+              {!secureNotePreviewMode ? (
+                <Textarea
+                  id="content"
+                  value={v.content || ''}
+                  onChange={(e) => updateTypedValue('content', e.target.value)}
+                  className="min-h-64"
+                />
+              ) : (
+                <div className="p-3 rounded-md bg-bg-elevated border border-border text-text-primary min-h-64 overflow-y-auto">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                    {v.content || ''}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
           </div>
         )
       case 'credit_card':
@@ -221,7 +300,7 @@ export default function EntryForm({
       default:
         return null
     }
-  }, [entryType, typedValue, updateTypedValue])
+  }, [entryType, typedValue, updateTypedValue, secureNotePreviewMode])
 
   const renderCustomFields = useCallback(() => {
     return (
@@ -328,7 +407,7 @@ export default function EntryForm({
                 </SelectContent>
               </Select>
             ) : (
-              <Badge variant="secondary">{entryType}</Badge>
+              <Badge variant="secondary">{getEntryTypeLabel(entryType)}</Badge>
             )}
           </div>
           <div>

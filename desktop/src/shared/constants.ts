@@ -8,11 +8,16 @@ export const ENTRY_TYPE_LABELS: Record<string, string> = {
   passkey: 'PassKey',
 }
 
+export function getEntryTypeLabel(type: string): string {
+  return ENTRY_TYPE_LABELS[type] ?? type
+}
+
 // Default app settings
 export const DEFAULT_SETTINGS = {
   clipboardClearSeconds: 30,
   autolockMinutes: 5,
   autolockOnBackground: true,
+  theme: 'light' as const,
 }
 
 // Storage keys

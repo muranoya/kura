@@ -33,6 +33,7 @@ pub fn run() {
             commands::labels::list_labels,
             commands::labels::create_label,
             commands::labels::delete_label,
+            commands::labels::rename_label,
             commands::labels::set_entry_labels,
             // Security
             commands::security::change_master_password,

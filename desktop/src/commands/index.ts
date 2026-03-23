@@ -119,6 +119,10 @@ export async function deleteLabel(id: string): Promise<void> {
   return invoke<void>('delete_label', { id })
 }
 
+export async function renameLabel(id: string, newName: string): Promise<void> {
+  return invoke<void>('rename_label', { id, newName })
+}
+
 export async function setEntryLabels(entryId: string, labelIds: string[]): Promise<void> {
   return invoke<void>('set_entry_labels', { entryId, labelIds })
 }

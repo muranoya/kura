@@ -10,7 +10,7 @@ import { Badge } from '../../components/ui/badge'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { EmptyState } from '../../components/layout/EmptyState'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Pencil, X, Check } from 'lucide-react'
 
 export default function LabelManager() {
   const navigate = useNavigate()
@@ -21,6 +21,8 @@ export default function LabelManager() {
   const [creating, setCreating] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
+  const [editingLabelId, setEditingLabelId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
 
   useEffect(() => {
     loadLabels()
@@ -86,6 +88,39 @@ export default function LabelManager() {
     setDeleteDialogOpen(true)
   }
 
+  const handleEditStart = (label: Label) => {
+    setEditingLabelId(label.id)
+    setEditingName(label.name)
+  }
+
+  const handleEditCancel = () => {
+    setEditingLabelId(null)
+    setEditingName('')
+  }
+
+  const handleEditSave = useCallback(async () => {
+    if (!editingLabelId || !editingName.trim()) {
+      setError('ラベル名を入力してください')
+      return
+    }
+
+    try {
+      await commands.renameLabel(editingLabelId, editingName)
+      const vaultBytes = await commands.getVaultBytes()
+      await commands.writeVaultFile(vaultBytes)
+      const s3Config = await getFromStorage<any>('s3Config')
+      if (s3Config) {
+        await commands.pushVault(JSON.stringify(s3Config))
+      }
+      setLabels(labels.map(l => l.id === editingLabelId ? { ...l, name: editingName } : l))
+      setEditingLabelId(null)
+      setEditingName('')
+      setError('')
+    } catch (err) {
+      setError(`ラベル更新失敗: ${err}`)
+    }
+  }, [editingLabelId, editingName, labels])
+
   return (
     <div className="min-h-screen bg-bg-base">
       <PageHeader title="ラベル管理" />
@@ -103,7 +138,7 @@ export default function LabelManager() {
           <CardHeader>
             <CardTitle>新規ラベル</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pb-4">
             <div className="flex gap-3">
               <Input
                 value={newLabelName}
@@ -115,7 +150,7 @@ export default function LabelManager() {
               <Button
                 onClick={handleCreateLabel}
                 disabled={creating || !newLabelName.trim()}
-                className="gap-2"
+                className="gap-2 whitespace-nowrap"
               >
                 <Plus size={18} />
                 {creating ? '作成中...' : '作成'}
@@ -139,16 +174,69 @@ export default function LabelManager() {
                   key={label.id}
                   className="flex items-center justify-between p-4 rounded-lg bg-bg-surface border border-border hover:border-accent/50 transition-colors"
                 >
-                  <Badge variant="primary">{label.name}</Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteLabelClick(label.id)}
-                    className="text-danger hover:text-danger gap-1"
-                  >
-                    <Trash2 size={16} />
-                    削除
-                  </Button>
+                  {editingLabelId === label.id ? (
+                    <Input
+                      autoFocus
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleEditSave()
+                        } else if (e.key === 'Escape') {
+                          handleEditCancel()
+                        }
+                      }}
+                      className="flex-1 mr-2"
+                      placeholder="ラベル名"
+                    />
+                  ) : (
+                    <Badge variant="primary">{label.name}</Badge>
+                  )}
+                  <div className="flex gap-2">
+                    {editingLabelId === label.id ? (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleEditSave}
+                          className="text-success hover:text-success"
+                          title="保存"
+                        >
+                          <Check size={16} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleEditCancel}
+                          className="text-text-secondary hover:text-text-primary"
+                          title="キャンセル"
+                        >
+                          <X size={16} />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditStart(label)}
+                          className="text-accent hover:text-accent"
+                          title="編集"
+                        >
+                          <Pencil size={16} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteLabelClick(label.id)}
+                          className="text-danger hover:text-danger"
+                          title="削除"
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

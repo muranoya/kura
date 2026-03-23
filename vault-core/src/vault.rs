@@ -317,6 +317,14 @@ impl UnlockedVault {
         Ok(())
     }
 
+    /// Rename label
+    pub fn rename_label(&mut self, id: &str, new_name: String) -> Result<()> {
+        let label = self.contents.labels.get_mut(id)
+            .ok_or_else(|| VaultError::LabelNotFound(id.to_string()))?;
+        label.name = new_name;
+        Ok(())
+    }
+
     /// Set entry labels
     pub fn set_entry_labels(&mut self, entry_id: &str, label_ids: Vec<String>) -> Result<()> {
         let entry = self.contents.entries.get_mut(entry_id)

@@ -32,6 +32,13 @@ pub async fn delete_label(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn rename_label(id: String, new_name: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || api_rename_label(id, new_name))
+        .await
+        .map_err(|e| format!("Task error: {}", e))?
+}
+
+#[tauri::command]
 pub async fn set_entry_labels(entry_id: String, label_ids: Vec<String>) -> Result<(), String> {
     tokio::task::spawn_blocking(move || api_set_entry_labels(entry_id, label_ids))
         .await

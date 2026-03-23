@@ -59,6 +59,7 @@ export interface AppSettings {
   clipboardClearSeconds: number
   autolockMinutes: number
   autolockOnBackground: boolean
+  theme?: 'light' | 'dark'
 }
 
 // Sync conflict

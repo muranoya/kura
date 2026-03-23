@@ -1,29 +1,29 @@
 @import "tailwindcss";
 
-@theme {
+@theme inline {
   /* 背景 */
-  --color-bg-base: #0f1117;
-  --color-bg-surface: #1a1d27;
-  --color-bg-elevated: #232736;
-  --color-bg-sidebar: #13151f;
+  --color-bg-base: var(--bg-base);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-sidebar: var(--bg-sidebar);
 
   /* テキスト */
-  --color-text-primary: #f0f2f5;
-  --color-text-secondary: #8b92a9;
-  --color-text-muted: #4a5068;
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
 
   /* アクセント（インディゴ: 信頼感） */
-  --color-accent: #6366f1;
-  --color-accent-hover: #4f52d1;
-  --color-accent-subtle: #1e2045;
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-subtle: var(--accent-subtle);
 
   /* ボーダー */
-  --color-border: #2a2f45;
-  --color-border-strong: #3d4460;
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
 
   /* セマンティック */
-  --color-danger: #ef4444;
-  --color-success: #22c55e;
+  --color-danger: var(--danger);
+  --color-success: var(--success);
 
   /* フォント */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
@@ -31,6 +31,42 @@
 
   /* サイズ */
   --sidebar-width: 220px;
+}
+
+/* ライトモード（デフォルト） */
+:root {
+  --bg-base: #f5f6f8;
+  --bg-surface: #ffffff;
+  --bg-elevated: #ebedf2;
+  --bg-sidebar: #eff0f3;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+  --accent: #6366f1;
+  --accent-hover: #4f52d1;
+  --accent-subtle: #eef2ff;
+  --border: #e2e4eb;
+  --border-strong: #c8ccd8;
+  --danger: #ef4444;
+  --success: #22c55e;
+}
+
+/* ダークモード */
+html.dark {
+  --bg-base: #0f1117;
+  --bg-surface: #1a1d27;
+  --bg-elevated: #232736;
+  --bg-sidebar: #13151f;
+  --text-primary: #f0f2f5;
+  --text-secondary: #8b92a9;
+  --text-muted: #4a5068;
+  --accent: #6366f1;
+  --accent-hover: #4f52d1;
+  --accent-subtle: #1e2045;
+  --border: #2a2f45;
+  --border-strong: #3d4460;
+  --danger: #ef4444;
+  --success: #22c55e;
 }
 
 html,
