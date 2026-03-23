@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getFromStorage } from '../../shared/storage'
-import { Card, CardContent } from '../../components/ui/card'
-import { PageHeader } from '../../components/layout/PageHeader'
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { CheckCircle2 } from 'lucide-react'
 
 export default function SyncStatus() {
@@ -25,10 +24,14 @@ export default function SyncStatus() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-bg-base">
-      <PageHeader title="同期状態" />
+    <div className="flex flex-col h-screen bg-bg-base">
+      {/* sticky ヘッダー */}
+      <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
+        <h1 className="text-sm font-semibold text-text-primary">同期状態</h1>
+      </div>
 
-      <div className="max-w-2xl mx-auto p-6 space-y-6">
+      {/* コンテンツ */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
@@ -44,8 +47,11 @@ export default function SyncStatus() {
         </Card>
 
         {/* ストレージ設定 */}
-        <div>
-          <h2 className="text-lg font-semibold text-text-primary mb-4">ストレージ設定</h2>
+        <Card>
+          <CardHeader className="px-3 py-2">
+            <CardTitle className="text-sm font-medium">ストレージ設定</CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3 pt-2">
           {loading ? (
             <Card>
               <CardContent className="py-8 text-center text-text-muted">読み込み中...</CardContent>
@@ -80,7 +86,8 @@ export default function SyncStatus() {
               </CardContent>
             </Card>
           )}
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

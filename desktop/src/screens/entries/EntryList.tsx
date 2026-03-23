@@ -6,7 +6,6 @@ import { EntryRow } from '../../shared/types'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { Badge } from '../../components/ui/badge'
-import { PageHeader } from '../../components/layout/PageHeader'
 import { EmptyState } from '../../components/layout/EmptyState'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { KeyRound, Building2, Terminal, FileText, CreditCard, Star, Plus, Trash2, Search, X } from 'lucide-react'
@@ -138,26 +137,27 @@ export default function EntryList({ onlyFavorites = false }: EntryListProps) {
   }
 
   return (
-    <div className="h-full flex flex-col bg-bg-base">
-      <PageHeader
-        title={onlyFavorites ? 'お気に入り' : 'アイテム一覧'}
-        action={
-          !onlyFavorites && (
-            <Button
-              onClick={() => navigate('/entries/create')}
-              className="gap-2"
-            >
-              <Plus size={18} />
-              <span>新規作成</span>
-            </Button>
-          )
-        }
-      />
+    <div className="flex flex-col h-screen bg-bg-base">
+      {/* sticky ヘッダー */}
+      <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
+        <h1 className="text-sm font-semibold text-text-primary flex-1">{onlyFavorites ? 'お気に入り' : 'アイテム一覧'}</h1>
+        {!onlyFavorites && (
+          <Button
+            onClick={() => navigate('/entries/create')}
+            size="sm"
+            className="gap-2"
+          >
+            <Plus size={18} />
+            新規作成
+          </Button>
+        )}
+      </div>
 
-      <div className="flex-1 overflow-auto p-6">
+      {/* コンテンツ */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {/* 検索ボックス */}
         {!onlyFavorites && (
-          <div className="mb-6">
+          <div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted" size={18} />
               <input
@@ -182,7 +182,7 @@ export default function EntryList({ onlyFavorites = false }: EntryListProps) {
 
         {/* エラーメッセージ */}
         {error && (
-          <div className="mb-6 p-4 rounded-md bg-danger/10 border border-danger/20">
+          <div className="mb-3 p-3 rounded-md bg-danger/10 border border-danger/20">
             <p className="text-sm text-danger">{error}</p>
           </div>
         )}
@@ -211,21 +211,21 @@ export default function EntryList({ onlyFavorites = false }: EntryListProps) {
             }
           />
         ) : (
-          <div className="grid gap-4 max-w-4xl">
+          <div className="space-y-3">
             {entries.map((entry) => (
               <Card
                 key={entry.id}
-                className="p-4 hover:border-accent/50 transition-colors cursor-pointer group"
+                className="p-3 hover:border-accent/50 transition-colors cursor-pointer group"
                 onClick={() => navigate(`/entries/${entry.id}`)}
               >
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-3">
                   {/* 左側: アイコン + 名前 */}
-                  <div className="flex items-center gap-4 min-w-0 flex-1">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
                       {getEntryIcon(entry.entryType)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-base font-semibold text-text-primary truncate">
+                      <h3 className="text-sm font-semibold text-text-primary truncate">
                         {entry.name}
                       </h3>
                       <div className="flex items-center gap-2 mt-1">

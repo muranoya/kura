@@ -2,9 +2,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import * as commands from '../../commands'
 import { getFromStorage } from '../../shared/storage'
-import { Entry, Label } from '../../shared/types'
+import { Entry, Label, CustomField } from '../../shared/types'
 import { Button } from '../../components/ui/button'
-import { PageHeader } from '../../components/layout/PageHeader'
 import EntryForm from '../../components/entries/EntryForm'
 
 export default function EntryEdit() {
@@ -72,14 +71,32 @@ export default function EntryEdit() {
 
 
 
-  if (loading) return <div className="p-6 text-center text-text-secondary">読み込み中...</div>
-  if (!entry) return <div className="p-6 text-center text-danger">アイテムが見つかりません</div>
+  if (loading) return <div className="flex items-center justify-center h-screen text-text-secondary">読み込み中...</div>
+  if (!entry) return <div className="flex items-center justify-center h-screen text-danger">アイテムが見つかりません</div>
 
   return (
-    <div className="min-h-screen bg-bg-base">
-      <PageHeader title="アイテム編集" />
+    <div className="flex flex-col h-screen bg-bg-base">
+      {/* sticky ヘッダー */}
+      <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
+        <h1 className="text-sm font-semibold text-text-primary flex-1">アイテム編集</h1>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => navigate(`/entries/${id}`)}
+        >
+          キャンセル
+        </Button>
+        <Button
+          size="sm"
+          onClick={handleSave}
+          disabled={saving}
+        >
+          {saving ? '保存中...' : '保存'}
+        </Button>
+      </div>
 
-      <div className="max-w-2xl mx-auto p-6">
+      {/* フォーム */}
+      <div className="flex-1 overflow-y-auto p-3">
         <EntryForm
           mode="edit"
           entryType={entry.entryType}
@@ -96,24 +113,6 @@ export default function EntryEdit() {
           onSelectedLabelIdsChange={setSelectedLabelIds}
           error={error}
         />
-
-        {/* アクション */}
-        <div className="flex gap-3">
-          <Button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1"
-          >
-            {saving ? '保存中...' : '保存'}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => navigate(`/entries/${id}`)}
-            className="flex-1"
-          >
-            キャンセル
-          </Button>
-        </div>
       </div>
     </div>
   )

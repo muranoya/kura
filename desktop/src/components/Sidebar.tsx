@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Separator } from './ui/separator'
-import { KeyRound, Star, Tags, RefreshCw, Settings, Trash2 } from 'lucide-react'
+import { KeyRound, Star, Tags, RefreshCw, Settings, Trash2, Wand2 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
 interface SidebarProps {}
@@ -15,6 +15,7 @@ const navItems: NavItem[] = [
   { icon: <KeyRound size={18} />, label: '全てのアイテム', path: '/entries' },
   { icon: <Star size={18} />, label: 'お気に入り', path: '/favorites' },
   { icon: <Tags size={18} />, label: 'ラベル', path: '/labels' },
+  { icon: <Wand2 size={18} />, label: 'パスワード生成', path: '/password-generator' },
   { icon: <RefreshCw size={18} />, label: '同期', path: '/sync' },
   { icon: <Settings size={18} />, label: '設定', path: '/settings' },
 ]

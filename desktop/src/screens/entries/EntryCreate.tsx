@@ -4,7 +4,6 @@ import * as commands from '../../commands'
 import { getFromStorage } from '../../shared/storage'
 import { Label, CustomField } from '../../shared/types'
 import { Button } from '../../components/ui/button'
-import { PageHeader } from '../../components/layout/PageHeader'
 import EntryForm from '../../components/entries/EntryForm'
 
 export default function EntryCreate() {
@@ -59,10 +58,28 @@ export default function EntryCreate() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-base">
-      <PageHeader title="新規アイテム" />
+    <div className="flex flex-col h-screen bg-bg-base">
+      {/* sticky ヘッダー */}
+      <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
+        <h1 className="text-sm font-semibold text-text-primary flex-1">新規アイテム</h1>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => navigate('/entries')}
+        >
+          キャンセル
+        </Button>
+        <Button
+          size="sm"
+          onClick={handleCreate}
+          disabled={loading}
+        >
+          {loading ? '作成中...' : '作成'}
+        </Button>
+      </div>
 
-      <div className="max-w-2xl mx-auto p-6">
+      {/* フォーム */}
+      <div className="flex-1 overflow-y-auto p-3">
         <EntryForm
           mode="create"
           entryType={entryType}
@@ -79,24 +96,6 @@ export default function EntryCreate() {
           selectedLabelIds={selectedLabelIds}
           onSelectedLabelIdsChange={setSelectedLabelIds}
         />
-
-        {/* アクション */}
-        <div className="flex gap-3">
-          <Button
-            onClick={handleCreate}
-            disabled={loading}
-            className="flex-1"
-          >
-            {loading ? '作成中...' : '作成'}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => navigate('/entries')}
-            className="flex-1"
-          >
-            キャンセル
-          </Button>
-        </div>
       </div>
     </div>
   )

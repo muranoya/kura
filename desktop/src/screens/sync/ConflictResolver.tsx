@@ -1,23 +1,26 @@
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
-import { PageHeader } from '../../components/layout/PageHeader'
 
 export default function ConflictResolver() {
   const navigate = useNavigate()
   return (
-    <div className="min-h-screen bg-bg-base">
-      <PageHeader title="コンフリクト解決" />
+    <div className="flex flex-col h-screen bg-bg-base">
+      {/* sticky ヘッダー */}
+      <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
+        <h1 className="text-sm font-semibold text-text-primary">コンフリクト解決</h1>
+      </div>
 
-      <div className="max-w-2xl mx-auto p-6">
+      {/* コンテンツ */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
         <Card>
-          <CardContent className="pt-6">
-            <p className="text-text-muted mb-6">
+          <CardContent className="px-3 pb-3 pt-2">
+            <p className="text-text-muted mb-3">
               複数デバイスからの同時更新により、ローカルとクラウドストレージ間にコンフリクトが発生しました。
               以下から選択して解決してください。
             </p>
 
-            <Button onClick={() => navigate('/sync')} className="w-full">
+            <Button onClick={() => navigate('/sync')} className="w-full" size="sm">
               戻る
             </Button>
           </CardContent>

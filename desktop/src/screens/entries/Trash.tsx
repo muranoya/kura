@@ -1,17 +1,14 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import { getFromStorage } from '../../shared/storage'
 import { EntryRow } from '../../shared/types'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
-import { PageHeader } from '../../components/layout/PageHeader'
 import { EmptyState } from '../../components/layout/EmptyState'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { RotateCw, Trash2 } from 'lucide-react'
 
 export default function Trash() {
-  const navigate = useNavigate()
   const [entries, setEntries] = useState<EntryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -73,12 +70,16 @@ export default function Trash() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-bg-base">
-      <PageHeader title="ゴミ箱" subtitle="削除済みエントリ" />
+    <div className="flex flex-col h-screen bg-bg-base">
+      {/* sticky ヘッダー */}
+      <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
+        <h1 className="text-sm font-semibold text-text-primary">ゴミ箱</h1>
+      </div>
 
-      <div className="flex-1 overflow-auto p-6">
+      {/* コンテンツ */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {error && (
-          <div className="mb-6 p-4 rounded-md bg-danger/10 border border-danger/20">
+          <div className="mb-3 p-3 rounded-md bg-danger/10 border border-danger/20">
             <p className="text-sm text-danger">{error}</p>
           </div>
         )}
@@ -88,12 +89,12 @@ export default function Trash() {
         ) : entries.length === 0 ? (
           <EmptyState icon="✓" title="ゴミ箱が空です" description="削除済みエントリはありません" />
         ) : (
-          <div className="grid gap-4 max-w-4xl">
+          <div className="space-y-3">
             {entries.map((entry) => (
-              <Card key={entry.id} className="p-4">
-                <div className="flex items-center justify-between gap-4">
+              <Card key={entry.id} className="p-3">
+                <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-base font-semibold text-text-primary truncate">{entry.name}</h3>
+                    <h3 className="text-sm font-semibold text-text-primary truncate">{entry.name}</h3>
                     <p className="text-xs text-text-muted mt-1">
                       削除日時: {entry.deletedAt ? new Date(entry.deletedAt * 1000).toLocaleString('ja-JP') : '-'}
                     </p>

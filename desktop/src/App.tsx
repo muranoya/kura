@@ -13,6 +13,7 @@ import EntryDetail from './screens/entries/EntryDetail'
 import EntryEdit from './screens/entries/EntryEdit'
 import EntryCreate from './screens/entries/EntryCreate'
 import Trash from './screens/entries/Trash'
+import PasswordGenerator from './screens/entries/PasswordGenerator'
 import SyncStatus from './screens/sync/SyncStatus'
 import ConflictResolver from './screens/sync/ConflictResolver'
 import LabelManager from './screens/labels/LabelManager'
@@ -103,6 +104,7 @@ export default function App() {
                   <Route path="/entries/create" element={<EntryCreate />} />
                   <Route path="/entries/:id" element={<EntryDetail />} />
                   <Route path="/entries/:id/edit" element={<EntryEdit />} />
+                  <Route path="/password-generator" element={<PasswordGenerator />} />
                   <Route path="/trash" element={<Trash />} />
                   <Route path="/sync" element={<SyncStatus />} />
                   <Route path="/sync/conflict-resolver" element={<ConflictResolver />} />

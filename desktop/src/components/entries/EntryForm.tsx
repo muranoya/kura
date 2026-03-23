@@ -117,9 +117,9 @@ export default function EntryForm({
     switch (entryType) {
       case 'login':
         return (
-          <div className="space-y-4">
-            <div>
-              <UILabel htmlFor="url">URL</UILabel>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <UILabel htmlFor="url" className="text-xs">URL</UILabel>
               <Input
                 id="url"
                 value={v.url || ''}
@@ -127,16 +127,16 @@ export default function EntryForm({
                 placeholder="https://example.com"
               />
             </div>
-            <div>
-              <UILabel htmlFor="username">ユーザー名</UILabel>
+            <div className="space-y-1">
+              <UILabel htmlFor="username" className="text-xs">ユーザー名</UILabel>
               <Input
                 id="username"
                 value={v.username || ''}
                 onChange={(e) => updateTypedValue('username', e.target.value)}
               />
             </div>
-            <div>
-              <UILabel htmlFor="password">パスワード</UILabel>
+            <div className="space-y-1">
+              <UILabel htmlFor="password" className="text-xs">パスワード</UILabel>
               <Input
                 id="password"
                 type="password"
@@ -144,8 +144,8 @@ export default function EntryForm({
                 onChange={(e) => updateTypedValue('password', e.target.value)}
               />
             </div>
-            <div>
-              <UILabel htmlFor="totp">TOTP（オプション）</UILabel>
+            <div className="space-y-1">
+              <UILabel htmlFor="totp" className="text-xs">TOTP（オプション）</UILabel>
               <Input
                 id="totp"
                 value={v.totp || ''}
@@ -157,25 +157,25 @@ export default function EntryForm({
         )
       case 'bank':
         return (
-          <div className="space-y-4">
-            <div>
-              <UILabel htmlFor="bank_name">銀行名</UILabel>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <UILabel htmlFor="bank_name" className="text-xs">銀行名</UILabel>
               <Input
                 id="bank_name"
                 value={v.bank_name || ''}
                 onChange={(e) => updateTypedValue('bank_name', e.target.value)}
               />
             </div>
-            <div>
-              <UILabel htmlFor="account_number">口座番号</UILabel>
+            <div className="space-y-1">
+              <UILabel htmlFor="account_number" className="text-xs">口座番号</UILabel>
               <Input
                 id="account_number"
                 value={v.account_number || ''}
                 onChange={(e) => updateTypedValue('account_number', e.target.value)}
               />
             </div>
-            <div>
-              <UILabel htmlFor="pin">PIN</UILabel>
+            <div className="space-y-1">
+              <UILabel htmlFor="pin" className="text-xs">PIN</UILabel>
               <Input
                 id="pin"
                 type="password"
@@ -187,9 +187,9 @@ export default function EntryForm({
         )
       case 'ssh_key':
         return (
-          <div className="space-y-4">
-            <div>
-              <UILabel htmlFor="private_key">秘密鍵</UILabel>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <UILabel htmlFor="private_key" className="text-xs">秘密鍵</UILabel>
               <Textarea
                 id="private_key"
                 value={v.private_key || ''}
@@ -197,8 +197,8 @@ export default function EntryForm({
                 className="font-mono text-sm"
               />
             </div>
-            <div>
-              <UILabel htmlFor="passphrase">パスフレーズ（オプション）</UILabel>
+            <div className="space-y-1">
+              <UILabel htmlFor="passphrase" className="text-xs">パスフレーズ（オプション）</UILabel>
               <Input
                 id="passphrase"
                 type="password"
@@ -210,15 +210,15 @@ export default function EntryForm({
         )
       case 'secure_note':
         return (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <UILabel htmlFor="content">内容</UILabel>
+                <UILabel htmlFor="content" className="text-xs">内容</UILabel>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setSecureNotePreviewMode(false)}
-                    className={`px-3 py-1 text-sm rounded transition-colors ${
+                    className={`px-3 py-1 text-xs rounded transition-colors ${
                       !secureNotePreviewMode
                         ? 'bg-accent text-text-primary'
                         : 'bg-bg-elevated text-text-secondary hover:text-text-primary'
@@ -229,7 +229,7 @@ export default function EntryForm({
                   <button
                     type="button"
                     onClick={() => setSecureNotePreviewMode(true)}
-                    className={`px-3 py-1 text-sm rounded transition-colors ${
+                    className={`px-3 py-1 text-xs rounded transition-colors ${
                       secureNotePreviewMode
                         ? 'bg-accent text-text-primary'
                         : 'bg-bg-elevated text-text-secondary hover:text-text-primary'
@@ -244,10 +244,10 @@ export default function EntryForm({
                   id="content"
                   value={v.content || ''}
                   onChange={(e) => updateTypedValue('content', e.target.value)}
-                  className="min-h-64"
+                  className="min-h-40"
                 />
               ) : (
-                <div className="p-3 rounded-md bg-bg-elevated border border-border text-text-primary min-h-64 overflow-y-auto">
+                <div className="p-3 rounded-md bg-bg-elevated border border-border text-text-primary min-h-40 overflow-y-auto">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                     {v.content || ''}
                   </ReactMarkdown>
@@ -258,17 +258,17 @@ export default function EntryForm({
         )
       case 'credit_card':
         return (
-          <div className="space-y-4">
-            <div>
-              <UILabel htmlFor="cardholder">カード名義</UILabel>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <UILabel htmlFor="cardholder" className="text-xs">カード名義</UILabel>
               <Input
                 id="cardholder"
                 value={v.cardholder || ''}
                 onChange={(e) => updateTypedValue('cardholder', e.target.value)}
               />
             </div>
-            <div>
-              <UILabel htmlFor="number">カード番号</UILabel>
+            <div className="space-y-1">
+              <UILabel htmlFor="number" className="text-xs">カード番号</UILabel>
               <Input
                 id="number"
                 value={v.number || ''}
@@ -276,8 +276,8 @@ export default function EntryForm({
                 placeholder="1234 5678 9012 3456"
               />
             </div>
-            <div>
-              <UILabel htmlFor="expiry">有効期限</UILabel>
+            <div className="space-y-1">
+              <UILabel htmlFor="expiry" className="text-xs">有効期限</UILabel>
               <Input
                 id="expiry"
                 value={v.expiry || ''}
@@ -285,8 +285,8 @@ export default function EntryForm({
                 placeholder="MM/YY"
               />
             </div>
-            <div>
-              <UILabel htmlFor="cvv">CVV</UILabel>
+            <div className="space-y-1">
+              <UILabel htmlFor="cvv" className="text-xs">CVV</UILabel>
               <Input
                 id="cvv"
                 type="password"
@@ -304,24 +304,15 @@ export default function EntryForm({
 
   const renderCustomFields = useCallback(() => {
     return (
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-text-primary">カスタムフィールド</h3>
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold text-text-primary">カスタムフィールド</h3>
         {customFields.map((field) => (
-          <Card key={field.id} className="p-4">
-            <div className="space-y-3">
-              <div>
-                <UILabel htmlFor={`field-name-${field.id}`}>フィールド名</UILabel>
-                <Input
-                  id={`field-name-${field.id}`}
-                  value={field.name}
-                  onChange={(e) => updateCustomField(field.id, { name: e.target.value })}
-                  placeholder="例: セキュリティ質問"
-                />
-              </div>
-              <div>
-                <UILabel htmlFor={`field-type-${field.id}`}>フィールド種類</UILabel>
+          <Card key={field.id} className="p-2 space-y-1.5">
+            <div className="flex items-end gap-2">
+              <div className="flex-1 space-y-0.5">
+                <UILabel htmlFor={`field-type-${field.id}`} className="text-xs">種類</UILabel>
                 <Select value={field.fieldType} onValueChange={(value) => updateCustomField(field.id, { fieldType: value as CustomFieldType })}>
-                  <SelectTrigger id={`field-type-${field.id}`}>
+                  <SelectTrigger id={`field-type-${field.id}`} className="h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -333,33 +324,44 @@ export default function EntryForm({
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <UILabel htmlFor={`field-value-${field.id}`}>値</UILabel>
+              <div className="flex-1 space-y-0.5">
+                <UILabel htmlFor={`field-name-${field.id}`} className="text-xs">フィールド名</UILabel>
                 <Input
-                  id={`field-value-${field.id}`}
-                  type={field.fieldType === 'password' ? 'password' : 'text'}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
+                  id={`field-name-${field.id}`}
+                  value={field.name}
+                  onChange={(e) => updateCustomField(field.id, { name: e.target.value })}
+                  placeholder="例: セキュリティ質問"
+                  className="h-8 text-xs"
                 />
               </div>
               <Button
-                variant="destructive"
+                variant="ghost"
                 size="sm"
                 onClick={() => deleteCustomField(field.id)}
-                className="gap-2 w-full"
+                className="p-1 shrink-0 h-8"
               >
-                <Trash2 size={16} />
-                削除
+                <Trash2 size={14} />
               </Button>
+            </div>
+            <div className="space-y-0.5">
+              <UILabel htmlFor={`field-value-${field.id}`} className="text-xs">値</UILabel>
+              <Input
+                id={`field-value-${field.id}`}
+                type={field.fieldType === 'password' ? 'password' : 'text'}
+                value={field.value}
+                onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
+                className="h-8 text-xs"
+              />
             </div>
           </Card>
         ))}
         <Button
           variant="secondary"
+          size="sm"
           onClick={addCustomField}
           className="w-full gap-2"
         >
-          <Plus size={18} />
+          <Plus size={16} />
           フィールドを追加
         </Button>
       </div>
@@ -380,17 +382,17 @@ export default function EntryForm({
   return (
     <>
       {error && (
-        <div className="mb-6 p-4 rounded-md bg-danger/10 border border-danger/20">
+        <div className="mb-3 p-3 rounded-md bg-danger/10 border border-danger/20">
           <p className="text-sm text-danger">{error}</p>
         </div>
       )}
 
       {/* 基本情報 */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>基本情報</CardTitle>
+      <Card className="mb-3">
+        <CardHeader className="px-3 py-2">
+          <CardTitle className="text-sm font-medium">基本情報</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="px-3 pb-3 pt-2 space-y-3">
           <div>
             <UILabel htmlFor="entry-type">アイテム種別</UILabel>
             {mode === 'create' ? (
@@ -423,28 +425,28 @@ export default function EntryForm({
       </Card>
 
       {/* アイテム種別別フォーム */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-lg">{getTypeLabel()}</CardTitle>
+      <Card className="mb-3">
+        <CardHeader className="px-3 py-2">
+          <CardTitle className="text-sm font-medium">{getTypeLabel()}</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 pb-3 pt-2">
           {renderForm()}
         </CardContent>
       </Card>
 
       {/* カスタムフィールド */}
-      <div className="mb-6">
+      <div className="mb-3">
         {renderCustomFields()}
       </div>
 
       {/* ラベル */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-lg">ラベル</CardTitle>
+      <Card className="mb-3">
+        <CardHeader className="px-3 py-2">
+          <CardTitle className="text-sm font-medium">ラベル</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 pb-3 pt-2">
           {allLabels.length === 0 ? (
-            <p className="text-sm text-text-muted">ラベルがありません</p>
+            <p className="text-xs text-text-muted">ラベルがありません</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {allLabels.map(label => (
@@ -461,7 +463,7 @@ export default function EntryForm({
                     }}
                     className="w-4 h-4 rounded border-border"
                   />
-                  <span className="text-sm">{label.name}</span>
+                  <span className="text-xs">{label.name}</span>
                 </label>
               ))}
             </div>
@@ -470,16 +472,16 @@ export default function EntryForm({
       </Card>
 
       {/* メモ */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-lg">メモ</CardTitle>
+      <Card className="mb-3">
+        <CardHeader className="px-3 py-2">
+          <CardTitle className="text-sm font-medium">メモ</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 pb-3 pt-2">
           <Textarea
             value={notes || ''}
             onChange={(e) => onNotesChange(e.target.value)}
             placeholder="メモを入力（オプション）"
-            className="min-h-32"
+            className="min-h-24"
           />
         </CardContent>
       </Card>

@@ -29,19 +29,19 @@ function FieldDisplay({ label, value, isPassword = false, isMasked = false, onTo
   }
 
   return (
-    <div className="space-y-1.5">
-      <label className="text-sm font-medium text-text-secondary">{label}</label>
-      <div className="flex items-center gap-2 p-3 rounded-md bg-bg-elevated border border-border">
-        <span className="font-mono text-sm text-text-primary flex-1 break-all">
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-text-secondary">{label}</label>
+      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-bg-elevated border border-border">
+        <span className="font-mono text-xs text-text-primary flex-1 break-all">
           {isPassword && isMasked ? '•'.repeat(Math.max(8, value.length)) : value}
         </span>
         {isPassword && onToggleMask && (
-          <button onClick={onToggleMask} className="p-1 text-text-muted hover:text-text-primary transition-colors">
-            {isMasked ? <EyeOff size={16} /> : <Eye size={16} />}
+          <button onClick={onToggleMask} className="p-1 text-text-muted hover:text-text-primary transition-colors shrink-0">
+            {isMasked ? <EyeOff size={14} /> : <Eye size={14} />}
           </button>
         )}
-        <button onClick={handleCopy} className="p-1 text-text-muted hover:text-text-primary transition-colors">
-          {copied ? <span className="text-xs text-success">✓</span> : <Copy size={16} />}
+        <button onClick={handleCopy} className="p-1 text-text-muted hover:text-text-primary transition-colors shrink-0">
+          {copied ? <span className="text-xs text-success">✓</span> : <Copy size={14} />}
         </button>
       </div>
     </div>
@@ -118,30 +118,30 @@ export default function EntryDetail() {
   const v = entry.typedValue as Record<string, any>
 
   return (
-    <div className="min-h-screen bg-bg-base p-6">
-      <div className="max-w-2xl">
-        {/* ヘッダー */}
+    <div className="flex flex-col h-screen bg-bg-base">
+      {/* sticky ヘッダー */}
+      <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
         <button
           onClick={() => navigate('/entries')}
-          className="flex items-center gap-2 text-accent hover:text-accent-hover mb-6 transition-colors"
+          className="p-1 text-text-muted hover:text-text-primary transition-colors shrink-0"
         >
-          <ArrowLeft size={18} />
-          <span className="text-sm font-medium">戻る</span>
+          <ArrowLeft size={16} />
         </button>
+        <h1 className="text-sm font-semibold text-text-primary truncate flex-1">{entry.name}</h1>
+        <Badge variant="secondary" className="text-xs shrink-0">{getEntryTypeLabel(entry.entryType)}</Badge>
+        <Button size="sm" onClick={() => navigate(`/entries/${id}/edit`)}>編集</Button>
+      </div>
 
-        {/* タイトル */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-text-primary mb-2">{entry.name}</h1>
-          <Badge variant="secondary">{getEntryTypeLabel(entry.entryType)}</Badge>
-        </div>
+      {/* スクロール可能コンテンツ */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
 
         {/* 基本情報 */}
-        {entry.entryType === 'login' && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">ログイン情報</CardTitle>
+        {entry.entryType === 'login' && (v.url || v.username || v.password || v.totp) && (
+          <Card>
+            <CardHeader className="px-3 py-2">
+              <CardTitle className="text-sm font-medium">ログイン情報</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="px-3 pb-3 pt-2 space-y-2">
               {v.url && <FieldDisplay label="URL" value={v.url} />}
               {v.username && <FieldDisplay label="ユーザー名" value={v.username} />}
               {v.password && (
@@ -158,12 +158,12 @@ export default function EntryDetail() {
           </Card>
         )}
 
-        {entry.entryType === 'bank' && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">銀行口座</CardTitle>
+        {entry.entryType === 'bank' && (v.bank_name || v.account_number || v.pin) && (
+          <Card>
+            <CardHeader className="px-3 py-2">
+              <CardTitle className="text-sm font-medium">銀行口座</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="px-3 pb-3 pt-2 space-y-2">
               {v.bank_name && <FieldDisplay label="銀行名" value={v.bank_name} />}
               {v.account_number && <FieldDisplay label="口座番号" value={v.account_number} />}
               {v.pin && <FieldDisplay label="PIN" value={v.pin} isPassword={true} isMasked={passwordMasked} onToggleMask={() => setPasswordMasked(!passwordMasked)} />}
@@ -171,25 +171,25 @@ export default function EntryDetail() {
           </Card>
         )}
 
-        {entry.entryType === 'ssh_key' && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">SSH キー</CardTitle>
+        {entry.entryType === 'ssh_key' && (v.private_key || v.passphrase) && (
+          <Card>
+            <CardHeader className="px-3 py-2">
+              <CardTitle className="text-sm font-medium">SSH キー</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="px-3 pb-3 pt-2 space-y-2">
               {v.private_key && <FieldDisplay label="秘密鍵" value={v.private_key} />}
               {v.passphrase && <FieldDisplay label="パスフレーズ" value={v.passphrase} isPassword={true} isMasked={passwordMasked} onToggleMask={() => setPasswordMasked(!passwordMasked)} />}
             </CardContent>
           </Card>
         )}
 
-        {entry.entryType === 'secure_note' && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">ノート</CardTitle>
+        {entry.entryType === 'secure_note' && v.content && (
+          <Card>
+            <CardHeader className="px-3 py-2">
+              <CardTitle className="text-sm font-medium">ノート</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="p-3 rounded-md bg-bg-elevated border border-border text-text-primary prose prose-invert max-w-none">
+            <CardContent className="px-3 pb-3 pt-2">
+              <div className="p-3 rounded-md bg-bg-elevated border border-border text-text-primary prose prose-invert max-w-none text-xs">
                 <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                   {v.content}
                 </ReactMarkdown>
@@ -198,12 +198,12 @@ export default function EntryDetail() {
           </Card>
         )}
 
-        {entry.entryType === 'credit_card' && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">クレジットカード</CardTitle>
+        {entry.entryType === 'credit_card' && (v.cardholder || v.number || v.expiry || v.cvv) && (
+          <Card>
+            <CardHeader className="px-3 py-2">
+              <CardTitle className="text-sm font-medium">クレジットカード</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="px-3 pb-3 pt-2 space-y-2">
               {v.cardholder && <FieldDisplay label="カード名義" value={v.cardholder} />}
               {v.number && <FieldDisplay label="カード番号" value={v.number} />}
               {v.expiry && <FieldDisplay label="有効期限" value={v.expiry} />}
@@ -214,11 +214,11 @@ export default function EntryDetail() {
 
         {/* カスタムフィールド */}
         {entry.customFields && entry.customFields.length > 0 && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">カスタムフィールド</CardTitle>
+          <Card>
+            <CardHeader className="px-3 py-2">
+              <CardTitle className="text-sm font-medium">カスタムフィールド</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="px-3 pb-3 pt-2 space-y-2">
               {entry.customFields.map((field) => (
                 <FieldDisplay
                   key={field.id}
@@ -235,12 +235,12 @@ export default function EntryDetail() {
 
         {/* メモ */}
         {entry.notes && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">メモ</CardTitle>
+          <Card>
+            <CardHeader className="px-3 py-2">
+              <CardTitle className="text-sm font-medium">メモ</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="p-3 rounded-md bg-bg-elevated border border-border text-text-primary text-sm whitespace-pre-wrap break-words">
+            <CardContent className="px-3 pb-3 pt-2">
+              <div className="p-3 rounded-md bg-bg-elevated border border-border text-text-primary text-xs whitespace-pre-wrap break-words">
                 {entry.notes}
               </div>
             </CardContent>
@@ -249,30 +249,20 @@ export default function EntryDetail() {
 
         {/* ラベル */}
         {entry.labels && entry.labels.length > 0 && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">ラベル</CardTitle>
+          <Card>
+            <CardHeader className="px-3 py-2">
+              <CardTitle className="text-sm font-medium">ラベル</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-3 pb-3 pt-2">
               <div className="flex gap-2 flex-wrap">
                 {entry.labels.map(labelId => {
                   const label = allLabels.find(l => l.id === labelId)
-                  return label ? <Badge key={labelId} variant="primary">{label.name}</Badge> : null
+                  return label ? <Badge key={labelId} variant="primary" className="text-xs">{label.name}</Badge> : null
                 })}
               </div>
             </CardContent>
           </Card>
         )}
-
-        {/* アクション */}
-        <div className="flex gap-3">
-          <Button onClick={() => navigate(`/entries/${id}/edit`)} className="flex-1">
-            編集
-          </Button>
-          <Button variant="secondary" onClick={() => navigate('/entries')} className="flex-1">
-            戻る
-          </Button>
-        </div>
       </div>
     </div>
   )

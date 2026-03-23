@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import { getFromStorage } from '../../shared/storage'
 import { Label } from '../../shared/types'
@@ -7,13 +6,11 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Badge } from '../../components/ui/badge'
-import { PageHeader } from '../../components/layout/PageHeader'
 import { EmptyState } from '../../components/layout/EmptyState'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Plus, Trash2, Pencil, X, Check } from 'lucide-react'
 
 export default function LabelManager() {
-  const navigate = useNavigate()
   const [labels, setLabels] = useState<Label[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -122,23 +119,27 @@ export default function LabelManager() {
   }, [editingLabelId, editingName, labels])
 
   return (
-    <div className="min-h-screen bg-bg-base">
-      <PageHeader title="ラベル管理" />
+    <div className="flex flex-col h-screen bg-bg-base">
+      {/* sticky ヘッダー */}
+      <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
+        <h1 className="text-sm font-semibold text-text-primary">ラベル管理</h1>
+      </div>
 
-      <div className="max-w-2xl mx-auto p-6">
+      {/* コンテンツ */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {/* エラーメッセージ */}
         {error && (
-          <div className="mb-6 p-4 rounded-md bg-danger/10 border border-danger/20">
+          <div className="mb-3 p-3 rounded-md bg-danger/10 border border-danger/20">
             <p className="text-sm text-danger">{error}</p>
           </div>
         )}
 
         {/* 新規ラベル作成 */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>新規ラベル</CardTitle>
+        <Card className="mb-3">
+          <CardHeader className="px-3 py-2">
+            <CardTitle className="text-sm font-medium">新規ラベル</CardTitle>
           </CardHeader>
-          <CardContent className="pb-4">
+          <CardContent className="px-3 pb-3 pt-2">
             <div className="flex gap-3">
               <Input
                 value={newLabelName}
@@ -161,7 +162,7 @@ export default function LabelManager() {
 
         {/* ラベル一覧 */}
         <div>
-          <h2 className="text-lg font-semibold text-text-primary mb-4">ラベル一覧</h2>
+          <h2 className="text-sm font-semibold text-text-primary mb-2">ラベル一覧</h2>
 
           {loading ? (
             <EmptyState icon="⏳" title="読み込み中..." description="ラベルを読み込んでいます" />
