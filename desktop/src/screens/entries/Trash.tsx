@@ -1,19 +1,19 @@
 import { useEffect, useState, useCallback } from 'react'
 import * as commands from '../../commands'
 import { getFromStorage } from '../../shared/storage'
-import { EntryRow } from '../../shared/types'
-import { Button } from '../../components/ui/button'
-import { Card } from '../../components/ui/card'
-import { EmptyState } from '../../components/layout/EmptyState'
+import { EntryRow, EntryType } from '../../shared/types'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { RotateCw, Trash2 } from 'lucide-react'
+import EntryCard from '../../components/entries/EntryCard'
+import EntryListPanel from '../../components/entries/EntryListPanel'
 
 export default function Trash() {
-  const [entries, setEntries] = useState<EntryRow[]>([])
+  const [allEntries, setAllEntries] = useState<EntryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [purgeDialogOpen, setPurgeDialogOpen] = useState(false)
   const [purgeTargetId, setPurgeTargetId] = useState<string | null>(null)
+  const [selectedType, setSelectedType] = useState<EntryType | undefined>(undefined)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     loadTrashEntries()
@@ -23,12 +23,42 @@ export default function Trash() {
     try {
       setLoading(true)
       const data = await commands.listEntries({ includeTrash: true })
-      setEntries(data.filter(e => e.deletedAt !== null))
+      setAllEntries(data.filter(e => e.deletedAt !== null))
     } catch (err) {
       setError(`ゴミ箱読み込み失敗: ${err}`)
     } finally {
       setLoading(false)
     }
+  }
+
+  const filterEntries = () => {
+    let filtered = allEntries
+
+    // 削除済みエントリのみ
+    filtered = filtered.filter(e => e.deletedAt !== null)
+
+    // タイプフィルター
+    if (selectedType) {
+      filtered = filtered.filter(e => e.entryType === selectedType)
+    }
+
+    // 検索フィルター（名前で検索）
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(e => e.name.toLowerCase().includes(query))
+    }
+
+    return filtered
+  }
+
+  const entries = filterEntries()
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+  }
+
+  const clearSearch = () => {
+    setSearchQuery('')
   }
 
   const handleRestore = useCallback(async (id: string) => {
@@ -40,11 +70,11 @@ export default function Trash() {
       if (s3Config) {
         await commands.pushVault(JSON.stringify(s3Config))
       }
-      setEntries(entries.filter(e => e.id !== id))
+      setAllEntries(allEntries.filter(e => e.id !== id))
     } catch (err) {
       setError(`復元失敗: ${err}`)
     }
-  }, [entries])
+  }, [allEntries])
 
   const handlePurgeConfirmed = useCallback(async () => {
     if (!purgeTargetId) return
@@ -56,13 +86,13 @@ export default function Trash() {
       if (s3Config) {
         await commands.pushVault(JSON.stringify(s3Config))
       }
-      setEntries(entries.filter(e => e.id !== purgeTargetId))
+      setAllEntries(allEntries.filter(e => e.id !== purgeTargetId))
       setPurgeDialogOpen(false)
       setPurgeTargetId(null)
     } catch (err) {
       setError(`完全削除失敗: ${err}`)
     }
-  }, [entries, purgeTargetId])
+  }, [allEntries, purgeTargetId])
 
   const handlePurgeClick = (id: string) => {
     setPurgeTargetId(id)
@@ -76,56 +106,26 @@ export default function Trash() {
         <h1 className="text-sm font-semibold text-text-primary">ゴミ箱</h1>
       </div>
 
-      {/* コンテンツ */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        {error && (
-          <div className="mb-3 p-3 rounded-md bg-danger/10 border border-danger/20">
-            <p className="text-sm text-danger">{error}</p>
-          </div>
+      <EntryListPanel
+        selectedType={selectedType}
+        onTypeChange={setSelectedType}
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+        onSearchClear={clearSearch}
+        entries={entries}
+        loading={loading}
+        error={error}
+        emptyTitle="ゴミ箱が空です"
+        emptyDescription="削除済みエントリはありません"
+        renderCard={(entry) => (
+          <EntryCard
+            variant="trash"
+            entry={entry}
+            onRestore={handleRestore}
+            onPurge={handlePurgeClick}
+          />
         )}
-
-        {loading ? (
-          <EmptyState icon="⏳" title="読み込み中..." description="ゴミ箱を読み込んでいます" />
-        ) : entries.length === 0 ? (
-          <EmptyState icon="✓" title="ゴミ箱が空です" description="削除済みエントリはありません" />
-        ) : (
-          <div className="space-y-3">
-            {entries.map((entry) => (
-              <Card key={entry.id} className="p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-semibold text-text-primary truncate">{entry.name}</h3>
-                    <p className="text-xs text-text-muted mt-1">
-                      削除日時: {entry.deletedAt ? new Date(entry.deletedAt * 1000).toLocaleString('ja-JP') : '-'}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleRestore(entry.id)}
-                      className="gap-1"
-                    >
-                      <RotateCw size={16} />
-                      復元
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handlePurgeClick(entry.id)}
-                      className="gap-1"
-                    >
-                      <Trash2 size={16} />
-                      削除
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+      />
 
       {/* 完全削除確認ダイアログ */}
       <ConfirmDialog

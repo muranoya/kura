@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react'
 import { getFromStorage } from '../../shared/storage'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import { CheckCircle2 } from 'lucide-react'
+import { Button } from '../../components/ui/button'
+import { CheckCircle2, RefreshCw, Loader2, AlertCircle } from 'lucide-react'
+import { syncVault } from '../../commands'
 
 export default function SyncStatus() {
   const [storageConfig, setStorageConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle')
+  const [syncMessage, setSyncMessage] = useState<string>('')
 
   useEffect(() => {
     const loadStorageConfig = async () => {
@@ -23,6 +27,31 @@ export default function SyncStatus() {
     loadStorageConfig()
   }, [])
 
+  const handleSync = async () => {
+    if (!storageConfig) return
+
+    setSyncStatus('syncing')
+    setSyncMessage('')
+
+    try {
+      const configJson = JSON.stringify(storageConfig)
+      const result = await syncVault(configJson)
+
+      setSyncStatus('success')
+      setSyncMessage('同期が完了しました')
+
+      // Auto-clear success message after 3 seconds
+      setTimeout(() => {
+        setSyncStatus('idle')
+        setSyncMessage('')
+      }, 3000)
+    } catch (err) {
+      setSyncStatus('error')
+      setSyncMessage(err instanceof Error ? err.message : '同期に失敗しました')
+      console.error('Sync failed:', err)
+    }
+  }
+
   return (
     <div className="flex flex-col h-screen bg-bg-base">
       {/* sticky ヘッダー */}
@@ -38,13 +67,48 @@ export default function SyncStatus() {
               <div className="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center">
                 <CheckCircle2 className="w-6 h-6 text-success" />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="font-semibold text-text-primary">同期準備完了</p>
                 <p className="text-sm text-text-muted">クラウドストレージが正常に接続されています</p>
               </div>
+              <Button
+                onClick={handleSync}
+                disabled={syncStatus === 'syncing' || !storageConfig}
+                size="sm"
+              >
+                {syncStatus === 'syncing' ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    同期中...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-1" />
+                    今すぐ同期
+                  </>
+                )}
+              </Button>
             </div>
           </CardContent>
         </Card>
+
+        {/* Sync status message */}
+        {syncMessage && (
+          <Card className={syncStatus === 'error' ? 'border-error/30' : ''}>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                {syncStatus === 'error' ? (
+                  <AlertCircle className="w-5 h-5 text-error flex-shrink-0" />
+                ) : (
+                  <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0" />
+                )}
+                <p className={syncStatus === 'error' ? 'text-error' : 'text-success'}>
+                  {syncMessage}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* ストレージ設定 */}
         <Card>

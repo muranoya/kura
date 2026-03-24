@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Sun, Moon } from 'lucide-react'
+import { Sun, Moon, ExternalLink } from 'lucide-react'
 import { clearStorage } from '../../shared/storage'
 import { useTheme } from '../../shared/ThemeContext'
 import { Button } from '../../components/ui/button'
@@ -69,12 +69,29 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* 情報 */}
-        <div className="pt-2 border-t border-border text-center">
-          <p className="text-xs text-text-muted">
-            kura v0.1.0 — サーバ不要のゼロ知識パスワードマネージャー
-          </p>
-        </div>
+        {/* このアプリについて */}
+        <Card>
+          <CardHeader className="px-3 py-2">
+            <CardTitle className="text-sm font-medium">このアプリについて</CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3 pt-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-text-muted">バージョン</p>
+              <p className="text-sm text-text-primary">v0.1.0</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-text-muted">リポジトリ</p>
+              <a
+                href="https://github.com/muranoya/kura"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-accent hover:underline flex items-center gap-1"
+              >
+                GitHub <ExternalLink size={12} />
+              </a>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* ログアウト確認ダイアログ */}

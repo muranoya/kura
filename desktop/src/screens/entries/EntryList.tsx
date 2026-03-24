@@ -2,42 +2,12 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import { getFromStorage } from '../../shared/storage'
-import { EntryRow } from '../../shared/types'
+import { EntryRow, EntryType } from '../../shared/types'
 import { Button } from '../../components/ui/button'
-import { Card } from '../../components/ui/card'
-import { Badge } from '../../components/ui/badge'
-import { EmptyState } from '../../components/layout/EmptyState'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { KeyRound, Building2, Terminal, FileText, CreditCard, Star, Plus, Trash2, Search, X } from 'lucide-react'
-
-const getEntryIcon = (type: string) => {
-  switch (type) {
-    case 'login':
-      return <KeyRound size={20} />
-    case 'bank':
-      return <Building2 size={20} />
-    case 'ssh_key':
-      return <Terminal size={20} />
-    case 'secure_note':
-      return <FileText size={20} />
-    case 'credit_card':
-      return <CreditCard size={20} />
-    default:
-      return <KeyRound size={20} />
-  }
-}
-
-const getTypeLabel = (type: string): string => {
-  const labels: Record<string, string> = {
-    login: 'ログイン',
-    bank: '銀行口座',
-    ssh_key: 'SSH キー',
-    secure_note: 'セキュアノート',
-    credit_card: 'クレジットカード',
-    passkey: 'PassKey',
-  }
-  return labels[type] || type
-}
+import { Plus } from 'lucide-react'
+import EntryCard from '../../components/entries/EntryCard'
+import EntryListPanel from '../../components/entries/EntryListPanel'
 
 interface EntryListProps {
   onlyFavorites?: boolean
@@ -51,18 +21,23 @@ export default function EntryList({ onlyFavorites = false }: EntryListProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedType, setSelectedType] = useState<EntryType | undefined>(undefined)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     loadEntries()
-  }, [onlyFavorites, searchQuery])
+  }, [onlyFavorites, searchQuery, selectedType])
 
   const loadEntries = async () => {
     try {
       setLoading(true)
-      console.log('DEBUG: loadEntries called with onlyFavorites=', onlyFavorites, 'searchQuery=', searchQuery)
-      const data = await commands.listEntries({ onlyFavorites, searchQuery: searchQuery || undefined })
-      console.log('DEBUG: received entries count=', data.length, 'filter onlyFavorites=', onlyFavorites, 'searchQuery=', searchQuery)
+      console.log('DEBUG: loadEntries called with onlyFavorites=', onlyFavorites, 'searchQuery=', searchQuery, 'selectedType=', selectedType)
+      const data = await commands.listEntries({
+        onlyFavorites,
+        searchQuery: searchQuery || undefined,
+        type: selectedType,
+      })
+      console.log('DEBUG: received entries count=', data.length, 'filter onlyFavorites=', onlyFavorites, 'searchQuery=', searchQuery, 'type=', selectedType)
       setEntries(data)
     } catch (err) {
       setError(`アイテム読み込み失敗: ${err}`)
@@ -153,125 +128,38 @@ export default function EntryList({ onlyFavorites = false }: EntryListProps) {
         )}
       </div>
 
-      {/* コンテンツ */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        {/* 検索ボックス */}
-        {!onlyFavorites && (
-          <div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted" size={18} />
-              <input
-                type="text"
-                placeholder="名前、メモ、カスタムフィールド名で検索..."
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="w-full pl-10 pr-10 py-2 rounded-md border border-border-primary bg-bg-input text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
-              />
-              {searchQuery && (
-                <button
-                  onClick={clearSearch}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
-                  title="検索をクリア"
-                >
-                  <X size={18} />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* エラーメッセージ */}
-        {error && (
-          <div className="mb-3 p-3 rounded-md bg-danger/10 border border-danger/20">
-            <p className="text-sm text-danger">{error}</p>
-          </div>
-        )}
-
-        {loading ? (
-          <EmptyState
-            icon="⏳"
-            title="読み込み中..."
-            description="アイテムを読み込んでいます"
+      <EntryListPanel
+        selectedType={selectedType}
+        onTypeChange={setSelectedType}
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+        onSearchClear={clearSearch}
+        entries={entries}
+        loading={loading}
+        error={error}
+        emptyTitle={onlyFavorites ? 'お気に入りがありません' : 'アイテムがありません'}
+        emptyDescription={
+          onlyFavorites
+            ? 'お気に入りに登録したアイテムがここに表示されます'
+            : '新規作成ボタンからアイテムを追加してください'
+        }
+        emptyAction={
+          !onlyFavorites && (
+            <Button onClick={() => navigate('/entries/create')}>
+              最初のアイテムを作成
+            </Button>
+          )
+        }
+        renderCard={(entry) => (
+          <EntryCard
+            variant="normal"
+            entry={entry}
+            onClick={(id) => navigate(`/entries/${id}`)}
+            onFavorite={handleFavorite}
+            onDelete={handleDeleteClick}
           />
-        ) : entries.length === 0 ? (
-          <EmptyState
-            icon={onlyFavorites ? '⭐' : '🔑'}
-            title={onlyFavorites ? 'お気に入りがありません' : 'アイテムがありません'}
-            description={
-              onlyFavorites
-                ? 'お気に入りに登録したアイテムがここに表示されます'
-                : '新規作成ボタンからアイテムを追加してください'
-            }
-            action={
-              !onlyFavorites && (
-                <Button onClick={() => navigate('/entries/create')}>
-                  最初のアイテムを作成
-                </Button>
-              )
-            }
-          />
-        ) : (
-          <div className="space-y-3">
-            {entries.map((entry) => (
-              <Card
-                key={entry.id}
-                className="p-3 hover:border-accent/50 transition-colors cursor-pointer group"
-                onClick={() => navigate(`/entries/${entry.id}`)}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  {/* 左側: アイコン + 名前 */}
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
-                      {getEntryIcon(entry.entryType)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-sm font-semibold text-text-primary truncate">
-                        {entry.name}
-                      </h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="muted" className="text-xs">
-                          {getTypeLabel(entry.entryType)}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 右側: アクション */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {/* お気に入いボタン */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleFavorite(entry.id, entry.isFavorite)
-                      }}
-                      className="p-2 rounded-md hover:bg-bg-elevated transition-colors"
-                      title={entry.isFavorite ? 'お気に入い解除' : 'お気に入い'}
-                    >
-                      <Star
-                        size={18}
-                        className={entry.isFavorite ? 'fill-accent text-accent' : 'text-text-muted'}
-                      />
-                    </button>
-
-                    {/* 削除ボタン */}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDeleteClick(entry.id)
-                      }}
-                      className="text-danger hover:text-danger gap-1"
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
         )}
-      </div>
+      />
 
       {/* 削除確認ダイアログ */}
       <ConfirmDialog

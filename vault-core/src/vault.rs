@@ -13,8 +13,8 @@ pub struct LockedVault {
 /// Unlocked vault - plaintext JSON in memory with DEK available
 pub struct UnlockedVault {
     meta: crate::models::VaultMeta,
-    contents: VaultContents,
-    dek: Dek,
+    pub contents: VaultContents,
+    pub dek: Dek,
     etag: Option<String>,
 }
 

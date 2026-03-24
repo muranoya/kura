@@ -11,6 +11,7 @@ import { Badge } from '../ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Plus, Trash2 } from 'lucide-react'
 import { getEntryTypeLabel } from '../../shared/constants'
+import PasswordGeneratorPanel from './PasswordGeneratorPanel'
 
 export interface EntryFormProps {
   mode: 'create' | 'edit'
@@ -86,6 +87,7 @@ export default function EntryForm({
   error,
 }: EntryFormProps) {
   const [secureNotePreviewMode, setSecureNotePreviewMode] = useState(false)
+  const [activeGeneratorFieldId, setActiveGeneratorFieldId] = useState<string | null>(null)
 
   const updateTypedValue = useCallback((key: string, value: any) => {
     onTypedValueChange(key, value)
@@ -142,7 +144,19 @@ export default function EntryForm({
                 type="password"
                 value={v.password || ''}
                 onChange={(e) => updateTypedValue('password', e.target.value)}
+                onFocus={() => setActiveGeneratorFieldId('password')}
+                onBlur={() => setActiveGeneratorFieldId(null)}
               />
+              {activeGeneratorFieldId === 'password' && (
+                <div onMouseDown={(e) => e.preventDefault()}>
+                  <PasswordGeneratorPanel
+                    onUse={(pw) => {
+                      updateTypedValue('password', pw)
+                      setActiveGeneratorFieldId(null)
+                    }}
+                  />
+                </div>
+              )}
             </div>
             <div className="space-y-1">
               <UILabel htmlFor="totp" className="text-xs">TOTP（オプション）</UILabel>
@@ -181,7 +195,19 @@ export default function EntryForm({
                 type="password"
                 value={v.pin || ''}
                 onChange={(e) => updateTypedValue('pin', e.target.value)}
+                onFocus={() => setActiveGeneratorFieldId('pin')}
+                onBlur={() => setActiveGeneratorFieldId(null)}
               />
+              {activeGeneratorFieldId === 'pin' && (
+                <div onMouseDown={(e) => e.preventDefault()}>
+                  <PasswordGeneratorPanel
+                    onUse={(pw) => {
+                      updateTypedValue('pin', pw)
+                      setActiveGeneratorFieldId(null)
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )
@@ -204,7 +230,19 @@ export default function EntryForm({
                 type="password"
                 value={v.passphrase || ''}
                 onChange={(e) => updateTypedValue('passphrase', e.target.value)}
+                onFocus={() => setActiveGeneratorFieldId('passphrase')}
+                onBlur={() => setActiveGeneratorFieldId(null)}
               />
+              {activeGeneratorFieldId === 'passphrase' && (
+                <div onMouseDown={(e) => e.preventDefault()}>
+                  <PasswordGeneratorPanel
+                    onUse={(pw) => {
+                      updateTypedValue('passphrase', pw)
+                      setActiveGeneratorFieldId(null)
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )
@@ -293,14 +331,26 @@ export default function EntryForm({
                 value={v.cvv || ''}
                 onChange={(e) => updateTypedValue('cvv', e.target.value)}
                 placeholder="123"
+                onFocus={() => setActiveGeneratorFieldId('cvv')}
+                onBlur={() => setActiveGeneratorFieldId(null)}
               />
+              {activeGeneratorFieldId === 'cvv' && (
+                <div onMouseDown={(e) => e.preventDefault()}>
+                  <PasswordGeneratorPanel
+                    onUse={(pw) => {
+                      updateTypedValue('cvv', pw)
+                      setActiveGeneratorFieldId(null)
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )
       default:
         return null
     }
-  }, [entryType, typedValue, updateTypedValue, secureNotePreviewMode])
+  }, [entryType, typedValue, updateTypedValue, secureNotePreviewMode, activeGeneratorFieldId])
 
   const renderCustomFields = useCallback(() => {
     return (
@@ -351,7 +401,19 @@ export default function EntryForm({
                 value={field.value}
                 onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
                 className="h-8 text-xs"
+                onFocus={() => field.fieldType === 'password' && setActiveGeneratorFieldId(`custom-${field.id}`)}
+                onBlur={() => field.fieldType === 'password' && setActiveGeneratorFieldId(null)}
               />
+              {field.fieldType === 'password' && activeGeneratorFieldId === `custom-${field.id}` && (
+                <div onMouseDown={(e) => e.preventDefault()}>
+                  <PasswordGeneratorPanel
+                    onUse={(pw) => {
+                      updateCustomField(field.id, { value: pw })
+                      setActiveGeneratorFieldId(null)
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </Card>
         ))}
@@ -366,7 +428,7 @@ export default function EntryForm({
         </Button>
       </div>
     )
-  }, [customFields, updateCustomField, deleteCustomField])
+  }, [customFields, updateCustomField, deleteCustomField, activeGeneratorFieldId])
 
   const getTypeLabel = () => {
     switch (entryType) {

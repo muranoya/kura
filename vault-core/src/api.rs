@@ -606,12 +606,141 @@ pub fn api_get_vault_bytes() -> Result<Vec<u8>, String> {
     }
 }
 
-/// S3から同期（コンフリクト検出）
+/// S3から同期（ローカルとリモートをマージ）
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
-pub async fn api_sync(_storage_config: String) -> Result<DartSyncResult, String> {
-    // TODO: S3設定パースと同期ロジック実装
-    // 計画段階では実装していない
-    Err("Sync not yet implemented".to_string())
+pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> {
+    // Parse storage config as JSON map first
+    let mut config_map: serde_json::Map<String, serde_json::Value> =
+        serde_json::from_str(&storage_config)
+            .map_err(|e| format!("Failed to parse S3 config: {}", e))?;
+
+    // Add default key if not present
+    if !config_map.contains_key("key") {
+        config_map.insert("key".to_string(), serde_json::Value::String("vault.json".to_string()));
+    }
+
+    // Now parse into S3Config
+    let s3_config: S3Config = serde_json::from_value(serde_json::Value::Object(config_map))
+        .map_err(|e| format!("Failed to parse S3 config: {}", e))?;
+
+    s3_config.validate()
+        .map_err(|e| format!("Invalid S3 config: {}", e))?;
+
+    #[cfg(feature = "storage-s3")]
+    {
+        use crate::storage::StorageBackend;
+        use crate::store::VaultFile;
+
+        let s3_storage = crate::storage::s3::S3Storage::new(s3_config)
+            .await
+            .map_err(|e| format!("Failed to create S3 storage: {}", e))?;
+
+        // Get local contents (scoped to release lock before async)
+        let local_contents = {
+            let session = VAULT_SESSION.lock().unwrap();
+            match session.as_ref() {
+                Some(SessionState::Unlocked(u)) => u.contents.clone(),
+                _ => return Err("Vault not unlocked".to_string()),
+            }
+        }; // Lock is released here
+
+        // Download remote version
+        let remote_option = s3_storage.download()
+            .await
+            .map_err(|e| format!("S3 download failed: {}", e))?;
+
+        let (remote_bytes, remote_etag) = match remote_option {
+            Some((bytes, etag)) => (bytes, etag),
+            None => {
+                // No remote version - push current state
+                let (vault_bytes, etag) = {
+                    let session = VAULT_SESSION.lock().unwrap();
+                    match session.as_ref() {
+                        Some(SessionState::Unlocked(u)) => {
+                            (u.to_vault_bytes()
+                                .map_err(|e| format!("Failed to serialize vault: {}", e))?,
+                             u.get_etag().cloned())
+                        }
+                        _ => return Err("Vault not unlocked".to_string()),
+                    }
+                }; // Lock is released here
+
+                let new_etag = s3_storage.upload(&vault_bytes, etag.as_deref())
+                    .await
+                    .map_err(|e| format!("S3 upload failed: {}", e))?;
+
+                {
+                    let mut session = VAULT_SESSION.lock().unwrap();
+                    if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
+                        u.set_etag(new_etag);
+                    }
+                }
+
+                return Ok(DartSyncResult { has_conflicts: false, conflicts: vec![] });
+            }
+        }; // Lock is released here
+
+        // Decrypt remote vault (scoped to release lock before async)
+        let remote_contents = {
+            let remote_vault_file = VaultFile::from_bytes(&remote_bytes)
+                .map_err(|e| format!("Failed to parse remote vault: {}", e))?;
+            let session = VAULT_SESSION.lock().unwrap();
+            match session.as_ref() {
+                Some(SessionState::Unlocked(u)) => {
+                    crate::crypto::encryption::decrypt_vault(&remote_vault_file.encrypted_vault, &u.dek)
+                        .map_err(|e| format!("Failed to decrypt remote vault: {}", e))?
+                }
+                _ => return Err("Vault not unlocked".to_string()),
+            }
+        }; // Lock is released here
+
+        // Auto-merge local and remote
+        let merge_result = crate::sync::auto_merge(&local_contents, &remote_contents)
+            .map_err(|e| format!("Merge failed: {}", e))?;
+
+        // Apply merged state to session
+        {
+            let mut session = VAULT_SESSION.lock().unwrap();
+            if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
+                u.contents.entries = merge_result.merged_entries;
+                u.contents.labels = merge_result.merged_labels;
+                u.set_etag(remote_etag);
+            }
+        } // Lock is released here
+
+        // Serialize merged vault and push to storage
+        let (merged_vault_bytes, merged_etag) = {
+            let session = VAULT_SESSION.lock().unwrap();
+            match session.as_ref() {
+                Some(SessionState::Unlocked(u)) => (
+                    u.to_vault_bytes()
+                        .map_err(|e| format!("Failed to serialize vault: {}", e))?,
+                    u.get_etag().cloned(),
+                ),
+                _ => return Err("Vault not unlocked".to_string()),
+            }
+        }; // Lock is released here
+
+        // Upload merged vault with conditional write
+        let new_etag = s3_storage.upload(&merged_vault_bytes, merged_etag.as_deref())
+            .await
+            .map_err(|e| format!("S3 upload failed: {}", e))?;
+
+        // Update etag in session
+        {
+            let mut session = VAULT_SESSION.lock().unwrap();
+            if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
+                u.set_etag(new_etag);
+            }
+        }
+
+        Ok(DartSyncResult { has_conflicts: false, conflicts: vec![] })
+    }
+
+    #[cfg(not(feature = "storage-s3"))]
+    {
+        Err("S3 support not compiled in".to_string())
+    }
 }
 
 /// S3へプッシュ
