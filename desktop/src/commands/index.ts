@@ -48,7 +48,16 @@ export async function listEntries(filter?: EntryFilter): Promise<EntryRow[]> {
 }
 
 export async function getEntry(id: string): Promise<Entry> {
-  return invoke<Entry>('get_entry', { id })
+  const entry = await invoke<any>('get_entry', { id })
+  return {
+    ...entry,
+    customFields: (entry.customFields ?? []).map((f: any) => ({
+      id: f.id,
+      name: f.name,
+      fieldType: f.field_type,
+      value: f.value,
+    }))
+  }
 }
 
 export async function createEntry(

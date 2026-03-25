@@ -29,7 +29,10 @@ export async function removeFromStorage(key: string): Promise<void> {
 
 export async function clearStorage(): Promise<void> {
   const s = await getStore()
-  // Store doesn't have a clear method, so we just recreate it
-  // For now, we'll just save empty data
+  // Delete all keys
+  const allKeys = await s.entries()
+  for (const [key] of allKeys) {
+    await s.delete(key)
+  }
   await s.save()
 }

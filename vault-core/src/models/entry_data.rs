@@ -2,6 +2,7 @@ use super::EntryType;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use zeroize::Zeroize;
+use crate::{VaultError, error::Result};
 
 const SCHEMA_VERSION: u32 = 1;
 
@@ -124,12 +125,12 @@ impl EntryData {
         }
     }
 
-    pub fn to_json_string(&self) -> crate::error::Result<String> {
-        serde_json::to_string(self).map_err(|e| crate::error::VaultError::JsonError(e))
+    pub fn to_json_string(&self) -> Result<String> {
+        serde_json::to_string(self).map_err(|e| VaultError::JsonError(e))
     }
 
-    pub fn from_json_string(json_str: &str) -> crate::error::Result<Self> {
-        serde_json::from_str(json_str).map_err(|e| crate::error::VaultError::JsonError(e))
+    pub fn from_json_string(json_str: &str) -> Result<Self> {
+        serde_json::from_str(json_str).map_err(|e| VaultError::JsonError(e))
     }
 }
 

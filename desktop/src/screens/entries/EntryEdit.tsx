@@ -52,7 +52,9 @@ export default function EntryEdit() {
     setSaving(true)
     try {
       const typedValueJson = JSON.stringify(typedValue)
-      const customFieldsJson = customFields.length > 0 ? JSON.stringify(customFields) : undefined
+      const customFieldsJson = customFields.length > 0
+        ? JSON.stringify(customFields.map(f => ({ id: f.id, name: f.name, field_type: f.fieldType, value: f.value })))
+        : undefined
       await commands.updateEntry(id!, name, typedValueJson, notes || undefined, selectedLabelIds, customFieldsJson)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)

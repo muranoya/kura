@@ -38,7 +38,9 @@ export default function EntryCreate() {
     setLoading(true)
     try {
       const typedValueJson = JSON.stringify(typedValue)
-      const customFieldsJson = customFields.length > 0 ? JSON.stringify(customFields) : undefined
+      const customFieldsJson = customFields.length > 0
+        ? JSON.stringify(customFields.map(f => ({ id: f.id, name: f.name, field_type: f.fieldType, value: f.value })))
+        : undefined
       const id = await commands.createEntry(entryType, name, typedValueJson, notes || undefined, selectedLabelIds, customFieldsJson)
 
       // Save vault to file and push to S3

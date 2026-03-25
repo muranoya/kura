@@ -1,8 +1,6 @@
 pub mod local;
 #[cfg(feature = "storage-s3")]
 pub mod s3;
-#[cfg(feature = "wasm")]
-pub mod wasm;
 
 use async_trait::async_trait;
 use crate::error::Result;

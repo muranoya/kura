@@ -125,6 +125,7 @@ fn entries_differ(local: &VaultEntry, remote: &VaultEntry) -> bool {
 }
 
 /// Automatically merge local and remote vault contents using LWW + Tombstone strategy
+/// Note: This does NOT perform garbage collection. Call apply_gc_to_contents() separately.
 pub fn auto_merge(
     local: &VaultContents,
     remote: &VaultContents,
@@ -147,20 +148,25 @@ pub fn auto_merge(
     }
 
     // Merge labels
-    let mut merged_labels = merge_labels(&local.labels, &remote.labels);
+    let merged_labels = merge_labels(&local.labels, &remote.labels);
 
     // Cleanup orphaned label references
     cleanup_orphaned_label_refs(&mut merged_entries, &merged_labels);
 
-    // Apply GC to tombstones
-    let gc_purged_count = apply_gc(&mut merged_entries);
-    apply_gc_labels(&mut merged_labels);
-
     Ok(MergeResult {
         merged_entries,
         merged_labels,
-        gc_purged_count,
+        gc_purged_count: 0,
     })
+}
+
+/// Apply garbage collection to vault contents
+/// Removes tombstones (purged entries and deleted labels) older than GC_RETENTION_DAYS
+pub fn apply_gc_to_contents(contents: &mut VaultContents) -> usize {
+    let mut gc_count = 0;
+    gc_count += apply_gc(&mut contents.entries);
+    apply_gc_labels(&mut contents.labels);
+    gc_count
 }
 
 /// Merge a single entry using LWW + Tombstone strategy

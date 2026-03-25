@@ -1,5 +1,6 @@
 use crate::error::{Result, VaultError};
 use zeroize::Zeroize;
+use argon2::{Argon2, Algorithm, Version, Params};
 
 /// Key Encryption Key - 32 bytes, automatically zeroized on drop
 #[derive(Clone)]
@@ -25,8 +26,6 @@ impl Kek {
 
 /// Derive KEK from password using Argon2
 pub fn derive_kek(password: &str, params: &crate::models::Argon2Params) -> Result<Kek> {
-    use argon2::{Argon2, Algorithm, Version, Params};
-
     let salt_bytes = base32_decode(&params.salt)
         .ok_or_else(|| VaultError::InvalidConfiguration("Invalid salt encoding".to_string()))?;
 

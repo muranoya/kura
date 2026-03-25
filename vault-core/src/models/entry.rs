@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::EntryData;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EntryType {
     #[serde(rename = "login")]
@@ -50,7 +52,7 @@ pub struct Entry {
     pub is_favorite: bool,
     pub updated_at: i64,
     pub deleted_at: Option<i64>,
-    pub data: crate::models::EntryData,
+    pub data: EntryData,
     pub labels: Vec<String>,
 }
 

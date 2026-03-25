@@ -5945,6 +5945,7 @@ dependencies = [
  "chrono",
  "flutter_rust_bridge",
  "getrandom 0.2.17",
+ "hmac",
  "js-sys",
  "log",
  "once_cell",

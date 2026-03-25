@@ -18,7 +18,7 @@ pub async fn upgrade_argon2_params(
     iterations: u32,
     memory: u32,
     parallelism: u32,
-) -> Result<(), String> {
+) -> Result<String, String> {
     tokio::task::spawn_blocking(move || {
         api_upgrade_argon2_params(password, iterations, memory, parallelism)
     })
@@ -27,7 +27,7 @@ pub async fn upgrade_argon2_params(
 }
 
 #[tauri::command]
-pub async fn rotate_dek(password: String) -> Result<(), String> {
+pub async fn rotate_dek(password: String) -> Result<String, String> {
     tokio::task::spawn_blocking(move || api_rotate_dek(password))
         .await
         .map_err(|e| format!("Task error: {}", e))?

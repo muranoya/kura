@@ -44,8 +44,6 @@ export default function MasterPassword() {
     }
   }
 
-  const passwordStrength = password.length >= 8 ? 'strong' : password.length >= 4 ? 'medium' : 'weak'
-
   return (
     <div className="min-h-screen bg-bg-base">
       <PageHeader title="マスターパスワード設定" subtitle="Vault全体を保護するパスワードを設定します" />
@@ -88,21 +86,6 @@ export default function MasterPassword() {
                   }}
                 />
                 <p className="text-xs text-text-muted mt-1.5">8文字以上の強力なパスワードを設定してください</p>
-
-                {/* パスワード強度インジケータ */}
-                {password && (
-                  <div className="mt-2 h-1.5 bg-bg-elevated rounded-full overflow-hidden">
-                    <div
-                      className={`h-full transition-all ${
-                        passwordStrength === 'strong'
-                          ? 'w-full bg-success'
-                          : passwordStrength === 'medium'
-                          ? 'w-2/3 bg-warning'
-                          : 'w-1/3 bg-danger'
-                      }`}
-                    />
-                  </div>
-                )}
               </div>
 
               {/* パスワード確認 */}

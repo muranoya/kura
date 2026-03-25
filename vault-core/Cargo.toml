@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 aes-gcm = "0"
 argon2 = "0"
-rand = { version = "0", features = ["getrandom"] }
+rand = { version = "0", optional = true }  # Used for password generation and UUIDs
 zeroize = { version = "1", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -18,13 +18,20 @@ base64 = "0"
 log = "0"
 async-trait = "0"
 sha2 = "0"
+hmac = "0"
 totp-rs = "5"
+getrandom = { version = "0", features = ["js"] }  # WASM-compatible random
 flutter_rust_bridge = { version = "=2.11.1", optional = true }
 once_cell = "1"
 
+# AWS SDK S3 and tokio are only needed for native targets (not WASM)
+# They are pulled in only when storage-s3 feature is enabled AND target is not wasm32
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 aws-sdk-s3 = { version = "1", optional = true }
 aws-config = { version = "1", optional = true }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"], optional = true }
+# Native-only: rand with getrandom support
+rand = { version = "0", features = ["getrandom"] }
 
 wasm-bindgen = { version = "0", optional = true }
 wasm-bindgen-futures = { version = "0", optional = true }
@@ -34,14 +41,18 @@ serde-wasm-bindgen = { version = "0", optional = true }
 getrandom = { version = "0", features = ["js"], optional = true }
 
 [features]
-default = ["storage-s3"]
-storage-s3 = ["dep:aws-sdk-s3", "dep:aws-config", "dep:tokio"]
+default = ["storage-s3", "dep:rand"]
+# storage-s3: Native-only (uses aws-sdk-s3, aws-config, tokio via target-specific deps)
+# Also enables rand for password generation in the storage backend context
+storage-s3 = ["dep:rand", "dep:aws-sdk-s3", "dep:aws-config", "dep:tokio"]
 mobile = ["dep:flutter_rust_bridge", "storage-s3"]
 desktop = ["storage-s3"]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:web-sys", "dep:serde-wasm-bindgen", "dep:getrandom"]
+# WASM feature: does NOT include storage-s3 due to tokio incompatibility
+# WASM S3 access uses web-sys + manual AWS Signature V4 implementation
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:web-sys", "dep:serde-wasm-bindgen"]
 
 [lib]
 crate-type = ["staticlib", "cdylib", "rlib"]
 
-[dev-dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio = { version = "1", features = ["rt", "macros"] }

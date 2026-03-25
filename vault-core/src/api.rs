@@ -97,7 +97,7 @@ pub fn api_create_new_vault(master_password: String) -> Result<String, String> {
     let locked_vault = unlocked.lock()
         .map_err(|e| format!("Failed to lock: {}", e))?;
 
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
     *session = Some(SessionState::Locked(locked_vault));
 
     Ok(recovery_key.to_display_string())
@@ -109,7 +109,7 @@ pub fn api_load_vault(vault_bytes: Vec<u8>, etag: String) -> Result<(), String> 
     let locked_vault = LockedVault::open(vault_bytes, Some(etag))
         .map_err(|e| format!("Failed to load vault: {}", e))?;
 
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
     *session = Some(SessionState::Locked(locked_vault));
 
     Ok(())
@@ -118,7 +118,7 @@ pub fn api_load_vault(vault_bytes: Vec<u8>, etag: String) -> Result<(), String> 
 /// マスターパスワードでアンロック
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_unlock(master_password: String) -> Result<(), String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     let locked = match session.take() {
         Some(SessionState::Locked(v)) => v,
@@ -136,7 +136,7 @@ pub fn api_unlock(master_password: String) -> Result<(), String> {
 /// リカバリーキーでアンロック（新しいマスターパスワード設定フロー）
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_unlock_with_recovery_key(recovery_key: String) -> Result<(), String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     let locked = match session.take() {
         Some(SessionState::Locked(v)) => v,
@@ -156,7 +156,7 @@ pub fn api_unlock_with_recovery_key(recovery_key: String) -> Result<(), String> 
 /// ロック（vault_bytesを返す）
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_lock() -> Result<Vec<u8>, String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     match session.take() {
         Some(SessionState::Unlocked(unlocked)) => {
@@ -186,7 +186,7 @@ pub fn api_list_entries(
     include_trash: bool,
     only_favorites: bool,
 ) -> Result<Vec<DartEntryRow>, String> {
-    let session = VAULT_SESSION.lock().unwrap();
+    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
     let unlocked = match session.as_ref() {
         Some(SessionState::Unlocked(v)) => v,
         _ => return Err("Vault not unlocked".to_string()),
@@ -226,7 +226,7 @@ pub fn api_list_entries(
 /// エントリ詳細（復号済み）
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_get_entry(id: String) -> Result<DartEntry, String> {
-    let session = VAULT_SESSION.lock().unwrap();
+    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
     let unlocked = match session.as_ref() {
         Some(SessionState::Unlocked(v)) => v,
         _ => return Err("Vault not unlocked".to_string()),
@@ -265,7 +265,7 @@ pub fn api_create_entry(
     label_ids: Vec<String>,
     custom_fields_json: Option<String>,
 ) -> Result<String, String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     let typed_value: Value = serde_json::from_str(&typed_value_json)
         .map_err(|e| format!("Invalid typed_value JSON: {}", e))?;
@@ -307,7 +307,7 @@ pub fn api_update_entry(
     _label_ids: Option<Vec<String>>,
     custom_fields_json: Option<String>,
 ) -> Result<(), String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         // Get current entry to preserve typed_value if not provided
@@ -354,7 +354,7 @@ pub fn api_update_entry(
 /// エントリをゴミ箱へ移動
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_delete_entry(id: String) -> Result<(), String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked.delete_entry(&id)
@@ -367,7 +367,7 @@ pub fn api_delete_entry(id: String) -> Result<(), String> {
 /// ゴミ箱から復元
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_restore_entry(id: String) -> Result<(), String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked.restore_entry(&id)
@@ -380,7 +380,7 @@ pub fn api_restore_entry(id: String) -> Result<(), String> {
 /// 完全削除
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_purge_entry(id: String) -> Result<(), String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked.purge_entry(&id)
@@ -393,7 +393,7 @@ pub fn api_purge_entry(id: String) -> Result<(), String> {
 /// お気に入り設定
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_set_favorite(id: String, is_favorite: bool) -> Result<(), String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked.set_favorite(&id, is_favorite)
@@ -410,7 +410,7 @@ pub fn api_set_favorite(id: String, is_favorite: bool) -> Result<(), String> {
 /// ラベル一覧
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_list_labels() -> Result<Vec<DartLabel>, String> {
-    let session = VAULT_SESSION.lock().unwrap();
+    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
     let unlocked = match session.as_ref() {
         Some(SessionState::Unlocked(v)) => v,
         _ => return Err("Vault not unlocked".to_string()),
@@ -428,7 +428,7 @@ pub fn api_list_labels() -> Result<Vec<DartLabel>, String> {
 /// ラベル作成
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_create_label(name: String) -> Result<String, String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         let label = unlocked.create_label(name)
@@ -442,7 +442,7 @@ pub fn api_create_label(name: String) -> Result<String, String> {
 /// ラベル削除
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_delete_label(id: String) -> Result<(), String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked.delete_label(&id)
@@ -455,7 +455,7 @@ pub fn api_delete_label(id: String) -> Result<(), String> {
 /// ラベル名変更
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_rename_label(id: String, new_name: String) -> Result<(), String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked.rename_label(&id, new_name)
@@ -468,7 +468,7 @@ pub fn api_rename_label(id: String, new_name: String) -> Result<(), String> {
 /// エントリにラベルを紐付け
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_set_entry_labels(entry_id: String, label_ids: Vec<String>) -> Result<(), String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked.set_entry_labels(&entry_id, label_ids)
@@ -485,7 +485,7 @@ pub fn api_set_entry_labels(entry_id: String, label_ids: Vec<String>) -> Result<
 /// マスターパスワード変更
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_change_master_password(old_password: String, new_password: String) -> Result<(), String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked.change_master_password(&old_password, &new_password)
@@ -497,8 +497,8 @@ pub fn api_change_master_password(old_password: String, new_password: String) ->
 
 /// Argon2パラメータアップグレード
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
-pub fn api_upgrade_argon2_params(password: String, iterations: u32, memory: u32, parallelism: u32) -> Result<(), String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+pub fn api_upgrade_argon2_params(password: String, iterations: u32, memory: u32, parallelism: u32) -> Result<String, String> {
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     let new_params = crate::models::Argon2Params {
         salt: crate::codec::base32::encode(&rand::random::<[u8; 16]>()),
@@ -510,19 +510,21 @@ pub fn api_upgrade_argon2_params(password: String, iterations: u32, memory: u32,
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked.upgrade_argon2_params(&password, new_params)
             .map_err(|e| format!("Failed to upgrade argon2 params: {}", e))
+            .map(|recovery_key| recovery_key.to_display_string())
     } else {
         Err("Vault not unlocked".to_string())
     }
 }
 
-/// DEK ローテーション
+/// DEK ローテーション（新しいリカバリーキーを返す）
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
-pub fn api_rotate_dek(password: String) -> Result<(), String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+pub fn api_rotate_dek(password: String) -> Result<String, String> {
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
-        unlocked.rotate_dek(&password)
-            .map_err(|e| format!("Failed to rotate DEK: {}", e))
+        let recovery_key = unlocked.rotate_dek(&password)
+            .map_err(|e| format!("Failed to rotate DEK: {}", e))?;
+        Ok(recovery_key.to_display_string())
     } else {
         Err("Vault not unlocked".to_string())
     }
@@ -531,7 +533,7 @@ pub fn api_rotate_dek(password: String) -> Result<(), String> {
 /// リカバリーキー再発行
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_regenerate_recovery_key(password: String) -> Result<String, String> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         let recovery_key = unlocked.regenerate_recovery_key(&password)
@@ -563,7 +565,6 @@ pub fn api_generate_password(
         include_lowercase,
         include_numbers,
         include_symbols,
-        exclude_ambiguous: false,
     };
 
     generate_password(&options)
@@ -591,7 +592,7 @@ pub fn api_generate_totp_default(secret: String) -> Result<String, String> {
 /// 現在のvault_bytesを取得
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub fn api_get_vault_bytes() -> Result<Vec<u8>, String> {
-    let session = VAULT_SESSION.lock().unwrap();
+    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     match session.as_ref() {
         Some(SessionState::Locked(locked)) => {
@@ -637,7 +638,7 @@ pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> 
 
         // Get local contents (scoped to release lock before async)
         let local_contents = {
-            let session = VAULT_SESSION.lock().unwrap();
+            let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
             match session.as_ref() {
                 Some(SessionState::Unlocked(u)) => u.contents.clone(),
                 _ => return Err("Vault not unlocked".to_string()),
@@ -654,7 +655,7 @@ pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> 
             None => {
                 // No remote version - push current state
                 let (vault_bytes, etag) = {
-                    let session = VAULT_SESSION.lock().unwrap();
+                    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
                     match session.as_ref() {
                         Some(SessionState::Unlocked(u)) => {
                             (u.to_vault_bytes()
@@ -670,7 +671,7 @@ pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> 
                     .map_err(|e| format!("S3 upload failed: {}", e))?;
 
                 {
-                    let mut session = VAULT_SESSION.lock().unwrap();
+                    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
                     if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
                         u.set_etag(new_etag);
                     }
@@ -684,7 +685,7 @@ pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> 
         let remote_contents = {
             let remote_vault_file = VaultFile::from_bytes(&remote_bytes)
                 .map_err(|e| format!("Failed to parse remote vault: {}", e))?;
-            let session = VAULT_SESSION.lock().unwrap();
+            let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
             match session.as_ref() {
                 Some(SessionState::Unlocked(u)) => {
                     crate::crypto::encryption::decrypt_vault(&remote_vault_file.encrypted_vault, &u.dek)
@@ -700,7 +701,7 @@ pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> 
 
         // Apply merged state to session
         {
-            let mut session = VAULT_SESSION.lock().unwrap();
+            let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
             if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
                 u.contents.entries = merge_result.merged_entries;
                 u.contents.labels = merge_result.merged_labels;
@@ -710,7 +711,7 @@ pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> 
 
         // Serialize merged vault and push to storage
         let (merged_vault_bytes, merged_etag) = {
-            let session = VAULT_SESSION.lock().unwrap();
+            let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
             match session.as_ref() {
                 Some(SessionState::Unlocked(u)) => (
                     u.to_vault_bytes()
@@ -728,7 +729,7 @@ pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> 
 
         // Update etag in session
         {
-            let mut session = VAULT_SESSION.lock().unwrap();
+            let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
             if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
                 u.set_etag(new_etag);
             }
@@ -765,7 +766,7 @@ pub async fn api_push(storage_config: String) -> Result<(), String> {
 
     // Get vault bytes and etag (scoped to release lock before async)
     let (vault_bytes, etag) = {
-        let session = VAULT_SESSION.lock().unwrap();
+        let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
         match session.as_ref() {
             Some(SessionState::Locked(locked)) => {
@@ -799,7 +800,7 @@ pub async fn api_push(storage_config: String) -> Result<(), String> {
 
         // Update etag in session (scoped)
         {
-            let mut session = VAULT_SESSION.lock().unwrap();
+            let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
             match session.as_mut() {
                 Some(SessionState::Locked(ref mut locked)) => {
                     locked.set_etag(_new_etag);
@@ -857,7 +858,7 @@ pub async fn api_download(storage_config: String) -> Result<bool, String> {
                 let locked_vault = LockedVault::open(vault_bytes, Some(etag))
                     .map_err(|e| format!("Failed to open vault: {}", e))?;
 
-                let mut session = VAULT_SESSION.lock().unwrap();
+                let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
                 *session = Some(SessionState::Locked(locked_vault));
 
                 Ok(true)
@@ -884,6 +885,6 @@ pub fn api_resolve_conflict(_id: String, _resolution: String) -> Result<(), Stri
 
 /// Vaultがアンロック状態かチェック
 pub fn api_is_unlocked() -> bool {
-    VAULT_SESSION.lock().unwrap().as_ref()
+    VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner()).as_ref()
         .map_or(false, |s| matches!(s, SessionState::Unlocked(_)))
 }

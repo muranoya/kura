@@ -8,7 +8,6 @@ pub struct PasswordOptions {
     pub include_lowercase: bool,
     pub include_numbers: bool,
     pub include_symbols: bool,
-    pub exclude_ambiguous: bool,
 }
 
 impl Default for PasswordOptions {
@@ -19,7 +18,6 @@ impl Default for PasswordOptions {
             include_lowercase: true,
             include_numbers: true,
             include_symbols: true,
-            exclude_ambiguous: false,
         }
     }
 }
@@ -29,7 +27,6 @@ pub fn generate_password(options: &PasswordOptions) -> Result<String> {
     const LOWERCASE: &[u8] = b"abcdefghijklmnopqrstuvwxyz";
     const NUMBERS: &[u8] = b"0123456789";
     const SYMBOLS: &[u8] = b"!@#$%^&*()-_=+[]{}|;:,.<>?";
-    const AMBIGUOUS: &[u8] = b"il1Lo0O";
 
     let mut charset = Vec::new();
 
@@ -46,11 +43,6 @@ pub fn generate_password(options: &PasswordOptions) -> Result<String> {
         charset.extend_from_slice(SYMBOLS);
     }
 
-    // Remove ambiguous characters if requested
-    if options.exclude_ambiguous {
-        charset.retain(|&c| !AMBIGUOUS.contains(&c));
-    }
-
     if charset.is_empty() {
         return Err(crate::error::VaultError::InvalidConfiguration(
             "No characters available for password generation".to_string(),
@@ -58,8 +50,10 @@ pub fn generate_password(options: &PasswordOptions) -> Result<String> {
     }
 
     let mut password = String::new();
+    let mut rng = rand::thread_rng();
     for _ in 0..options.length {
-        let idx = (rand::random::<u32>() as usize) % charset.len();
+        use rand::Rng;
+        let idx = rng.gen_range(0..charset.len());
         password.push(charset[idx] as char);
     }
 
@@ -90,7 +84,6 @@ mod tests {
             include_lowercase: false,
             include_numbers: true,
             include_symbols: false,
-            exclude_ambiguous: false,
         };
 
         let password = generate_password(&options).unwrap();

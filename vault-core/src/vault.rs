@@ -4,6 +4,9 @@ use crate::models::{Argon2Params, EntryData, Label, Entry, EntryFilter};
 use crate::store::{VaultFile, VaultContents, VaultEntry, LabelValue};
 use crate::storage::StorageBackend;
 
+/// Current schema version for vault.json
+const CURRENT_SCHEMA_VERSION: u32 = 1;
+
 /// Locked vault - encrypted data in memory, DEK not available
 pub struct LockedVault {
     vault_file: VaultFile,
@@ -45,7 +48,7 @@ impl LockedVault {
         let encrypted_vault = crate::crypto::encryption::encrypt_vault(&contents, &dek)?;
 
         let vault_file = VaultFile {
-            schema_version: 1,
+            schema_version: CURRENT_SCHEMA_VERSION,
             meta: vault_meta,
             encrypted_vault,
         };
@@ -61,10 +64,8 @@ impl LockedVault {
         let vault_file = VaultFile::from_bytes(&bytes)?;
 
         // Validate schema version
-        if vault_file.schema_version != 1 {
-            return Err(VaultError::InvalidInput(
-                format!("Unsupported schema version: {}", vault_file.schema_version),
-            ));
+        if vault_file.schema_version != CURRENT_SCHEMA_VERSION {
+            return Err(VaultError::UnsupportedSchemaVersion(vault_file.schema_version));
         }
 
         Ok(LockedVault {
@@ -136,25 +137,6 @@ impl LockedVault {
 }
 
 impl UnlockedVault {
-    /// Get recovery key (requires master password verification)
-    pub fn get_recovery_key(&self, master_password: &str) -> Result<crate::crypto::RecoveryKey> {
-        use base64::Engine;
-
-        // Verify master password
-        let kek = crate::crypto::kdf::derive_kek(master_password, &self.meta.argon2_params)?;
-        let engine = base64::engine::general_purpose::STANDARD;
-        let encrypted_dek_bytes = engine.decode(&self.meta.encrypted_dek_master)
-            .map_err(|_| VaultError::DecryptionError("Invalid base64".to_string()))?;
-        let dek_from_master = Dek::unwrap(&encrypted_dek_bytes, &kek)?;
-
-        // Verify master password is correct
-        if dek_from_master.as_bytes() != self.dek.as_bytes() {
-            return Err(VaultError::InvalidMasterPassword);
-        }
-
-        // TODO: Extract recovery key from encrypted_dek_recovery
-        Err(VaultError::StorageError("Recovery key extraction not yet implemented".to_string()))
-    }
 
     /// List entries
     pub fn list_entries(&self, filter: &EntryFilter) -> Result<Vec<Entry>> {
@@ -229,7 +211,9 @@ impl UnlockedVault {
     pub fn delete_entry(&mut self, id: &str) -> Result<()> {
         let entry = self.contents.entries.get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
-        entry.deleted_at = Some(chrono::Utc::now().timestamp());
+        let now = chrono::Utc::now().timestamp();
+        entry.deleted_at = Some(now);
+        entry.updated_at = now;
         Ok(())
     }
 
@@ -355,31 +339,37 @@ impl UnlockedVault {
         Ok(())
     }
 
-    /// Rotate DEK (re-encrypt all entries with new key)
-    pub fn rotate_dek(&mut self, master_password: &str) -> Result<()> {
+    /// Rotate DEK and regenerate recovery key
+    /// Returns the new recovery key for user to save
+    pub fn rotate_dek(&mut self, master_password: &str) -> Result<crate::crypto::RecoveryKey> {
         use base64::Engine;
 
-        let new_dek = Dek::generate();
-
-        // Re-encrypt DEK wrapper with existing KEKs
+        // Verify master password first
         let kek_master = crate::crypto::kdf::derive_kek(master_password, &self.meta.argon2_params)?;
+        let engine = base64::engine::general_purpose::STANDARD;
+        let encrypted_dek_bytes = engine.decode(&self.meta.encrypted_dek_master)
+            .map_err(|_| VaultError::DecryptionError("Invalid base64".to_string()))?;
+        let _verified_dek = Dek::unwrap(&encrypted_dek_bytes, &kek_master)?;
+
+        // Generate new DEK
+        let new_dek = Dek::generate();
         let encrypted_dek_master = new_dek.wrap(&kek_master)?;
 
-        // Re-encrypt recovery key wrapper (need to extract recovery key first)
-        // For now, we can't do this without the recovery key, so we'll skip this part
-        // In a full implementation, this would require either:
-        // 1. Passing the recovery key as a parameter, or
-        // 2. Deriving it from the recovery key string
+        // Generate new recovery key
+        let new_recovery_key = crate::crypto::RecoveryKey::generate();
+        let kek_recovery = new_recovery_key.derive_kek(&self.meta.argon2_params)?;
+        let encrypted_dek_recovery = new_dek.wrap(&kek_recovery)?;
 
+        // Update vault state
         self.dek = new_dek;
-        let engine = base64::engine::general_purpose::STANDARD;
         self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
+        self.meta.encrypted_dek_recovery = engine.encode(&encrypted_dek_recovery);
 
-        Ok(())
+        Ok(new_recovery_key)
     }
 
     /// Upgrade Argon2 parameters for stronger key derivation
-    pub fn upgrade_argon2_params(&mut self, master_password: &str, new_params: Argon2Params) -> Result<()> {
+    pub fn upgrade_argon2_params(&mut self, master_password: &str, new_params: Argon2Params) -> Result<crate::crypto::RecoveryKey> {
         use base64::Engine;
 
         // Verify password with old params
@@ -393,11 +383,17 @@ impl UnlockedVault {
         let new_kek = crate::crypto::kdf::derive_kek(master_password, &new_params)?;
         let encrypted_dek_master = self.dek.wrap(&new_kek)?;
 
+        // Generate new recovery key with new params
+        let new_recovery_key = crate::crypto::RecoveryKey::generate();
+        let kek_recovery = new_recovery_key.derive_kek(&new_params)?;
+        let encrypted_dek_recovery = self.dek.wrap(&kek_recovery)?;
+
         // Update vault_meta
         self.meta.argon2_params = new_params;
         self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
+        self.meta.encrypted_dek_recovery = engine.encode(&encrypted_dek_recovery);
 
-        Ok(())
+        Ok(new_recovery_key)
     }
 
     /// Regenerate recovery key
@@ -454,6 +450,9 @@ impl UnlockedVault {
         self.contents.labels = merge_result.merged_labels;
         self.etag = Some(remote_etag.clone());
 
+        // Apply garbage collection to remove old tombstones
+        crate::sync::apply_gc_to_contents(&mut self.contents);
+
         // Push merged state back to remote
         let new_etag = self.push(storage).await?;
         self.etag = Some(new_etag.clone());
@@ -500,7 +499,7 @@ impl UnlockedVault {
     /// Lock vault (DEK is zeroized)
     pub fn lock(self) -> Result<LockedVault> {
         let vault_file = VaultFile {
-            schema_version: 1,
+            schema_version: CURRENT_SCHEMA_VERSION,
             meta: self.meta,
             encrypted_vault: crate::crypto::encryption::encrypt_vault(&self.contents, &self.dek)?,
         };
@@ -520,7 +519,7 @@ impl UnlockedVault {
     fn to_vault_file(&self) -> Result<VaultFile> {
         let encrypted_vault = crate::crypto::encryption::encrypt_vault(&self.contents, &self.dek)?;
         Ok(VaultFile {
-            schema_version: 1,
+            schema_version: CURRENT_SCHEMA_VERSION,
             meta: self.meta.clone(),
             encrypted_vault,
         })
@@ -531,11 +530,11 @@ impl UnlockedVault {
 fn vault_entry_to_entry(id: String, e: &VaultEntry) -> Entry {
     // Convert typed_value back to EntryData
     let data = EntryData {
-        schema_version: 1,
+        schema_version: CURRENT_SCHEMA_VERSION,
         entry_type: e.entry_type,
         typed_value: e.typed_value.clone(),
         notes: e.notes.clone(),
-        custom_fields: None,
+        custom_fields: e.custom_fields.clone(),
     };
 
     Entry {

@@ -232,7 +232,6 @@ fn test_password_generation() {
         include_lowercase: true,
         include_numbers: true,
         include_symbols: false,
-        exclude_ambiguous: false,
     };
 
     let password = vault_core::generate_password(&options).expect("Failed to generate password");

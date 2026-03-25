@@ -39,7 +39,7 @@ pub fn api_create_new_vault(master_password: String) -> Result<String, JsValue> 
         .map_err(|e| JsValue::from_str(&format!("Failed to create vault: {}", e)))?;
 
     // Get recovery key by unlocking first
-    let unlocked = locked_vault
+    let mut unlocked = locked_vault
         .unlock(&master_password)
         .map_err(|e| JsValue::from_str(&format!("Failed to unlock: {}", e)))?;
 
@@ -52,10 +52,10 @@ pub fn api_create_new_vault(master_password: String) -> Result<String, JsValue> 
         .lock()
         .map_err(|e| JsValue::from_str(&format!("Failed to lock: {}", e)))?;
 
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
     *session = Some(SessionState::Locked(locked_vault));
 
-    Ok(recovery_key.to_string())
+    Ok(recovery_key.to_display_string())
 }
 
 /// 既存Vaultをメモリに読み込む
@@ -64,7 +64,7 @@ pub fn api_load_vault(vault_bytes: &[u8], etag: String) -> Result<(), JsValue> {
     let locked_vault = LockedVault::open(vault_bytes.to_vec(), Some(etag))
         .map_err(|e| JsValue::from_str(&format!("Failed to load vault: {}", e)))?;
 
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
     *session = Some(SessionState::Locked(locked_vault));
 
     Ok(())
@@ -73,7 +73,7 @@ pub fn api_load_vault(vault_bytes: &[u8], etag: String) -> Result<(), JsValue> {
 /// マスターパスワードでアンロック
 #[wasm_bindgen]
 pub fn api_unlock(master_password: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     let locked = match session.take() {
         Some(SessionState::Locked(v)) => v,
@@ -94,7 +94,7 @@ pub fn api_unlock(master_password: String) -> Result<(), JsValue> {
 /// リカバリーキーでアンロック（新しいマスターパスワード設定フロー）
 #[wasm_bindgen]
 pub fn api_unlock_with_recovery_key(recovery_key: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     let locked = match session.take() {
         Some(SessionState::Locked(v)) => v,
@@ -103,9 +103,6 @@ pub fn api_unlock_with_recovery_key(recovery_key: String) -> Result<(), JsValue>
         }
         None => return Err(JsValue::from_str("No vault loaded")),
     };
-
-    let recovery_key = RecoveryKey::from_string(&recovery_key)
-        .map_err(|e| JsValue::from_str(&format!("Invalid recovery key: {}", e)))?;
 
     let unlocked = locked
         .unlock_with_recovery_key(&recovery_key)
@@ -118,7 +115,7 @@ pub fn api_unlock_with_recovery_key(recovery_key: String) -> Result<(), JsValue>
 /// ロック（vault_bytesを返す）
 #[wasm_bindgen]
 pub fn api_lock() -> Result<Vec<u8>, JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     match session.take() {
         Some(SessionState::Unlocked(unlocked)) => {
@@ -140,7 +137,7 @@ pub fn api_lock() -> Result<Vec<u8>, JsValue> {
 /// 現在のvault_bytesを取得
 #[wasm_bindgen]
 pub fn api_get_vault_bytes() -> Result<Vec<u8>, JsValue> {
-    let session = VAULT_SESSION.lock().unwrap();
+    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     match session.as_ref() {
         Some(SessionState::Locked(locked)) => locked
@@ -166,7 +163,7 @@ pub fn api_list_entries(
     label_id: Option<String>,
     include_trash: bool,
 ) -> Result<String, JsValue> {
-    let session = VAULT_SESSION.lock().unwrap();
+    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
     let unlocked = match session.as_ref() {
         Some(SessionState::Unlocked(v)) => v,
         _ => return Err(JsValue::from_str("Vault not unlocked")),
@@ -212,7 +209,7 @@ pub fn api_list_entries(
 /// 戻り値は JSON 文字列
 #[wasm_bindgen]
 pub fn api_get_entry(id: String) -> Result<String, JsValue> {
-    let session = VAULT_SESSION.lock().unwrap();
+    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
     let unlocked = match session.as_ref() {
         Some(SessionState::Unlocked(v)) => v,
         _ => return Err(JsValue::from_str("Vault not unlocked")),
@@ -248,8 +245,9 @@ pub fn api_create_entry(
     notes: Option<String>,
     typed_value_json: String,
     label_ids: Vec<String>,
+    custom_fields_json: Option<String>,
 ) -> Result<String, JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     let typed_value: Value = serde_json::from_str(&typed_value_json)
         .map_err(|e| JsValue::from_str(&format!("Invalid typed_value JSON: {}", e)))?;
@@ -257,11 +255,19 @@ pub fn api_create_entry(
     let et = EntryType::from_str(&entry_type)
         .ok_or_else(|| JsValue::from_str(&format!("Invalid entry type: {}", entry_type)))?;
 
+    let custom_fields = if let Some(json) = custom_fields_json {
+        Some(serde_json::from_str(&json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid custom_fields JSON: {}", e)))?)
+    } else {
+        None
+    };
+
     let data = crate::models::EntryData {
         schema_version: 1,
         entry_type: et,
         typed_value,
         notes,
+        custom_fields,
     };
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
@@ -282,8 +288,9 @@ pub fn api_update_entry(
     notes: Option<String>,
     typed_value_json: Option<String>,
     label_ids: Option<Vec<String>>,
+    custom_fields_json: Option<String>,
 ) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         // Get current entry to preserve typed_value if not provided
@@ -299,11 +306,19 @@ pub fn api_update_entry(
             current.data.typed_value.clone()
         };
 
+        let custom_fields = if let Some(json) = custom_fields_json {
+            Some(serde_json::from_str(&json)
+                .map_err(|e| JsValue::from_str(&format!("Invalid custom_fields JSON: {}", e)))?)
+        } else {
+            current.data.custom_fields.clone()
+        };
+
         let data = crate::models::EntryData {
             schema_version: 1,
             entry_type: current.entry_type,
             typed_value,
             notes: notes.or_else(|| current.data.notes.clone()),
+            custom_fields,
         };
 
         unlocked
@@ -325,7 +340,7 @@ pub fn api_update_entry(
 /// エントリをゴミ箱へ移動
 #[wasm_bindgen]
 pub fn api_delete_entry(id: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked
@@ -339,7 +354,7 @@ pub fn api_delete_entry(id: String) -> Result<(), JsValue> {
 /// ゴミ箱から復元
 #[wasm_bindgen]
 pub fn api_restore_entry(id: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked
@@ -353,7 +368,7 @@ pub fn api_restore_entry(id: String) -> Result<(), JsValue> {
 /// 完全削除
 #[wasm_bindgen]
 pub fn api_purge_entry(id: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked
@@ -367,7 +382,7 @@ pub fn api_purge_entry(id: String) -> Result<(), JsValue> {
 /// お気に入り設定
 #[wasm_bindgen]
 pub fn api_set_favorite(id: String, is_favorite: bool) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked
@@ -386,7 +401,7 @@ pub fn api_set_favorite(id: String, is_favorite: bool) -> Result<(), JsValue> {
 /// 戻り値は JSON 文字列（ラベル配列）
 #[wasm_bindgen]
 pub fn api_list_labels() -> Result<String, JsValue> {
-    let session = VAULT_SESSION.lock().unwrap();
+    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
     let unlocked = match session.as_ref() {
         Some(SessionState::Unlocked(v)) => v,
         _ => return Err(JsValue::from_str("Vault not unlocked")),
@@ -413,7 +428,7 @@ pub fn api_list_labels() -> Result<String, JsValue> {
 /// ラベル作成
 #[wasm_bindgen]
 pub fn api_create_label(name: String) -> Result<String, JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         let label = unlocked
@@ -428,7 +443,7 @@ pub fn api_create_label(name: String) -> Result<String, JsValue> {
 /// ラベル削除
 #[wasm_bindgen]
 pub fn api_delete_label(id: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked
@@ -442,7 +457,7 @@ pub fn api_delete_label(id: String) -> Result<(), JsValue> {
 /// エントリにラベルを紐付け
 #[wasm_bindgen]
 pub fn api_set_entry_labels(entry_id: String, label_ids: Vec<String>) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked
@@ -460,7 +475,7 @@ pub fn api_set_entry_labels(entry_id: String, label_ids: Vec<String>) -> Result<
 /// マスターパスワード変更
 #[wasm_bindgen]
 pub fn api_change_master_password(old_password: String, new_password: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked
@@ -478,8 +493,8 @@ pub fn api_upgrade_argon2_params(
     iterations: u32,
     memory: u32,
     parallelism: u32,
-) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+) -> Result<String, JsValue> {
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     let new_params = crate::models::Argon2Params {
         salt: crate::codec::base32::encode(&rand::random::<[u8; 16]>()),
@@ -492,20 +507,22 @@ pub fn api_upgrade_argon2_params(
         unlocked
             .upgrade_argon2_params(&password, new_params)
             .map_err(|e| JsValue::from_str(&format!("Failed to upgrade argon2 params: {}", e)))
+            .map(|recovery_key| recovery_key.to_display_string())
     } else {
         Err(JsValue::from_str("Vault not unlocked"))
     }
 }
 
-/// DEK ローテーション
+/// DEK ローテーション（新しいリカバリーキーを返す）
 #[wasm_bindgen]
-pub fn api_rotate_dek(password: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+pub fn api_rotate_dek(password: String) -> Result<String, JsValue> {
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
-        unlocked
+        let recovery_key = unlocked
             .rotate_dek(&password)
-            .map_err(|e| JsValue::from_str(&format!("Failed to rotate DEK: {}", e)))
+            .map_err(|e| JsValue::from_str(&format!("Failed to rotate DEK: {}", e)))?;
+        Ok(recovery_key.to_display_string())
     } else {
         Err(JsValue::from_str("Vault not unlocked"))
     }
@@ -514,13 +531,13 @@ pub fn api_rotate_dek(password: String) -> Result<(), JsValue> {
 /// リカバリーキー再発行
 #[wasm_bindgen]
 pub fn api_regenerate_recovery_key(password: String) -> Result<String, JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap();
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         let recovery_key = unlocked
             .regenerate_recovery_key(&password)
             .map_err(|e| JsValue::from_str(&format!("Failed to regenerate recovery key: {}", e)))?;
-        Ok(recovery_key.to_string())
+        Ok(recovery_key.to_display_string())
     } else {
         Err(JsValue::from_str("Vault not unlocked"))
     }

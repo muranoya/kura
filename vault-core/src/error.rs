@@ -49,6 +49,9 @@ pub enum VaultError {
 
     #[error("Invalid input: {0}")]
     InvalidInput(String),
+
+    #[error("Unsupported schema version: {0}")]
+    UnsupportedSchemaVersion(u32),
 }
 
 pub type Result<T> = std::result::Result<T, VaultError>;
