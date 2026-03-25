@@ -9,7 +9,7 @@ argon2 = "0"
 rand = { version = "0", optional = true }  # Used for password generation and UUIDs
 zeroize = { version = "1", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["raw_value"] }
 uuid = { version = "1", features = ["v4", "serde", "js"] }
 thiserror = "2"
 chrono = { version = "0", features = ["serde", "wasmbind"] }
@@ -33,12 +33,13 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"], optional = tr
 # Native-only: rand with getrandom support
 rand = { version = "0", features = ["getrandom"] }
 
+# WASM-specific dependencies for browser targets
+[target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = { version = "0", optional = true }
 wasm-bindgen-futures = { version = "0", optional = true }
 js-sys = { version = "0", optional = true }
 web-sys = { version = "0", features = ["Window", "Headers", "Request", "Response", "RequestInit", "RequestMode"], optional = true }
 serde-wasm-bindgen = { version = "0", optional = true }
-getrandom = { version = "0", features = ["js"], optional = true }
 
 [features]
 default = ["storage-s3", "dep:rand"]
@@ -50,6 +51,7 @@ desktop = ["storage-s3"]
 # WASM feature: does NOT include storage-s3 due to tokio incompatibility
 # WASM S3 access uses web-sys + manual AWS Signature V4 implementation
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:web-sys", "dep:serde-wasm-bindgen"]
+storage-s3-wasm = ["wasm", "dep:rand"]
 
 [lib]
 crate-type = ["staticlib", "cdylib", "rlib"]

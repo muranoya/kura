@@ -1,5 +1,6 @@
 #[cfg(feature = "mobile")]
 mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be accurate, and you can change it according to your needs. */
+mod raw_json_serde;
 pub mod config;
 pub mod error;
 pub mod models;

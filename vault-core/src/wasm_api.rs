@@ -5,7 +5,6 @@
 //! wasm-bindgen で JavaScript バインディング可能な型のみを使用。
 
 use crate::{
-    crypto::RecoveryKey,
     models::{EntryType, EntryFilter},
     totp::generate_totp_default,
     vault::{LockedVault, UnlockedVault},
@@ -162,6 +161,7 @@ pub fn api_list_entries(
     entry_type: Option<String>,
     label_id: Option<String>,
     include_trash: bool,
+    only_favorites: bool,
 ) -> Result<String, JsValue> {
     let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
     let unlocked = match session.as_ref() {
@@ -171,7 +171,8 @@ pub fn api_list_entries(
 
     let mut filter = EntryFilter::new()
         .with_trash(include_trash)
-        .with_search(search_query.unwrap_or_default());
+        .with_search(search_query.unwrap_or_default())
+        .with_favorites(only_favorites);
 
     if let Some(t) = entry_type {
         if let Some(entry_type) = EntryType::from_str(&t) {
@@ -231,6 +232,7 @@ pub fn api_get_entry(id: String) -> Result<String, JsValue> {
         "typed_value": serde_json::to_string(&entry.data.typed_value)
             .unwrap_or_else(|_| "{}".to_string()),
         "labels": entry.labels,
+        "custom_fields": entry.data.custom_fields,
     });
 
     serde_json::to_string(&wasm_entry)
@@ -263,7 +265,6 @@ pub fn api_create_entry(
     };
 
     let data = crate::models::EntryData {
-        schema_version: 1,
         entry_type: et,
         typed_value,
         notes,
@@ -314,7 +315,6 @@ pub fn api_update_entry(
         };
 
         let data = crate::models::EntryData {
-            schema_version: 1,
             entry_type: current.entry_type,
             typed_value,
             notes: notes.or_else(|| current.data.notes.clone()),
@@ -454,6 +454,20 @@ pub fn api_delete_label(id: String) -> Result<(), JsValue> {
     }
 }
 
+/// ラベル名変更
+#[wasm_bindgen]
+pub fn api_rename_label(id: String, new_name: String) -> Result<(), JsValue> {
+    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+
+    if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
+        unlocked
+            .rename_label(&id, new_name)
+            .map_err(|e| JsValue::from_str(&format!("Failed to rename label: {}", e)))
+    } else {
+        Err(JsValue::from_str("Vault not unlocked"))
+    }
+}
+
 /// エントリにラベルを紐付け
 #[wasm_bindgen]
 pub fn api_set_entry_labels(entry_id: String, label_ids: Vec<String>) -> Result<(), JsValue> {
@@ -568,7 +582,8 @@ pub fn api_generate_password(
         include_symbols,
     };
 
-    Ok(generate_password(&options))
+    generate_password(&options)
+        .map_err(|e| JsValue::from_str(&format!("Failed to generate password: {}", e)))
 }
 
 /// TOTP生成
@@ -583,4 +598,269 @@ pub fn api_generate_totp(secret: String, digits: u32, period: u32) -> Result<Str
 pub fn api_generate_totp_default(secret: String) -> Result<String, JsValue> {
     generate_totp_default(&secret)
         .map_err(|e| JsValue::from_str(&format!("Failed to generate TOTP: {}", e)))
+}
+
+// ============================================================================
+// S3 Sync API (WASM版)
+// ============================================================================
+
+#[cfg(feature = "storage-s3-wasm")]
+use {
+    crate::config::S3Config,
+};
+
+#[cfg(feature = "storage-s3-wasm")]
+fn parse_s3_config(storage_config: &str) -> Result<S3Config, String> {
+    let mut map: serde_json::Map<String, serde_json::Value> =
+        serde_json::from_str(storage_config)
+            .map_err(|e| format!("Failed to parse S3 config: {}", e))?;
+
+    // Add default key if not present
+    if !map.contains_key("key") {
+        map.insert(
+            "key".to_string(),
+            serde_json::Value::String("vault.json".to_string()),
+        );
+    }
+
+    // Parse into S3Config
+    let config: S3Config = serde_json::from_value(serde_json::Value::Object(map))
+        .map_err(|e| format!("Failed to parse S3 config: {}", e))?;
+
+    config
+        .validate()
+        .map_err(|e| format!("Invalid S3 config: {}", e))?;
+
+    Ok(config)
+}
+
+/// S3からVaultをダウンロード＆ローカルデータとマージ
+#[cfg(feature = "storage-s3-wasm")]
+#[wasm_bindgen]
+pub fn api_sync(storage_config: String) -> js_sys::Promise {
+    wasm_bindgen_futures::future_to_promise(async move {
+        do_sync_inner(storage_config)
+            .await
+            .map(|_| wasm_bindgen::JsValue::TRUE)
+            .map_err(|e| wasm_bindgen::JsValue::from_str(&e))
+    })
+}
+
+#[cfg(feature = "storage-s3-wasm")]
+async fn do_sync_inner(storage_config: String) -> Result<(), String> {
+    use crate::store::VaultFile;
+
+    const MAX_RETRIES: usize = 5;
+
+    let s3_config = parse_s3_config(&storage_config)?;
+    let storage = crate::storage::WasmS3Storage::new(s3_config)
+        .map_err(|e| format!("Failed to create S3 storage: {}", e))?;
+
+    for attempt in 0..MAX_RETRIES {
+        // (1) ローカルコンテンツを取得（lock即座にdrop）
+        let local_contents = {
+            let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+            match session.as_ref() {
+                Some(SessionState::Unlocked(u)) => u.contents.clone(),
+                _ => return Err("Vault not unlocked".to_string()),
+            }
+        };
+
+        // (2) リモートからダウンロード
+        let remote_option = storage
+            .download()
+            .await
+            .map_err(|e| format!("S3 download failed: {}", e))?;
+
+        let (remote_bytes, remote_etag) = match remote_option {
+            None => {
+                // リモートに存在しない → ローカルをアップロード
+                let (vault_bytes, local_etag) = {
+                    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+                    match session.as_ref() {
+                        Some(SessionState::Unlocked(u)) => (
+                            u.to_vault_bytes()
+                                .map_err(|e| format!("Failed to serialize vault: {}", e))?,
+                            u.get_etag().cloned(),
+                        ),
+                        _ => return Err("Vault not unlocked".to_string()),
+                    }
+                };
+
+                let new_etag = storage
+                    .upload(&vault_bytes, local_etag.as_deref())
+                    .await
+                    .map_err(|e| format!("S3 upload failed: {}", e))?;
+
+                {
+                    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+                    if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
+                        u.set_etag(new_etag);
+                    }
+                }
+
+                return Ok(());
+            }
+            Some(pair) => pair,
+        };
+
+        // (3) リモートVaultをロック解除用にDEKで復号
+        let remote_contents = {
+            let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+            match session.as_ref() {
+                Some(SessionState::Unlocked(u)) => {
+                    let remote_vault_file = VaultFile::from_bytes(&remote_bytes)
+                        .map_err(|e| format!("Failed to parse remote vault: {}", e))?;
+                    crate::crypto::encryption::decrypt_vault(
+                        &remote_vault_file.encrypted_vault,
+                        &u.dek,
+                    )
+                    .map_err(|e| format!("Failed to decrypt remote vault: {}", e))?
+                }
+                _ => return Err("Vault not unlocked".to_string()),
+            }
+        };
+
+        // (4) auto_merge
+        let merge_result = crate::sync::auto_merge(&local_contents, &remote_contents)
+            .map_err(|e| format!("Merge failed: {}", e))?;
+
+        // (5) GC適用 - GC前のmerge_resultをVaultContentsにまとめてからGCを適用する
+        let mut merged_contents = crate::store::VaultContents {
+            entries: merge_result.merged_entries,
+            labels: merge_result.merged_labels,
+        };
+        crate::sync::apply_gc_to_contents(&mut merged_contents);
+
+        // (6) session に GC後のmerged state を適用
+        {
+            let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+            if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
+                u.contents.entries = merged_contents.entries;
+                u.contents.labels = merged_contents.labels;
+                u.set_etag(remote_etag.clone());
+            }
+        }
+
+        // (7) 再シリアライズ
+        let vault_bytes = {
+            let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+            match session.as_ref() {
+                Some(SessionState::Unlocked(u)) => u
+                    .to_vault_bytes()
+                    .map_err(|e| format!("Failed to serialize vault: {}", e))?,
+                _ => return Err("Vault not unlocked".to_string()),
+            }
+        };
+
+        // (8) Conditional PUT (If-Match: remote_etag) - GC後のETagで再試行
+        match storage
+            .upload(&vault_bytes, Some(&remote_etag))
+            .await
+        {
+            Ok(new_etag) => {
+                let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+                if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
+                    u.set_etag(new_etag);
+                }
+                return Ok(());
+            }
+            Err(crate::error::VaultError::ConflictDetected) => {
+                // 409: リトライ
+                if attempt + 1 == MAX_RETRIES {
+                    return Err("Sync failed after maximum retries".to_string());
+                }
+                continue;
+            }
+            Err(e) => return Err(format!("S3 upload failed: {}", e)),
+        }
+    }
+
+    Err("Sync failed after maximum retries".to_string())
+}
+
+/// S3へVaultをプッシュ
+#[cfg(feature = "storage-s3-wasm")]
+#[wasm_bindgen]
+pub fn api_push(storage_config: String) -> js_sys::Promise {
+    wasm_bindgen_futures::future_to_promise(async move {
+        do_push_inner(storage_config)
+            .await
+            .map(|_| wasm_bindgen::JsValue::TRUE)
+            .map_err(|e| wasm_bindgen::JsValue::from_str(&e))
+    })
+}
+
+#[cfg(feature = "storage-s3-wasm")]
+async fn do_push_inner(storage_config: String) -> Result<(), String> {
+    let s3_config = parse_s3_config(&storage_config)?;
+    let storage = crate::storage::WasmS3Storage::new(s3_config)
+        .map_err(|e| format!("Failed to create S3 storage: {}", e))?;
+
+    let (vault_bytes, etag) = {
+        let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+        match session.as_ref() {
+            Some(SessionState::Locked(l)) => (
+                l.to_vault_bytes()
+                    .map_err(|e| format!("Failed to serialize vault: {}", e))?,
+                l.get_etag().cloned(),
+            ),
+            Some(SessionState::Unlocked(u)) => (
+                u.to_vault_bytes()
+                    .map_err(|e| format!("Failed to serialize vault: {}", e))?,
+                u.get_etag().cloned(),
+            ),
+            None => return Err("No vault loaded".to_string()),
+        }
+    };
+
+    let new_etag = storage
+        .upload(&vault_bytes, etag.as_deref())
+        .await
+        .map_err(|e| format!("S3 upload failed: {}", e))?;
+
+    {
+        let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+        match session.as_mut() {
+            Some(SessionState::Locked(ref mut l)) => l.set_etag(new_etag),
+            Some(SessionState::Unlocked(ref mut u)) => u.set_etag(new_etag),
+            None => {}
+        }
+    }
+
+    Ok(())
+}
+
+/// S3からVaultをダウンロードしてセッションにロード
+#[cfg(feature = "storage-s3-wasm")]
+#[wasm_bindgen]
+pub fn api_download(storage_config: String) -> js_sys::Promise {
+    wasm_bindgen_futures::future_to_promise(async move {
+        do_download_inner(storage_config)
+            .await
+            .map(|exists| wasm_bindgen::JsValue::from_bool(exists))
+            .map_err(|e| wasm_bindgen::JsValue::from_str(&e))
+    })
+}
+
+#[cfg(feature = "storage-s3-wasm")]
+async fn do_download_inner(storage_config: String) -> Result<bool, String> {
+    let s3_config = parse_s3_config(&storage_config)?;
+    let storage = crate::storage::WasmS3Storage::new(s3_config)
+        .map_err(|e| format!("Failed to create S3 storage: {}", e))?;
+
+    match storage
+        .download()
+        .await
+        .map_err(|e| format!("S3 download failed: {}", e))?
+    {
+        Some((vault_bytes, etag)) => {
+            let locked = LockedVault::open(vault_bytes, Some(etag))
+                .map_err(|e| format!("Failed to open vault: {}", e))?;
+            let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+            *session = Some(SessionState::Locked(locked));
+            Ok(true)
+        }
+        None => Ok(false),
+    }
 }

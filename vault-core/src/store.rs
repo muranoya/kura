@@ -2,6 +2,7 @@
 use crate::models::EntryType;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use zeroize::Zeroizing;
 
 /// Top-level vault.json structure stored in S3
 /// schema_version and meta are in plaintext, encrypted_vault is AES-256-GCM encrypted
@@ -45,7 +46,8 @@ pub struct VaultEntry {
     pub purged_at: Option<i64>,
     pub is_favorite: bool,
     pub label_ids: Vec<String>,
-    pub typed_value: serde_json::Value,
+    #[serde(with = "crate::raw_json_serde")]
+    pub typed_value: Zeroizing<String>,
     pub notes: Option<String>,
     pub custom_fields: Option<Vec<crate::models::entry_data::CustomField>>,
 }

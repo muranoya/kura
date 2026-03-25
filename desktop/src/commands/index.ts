@@ -152,8 +152,8 @@ export async function upgradeArgon2Params(
   iterations: number,
   memory: number,
   parallelism: number
-): Promise<void> {
-  return invoke<void>('upgrade_argon2_params', {
+): Promise<string> {
+  return invoke<string>('upgrade_argon2_params', {
     password,
     iterations,
     memory,
@@ -161,8 +161,8 @@ export async function upgradeArgon2Params(
   })
 }
 
-export async function rotateDek(password: string): Promise<void> {
-  return invoke<void>('rotate_dek', { password })
+export async function rotateDek(password: string): Promise<string> {
+  return invoke<string>('rotate_dek', { password })
 }
 
 export async function regenerateRecoveryKey(password: string): Promise<string> {
@@ -202,10 +202,9 @@ export async function generateTotpDefault(secret: string): Promise<string> {
 // ============================================================================
 
 export async function syncVault(storageConfig: string): Promise<{
-  hasConflicts: boolean
-  conflicts: unknown[]
+  synced: boolean
 }> {
-  return invoke<{ hasConflicts: boolean; conflicts: unknown[] }>('sync_vault', {
+  return invoke<{ synced: boolean }>('sync_vault', {
     storageConfig,
   })
 }
@@ -216,10 +215,6 @@ export async function pushVault(storageConfig: string): Promise<void> {
 
 export async function downloadVault(storageConfig: string): Promise<boolean> {
   return invoke<boolean>('download_vault', { storageConfig })
-}
-
-export async function resolveConflict(id: string, resolution: string): Promise<void> {
-  return invoke<void>('resolve_conflict', { id, resolution })
 }
 
 // ============================================================================

@@ -62,17 +62,3 @@ export interface AppSettings {
   theme?: 'light' | 'dark'
 }
 
-// Sync conflict
-export interface SyncConflict {
-  id: string
-  entryName: string
-  conflictType: 'both_modified' | 'deleted_remote' | 'deleted_local'
-  localEntry?: Entry
-  remoteEntry?: Entry
-}
-
-// Sync result
-export interface SyncResult {
-  hasConflicts: boolean
-  conflicts: SyncConflict[]
-}

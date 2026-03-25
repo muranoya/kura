@@ -174,7 +174,7 @@ impl UnlockedVault {
             purged_at: None,
             is_favorite: false,
             label_ids: label_ids.clone(),
-            typed_value: data.typed_value.clone(),
+            typed_value: zeroize::Zeroizing::new(data.typed_value.to_string()),
             notes: data.notes.clone(),
             custom_fields: data.custom_fields.clone(),
         };
@@ -199,7 +199,7 @@ impl UnlockedVault {
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
 
         entry.name = name;
-        entry.typed_value = data.typed_value.clone();
+        entry.typed_value = zeroize::Zeroizing::new(data.typed_value.to_string());
         entry.notes = data.notes.clone();
         entry.custom_fields = data.custom_fields.clone();
         entry.updated_at = chrono::Utc::now().timestamp();
@@ -244,7 +244,7 @@ impl UnlockedVault {
         entry.purged_at = Some(now);
         entry.updated_at = now;
         entry.name = String::new();
-        entry.typed_value = serde_json::Value::Null;
+        entry.typed_value = zeroize::Zeroizing::new("{}".to_string());
         entry.notes = None;
         entry.custom_fields = None;
         entry.label_ids.clear();
@@ -461,31 +461,6 @@ impl UnlockedVault {
     }
 
     /// Resolve sync conflicts
-    pub fn resolve_conflict(
-        &mut self,
-        conflict_id: &str,
-        resolution: crate::sync::ConflictResolution,
-    ) -> Result<()> {
-        use crate::sync::ConflictResolution;
-
-        match resolution {
-            ConflictResolution::UseLocal => {
-                // Keep local version - nothing to do
-                Ok(())
-            }
-            ConflictResolution::UseRemote => {
-                // Delete local version
-                self.contents.entries.remove(conflict_id);
-                Ok(())
-            }
-            ConflictResolution::DeleteEntry => {
-                // Permanently delete
-                self.contents.entries.remove(conflict_id);
-                Ok(())
-            }
-        }
-    }
-
     /// Get current ETag
     pub fn get_etag(&self) -> Option<&String> {
         self.etag.as_ref()
@@ -529,10 +504,13 @@ impl UnlockedVault {
 /// Helper function to convert VaultEntry to Entry
 fn vault_entry_to_entry(id: String, e: &VaultEntry) -> Entry {
     // Convert typed_value back to EntryData
+    // Zeroizing<String> contains JSON that needs to be parsed
+    let typed_value = serde_json::from_str(e.typed_value.as_ref())
+        .unwrap_or_else(|_| serde_json::json!({}));
+
     let data = EntryData {
-        schema_version: CURRENT_SCHEMA_VERSION,
         entry_type: e.entry_type,
-        typed_value: e.typed_value.clone(),
+        typed_value,
         notes: e.notes.clone(),
         custom_fields: e.custom_fields.clone(),
     };
