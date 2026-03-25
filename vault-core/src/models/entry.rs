@@ -90,6 +90,11 @@ impl EntryFilter {
         self
     }
 
+    pub fn with_favorites(mut self, favorites_only: bool) -> Self {
+        self.favorites_only = favorites_only;
+        self
+    }
+
     pub fn with_search(mut self, query: String) -> Self {
         self.search_query = Some(query);
         self

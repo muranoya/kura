@@ -13,9 +13,10 @@
 just release-all
 
 # または個別にビルド
-just release-mobile       # iOS + Android
-just release-desktop      # macOS/Windows/Linux (Tauri) - リリース版
-just release-extension    # Chrome/Firefox ブラウザ拡張
+just release-mobile              # iOS + Android
+just release-desktop             # macOS/Windows/Linux (Tauri) - リリース版
+just release-extension-chrome    # Chrome ブラウザ拡張
+just release-extension-firefox   # Firefox ブラウザ拡張
 ```
 
 ### デスクトップアプリの開発

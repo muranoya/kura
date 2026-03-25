@@ -1,7 +1,7 @@
 // Service Worker エントリーポイント
 // WASM の初期化とメッセージハンドラーのセットアップ
 
-import init, * as vault from '../../wasm/vault_core'
+import * as vault from '../../wasm/vault_core'
 import { getFromStorage, saveToStorage } from '../shared/storage'
 
 let wasmInitialized = false
@@ -11,7 +11,6 @@ let unlocked = false
 async function initWasm() {
   if (wasmInitialized) return
   try {
-    await init()
     wasmInitialized = true
     console.log('[SW] WASM initialized')
   } catch (error) {
@@ -443,13 +442,18 @@ async function handleAutolockAlarm() {
 async function handleClipboardClearAlarm() {
   console.log('[SW] Clipboard clear alarm triggered')
   try {
-    // offscreen document を作成してクリップボードをクリア
-    await chrome.offscreen.createDocument({
-      url: chrome.runtime.getURL('src/background/offscreen.html'),
-      reasons: ['CLIPBOARD'],
-      justification: 'Clear clipboard after copy timeout',
-    } as any)
-    chrome.runtime.sendMessage({ type: 'CLEAR_CLIPBOARD' })
+    if (typeof chrome.offscreen !== 'undefined') {
+      // Chrome: offscreen document 経由でクリップボードをクリア
+      await chrome.offscreen.createDocument({
+        url: chrome.runtime.getURL('src/background/offscreen.html'),
+        reasons: ['CLIPBOARD'],
+        justification: 'Clear clipboard after copy timeout',
+      } as any)
+      chrome.runtime.sendMessage({ type: 'CLEAR_CLIPBOARD' })
+    } else {
+      // Firefox: background page から直接クリップボードをクリア
+      await navigator.clipboard.writeText('')
+    }
   } catch (err) {
     console.error('[SW] Clipboard clear failed:', err)
   }

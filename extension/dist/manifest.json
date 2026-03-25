@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "kura",
+  "version": "0.1.0",
+  "description": "サーバ不要、自分一人のための、運用コストゼロのパスワードマネージャー",
+  "permissions": [
+    "storage",
+    "alarms",
+    "clipboardWrite"
+  ],
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "background": {
+    "scripts": [
+      "assets/background-B9qBKASG.js"
+    ],
+    "type": "module"
+  },
+  "web_accessible_resources": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "resources": [
+        "wasm/vault_core_bg.wasm"
+      ],
+      "use_dynamic_url": false
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "kura@muraoka.dev",
+      "strict_min_version": "109.0"
+    }
+  }
+}

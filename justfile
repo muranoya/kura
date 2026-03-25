@@ -29,11 +29,16 @@ default: help
 		echo "❌ cargo not found. Please install Rust/Cargo."; \
 		exit 1; \
 	fi
+	if ! command -v wasm-pack &> /dev/null; then \
+		echo "❌ wasm-pack not found. Please install wasm-pack."; \
+		exit 1; \
+	fi
 	echo "✅ All dependencies found"
 	echo "  - Flutter: $(flutter --version | head -1)"
 	echo "  - Node.js: $(node --version)"
 	echo "  - pnpm: $(pnpm --version)"
 	echo "  - Cargo: $(cargo --version | head -1)"
+	echo "  - wasm-pack: $(wasm-pack --version)"
 
 # Mobile app (iOS + Android)
 @release-mobile: check-dependencies
@@ -88,12 +93,15 @@ default: help
 	echo "✅ Desktop build completed!"
 	echo "  - Output: {{DESKTOP_DIR}}/src-tauri/target/release/"
 
-# Browser extension (Chrome/Firefox)
-@release-extension: check-dependencies
+# Browser extension - Chrome
+@release-extension-chrome: check-dependencies
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo "🔨 Building browser extension..."
+	echo "🔨 Building Chrome extension..."
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	echo "🦀 Building WASM package from vault-core..."
+	wasm-pack build {{VAULT_CORE_DIR}} --target bundler --out-dir ../{{EXTENSION_DIR}}/wasm --features wasm --no-default-features
 	echo ""
 	echo "📥 Installing dependencies..."
 	cd {{EXTENSION_DIR}} && pnpm install
@@ -101,8 +109,51 @@ default: help
 	echo "🏗️  Building extension..."
 	cd {{EXTENSION_DIR}} && pnpm run build
 	echo ""
-	echo "✅ Extension build completed!"
+	echo "📦 Packaging extension..."
+	cd {{EXTENSION_DIR}}/dist && zip -r ../kura-extension-chrome.zip .
+	echo ""
+	echo "✅ Chrome extension build completed!"
 	echo "  - Output: {{EXTENSION_DIR}}/dist/"
+	echo "  - Package: {{EXTENSION_DIR}}/kura-extension-chrome.zip"
+
+# Browser extension - Firefox
+@release-extension-firefox: check-dependencies
+	echo ""
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "🔨 Building Firefox extension..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	echo "🦀 Building WASM package from vault-core..."
+	wasm-pack build {{VAULT_CORE_DIR}} --target bundler --out-dir ../{{EXTENSION_DIR}}/wasm --features wasm --no-default-features
+	echo ""
+	echo "📥 Installing dependencies..."
+	cd {{EXTENSION_DIR}} && pnpm install
+	echo ""
+	echo "🏗️  Building Firefox extension..."
+	cd {{EXTENSION_DIR}} && pnpm run build:firefox
+	echo ""
+	echo "📦 Packaging extension..."
+	cd {{EXTENSION_DIR}}/dist && zip -r ../kura-extension-firefox.zip .
+	echo ""
+	echo "✅ Firefox extension build completed!"
+	echo "  - Output: {{EXTENSION_DIR}}/dist/"
+	echo "  - Package: {{EXTENSION_DIR}}/kura-extension-firefox.zip"
+
+# Browser extension - Development (HMR付き)
+@dev-extension: check-dependencies
+	echo ""
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "🚀 Starting extension in development mode..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	echo "🦀 Building WASM package from vault-core..."
+	wasm-pack build {{VAULT_CORE_DIR}} --target web --out-dir ../{{EXTENSION_DIR}}/wasm --features wasm --no-default-features
+	echo ""
+	echo "📥 Installing dependencies..."
+	cd {{EXTENSION_DIR}} && pnpm install
+	echo ""
+	echo "🔌 Starting extension dev server..."
+	cd {{EXTENSION_DIR}} && pnpm run dev
 
 # Build all releases
 @release-all: check-dependencies
@@ -114,7 +165,8 @@ default: help
 	echo "╚━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╝"
 	just release-mobile
 	just release-desktop
-	just release-extension
+	just release-extension-chrome
+	just release-extension-firefox
 	echo ""
 	echo "╔━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╗"
 	echo "║                  🎉 All releases completed!                ║"
@@ -129,7 +181,7 @@ default: help
 	cd {{DESKTOP_DIR}} && rm -rf dist/ build/ node_modules/
 	cd {{DESKTOP_DIR}}/src-tauri && cargo clean
 	echo "  - Extension..."
-	cd {{EXTENSION_DIR}} && rm -rf dist/ build/ node_modules/
+	cd {{EXTENSION_DIR}} && rm -rf dist/ build/ node_modules/ wasm/
 	echo "✅ Cleanup completed!"
 
 # ヘルプ表示
@@ -146,7 +198,9 @@ default: help
 	echo "    just release-desktop      - Build desktop app (Tauri release)"
 	echo ""
 	echo "  🔌 Extension:"
-	echo "    just release-extension    - Build browser extension"
+	echo "    just dev-extension            - Start extension in dev mode (HMR)"
+	echo "    just release-extension-chrome - Build Chrome extension"
+	echo "    just release-extension-firefox - Build Firefox extension"
 	echo ""
 	echo "  🔧 Utilities:"
 	echo "    just release-all          - Build all apps for release"
