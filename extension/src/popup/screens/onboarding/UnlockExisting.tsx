@@ -104,7 +104,7 @@ export default function UnlockExisting() {
         {/* ダウンロード中 */}
         {downloading && (
           <div className="p-3 rounded-md bg-accent/10 border border-accent/20">
-            <p className="text-xs text-text-primary">
+            <p className="text-sm text-text-primary">
               🔄 S3からVaultをダウンロード中...
             </p>
           </div>
@@ -113,7 +113,7 @@ export default function UnlockExisting() {
         {/* エラーメッセージ */}
         {error && (
           <div className="p-3 rounded-md bg-danger/10 border border-danger/20">
-            <p className="text-xs text-danger">⚠️ {error}</p>
+            <p className="text-sm text-danger">⚠️ {error}</p>
           </div>
         )}
 
@@ -121,17 +121,17 @@ export default function UnlockExisting() {
         {!downloading && (
           <Card>
             <CardHeader className="px-3 py-2">
-              <CardTitle className="text-xs font-medium">マスターパスワード入力</CardTitle>
+              <CardTitle className="text-sm font-medium">マスターパスワード入力</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2 space-y-3">
               <div className="p-3 rounded-md bg-accent/10 border border-accent/20">
-                <p className="text-xs text-text-primary">
+                <p className="text-sm text-text-primary">
                   📌 このVaultで使用されているマスターパスワードを入力してください。
                 </p>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="password" className="text-xs">
+                <Label htmlFor="password" className="text-sm">
                   マスターパスワード
                 </Label>
                 <Input
@@ -145,7 +145,7 @@ export default function UnlockExisting() {
                     }
                   }}
                   placeholder="マスターパスワードを入力してください"
-                  className="text-xs"
+                  className="text-sm"
                   disabled={loading}
                 />
               </div>

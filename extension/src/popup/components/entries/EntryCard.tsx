@@ -78,12 +78,12 @@ export default function EntryCard(props: EntryCardProps) {
               {React.cloneElement(getEntryIcon(props.entry.entryType) as React.ReactElement, { size: iconSize })}
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className={`${isCompact ? 'text-xs' : 'text-sm'} font-semibold text-text-primary truncate`}>
+              <h3 className={`${isCompact ? 'text-sm' : 'text-sm'} font-semibold text-text-primary truncate`}>
                 {props.entry.name}
               </h3>
               {!isCompact && (
                 <div className="flex items-center gap-2 mt-1">
-                  <Badge variant="muted" className="text-xs">
+                  <Badge variant="muted" className="text-sm">
                     {getTypeLabel(props.entry.entryType)}
                   </Badge>
                 </div>
@@ -134,7 +134,7 @@ export default function EntryCard(props: EntryCardProps) {
           <h3 className="text-sm font-semibold text-text-primary truncate">
             {props.entry.name}
           </h3>
-          <p className="text-xs text-text-muted mt-1">
+          <p className="text-sm text-text-muted mt-1">
             削除日時: {props.entry.deletedAt ? new Date(props.entry.deletedAt * 1000).toLocaleString('ja-JP') : '-'}
           </p>
         </div>

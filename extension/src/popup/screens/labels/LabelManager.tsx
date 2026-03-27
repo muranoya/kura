@@ -107,18 +107,18 @@ export default function LabelManager() {
       <div className="p-4 space-y-4">
         {error && (
           <div className="p-3 rounded-md bg-danger/10 border border-danger/20">
-            <p className="text-xs text-danger">{error}</p>
+            <p className="text-sm text-danger">{error}</p>
           </div>
         )}
 
         {/* 新規ラベル作成 */}
         <Card>
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-xs font-medium">新しいラベル</CardTitle>
+            <CardTitle className="text-sm font-medium">新しいラベル</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2 space-y-2">
             <div className="space-y-1">
-              <Label htmlFor="new-label-name" className="text-xs">
+              <Label htmlFor="new-label-name" className="text-sm">
                 ラベル名
               </Label>
               <Input
@@ -132,13 +132,13 @@ export default function LabelManager() {
                 }}
                 onKeyPress={(e) => e.key === 'Enter' && handleCreateLabel()}
                 disabled={creating}
-                className="text-xs"
+                className="text-sm"
               />
             </div>
             <Button
               onClick={handleCreateLabel}
               disabled={creating || !newLabelName.trim()}
-              className="w-full text-xs gap-1"
+              className="w-full text-sm gap-1"
               size="sm"
             >
               <Plus size={14} />
@@ -149,7 +149,7 @@ export default function LabelManager() {
 
         {/* ラベル一覧 */}
         {loading ? (
-          <div className="text-center py-8 text-text-muted text-xs">読み込み中...</div>
+          <div className="text-center py-8 text-text-muted text-sm">読み込み中...</div>
         ) : labels.length === 0 ? (
           <EmptyState
             title="ラベルがありません"
@@ -158,7 +158,7 @@ export default function LabelManager() {
         ) : (
           <Card>
             <CardHeader className="px-3 py-2">
-              <CardTitle className="text-xs font-medium">ラベル一覧</CardTitle>
+              <CardTitle className="text-sm font-medium">ラベル一覧</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2 space-y-2">
               {labels.map((label) => (
@@ -172,14 +172,14 @@ export default function LabelManager() {
                         type="text"
                         value={editingName}
                         onChange={(e) => setEditingName(e.target.value)}
-                        className="flex-1 text-xs"
+                        className="flex-1 text-sm"
                         autoFocus
                       />
                       <Button
                         variant="secondary"
                         size="sm"
                         onClick={() => saveEdit(label.id)}
-                        className="text-xs px-2"
+                        className="text-sm px-2"
                       >
                         <Check size={12} />
                       </Button>
@@ -190,21 +190,21 @@ export default function LabelManager() {
                           setEditingId(null)
                           setEditingName('')
                         }}
-                        className="text-xs px-2"
+                        className="text-sm px-2"
                       >
                         <X size={12} />
                       </Button>
                     </>
                   ) : (
                     <>
-                      <span className="flex-1 text-xs text-text-primary font-medium">
+                      <span className="flex-1 text-sm text-text-primary font-medium">
                         {label.name}
                       </span>
                       <Button
                         variant="secondary"
                         size="sm"
                         onClick={() => startEdit(label.id, label.name)}
-                        className="text-xs px-2"
+                        className="text-sm px-2"
                       >
                         <Edit2 size={12} />
                       </Button>
@@ -212,7 +212,7 @@ export default function LabelManager() {
                         variant="destructive"
                         size="sm"
                         onClick={() => openDeleteConfirm(label.id)}
-                        className="text-xs px-2"
+                        className="text-sm px-2"
                       >
                         <Trash2 size={12} />
                       </Button>

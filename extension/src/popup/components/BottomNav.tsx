@@ -31,7 +31,7 @@ export function BottomNav() {
             to={path}
             className={cn(
               'flex flex-col items-center justify-center gap-1 px-4 py-3 transition-colors',
-              'flex-1 text-center text-xs',
+              'flex-1 text-center text-sm',
               isActiveTab(path)
                 ? 'text-accent border-t-2 border-accent'
                 : 'text-text-secondary hover:text-text-primary'

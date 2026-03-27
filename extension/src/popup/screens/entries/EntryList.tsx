@@ -139,7 +139,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
           {/* エラーメッセージ */}
           {error && (
             <div className="mx-2 mt-2 p-2 rounded-md bg-danger/10 border border-danger/20">
-              <p className="text-xs text-danger">{error}</p>
+              <p className="text-sm text-danger">{error}</p>
             </div>
           )}
 
@@ -165,7 +165,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
                   variant="primary"
                   size="sm"
                   onClick={() => navigate('/entries/create')}
-                  className="gap-1 text-xs"
+                  className="gap-1 text-sm"
                 >
                   <Plus size={14} />
                   新規作成
@@ -248,7 +248,7 @@ function EntryDetailPane({
     isMasked?: boolean
   }) => (
     <div className="py-3 border-b border-border/50">
-      <p className="text-xs font-semibold text-text-muted uppercase mb-1.5">{label}</p>
+      <p className="text-sm font-semibold text-text-muted uppercase mb-1.5">{label}</p>
       <div className="flex items-center gap-2">
         <code className="text-sm text-text-primary font-mono break-all flex-1">
           {isPassword && isMasked ? '••••••••' : value}
@@ -284,7 +284,7 @@ function EntryDetailPane({
               size="sm"
               variant="secondary"
               onClick={onEdit}
-              className="gap-1.5 text-xs"
+              className="gap-1.5 text-sm"
             >
               <Pencil size={14} />
               編集
@@ -293,14 +293,14 @@ function EntryDetailPane({
               size="sm"
               variant="destructive"
               onClick={onDelete}
-              className="gap-1.5 text-xs"
+              className="gap-1.5 text-sm"
             >
               <Trash2 size={14} />
               削除
             </Button>
           </div>
         </div>
-        <Badge variant="muted" className="text-xs">
+        <Badge variant="muted" className="text-sm">
           {getTypeLabel(entry.entryType)}
         </Badge>
       </div>
@@ -394,7 +394,7 @@ function EntryDetailPane({
 
           {entry.entryType === 'secure_note' && (
             <div className="py-3">
-              <p className="text-xs font-semibold text-text-muted uppercase mb-2">コンテンツ</p>
+              <p className="text-sm font-semibold text-text-muted uppercase mb-2">コンテンツ</p>
               <p className="text-sm text-text-primary whitespace-pre-wrap">
                 {(entry.typedValue as any).content}
               </p>

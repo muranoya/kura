@@ -64,7 +64,7 @@ export default function EntryListPanel({
             placeholder="検索..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-9 pr-8 py-1.5 text-xs rounded-md border border-border bg-bg-surface text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
+            className="w-full pl-9 pr-8 py-1.5 text-sm rounded-md border border-border bg-bg-surface text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
           />
           {searchQuery && (
             <button
@@ -85,7 +85,7 @@ export default function EntryListPanel({
           <button
             key={t.value}
             onClick={() => onTypeChange(t.value === 'all' ? undefined : (t.value as EntryType))}
-            className={`px-2.5 py-1.5 text-xs whitespace-nowrap rounded-md transition-colors font-medium ${
+            className={`px-2.5 py-1.5 text-sm whitespace-nowrap rounded-md transition-colors font-medium ${
               (t.value === 'all' && !selectedType) || (t.value !== 'all' && selectedType === t.value)
                 ? 'bg-accent text-white border-b-2 border-accent'
                 : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'

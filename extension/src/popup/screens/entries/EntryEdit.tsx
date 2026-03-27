@@ -78,7 +78,7 @@ export default function EntryEdit() {
             size="sm"
             onClick={handleSave}
             disabled={saving || !name.trim()}
-            className="text-xs"
+            className="text-sm"
           >
             {saving ? '保存中...' : '保存'}
           </Button>
@@ -86,7 +86,7 @@ export default function EntryEdit() {
       />
 
       <div className="flex-1 overflow-y-auto p-3">
-        {error && <div className="mb-3 p-2 bg-danger/10 text-danger text-xs rounded-md">{error}</div>}
+        {error && <div className="mb-3 p-2 bg-danger/10 text-danger text-sm rounded-md">{error}</div>}
         <EntryForm
           mode="edit"
           entryType={entry.entryType}

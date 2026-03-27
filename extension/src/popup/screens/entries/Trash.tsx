@@ -85,15 +85,15 @@ export default function Trash() {
           {entries.map((entry) => (
             <div key={entry.id} className="flex items-center gap-2 p-3 bg-bg-elevated rounded-lg border border-border">
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-text-primary truncate">{entry.name}</p>
-                <p className="text-xs text-text-muted mt-0.5">{entry.entryType}</p>
+                <p className="text-sm font-medium text-text-primary truncate">{entry.name}</p>
+                <p className="text-sm text-text-muted mt-0.5">{entry.entryType}</p>
               </div>
               <div className="flex gap-1 shrink-0">
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={() => handleRestore(entry.id)}
-                  className="text-xs gap-1 px-2"
+                  className="text-sm gap-1 px-2"
                 >
                   <RotateCcw size={12} />
                   復元
@@ -102,7 +102,7 @@ export default function Trash() {
                   variant="destructive"
                   size="sm"
                   onClick={() => openPurgeConfirm(entry.id)}
-                  className="text-xs gap-1 px-2"
+                  className="text-sm gap-1 px-2"
                 >
                   <Trash2 size={12} />
                 </Button>

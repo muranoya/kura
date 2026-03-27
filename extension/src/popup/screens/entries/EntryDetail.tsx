@@ -31,9 +31,9 @@ function FieldDisplay({ label, value, isPassword = false, isMasked = false, onTo
 
   return (
     <div className="space-y-0.5">
-      <label className="text-xs font-semibold text-text-muted uppercase">{label}</label>
+      <label className="text-sm font-semibold text-text-muted uppercase">{label}</label>
       <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-bg-elevated border border-border">
-        <code className="font-mono text-xs text-text-primary flex-1 break-all">
+        <code className="font-mono text-sm text-text-primary flex-1 break-all">
           {isPassword && isMasked ? '••••••••' : value}
         </code>
         {isPassword && onToggleMask && (
@@ -42,7 +42,7 @@ function FieldDisplay({ label, value, isPassword = false, isMasked = false, onTo
           </button>
         )}
         <button onClick={handleCopy} className="p-1 text-text-muted hover:text-accent transition-colors shrink-0" title="コピー">
-          {copied ? <span className="text-xs text-success">✓</span> : <Copy size={14} />}
+          {copied ? <span className="text-sm text-success">✓</span> : <Copy size={14} />}
         </button>
       </div>
     </div>
@@ -53,22 +53,22 @@ const markdownComponents = {
   h1: ({ children }: any) => <h1 className="text-lg font-bold text-text-primary mt-2 mb-1">{children}</h1>,
   h2: ({ children }: any) => <h2 className="text-base font-bold text-text-primary mt-1.5 mb-1">{children}</h2>,
   h3: ({ children }: any) => <h3 className="text-sm font-bold text-text-primary mt-1 mb-0.5">{children}</h3>,
-  p: ({ children }: any) => <p className="text-text-primary mb-1 text-xs leading-tight">{children}</p>,
-  ul: ({ children }: any) => <ul className="list-disc list-inside text-text-primary mb-1 space-y-0.5 text-xs">{children}</ul>,
-  ol: ({ children }: any) => <ol className="list-decimal list-inside text-text-primary mb-1 space-y-0.5 text-xs">{children}</ol>,
-  li: ({ children }: any) => <li className="text-text-primary text-xs">{children}</li>,
+  p: ({ children }: any) => <p className="text-text-primary mb-1 text-sm leading-tight">{children}</p>,
+  ul: ({ children }: any) => <ul className="list-disc list-inside text-text-primary mb-1 space-y-0.5 text-sm">{children}</ul>,
+  ol: ({ children }: any) => <ol className="list-decimal list-inside text-text-primary mb-1 space-y-0.5 text-sm">{children}</ol>,
+  li: ({ children }: any) => <li className="text-text-primary text-sm">{children}</li>,
   code: ({ inline, children }: any) =>
     inline ? (
-      <code className="bg-bg-elevated px-1 py-0.5 rounded text-xs font-mono text-text-primary">{children}</code>
+      <code className="bg-bg-elevated px-1 py-0.5 rounded text-sm font-mono text-text-primary">{children}</code>
     ) : (
-      <code className="block bg-bg-elevated p-2 rounded text-xs font-mono text-text-primary overflow-x-auto mb-1">{children}</code>
+      <code className="block bg-bg-elevated p-2 rounded text-sm font-mono text-text-primary overflow-x-auto mb-1">{children}</code>
     ),
-  pre: ({ children }: any) => <pre className="bg-bg-elevated p-2 rounded text-xs font-mono text-text-primary overflow-x-auto mb-1">{children}</pre>,
+  pre: ({ children }: any) => <pre className="bg-bg-elevated p-2 rounded text-sm font-mono text-text-primary overflow-x-auto mb-1">{children}</pre>,
   blockquote: ({ children }: any) => (
-    <blockquote className="border-l-4 border-accent pl-2 py-0.5 text-text-secondary italic mb-1 text-xs">{children}</blockquote>
+    <blockquote className="border-l-4 border-accent pl-2 py-0.5 text-text-secondary italic mb-1 text-sm">{children}</blockquote>
   ),
   a: ({ href, children }: any) => (
-    <a href={href} className="text-accent hover:text-accent-hover underline break-all text-xs" target="_blank" rel="noopener noreferrer">
+    <a href={href} className="text-accent hover:text-accent-hover underline break-all text-sm" target="_blank" rel="noopener noreferrer">
       {children}
     </a>
   ),
@@ -129,11 +129,11 @@ export default function EntryDetail() {
         onBack={() => navigate('/entries')}
         action={
           <div className="flex gap-1.5">
-            <Button size="sm" variant="secondary" onClick={() => navigate(`/entries/${id}/edit`)} className="gap-1.5 text-xs h-8">
+            <Button size="sm" variant="secondary" onClick={() => navigate(`/entries/${id}/edit`)} className="gap-1.5 text-sm h-8">
               <Pencil size={14} />
               編集
             </Button>
-            <Button size="sm" variant="destructive" onClick={handleDelete} className="gap-1.5 text-xs h-8">
+            <Button size="sm" variant="destructive" onClick={handleDelete} className="gap-1.5 text-sm h-8">
               <Trash2 size={14} />
               削除
             </Button>
@@ -147,7 +147,7 @@ export default function EntryDetail() {
         {entry.entryType === 'login' && (v.url || v.username || v.password || v.totp) && (
           <Card>
             <CardHeader className="px-3 py-2">
-              <CardTitle className="text-xs font-medium">ログイン情報</CardTitle>
+              <CardTitle className="text-sm font-medium">ログイン情報</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2 space-y-1.5">
               {v.url && <FieldDisplay label="URL" value={v.url} />}
@@ -169,7 +169,7 @@ export default function EntryDetail() {
         {entry.entryType === 'bank' && (v.bank_name || v.account_number || v.pin) && (
           <Card>
             <CardHeader className="px-3 py-2">
-              <CardTitle className="text-xs font-medium">銀行口座</CardTitle>
+              <CardTitle className="text-sm font-medium">銀行口座</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2 space-y-1.5">
               {v.bank_name && <FieldDisplay label="銀行名" value={v.bank_name} />}
@@ -190,7 +190,7 @@ export default function EntryDetail() {
         {entry.entryType === 'ssh_key' && (v.private_key || v.passphrase) && (
           <Card>
             <CardHeader className="px-3 py-2">
-              <CardTitle className="text-xs font-medium">SSH キー</CardTitle>
+              <CardTitle className="text-sm font-medium">SSH キー</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2 space-y-1.5">
               {v.private_key && <FieldDisplay label="秘密鍵" value={v.private_key} />}
@@ -210,10 +210,10 @@ export default function EntryDetail() {
         {entry.entryType === 'secure_note' && v.content && (
           <Card>
             <CardHeader className="px-3 py-2">
-              <CardTitle className="text-xs font-medium">ノート</CardTitle>
+              <CardTitle className="text-sm font-medium">ノート</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2">
-              <div className="p-2 rounded-md bg-bg-elevated border border-border text-text-primary text-xs">
+              <div className="p-2 rounded-md bg-bg-elevated border border-border text-text-primary text-sm">
                 <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                   {v.content}
                 </ReactMarkdown>
@@ -225,7 +225,7 @@ export default function EntryDetail() {
         {entry.entryType === 'credit_card' && (v.cardholder || v.number || v.expiry || v.cvv) && (
           <Card>
             <CardHeader className="px-3 py-2">
-              <CardTitle className="text-xs font-medium">クレジットカード</CardTitle>
+              <CardTitle className="text-sm font-medium">クレジットカード</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2 space-y-1.5">
               {v.cardholder && <FieldDisplay label="カード名義" value={v.cardholder} />}
@@ -248,7 +248,7 @@ export default function EntryDetail() {
         {entry.customFields && entry.customFields.length > 0 && (
           <Card>
             <CardHeader className="px-3 py-2">
-              <CardTitle className="text-xs font-medium">カスタムフィールド</CardTitle>
+              <CardTitle className="text-sm font-medium">カスタムフィールド</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2 space-y-1.5">
               {entry.customFields.map((field) => (
@@ -269,10 +269,10 @@ export default function EntryDetail() {
         {entry.notes && (
           <Card>
             <CardHeader className="px-3 py-2">
-              <CardTitle className="text-xs font-medium">メモ</CardTitle>
+              <CardTitle className="text-sm font-medium">メモ</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2">
-              <div className="p-2 rounded-md bg-bg-elevated border border-border text-text-primary text-xs whitespace-pre-wrap break-words">
+              <div className="p-2 rounded-md bg-bg-elevated border border-border text-text-primary text-sm whitespace-pre-wrap break-words">
                 {entry.notes}
               </div>
             </CardContent>
@@ -283,14 +283,14 @@ export default function EntryDetail() {
         {entry.labels && entry.labels.length > 0 && (
           <Card>
             <CardHeader className="px-3 py-2">
-              <CardTitle className="text-xs font-medium">ラベル</CardTitle>
+              <CardTitle className="text-sm font-medium">ラベル</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2">
               <div className="flex gap-1.5 flex-wrap">
                 {entry.labels.map((labelId) => {
                   const label = allLabels.find((l) => l.id === labelId)
                   return label ? (
-                    <Badge key={labelId} variant="primary" className="text-xs">
+                    <Badge key={labelId} variant="primary" className="text-sm">
                       {label.name}
                     </Badge>
                   ) : null

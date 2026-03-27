@@ -95,19 +95,19 @@ export default function StorageSetup() {
         {/* エラー表示 */}
         {error && (
           <div className="p-3 rounded-md bg-danger/10 border border-danger/20">
-            <p className="text-xs text-danger">⚠️ {error}</p>
+            <p className="text-sm text-danger">⚠️ {error}</p>
           </div>
         )}
 
         {/* 接続情報入力 */}
         <Card>
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-xs font-medium">接続情報</CardTitle>
+            <CardTitle className="text-sm font-medium">接続情報</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2 space-y-3">
             {/* リージョン */}
             <div className="space-y-1">
-              <Label htmlFor="region" className="text-xs">
+              <Label htmlFor="region" className="text-sm">
                 リージョン <span className="text-danger">*</span>
               </Label>
               <Input
@@ -116,14 +116,14 @@ export default function StorageSetup() {
                 value={region}
                 onChange={(e) => setDraft({ region: e.target.value })}
                 placeholder="例: ap-northeast-1"
-                className="text-xs"
+                className="text-sm"
                 disabled={loading}
               />
             </div>
 
             {/* バケット */}
             <div className="space-y-1">
-              <Label htmlFor="bucket" className="text-xs">
+              <Label htmlFor="bucket" className="text-sm">
                 バケット <span className="text-danger">*</span>
               </Label>
               <Input
@@ -132,14 +132,14 @@ export default function StorageSetup() {
                 value={bucket}
                 onChange={(e) => setDraft({ bucket: e.target.value })}
                 placeholder="例: my-vault"
-                className="text-xs"
+                className="text-sm"
                 disabled={loading}
               />
             </div>
 
             {/* ファイルパス */}
             <div className="space-y-1">
-              <Label htmlFor="key" className="text-xs">
+              <Label htmlFor="key" className="text-sm">
                 ファイルパス <span className="text-text-muted">(オプション)</span>
               </Label>
               <Input
@@ -148,17 +148,17 @@ export default function StorageSetup() {
                 value={key}
                 onChange={(e) => setDraft({ key: e.target.value })}
                 placeholder="vault.json"
-                className="text-xs"
+                className="text-sm"
                 disabled={loading}
               />
-              <p className="text-xs text-text-muted mt-1">
+              <p className="text-sm text-text-muted mt-1">
                 バケット内の保存パス。デフォルト: vault.json
               </p>
             </div>
 
             {/* アクセスキーID */}
             <div className="space-y-1">
-              <Label htmlFor="access-key" className="text-xs">
+              <Label htmlFor="access-key" className="text-sm">
                 アクセスキーID <span className="text-danger">*</span>
               </Label>
               <Input
@@ -167,14 +167,14 @@ export default function StorageSetup() {
                 value={accessKeyId}
                 onChange={(e) => setDraft({ accessKeyId: e.target.value })}
                 placeholder="AKIA..."
-                className="text-xs"
+                className="text-sm"
                 disabled={loading}
               />
             </div>
 
             {/* シークレットアクセスキー */}
             <div className="space-y-1">
-              <Label htmlFor="secret-key" className="text-xs">
+              <Label htmlFor="secret-key" className="text-sm">
                 シークレットアクセスキー <span className="text-danger">*</span>
               </Label>
               <Input
@@ -182,14 +182,14 @@ export default function StorageSetup() {
                 type="password"
                 value={secretAccessKey}
                 onChange={(e) => setDraft({ secretAccessKey: e.target.value })}
-                className="text-xs"
+                className="text-sm"
                 disabled={loading}
               />
             </div>
 
             {/* エンドポイント */}
             <div className="space-y-1">
-              <Label htmlFor="endpoint" className="text-xs">
+              <Label htmlFor="endpoint" className="text-sm">
                 エンドポイント <span className="text-text-muted">(オプション)</span>
               </Label>
               <Input
@@ -198,10 +198,10 @@ export default function StorageSetup() {
                 value={endpoint}
                 onChange={(e) => setDraft({ endpoint: e.target.value })}
                 placeholder="例: https://s3.example.com"
-                className="text-xs"
+                className="text-sm"
                 disabled={loading}
               />
-              <p className="text-xs text-text-muted mt-1">
+              <p className="text-sm text-text-muted mt-1">
                 自社ホストの S3 互換サーバーを使用する場合のみ入力
               </p>
             </div>

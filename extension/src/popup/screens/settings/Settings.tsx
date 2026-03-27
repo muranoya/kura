@@ -159,17 +159,17 @@ export default function Settings() {
         {/* 外観 */}
         <Card>
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-xs font-medium">外観</CardTitle>
+            <CardTitle className="text-sm font-medium">外観</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-text-primary">テーマ</p>
-                <p className="text-xs text-text-muted mt-0.5">
+                <p className="text-sm font-medium text-text-primary">テーマ</p>
+                <p className="text-sm text-text-muted mt-0.5">
                   {theme === 'light' ? 'ライトモード' : 'ダークモード'}
                 </p>
               </div>
-              <Button variant="secondary" size="sm" onClick={toggleTheme} className="text-xs gap-1">
+              <Button variant="secondary" size="sm" onClick={toggleTheme} className="text-sm gap-1">
                 {theme === 'light' ? (
                   <>
                     <Moon size={14} />
@@ -189,13 +189,13 @@ export default function Settings() {
         {/* セキュリティ */}
         <Card>
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-xs font-medium">セキュリティ</CardTitle>
+            <CardTitle className="text-sm font-medium">セキュリティ</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2 space-y-1.5">
             <Button
               variant="secondary"
               onClick={() => setChangePasswordOpen(true)}
-              className="w-full text-xs"
+              className="w-full text-sm"
               size="sm"
             >
               マスターパスワード変更
@@ -203,7 +203,7 @@ export default function Settings() {
             <Button
               variant="secondary"
               onClick={() => setRotateDekOpen(true)}
-              className="w-full text-xs"
+              className="w-full text-sm"
               size="sm"
             >
               DEK更新
@@ -211,7 +211,7 @@ export default function Settings() {
             <Button
               variant="secondary"
               onClick={() => setRegenerateRecoveryOpen(true)}
-              className="w-full text-xs"
+              className="w-full text-sm"
               size="sm"
             >
               リカバリーキー再生成
@@ -219,7 +219,7 @@ export default function Settings() {
             <Button
               variant="destructive"
               onClick={() => setLogoutDialogOpen(true)}
-              className="w-full text-xs"
+              className="w-full text-sm"
               size="sm"
             >
               ログアウト
@@ -230,14 +230,14 @@ export default function Settings() {
         {/* このアプリについて */}
         <Card>
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-xs font-medium">このアプリについて</CardTitle>
+            <CardTitle className="text-sm font-medium">このアプリについて</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2 space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center justify-between text-sm">
               <p className="text-text-muted">バージョン</p>
               <p className="text-text-primary">v0.1.0</p>
             </div>
-            <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center justify-between text-sm">
               <p className="text-text-muted">リポジトリ</p>
               <a
                 href="https://github.com/muranoya/kura"
@@ -269,13 +269,13 @@ export default function Settings() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-sm">マスターパスワード変更</DialogTitle>
-            <DialogDescription className="text-xs">
+            <DialogDescription className="text-sm">
               新しいマスターパスワードを設定します。現在のパスワードで認証が必要です。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="old-password" className="text-xs">
+              <Label htmlFor="old-password" className="text-sm">
                 現在のパスワード
               </Label>
               <Input
@@ -285,11 +285,11 @@ export default function Settings() {
                 onChange={(e) => setOldPassword(e.target.value)}
                 disabled={changePasswordLoading}
                 placeholder="現在のパスワード"
-                className="text-xs"
+                className="text-sm"
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="new-password" className="text-xs">
+              <Label htmlFor="new-password" className="text-sm">
                 新しいパスワード
               </Label>
               <Input
@@ -299,11 +299,11 @@ export default function Settings() {
                 onChange={(e) => setNewPassword(e.target.value)}
                 disabled={changePasswordLoading}
                 placeholder="新しいパスワード"
-                className="text-xs"
+                className="text-sm"
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="confirm-password" className="text-xs">
+              <Label htmlFor="confirm-password" className="text-sm">
                 新しいパスワード（確認）
               </Label>
               <Input
@@ -313,11 +313,11 @@ export default function Settings() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 disabled={changePasswordLoading}
                 placeholder="新しいパスワード（確認）"
-                className="text-xs"
+                className="text-sm"
               />
             </div>
             {changePasswordError && (
-              <div className="text-xs text-danger bg-danger/10 px-2 py-1.5 rounded">
+              <div className="text-sm text-danger bg-danger/10 px-2 py-1.5 rounded">
                 {changePasswordError}
               </div>
             )}
@@ -328,7 +328,7 @@ export default function Settings() {
               onClick={() => setChangePasswordOpen(false)}
               disabled={changePasswordLoading}
               size="sm"
-              className="text-xs"
+              className="text-sm"
             >
               キャンセル
             </Button>
@@ -336,7 +336,7 @@ export default function Settings() {
               onClick={handleChangePassword}
               disabled={changePasswordLoading}
               size="sm"
-              className="text-xs"
+              className="text-sm"
             >
               {changePasswordLoading ? '変更中...' : '変更'}
             </Button>
@@ -349,14 +349,14 @@ export default function Settings() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-sm">DEK更新</DialogTitle>
-            <DialogDescription className="text-xs">
+            <DialogDescription className="text-sm">
               データ暗号化キーを新しく生成します。マスターパスワードで認証が必要です。
               同時にリカバリーキーも更新されます。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="rotate-dek-password" className="text-xs">
+              <Label htmlFor="rotate-dek-password" className="text-sm">
                 マスターパスワード
               </Label>
               <Input
@@ -366,11 +366,11 @@ export default function Settings() {
                 onChange={(e) => setRotateDekPassword(e.target.value)}
                 disabled={rotateDekLoading}
                 placeholder="マスターパスワード"
-                className="text-xs"
+                className="text-sm"
               />
             </div>
             {rotateDekError && (
-              <div className="text-xs text-danger bg-danger/10 px-2 py-1.5 rounded">
+              <div className="text-sm text-danger bg-danger/10 px-2 py-1.5 rounded">
                 {rotateDekError}
               </div>
             )}
@@ -381,7 +381,7 @@ export default function Settings() {
               onClick={() => setRotateDekOpen(false)}
               disabled={rotateDekLoading}
               size="sm"
-              className="text-xs"
+              className="text-sm"
             >
               キャンセル
             </Button>
@@ -389,7 +389,7 @@ export default function Settings() {
               onClick={handleRotateDek}
               disabled={rotateDekLoading}
               size="sm"
-              className="text-xs"
+              className="text-sm"
             >
               {rotateDekLoading ? '更新中...' : '更新'}
             </Button>
@@ -402,13 +402,13 @@ export default function Settings() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-sm">リカバリーキー再生成</DialogTitle>
-            <DialogDescription className="text-xs">
+            <DialogDescription className="text-sm">
               新しいリカバリーキーを生成します。マスターパスワードで認証が必要です。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="regenerate-password" className="text-xs">
+              <Label htmlFor="regenerate-password" className="text-sm">
                 マスターパスワード
               </Label>
               <Input
@@ -418,11 +418,11 @@ export default function Settings() {
                 onChange={(e) => setRegeneratePassword(e.target.value)}
                 disabled={regenerateLoading}
                 placeholder="マスターパスワード"
-                className="text-xs"
+                className="text-sm"
               />
             </div>
             {regenerateError && (
-              <div className="text-xs text-danger bg-danger/10 px-2 py-1.5 rounded">
+              <div className="text-sm text-danger bg-danger/10 px-2 py-1.5 rounded">
                 {regenerateError}
               </div>
             )}
@@ -433,7 +433,7 @@ export default function Settings() {
               onClick={() => setRegenerateRecoveryOpen(false)}
               disabled={regenerateLoading}
               size="sm"
-              className="text-xs"
+              className="text-sm"
             >
               キャンセル
             </Button>
@@ -441,7 +441,7 @@ export default function Settings() {
               onClick={handleRegenerateRecoveryKey}
               disabled={regenerateLoading}
               size="sm"
-              className="text-xs"
+              className="text-sm"
             >
               {regenerateLoading ? '生成中...' : '生成'}
             </Button>
@@ -454,19 +454,19 @@ export default function Settings() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-sm">新しいリカバリーキー</DialogTitle>
-            <DialogDescription className="text-xs">
+            <DialogDescription className="text-sm">
               新しいリカバリーキーが生成されました。安全な場所に保管してください。
               マスターパスワードを忘れた場合に使用できます。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="bg-bg-elevated p-2 rounded font-mono text-xs break-all max-h-32 overflow-y-auto border border-border">
+            <div className="bg-bg-elevated p-2 rounded font-mono text-sm break-all max-h-32 overflow-y-auto border border-border">
               {recoveryKeyDisplayValue}
             </div>
             <Button
               variant="secondary"
               onClick={copyRecoveryKey}
-              className="w-full text-xs"
+              className="w-full text-sm"
               size="sm"
             >
               {recoveryKeyCopied ? (
@@ -484,7 +484,7 @@ export default function Settings() {
             <Button
               onClick={() => setRecoveryKeyDisplayOpen(false)}
               size="sm"
-              className="text-xs"
+              className="text-sm"
             >
               保管しました
             </Button>

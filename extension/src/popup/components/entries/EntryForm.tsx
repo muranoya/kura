@@ -121,7 +121,7 @@ export default function EntryForm({
         return (
           <div className="space-y-3">
             <div className="space-y-1">
-              <UILabel htmlFor="url" className="text-xs">URL</UILabel>
+              <UILabel htmlFor="url" className="text-sm">URL</UILabel>
               <Input
                 id="url"
                 value={v.url || ''}
@@ -130,7 +130,7 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="username" className="text-xs">ユーザー名</UILabel>
+              <UILabel htmlFor="username" className="text-sm">ユーザー名</UILabel>
               <Input
                 id="username"
                 value={v.username || ''}
@@ -138,7 +138,7 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="password" className="text-xs">パスワード</UILabel>
+              <UILabel htmlFor="password" className="text-sm">パスワード</UILabel>
               <Input
                 id="password"
                 type="password"
@@ -159,7 +159,7 @@ export default function EntryForm({
               )}
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="totp" className="text-xs">TOTP（オプション）</UILabel>
+              <UILabel htmlFor="totp" className="text-sm">TOTP（オプション）</UILabel>
               <Input
                 id="totp"
                 value={v.totp || ''}
@@ -173,7 +173,7 @@ export default function EntryForm({
         return (
           <div className="space-y-3">
             <div className="space-y-1">
-              <UILabel htmlFor="bank_name" className="text-xs">銀行名</UILabel>
+              <UILabel htmlFor="bank_name" className="text-sm">銀行名</UILabel>
               <Input
                 id="bank_name"
                 value={v.bank_name || ''}
@@ -181,7 +181,7 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="account_number" className="text-xs">口座番号</UILabel>
+              <UILabel htmlFor="account_number" className="text-sm">口座番号</UILabel>
               <Input
                 id="account_number"
                 value={v.account_number || ''}
@@ -189,7 +189,7 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="pin" className="text-xs">PIN</UILabel>
+              <UILabel htmlFor="pin" className="text-sm">PIN</UILabel>
               <Input
                 id="pin"
                 type="password"
@@ -215,7 +215,7 @@ export default function EntryForm({
         return (
           <div className="space-y-3">
             <div className="space-y-1">
-              <UILabel htmlFor="private_key" className="text-xs">秘密鍵</UILabel>
+              <UILabel htmlFor="private_key" className="text-sm">秘密鍵</UILabel>
               <Textarea
                 id="private_key"
                 value={v.private_key || ''}
@@ -224,7 +224,7 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="passphrase" className="text-xs">パスフレーズ（オプション）</UILabel>
+              <UILabel htmlFor="passphrase" className="text-sm">パスフレーズ（オプション）</UILabel>
               <Input
                 id="passphrase"
                 type="password"
@@ -251,12 +251,12 @@ export default function EntryForm({
           <div className="space-y-3">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <UILabel htmlFor="content" className="text-xs">内容</UILabel>
+                <UILabel htmlFor="content" className="text-sm">内容</UILabel>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setSecureNotePreviewMode(false)}
-                    className={`px-3 py-1 text-xs rounded transition-colors ${
+                    className={`px-3 py-1 text-sm rounded transition-colors ${
                       !secureNotePreviewMode
                         ? 'bg-accent text-text-primary'
                         : 'bg-bg-elevated text-text-secondary hover:text-text-primary'
@@ -267,7 +267,7 @@ export default function EntryForm({
                   <button
                     type="button"
                     onClick={() => setSecureNotePreviewMode(true)}
-                    className={`px-3 py-1 text-xs rounded transition-colors ${
+                    className={`px-3 py-1 text-sm rounded transition-colors ${
                       secureNotePreviewMode
                         ? 'bg-accent text-text-primary'
                         : 'bg-bg-elevated text-text-secondary hover:text-text-primary'
@@ -298,7 +298,7 @@ export default function EntryForm({
         return (
           <div className="space-y-3">
             <div className="space-y-1">
-              <UILabel htmlFor="cardholder" className="text-xs">カード名義</UILabel>
+              <UILabel htmlFor="cardholder" className="text-sm">カード名義</UILabel>
               <Input
                 id="cardholder"
                 value={v.cardholder || ''}
@@ -306,7 +306,7 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="number" className="text-xs">カード番号</UILabel>
+              <UILabel htmlFor="number" className="text-sm">カード番号</UILabel>
               <Input
                 id="number"
                 value={v.number || ''}
@@ -315,7 +315,7 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="expiry" className="text-xs">有効期限</UILabel>
+              <UILabel htmlFor="expiry" className="text-sm">有効期限</UILabel>
               <Input
                 id="expiry"
                 value={v.expiry || ''}
@@ -324,7 +324,7 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="cvv" className="text-xs">CVV</UILabel>
+              <UILabel htmlFor="cvv" className="text-sm">CVV</UILabel>
               <Input
                 id="cvv"
                 type="password"
@@ -360,9 +360,9 @@ export default function EntryForm({
           <Card key={field.id} className="p-2 space-y-1.5">
             <div className="flex items-end gap-2">
               <div className="flex-1 space-y-0.5">
-                <UILabel htmlFor={`field-type-${field.id}`} className="text-xs">種類</UILabel>
+                <UILabel htmlFor={`field-type-${field.id}`} className="text-sm">種類</UILabel>
                 <Select value={field.fieldType} onValueChange={(value) => updateCustomField(field.id, { fieldType: value as CustomFieldType })}>
-                  <SelectTrigger id={`field-type-${field.id}`} className="h-8 text-xs">
+                  <SelectTrigger id={`field-type-${field.id}`} className="h-8 text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -375,13 +375,13 @@ export default function EntryForm({
                 </Select>
               </div>
               <div className="flex-1 space-y-0.5">
-                <UILabel htmlFor={`field-name-${field.id}`} className="text-xs">フィールド名</UILabel>
+                <UILabel htmlFor={`field-name-${field.id}`} className="text-sm">フィールド名</UILabel>
                 <Input
                   id={`field-name-${field.id}`}
                   value={field.name}
                   onChange={(e) => updateCustomField(field.id, { name: e.target.value })}
                   placeholder="例: セキュリティ質問"
-                  className="h-8 text-xs"
+                  className="h-8 text-sm"
                 />
               </div>
               <Button
@@ -394,13 +394,13 @@ export default function EntryForm({
               </Button>
             </div>
             <div className="space-y-0.5">
-              <UILabel htmlFor={`field-value-${field.id}`} className="text-xs">値</UILabel>
+              <UILabel htmlFor={`field-value-${field.id}`} className="text-sm">値</UILabel>
               <Input
                 id={`field-value-${field.id}`}
                 type={field.fieldType === 'password' ? 'password' : 'text'}
                 value={field.value}
                 onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
-                className="h-8 text-xs"
+                className="h-8 text-sm"
                 onFocus={() => field.fieldType === 'password' && setActiveGeneratorFieldId(`custom-${field.id}`)}
                 onBlur={() => field.fieldType === 'password' && setActiveGeneratorFieldId(null)}
               />
@@ -508,7 +508,7 @@ export default function EntryForm({
         </CardHeader>
         <CardContent className="px-3 pb-3 pt-2">
           {allLabels.length === 0 ? (
-            <p className="text-xs text-text-muted">ラベルがありません</p>
+            <p className="text-sm text-text-muted">ラベルがありません</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {allLabels.map(label => (
@@ -525,7 +525,7 @@ export default function EntryForm({
                     }}
                     className="w-4 h-4 rounded border-border"
                   />
-                  <span className="text-xs">{label.name}</span>
+                  <span className="text-sm">{label.name}</span>
                 </label>
               ))}
             </div>

@@ -106,7 +106,7 @@ export default function ConflictResolver() {
       <PageHeader title="コンフリクト解決" showBackButton={true} />
 
       <div className="p-4 space-y-4">
-        <div className="text-xs text-text-secondary">
+        <div className="text-sm text-text-secondary">
           複数のデバイスで同時に変更されました。以下のエントリについて、どちらの変更を採用するか選択してください。
         </div>
 
@@ -116,8 +116,8 @@ export default function ConflictResolver() {
             <Card key={conflict.entryId}>
               <CardHeader className="px-3 py-2">
                 <div>
-                  <CardTitle className="text-xs font-medium">{conflict.entryName}</CardTitle>
-                  <p className="text-xs text-text-muted mt-1">
+                  <CardTitle className="text-sm font-medium">{conflict.entryName}</CardTitle>
+                  <p className="text-sm text-text-muted mt-1">
                     {getConflictDescription(conflict.conflictType)}
                   </p>
                 </div>
@@ -136,7 +136,7 @@ export default function ConflictResolver() {
                       }
                       className="w-4 h-4"
                     />
-                    <div className="flex-1 text-xs">
+                    <div className="flex-1 text-sm">
                       <p className="font-medium text-text-primary">ローカル版</p>
                       <p className="text-text-muted">このデバイスの変更を使用</p>
                     </div>
@@ -154,7 +154,7 @@ export default function ConflictResolver() {
                       }
                       className="w-4 h-4"
                     />
-                    <div className="flex-1 text-xs">
+                    <div className="flex-1 text-sm">
                       <p className="font-medium text-text-primary">リモート版</p>
                       <p className="text-text-muted">他のデバイスの変更を使用</p>
                     </div>

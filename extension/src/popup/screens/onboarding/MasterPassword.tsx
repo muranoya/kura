@@ -99,19 +99,19 @@ export default function MasterPassword() {
       <div className="p-4 space-y-4">
         {/* パスワード説明 */}
         <div className="p-3 rounded-md bg-accent/10 border border-accent/20">
-          <p className="text-xs text-text-primary">
+          <p className="text-sm text-text-primary">
             📌 すべてのデータを保護するマスターパスワードです。安全で予測困難なパスワードを設定してください。
           </p>
         </div>
 
         <Card>
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-xs font-medium">パスワード設定</CardTitle>
+            <CardTitle className="text-sm font-medium">パスワード設定</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2 space-y-3">
             {/* パスワード入力 */}
             <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-xs">
+              <Label htmlFor="password" className="text-sm">
                 マスターパスワード
               </Label>
               <Input
@@ -120,7 +120,7 @@ export default function MasterPassword() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="強力なパスワードを設定してください"
-                className="text-xs"
+                className="text-sm"
               />
 
               {/* 強度インジケータ */}
@@ -136,7 +136,7 @@ export default function MasterPassword() {
                       />
                     ))}
                   </div>
-                  <p className="text-xs text-text-muted">
+                  <p className="text-sm text-text-muted">
                     強度: {strengthLabels[strength]}
                   </p>
                 </div>
@@ -145,7 +145,7 @@ export default function MasterPassword() {
 
             {/* パスワード確認入力 */}
             <div className="space-y-1.5">
-              <Label htmlFor="confirm-password" className="text-xs">
+              <Label htmlFor="confirm-password" className="text-sm">
                 パスワード確認
               </Label>
               <Input
@@ -154,13 +154,13 @@ export default function MasterPassword() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="パスワードを再入力してください"
-                className="text-xs"
+                className="text-sm"
               />
 
               {/* マッチング状態 */}
               {confirmPassword && (
                 <div
-                  className={`flex items-center gap-1 text-xs ${
+                  className={`flex items-center gap-1 text-sm ${
                     passwordsMatch ? 'text-success' : 'text-danger'
                   }`}
                 >
@@ -185,7 +185,7 @@ export default function MasterPassword() {
                 onChange={(e) => setConfirmed(e.target.checked)}
                 className="w-4 h-4 mt-0.5 flex-shrink-0"
               />
-              <span className="text-xs text-text-primary">
+              <span className="text-sm text-text-primary">
                 このパスワードを忘れないことを確認します
               </span>
             </label>

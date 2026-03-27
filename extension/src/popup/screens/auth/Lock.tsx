@@ -69,7 +69,7 @@ export default function LockScreen() {
             <Lock className="w-6 h-6 text-accent" />
           </div>
           <h1 className="text-2xl font-bold text-text-primary mb-1">kura</h1>
-          <p className="text-xs text-text-secondary">Vaultはロックされています</p>
+          <p className="text-sm text-text-secondary">Vaultはロックされています</p>
         </div>
 
         <Card>
@@ -77,13 +77,13 @@ export default function LockScreen() {
             {/* エラーメッセージ */}
             {error && (
               <div className="mb-3 p-2 rounded-md bg-danger/10 border border-danger/20">
-                <p className="text-xs text-danger">{error}</p>
+                <p className="text-sm text-danger">{error}</p>
               </div>
             )}
 
             {/* マスターパスワード入力 */}
             <div className="space-y-1.5 mb-4">
-              <Label htmlFor="password" className="text-xs">
+              <Label htmlFor="password" className="text-sm">
                 マスターパスワード
               </Label>
               <Input

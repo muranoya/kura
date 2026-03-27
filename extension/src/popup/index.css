@@ -76,6 +76,8 @@ body,
 
 body {
   width: 720px;
+  height: 616px;
+  padding: 8px;
   background-color: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-sans);
@@ -84,8 +86,11 @@ body {
 }
 
 #root {
-  width: 720px;
+  width: 100%;
   height: 600px;
+  background-color: var(--bg-surface);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 * {

@@ -60,7 +60,7 @@ export default function EntryCreate() {
             size="sm"
             onClick={handleCreate}
             disabled={loading || !name}
-            className="text-xs"
+            className="text-sm"
           >
             {loading ? '作成中...' : '作成'}
           </Button>

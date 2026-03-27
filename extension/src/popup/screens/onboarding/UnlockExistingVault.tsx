@@ -75,14 +75,14 @@ export default function UnlockExistingVault() {
             </div>
 
             {/* 説明文 */}
-            <p className="text-xs text-center text-text-secondary">
+            <p className="text-sm text-center text-text-secondary">
               このVaultを使用するためには、マスターパスワードを入力してください。
             </p>
 
             {/* エラーメッセージ */}
             {error && (
               <div className="w-full p-3 rounded-md bg-danger/10 border border-danger/20">
-                <p className="text-xs text-danger">⚠️ {error}</p>
+                <p className="text-sm text-danger">⚠️ {error}</p>
               </div>
             )}
 
@@ -95,7 +95,7 @@ export default function UnlockExistingVault() {
               }}
             >
               <div className="space-y-1.5">
-                <Label htmlFor="password" className="text-xs">
+                <Label htmlFor="password" className="text-sm">
                   マスターパスワード
                 </Label>
                 <Input
@@ -105,7 +105,7 @@ export default function UnlockExistingVault() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
-                  className="text-xs"
+                  className="text-sm"
                   autoFocus
                 />
               </div>

@@ -52,7 +52,7 @@ export function PageHeader({
         )}
         <div className="min-w-0 flex-1">
           <h1 className={cn('text-text-primary truncate', titleClass)}>{title}</h1>
-          {subtitle && <p className="text-xs text-text-secondary mt-0.5 truncate">{subtitle}</p>}
+          {subtitle && <p className="text-sm text-text-secondary mt-0.5 truncate">{subtitle}</p>}
         </div>
       </div>
       {action && <div className="flex items-center gap-2 flex-shrink-0">{action}</div>}

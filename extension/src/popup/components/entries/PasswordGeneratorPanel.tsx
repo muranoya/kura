@@ -71,7 +71,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
             <CardContent className="px-2 py-2">
               {password ? (
                 <div className="flex items-center gap-2 p-2 rounded-md bg-bg-elevated border border-border">
-                  <span className="font-mono text-xs text-text-primary flex-1 break-all">{password}</span>
+                  <span className="font-mono text-sm text-text-primary flex-1 break-all">{password}</span>
                   <div className="flex gap-1 shrink-0">
                     <button
                       onClick={handleCopy}
@@ -91,7 +91,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                     {onUse && (
                       <button
                         onClick={() => onUse(password)}
-                        className="px-2 py-1 text-xs bg-accent text-white hover:bg-accent-hover rounded transition-colors whitespace-nowrap"
+                        className="px-2 py-1 text-sm bg-accent text-white hover:bg-accent-hover rounded transition-colors whitespace-nowrap"
                         title="このパスワードを使用"
                       >
                         使用する
@@ -100,7 +100,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                   </div>
                 </div>
               ) : (
-                <div className="p-2 rounded-md bg-bg-elevated border border-border text-center text-text-secondary text-xs">
+                <div className="p-2 rounded-md bg-bg-elevated border border-border text-center text-text-secondary text-sm">
                   パスワードをまだ生成していません
                 </div>
               )}
@@ -110,7 +110,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           {/* 設定（コンパクト版） */}
           <div className="space-y-2">
             <div className="space-y-1">
-              <UILabel htmlFor={`length-${isInline ? 'inline' : 'screen'}`} className="text-xs">
+              <UILabel htmlFor={`length-${isInline ? 'inline' : 'screen'}`} className="text-sm">
                 長さ: {length}
               </UILabel>
               <Input
@@ -122,7 +122,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                 onChange={(e) => setLength(parseInt(e.target.value))}
                 className="h-2 px-0 py-0 w-full"
               />
-              <div className="flex gap-2 text-xs text-text-secondary">
+              <div className="flex gap-2 text-sm text-text-secondary">
                 <span>1</span>
                 <span className="flex-1" />
                 <span>128</span>
@@ -138,7 +138,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                   onChange={(e) => setIncludeUppercase(e.target.checked)}
                   className="w-3 h-3 rounded border-border"
                 />
-                <label htmlFor={`uppercase-${isInline ? 'inline' : 'screen'}`} className="text-xs text-text-primary cursor-pointer">
+                <label htmlFor={`uppercase-${isInline ? 'inline' : 'screen'}`} className="text-sm text-text-primary cursor-pointer">
                   大文字 (A-Z)
                 </label>
               </div>
@@ -151,7 +151,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                   onChange={(e) => setIncludeLowercase(e.target.checked)}
                   className="w-3 h-3 rounded border-border"
                 />
-                <label htmlFor={`lowercase-${isInline ? 'inline' : 'screen'}`} className="text-xs text-text-primary cursor-pointer">
+                <label htmlFor={`lowercase-${isInline ? 'inline' : 'screen'}`} className="text-sm text-text-primary cursor-pointer">
                   小文字 (a-z)
                 </label>
               </div>
@@ -164,7 +164,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                   onChange={(e) => setIncludeNumbers(e.target.checked)}
                   className="w-3 h-3 rounded border-border"
                 />
-                <label htmlFor={`numbers-${isInline ? 'inline' : 'screen'}`} className="text-xs text-text-primary cursor-pointer">
+                <label htmlFor={`numbers-${isInline ? 'inline' : 'screen'}`} className="text-sm text-text-primary cursor-pointer">
                   数字 (0-9)
                 </label>
               </div>
@@ -177,7 +177,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                   onChange={(e) => setIncludeSymbols(e.target.checked)}
                   className="w-3 h-3 rounded border-border"
                 />
-                <label htmlFor={`symbols-${isInline ? 'inline' : 'screen'}`} className="text-xs text-text-primary cursor-pointer">
+                <label htmlFor={`symbols-${isInline ? 'inline' : 'screen'}`} className="text-sm text-text-primary cursor-pointer">
                   特殊文字 (!@#$%...)
                 </label>
               </div>
@@ -230,7 +230,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2 space-y-3">
               <div className="space-y-3">
-                <UILabel htmlFor="length" className="text-xs">
+                <UILabel htmlFor="length" className="text-sm">
                   長さ: {length}
                 </UILabel>
                 <div>
@@ -244,7 +244,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                     className="h-2 px-0 py-0 w-full"
                   />
                 </div>
-                <div className="flex gap-2 text-xs text-text-secondary">
+                <div className="flex gap-2 text-sm text-text-secondary">
                   <span>1</span>
                   <span className="flex-1" />
                   <span>128</span>
@@ -260,7 +260,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                     onChange={(e) => setIncludeUppercase(e.target.checked)}
                     className="w-4 h-4 rounded border-border"
                   />
-                  <label htmlFor="uppercase" className="text-xs text-text-primary cursor-pointer">
+                  <label htmlFor="uppercase" className="text-sm text-text-primary cursor-pointer">
                     大文字 (A-Z)
                   </label>
                 </div>
@@ -273,7 +273,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                     onChange={(e) => setIncludeLowercase(e.target.checked)}
                     className="w-4 h-4 rounded border-border"
                   />
-                  <label htmlFor="lowercase" className="text-xs text-text-primary cursor-pointer">
+                  <label htmlFor="lowercase" className="text-sm text-text-primary cursor-pointer">
                     小文字 (a-z)
                   </label>
                 </div>
@@ -286,7 +286,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                     onChange={(e) => setIncludeNumbers(e.target.checked)}
                     className="w-4 h-4 rounded border-border"
                   />
-                  <label htmlFor="numbers" className="text-xs text-text-primary cursor-pointer">
+                  <label htmlFor="numbers" className="text-sm text-text-primary cursor-pointer">
                     数字 (0-9)
                   </label>
                 </div>
@@ -299,7 +299,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                     onChange={(e) => setIncludeSymbols(e.target.checked)}
                     className="w-4 h-4 rounded border-border"
                   />
-                  <label htmlFor="symbols" className="text-xs text-text-primary cursor-pointer">
+                  <label htmlFor="symbols" className="text-sm text-text-primary cursor-pointer">
                     特殊文字 (!@#$%...)
                   </label>
                 </div>

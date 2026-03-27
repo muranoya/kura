@@ -86,7 +86,7 @@ export default function RecoveryKey() {
         {/* 警告 */}
         <div className="p-3 rounded-md bg-danger/10 border border-danger/20 flex gap-3">
           <AlertTriangle size={16} className="text-danger flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-danger">
+          <p className="text-sm text-danger">
             このキーを失うと復旧不可能です。紙に書き写して安全な場所に保管してください。
           </p>
         </div>
@@ -94,16 +94,16 @@ export default function RecoveryKey() {
         {/* リカバリーキー表示 */}
         <Card>
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-xs font-medium">リカバリーキー</CardTitle>
+            <CardTitle className="text-sm font-medium">リカバリーキー</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2 space-y-2">
-            <div className="bg-bg-elevated p-3 rounded-md border border-border font-mono text-xs text-text-primary break-all">
+            <div className="bg-bg-elevated p-3 rounded-md border border-border font-mono text-sm text-text-primary break-all">
               {recoveryKey}
             </div>
             <Button
               variant="secondary"
               onClick={handleCopy}
-              className="w-full text-xs gap-1"
+              className="w-full text-sm gap-1"
               size="sm"
             >
               {copied ? (
@@ -127,7 +127,7 @@ export default function RecoveryKey() {
             onChange={(e) => setConfirmed(e.target.checked)}
             className="w-4 h-4 mt-0.5 flex-shrink-0"
           />
-          <span className="text-xs text-text-primary">
+          <span className="text-sm text-text-primary">
             リカバリーキーを紙に書き写しました
           </span>
         </label>
@@ -136,10 +136,10 @@ export default function RecoveryKey() {
         {confirmed && (
           <Card>
             <CardHeader className="px-3 py-2">
-              <CardTitle className="text-xs font-medium">リカバリーキーを確認</CardTitle>
+              <CardTitle className="text-sm font-medium">リカバリーキーを確認</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2">
-              <p className="text-xs text-text-muted mb-2">
+              <p className="text-sm text-text-muted mb-2">
                 リカバリーキーを入力して保管を確認してください
               </p>
               <Input
@@ -147,7 +147,7 @@ export default function RecoveryKey() {
                 value={recoveryKeyInput}
                 onChange={(e) => setRecoveryKeyInput(e.target.value)}
                 placeholder="XXXX-XXXX-..."
-                className="text-xs font-mono"
+                className="text-sm font-mono"
               />
             </CardContent>
           </Card>

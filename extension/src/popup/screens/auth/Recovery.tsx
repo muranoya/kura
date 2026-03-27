@@ -43,7 +43,7 @@ export default function Recovery() {
         {/* ヘッダー */}
         <button
           onClick={() => navigate('/auth/lock')}
-          className="flex items-center gap-1 text-accent hover:text-accent-hover mb-6 text-xs"
+          className="flex items-center gap-1 text-accent hover:text-accent-hover mb-6 text-sm"
         >
           <ArrowLeft size={14} />
           戻る
@@ -52,7 +52,7 @@ export default function Recovery() {
         {/* タイトル */}
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-text-primary mb-1">リカバリーキーで復旧</h1>
-          <p className="text-xs text-text-secondary">
+          <p className="text-sm text-text-secondary">
             マスターパスワードを忘れた場合、リカバリーキーを使って新しいパスワードを設定できます
           </p>
         </div>
@@ -62,13 +62,13 @@ export default function Recovery() {
             {/* エラーメッセージ */}
             {error && (
               <div className="p-3 rounded-md bg-danger/10 border border-danger/20">
-                <p className="text-xs text-danger">{error}</p>
+                <p className="text-sm text-danger">{error}</p>
               </div>
             )}
 
             {/* リカバリーキー入力 */}
             <div className="space-y-1.5">
-              <Label htmlFor="recovery-key" className="text-xs">
+              <Label htmlFor="recovery-key" className="text-sm">
                 リカバリーキー
               </Label>
               <Input
@@ -83,14 +83,14 @@ export default function Recovery() {
                 disabled={loading}
                 className="text-sm font-mono"
               />
-              <p className="text-xs text-text-muted mt-1">
+              <p className="text-sm text-text-muted mt-1">
                 セットアップ時に保管したリカバリーキーを入力してください
               </p>
             </div>
 
             {/* 新しいパスワード入力 */}
             <div className="space-y-1.5">
-              <Label htmlFor="new-password" className="text-xs">
+              <Label htmlFor="new-password" className="text-sm">
                 新しいマスターパスワード
               </Label>
               <Input
@@ -109,7 +109,7 @@ export default function Recovery() {
 
             {/* パスワード確認 */}
             <div className="space-y-1.5">
-              <Label htmlFor="confirm-password" className="text-xs">
+              <Label htmlFor="confirm-password" className="text-sm">
                 パスワード確認
               </Label>
               <Input

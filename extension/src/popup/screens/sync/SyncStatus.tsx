@@ -100,7 +100,7 @@ export default function SyncStatus() {
             <div className="text-center">
               <p className={`text-sm font-medium ${display.color}`}>{display.title}</p>
               {lastSyncTime && syncStatus !== 'syncing' && (
-                <p className="text-xs text-text-muted mt-1">
+                <p className="text-sm text-text-muted mt-1">
                   最終同期: {lastSyncTime}
                 </p>
               )}
@@ -108,7 +108,7 @@ export default function SyncStatus() {
 
             {error && (
               <div className="w-full mt-2 p-2 rounded-md bg-danger/10 border border-danger/20">
-                <p className="text-xs text-danger text-center">{error}</p>
+                <p className="text-sm text-danger text-center">{error}</p>
               </div>
             )}
           </CardContent>
@@ -117,9 +117,9 @@ export default function SyncStatus() {
         {/* 同期情報 */}
         <Card>
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-xs font-medium">同期設定</CardTitle>
+            <CardTitle className="text-sm font-medium">同期設定</CardTitle>
           </CardHeader>
-          <CardContent className="px-3 pb-3 pt-2 space-y-2 text-xs text-text-secondary">
+          <CardContent className="px-3 pb-3 pt-2 space-y-2 text-sm text-text-secondary">
             <p>• 自動同期: オフ（手動で実行してください）</p>
             <p>• 保存時同期: オン（エントリ保存時に自動同期）</p>
             <p>• オフラインモード: 対応</p>
