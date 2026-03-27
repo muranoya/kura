@@ -44,8 +44,8 @@ pub fn sign_get_request(
 
     // Canonical request
     let canonical_request = format!(
-        "GET\n{}\n\n{}\n{}",
-        uri, canonical_headers, signed_headers
+        "GET\n{}\n\n{}\n{}\n{}",
+        uri, canonical_headers, signed_headers, payload_hash
     );
 
     // Canonical request hash
@@ -98,6 +98,9 @@ pub fn sign_put_request(
 ) -> SignedHeaders {
     let date = &datetime[..8];
 
+    // Filter out empty string ETags (treat as None for unsigned upload)
+    let etag = etag.filter(|s| !s.is_empty());
+
     // Body SHA256
     let payload_hash = sha256_hex(body);
 
@@ -106,15 +109,18 @@ pub fn sign_put_request(
     let uri = extract_path(url);
 
     // Build canonical headers (must be alphabetically sorted by lowercase name)
-    let mut canonical_headers = format!(
-        "host:{}\nx-amz-content-sha256:{}\nx-amz-date:{}\n",
-        host, payload_hash, datetime
-    );
-
-    // If-Match header (if provided)
-    if let Some(if_match_val) = etag {
-        canonical_headers.insert_str(0, &format!("if-match:{}\n", if_match_val));
-    }
+    let canonical_headers = if let Some(if_match_val) = etag {
+        // Alphabetically sorted: host < if-match < x-amz-content-sha256 < x-amz-date
+        format!(
+            "host:{}\nif-match:{}\nx-amz-content-sha256:{}\nx-amz-date:{}\n",
+            host, if_match_val, payload_hash, datetime
+        )
+    } else {
+        format!(
+            "host:{}\nx-amz-content-sha256:{}\nx-amz-date:{}\n",
+            host, payload_hash, datetime
+        )
+    };
 
     // Signed headers list (alphabetically sorted, semicolon-separated)
     let mut signed_headers_vec = vec!["host", "x-amz-content-sha256", "x-amz-date"];
@@ -126,8 +132,8 @@ pub fn sign_put_request(
 
     // Canonical request
     let canonical_request = format!(
-        "PUT\n{}\n\n{}\n{}",
-        uri, canonical_headers, signed_headers
+        "PUT\n{}\n\n{}\n{}\n{}",
+        uri, canonical_headers, signed_headers, payload_hash
     );
 
     // Canonical request hash

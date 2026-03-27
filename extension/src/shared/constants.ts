@@ -1,23 +1,47 @@
-// 定数
+// Entry type labels and icons
+export const ENTRY_TYPE_LABELS: Record<string, string> = {
+  login: 'ログイン',
+  bank: '銀行口座',
+  ssh_key: 'SSHキー',
+  secure_note: 'セキュアノート',
+  credit_card: 'クレジットカード',
+  passkey: 'PassKey',
+}
 
+export function getEntryTypeLabel(type: string): string {
+  return ENTRY_TYPE_LABELS[type] ?? type
+}
+
+// Default app settings
 export const DEFAULT_SETTINGS = {
   clipboardClearSeconds: 30,
   autolockMinutes: 5,
   autolockOnBackground: true,
-  screenshotPreventionEnabled: true,
+  theme: 'light' as const,
 }
 
-export const ENTRY_TYPES = [
-  { value: 'login' as const, label: 'ログイン' },
-  { value: 'bank' as const, label: '銀行口座' },
-  { value: 'ssh_key' as const, label: 'SSHキー' },
-  { value: 'secure_note' as const, label: 'セキュアノート' },
-  { value: 'credit_card' as const, label: 'クレジットカード' },
-  { value: 'passkey' as const, label: 'PassKey' },
-]
+// Storage keys
+export const STORAGE_KEYS = {
+  VAULT_BYTES: 'vaultBytes',
+  VAULT_ETAG: 'vaultETag',
+  S3_CONFIG: 's3Config',
+  APP_SETTINGS: 'appSettings',
+  ONBOARDING_DRAFT: 'onboardingDraft',
+  ONBOARDING_FLOW: 'onboardingFlow',
+  LAST_SYNC_TIME: 'lastSyncTime',
+}
 
-export const PASSWORD_STRENGTH = {
-  weak: { label: '弱', color: '#dc2626' },
-  medium: { label: '中', color: '#ea580c' },
-  strong: { label: '強', color: '#16a34a' },
+// Password generation defaults
+export const PASSWORD_GENERATION_DEFAULTS = {
+  length: 16,
+  includeUppercase: true,
+  includeLowercase: true,
+  includeNumbers: true,
+  includeSymbols: true,
+}
+
+// TOTP defaults
+export const TOTP_DEFAULTS = {
+  digits: 6,
+  period: 30,
 }

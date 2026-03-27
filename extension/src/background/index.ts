@@ -3,6 +3,7 @@
 
 import * as vault from '../../wasm/vault_core'
 import { getFromStorage, saveToStorage } from '../shared/storage'
+import { STORAGE_KEYS } from '../shared/constants'
 
 let wasmInitialized = false
 let unlocked = false
@@ -19,27 +20,128 @@ async function initWasm() {
   }
 }
 
-// Service Worker 起動時に初期化
-self.addEventListener('install', (event) => {
-  event.waitUntil(initWasm())
-})
+// ========== メッセージハンドラーのセットアップ ==========
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(initWasm().then(() => {
-    setupMessageHandlers()
-    setupAlarms()
-  }))
-})
-
-// メッセージハンドラーのセットアップ
 function setupMessageHandlers() {
+  console.log('[SW] Setting up message handlers')
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    handleMessage(message, sender, sendResponse)
+    console.log('[SW] Message received:', message.type)
+    // async 処理を fire-and-forget で実行し、Promise で sendResponse を呼ぶ
+    handleMessage(message, sender, sendResponse).catch((err) => {
+      console.error('[SW] Unhandled error in message handler:', err)
+      try {
+        sendResponse({ success: false, error: String(err) })
+      } catch (e) {
+        console.error('[SW] Failed to send error response:', e)
+      }
+    })
     return true // 非同期レスポンスを許可
   })
 }
 
-// メッセージハンドリング
+// メッセージハンドラーを最初に登録（スクリプト読み込み時）
+console.log('[SW] Registering message handlers immediately on script load')
+setupMessageHandlers()
+
+// Service Worker 起動時に初期化
+self.addEventListener('install', (event) => {
+  console.log('[SW] install event')
+  event.waitUntil(initWasm())
+})
+
+self.addEventListener('activate', (event) => {
+  console.log('[SW] activate event')
+  event.waitUntil(initWasm().then(() => {
+    console.log('[SW] Calling setupAlarms in activate')
+    setupAlarms()
+  }))
+})
+
+// ========== ヘルパー関数 ==========
+
+/**
+ * camelCase への正規化（WASM からの snake_case → camelCase）
+ */
+function normalizeEntry(raw: any): any {
+  if (!raw) return raw
+  return {
+    id: raw.id,
+    entryType: raw.entry_type,
+    name: raw.name,
+    isFavorite: raw.is_favorite ?? false,
+    updatedAt: raw.updated_at ?? 0,
+    deletedAt: raw.deleted_at ?? null,
+    notes: raw.notes ?? null,
+    typedValue: raw.typed_value ?? {},
+    labels: raw.label_ids ?? [],
+    customFields: (raw.custom_fields ?? []).map((f: any) => ({
+      id: f.id,
+      name: f.name,
+      fieldType: f.field_type,
+      value: f.value,
+    })),
+  }
+}
+
+/**
+ * 配列エントリを正規化（normalizeEntry を各要素に適用）
+ */
+function normalizeEntries(entries: any[]): any[] {
+  return (entries ?? []).map(normalizeEntry)
+}
+
+/**
+ * 自動保存 & S3 へのプッシュ
+ */
+async function autoSaveAndPush() {
+  try {
+    console.log('[SW] autoSaveAndPush: Starting')
+    const vaultBytes = (vault as any).api_get_vault_bytes()
+    console.log('[SW] autoSaveAndPush: Got vault bytes, size:', vaultBytes?.length)
+    await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
+
+    const s3Config = await getFromStorage(STORAGE_KEYS.S3_CONFIG)
+    console.log('[SW] autoSaveAndPush: s3Config exists:', !!s3Config)
+    console.log('[SW] autoSaveAndPush: api_push type:', typeof (vault as any).api_push)
+
+    if (s3Config) {
+      try {
+        // api_push が存在する場合のみ実行
+        if (typeof (vault as any).api_push === 'function') {
+          console.log('[SW] autoSaveAndPush: Calling api_push')
+          const pushResult = await (vault as any).api_push(JSON.stringify(s3Config))
+          console.log('[SW] autoSaveAndPush: api_push returned:', pushResult)
+          // Save updated ETag and sync time
+          const newEtag = (vault as any).api_get_vault_etag?.() ?? null
+          await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
+          await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, new Date().toISOString())
+          console.log('[SW] Auto-push successful')
+        } else {
+          console.warn('[SW] autoSaveAndPush: api_push not available in WASM')
+        }
+      } catch (e) {
+        console.warn('[SW] Auto-push failed:', e)
+      }
+    } else {
+      console.log('[SW] autoSaveAndPush: No S3 config, skipping push')
+    }
+  } catch (err) {
+    console.error('[SW] autoSaveAndPush failed:', err)
+  }
+}
+
+async function loadSettings() {
+  const settings = await getFromStorage(STORAGE_KEYS.APP_SETTINGS)
+  return settings || {
+    autolockMinutes: 5,
+    clipboardClearSeconds: 30,
+    clipboardAutoClean: true,
+    theme: 'light',
+  }
+}
+
+// ========== メッセージハンドリング ==========
+
 async function handleMessage(
   message: any,
   sender: chrome.runtime.MessageSender,
@@ -48,9 +150,27 @@ async function handleMessage(
   try {
     await initWasm()
 
+    // Service Worker 再起動時の vault 自動復元
+    // vaultBytes が storage に存在し、unlocked が false の場合、vault をロードする
+    if (!unlocked) {
+      const vaultBytes = await getFromStorage(STORAGE_KEYS.VAULT_BYTES)
+      if (vaultBytes) {
+        try {
+          const etag = await getFromStorage(STORAGE_KEYS.VAULT_ETAG)
+          console.log('[SW] Auto-loading vault from storage (Service Worker recovered)')
+          ;(vault as any).api_load_vault(new Uint8Array(vaultBytes), etag || '')
+          // Note: We load but don't unlock yet - the actual unlock state is restored on first UNLOCK/CREATE_VAULT
+        } catch (e) {
+          console.warn('[SW] Failed to auto-load vault:', e)
+        }
+      }
+    }
+
     switch (message.type) {
+      // ========== Auth ==========
+
       case 'IS_UNLOCKED': {
-        sendResponse({ unlocked })
+        sendResponse({ success: true, unlocked })
         break
       }
 
@@ -60,8 +180,8 @@ async function handleMessage(
           break
         }
         try {
-          const vaultBytes = await getFromStorage('vaultBytes')
-          const etag = await getFromStorage('vaultEtag')
+          const vaultBytes = await getFromStorage(STORAGE_KEYS.VAULT_BYTES)
+          const etag = await getFromStorage(STORAGE_KEYS.VAULT_ETAG)
           if (!vaultBytes) {
             sendResponse({ success: false, error: 'Vault not found' })
             break
@@ -80,18 +200,23 @@ async function handleMessage(
         break
       }
 
-      case 'RECOVER': {
-        if (!message.recoveryKey || !message.newPassword) {
-          sendResponse({ success: false, error: 'Recovery key and password required' })
+      case 'UNLOCK_EXISTING': {
+        if (!message.password) {
+          sendResponse({ success: false, error: 'Password required' })
           break
         }
         try {
-          ;(vault as any).api_unlock_with_recovery_key(message.recoveryKey)
-          ;(vault as any).api_change_master_password(message.recoveryKey, message.newPassword)
-          const vaultBytes = (vault as any).api_get_vault_bytes()
-          await saveToStorage('vaultBytes', Array.from(vaultBytes))
-          await saveToStorage('vaultEtag', null)
+          const vaultBytes = await getFromStorage(STORAGE_KEYS.VAULT_BYTES)
+          const etag = await getFromStorage(STORAGE_KEYS.VAULT_ETAG)
+          if (!vaultBytes) {
+            sendResponse({ success: false, error: 'Vault not found' })
+            break
+          }
+          ;(vault as any).api_load_vault(new Uint8Array(vaultBytes), etag || '')
+          ;(vault as any).api_unlock(message.password)
           unlocked = true
+          const settings = await loadSettings()
+          chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -102,7 +227,7 @@ async function handleMessage(
       case 'LOCK': {
         try {
           const vaultBytes = (vault as any).api_lock()
-          await saveToStorage('vaultBytes', Array.from(vaultBytes))
+          await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
           unlocked = false
           chrome.alarms.clear('autolock')
           sendResponse({ success: true })
@@ -118,17 +243,61 @@ async function handleMessage(
           break
         }
         try {
+          console.log('[SW] CREATE_VAULT: Starting vault creation')
+          console.log('[SW] CREATE_VAULT: vault object type:', typeof vault)
+          console.log('[SW] CREATE_VAULT: vault.api_create_new_vault:', typeof (vault as any).api_create_new_vault)
+
           const recoveryKey = (vault as any).api_create_new_vault(message.masterPassword)
+          console.log('[SW] CREATE_VAULT: Vault created, recovery key:', recoveryKey)
+
           const vaultBytes = (vault as any).api_get_vault_bytes()
-          await saveToStorage('vaultBytes', Array.from(vaultBytes))
-          await saveToStorage('vaultEtag', null)
+          console.log('[SW] CREATE_VAULT: Got vault bytes, size:', vaultBytes?.length)
+
+          await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
+          await saveToStorage(STORAGE_KEYS.VAULT_ETAG, null)
+          console.log('[SW] CREATE_VAULT: Saved vault bytes to storage')
+
+          if (message.s3Config) {
+            await saveToStorage(STORAGE_KEYS.S3_CONFIG, message.s3Config)
+          }
           unlocked = true
-          sendResponse({ success: true, recoveryKey })
+          const settings = await loadSettings()
+          chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
+          console.log('[SW] CREATE_VAULT: Success, sending response')
+          const responsePayload = { success: true, recoveryKey }
+          console.log('[SW] CREATE_VAULT: Response payload:', responsePayload)
+          sendResponse(responsePayload)
+          console.log('[SW] CREATE_VAULT: sendResponse called')
+        } catch (err) {
+          console.error('[SW] CREATE_VAULT: Error:', err)
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      case 'RECOVER': {
+        if (!message.recoveryKey || !message.newPassword) {
+          sendResponse({ success: false, error: 'Recovery key and password required' })
+          break
+        }
+        try {
+          ;(vault as any).api_unlock_with_recovery_key(message.recoveryKey)
+          ;(vault as any).api_change_master_password(message.recoveryKey, message.newPassword)
+          const vaultBytes = (vault as any).api_get_vault_bytes()
+          await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
+          await saveToStorage(STORAGE_KEYS.VAULT_ETAG, null)
+          await autoSaveAndPush()
+          unlocked = true
+          const settings = await loadSettings()
+          chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
+          sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }
         break
       }
+
+      // ========== Entries ==========
 
       case 'LIST_ENTRIES': {
         if (!unlocked) {
@@ -141,9 +310,11 @@ async function handleMessage(
             filter.searchQuery || null,
             filter.type || null,
             filter.labelId || null,
-            filter.includeTrash || false
+            filter.includeTrash || false,
+            filter.onlyFavorites || false
           )
-          const entries = JSON.parse(result)
+          const rawEntries = JSON.parse(result)
+          const entries = normalizeEntries(rawEntries)
           sendResponse({ success: true, entries })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -158,10 +329,11 @@ async function handleMessage(
         }
         try {
           const result = (vault as any).api_get_entry(message.id)
-          const entry = JSON.parse(result)
-          if (entry && entry.typed_value && typeof entry.typed_value === 'string') {
-            entry.typed_value = JSON.parse(entry.typed_value)
+          const rawEntry = JSON.parse(result)
+          if (rawEntry && rawEntry.typed_value && typeof rawEntry.typed_value === 'string') {
+            rawEntry.typed_value = JSON.parse(rawEntry.typed_value)
           }
+          const entry = normalizeEntry(rawEntry)
           sendResponse({ success: true, entry })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -175,14 +347,16 @@ async function handleMessage(
           break
         }
         try {
-          ;(vault as any).api_create_entry(
+          const entryId = (vault as any).api_create_entry(
             message.entryType,
             message.name,
             message.notes || null,
-            JSON.stringify(message.typed_value || {}),
-            message.labelIds || []
+            JSON.stringify(message.typedValue || {}),
+            message.labelIds || [],
+            message.customFields ? JSON.stringify(message.customFields) : null
           )
-          sendResponse({ success: true })
+          await autoSaveAndPush()
+          sendResponse({ success: true, entryId })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }
@@ -199,9 +373,11 @@ async function handleMessage(
             message.id,
             message.name,
             message.notes || null,
-            JSON.stringify(message.typed_value || {}),
-            message.labelIds || []
+            JSON.stringify(message.typedValue || {}),
+            message.labelIds || [],
+            message.customFields ? JSON.stringify(message.customFields) : null
           )
+          await autoSaveAndPush()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -216,6 +392,7 @@ async function handleMessage(
         }
         try {
           ;(vault as any).api_delete_entry(message.id)
+          await autoSaveAndPush()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -230,6 +407,7 @@ async function handleMessage(
         }
         try {
           ;(vault as any).api_restore_entry(message.id)
+          await autoSaveAndPush()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -244,6 +422,7 @@ async function handleMessage(
         }
         try {
           ;(vault as any).api_purge_entry(message.id)
+          await autoSaveAndPush()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -258,6 +437,7 @@ async function handleMessage(
         }
         try {
           ;(vault as any).api_set_favorite(message.id, message.isFavorite)
+          await autoSaveAndPush()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -265,20 +445,25 @@ async function handleMessage(
         break
       }
 
+      // ========== Trash ==========
+
       case 'LIST_TRASH': {
         if (!unlocked) {
           sendResponse({ success: false, error: 'Vault not unlocked' })
           break
         }
         try {
-          const result = (vault as any).api_list_entries(null, null, null, true)
-          const entries = JSON.parse(result)
+          const result = (vault as any).api_list_entries(null, null, null, true, false)
+          const rawEntries = JSON.parse(result)
+          const entries = normalizeEntries(rawEntries)
           sendResponse({ success: true, entries })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }
         break
       }
+
+      // ========== Labels ==========
 
       case 'LIST_LABELS': {
         if (!unlocked) {
@@ -302,7 +487,8 @@ async function handleMessage(
         }
         try {
           const labelId = (vault as any).api_create_label(message.name)
-          sendResponse({ success: true, label: { id: labelId, name: message.name } })
+          await autoSaveAndPush()
+          sendResponse({ success: true, labelId })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }
@@ -316,6 +502,22 @@ async function handleMessage(
         }
         try {
           ;(vault as any).api_delete_label(message.id)
+          await autoSaveAndPush()
+          sendResponse({ success: true })
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      case 'RENAME_LABEL': {
+        if (!unlocked) {
+          sendResponse({ success: false, error: 'Vault not unlocked' })
+          break
+        }
+        try {
+          ;(vault as any).api_rename_label(message.id, message.newName)
+          await autoSaveAndPush()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -330,6 +532,7 @@ async function handleMessage(
         }
         try {
           ;(vault as any).api_set_entry_labels(message.entryId, message.labelIds || [])
+          await autoSaveAndPush()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -337,27 +540,232 @@ async function handleMessage(
         break
       }
 
+      // ========== Password & TOTP ==========
+
+      case 'GENERATE_PASSWORD': {
+        try {
+          const password = (vault as any).api_generate_password(
+            message.length ?? 16,
+            message.includeUppercase ?? true,
+            message.includeLowercase ?? true,
+            message.includeNumbers ?? true,
+            message.includeSymbols ?? true
+          )
+          sendResponse({ success: true, password })
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      case 'GENERATE_TOTP': {
+        try {
+          const totp = (vault as any).api_generate_totp_default(message.secret)
+          sendResponse({ success: true, totp })
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      // ========== Security ==========
+
+      case 'CHANGE_MASTER_PASSWORD': {
+        if (!unlocked) {
+          sendResponse({ success: false, error: 'Vault not unlocked' })
+          break
+        }
+        try {
+          ;(vault as any).api_change_master_password(message.oldPassword, message.newPassword)
+          await autoSaveAndPush()
+          sendResponse({ success: true })
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      case 'ROTATE_DEK': {
+        if (!unlocked) {
+          sendResponse({ success: false, error: 'Vault not unlocked' })
+          break
+        }
+        try {
+          const recoveryKey = (vault as any).api_rotate_dek(message.password)
+          await autoSaveAndPush()
+          sendResponse({ success: true, recoveryKey })
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      case 'REGENERATE_RECOVERY_KEY': {
+        if (!unlocked) {
+          sendResponse({ success: false, error: 'Vault not unlocked' })
+          break
+        }
+        try {
+          const recoveryKey = (vault as any).api_regenerate_recovery_key(message.password)
+          await autoSaveAndPush()
+          sendResponse({ success: true, recoveryKey })
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      // ========== Storage & Sync ==========
+
+      case 'DOWNLOAD_VAULT': {
+        try {
+          const s3Config = await getFromStorage(STORAGE_KEYS.S3_CONFIG)
+          if (!s3Config) {
+            sendResponse({ success: false, error: 'S3 config not found' })
+            break
+          }
+
+          // api_download が実装されるまでは、エラーを返す
+          if (typeof (vault as any).api_download !== 'function') {
+            console.warn('[SW] DOWNLOAD_VAULT: api_download is not available in vault_core')
+            sendResponse({
+              success: false,
+              error: 'S3 download feature is not yet implemented in vault_core',
+            })
+            break
+          }
+
+          console.log('[SW] DOWNLOAD_VAULT: Downloading vault from S3')
+          const vaultExists = await (vault as any).api_download(JSON.stringify(s3Config))
+
+          if (vaultExists) {
+            const vaultBytes = (vault as any).api_get_vault_bytes()
+            await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
+            console.log('[SW] DOWNLOAD_VAULT: Vault downloaded and saved to storage')
+          } else {
+            console.log('[SW] DOWNLOAD_VAULT: Vault not found in S3, vaultExists=false')
+          }
+
+          sendResponse({ success: true, vaultExists })
+        } catch (err) {
+          console.error('[SW] DOWNLOAD_VAULT: Error:', err)
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      case 'PUSH_VAULT': {
+        if (!unlocked) {
+          sendResponse({ success: false, error: 'Vault not unlocked' })
+          break
+        }
+        try {
+          const s3Config = await getFromStorage(STORAGE_KEYS.S3_CONFIG)
+          if (!s3Config) {
+            sendResponse({ success: false, error: 'S3 config not found' })
+            break
+          }
+
+          // api_push が実装されるまでは、エラーを返す
+          if (typeof (vault as any).api_push !== 'function') {
+            console.warn('[SW] PUSH_VAULT: api_push is not available in vault_core')
+            sendResponse({
+              success: false,
+              error: 'S3 push feature is not yet implemented in vault_core',
+            })
+            break
+          }
+
+          console.log('[SW] PUSH_VAULT: Pushing vault to S3')
+          await (vault as any).api_push(JSON.stringify(s3Config))
+          const newEtag = (vault as any).api_get_vault_etag?.() ?? null
+          await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
+          await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, new Date().toISOString())
+          console.log('[SW] PUSH_VAULT: Push successful')
+          sendResponse({ success: true })
+        } catch (err) {
+          console.error('[SW] PUSH_VAULT: Error:', err)
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      case 'DOWNLOAD': {
+        try {
+          console.log('[SW] DOWNLOAD: Starting download')
+          const s3Config = message.storageConfig ? JSON.parse(message.storageConfig) : await getFromStorage(STORAGE_KEYS.S3_CONFIG)
+
+          if (!s3Config) {
+            sendResponse({ success: false, error: 'S3 config not found' })
+            break
+          }
+
+          const configStr = JSON.stringify(s3Config)
+          console.log('[SW] DOWNLOAD: Calling api_download')
+          const downloadResult = await (vault as any).api_download(configStr)
+          console.log('[SW] DOWNLOAD: api_download completed, result:', downloadResult)
+
+          sendResponse({ success: true, result: downloadResult })
+        } catch (err) {
+          console.error('[SW] DOWNLOAD: Error:', err)
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
       case 'SYNC': {
-        // S3 同期は現フェーズでは未実装
-        sendResponse({ success: true, status: 'idle' })
+        if (!unlocked) {
+          sendResponse({ success: false, error: 'Vault not unlocked' })
+          break
+        }
+        try {
+          console.log('[SW] SYNC: Starting sync')
+          const s3Config = await getFromStorage(STORAGE_KEYS.S3_CONFIG)
+          console.log('[SW] SYNC: s3Config:', s3Config)
+
+          if (!s3Config) {
+            console.log('[SW] SYNC: No S3 config found')
+            sendResponse({ success: true, status: 'idle', message: 'S3 config not set' })
+            break
+          }
+
+          console.log('[SW] SYNC: api_sync available:', typeof (vault as any).api_sync === 'function')
+          console.log('[SW] SYNC: api_push available:', typeof (vault as any).api_push === 'function')
+
+          const configStr = JSON.stringify(s3Config)
+
+          // api_sync が実装されている場合、それを使用
+          if (typeof (vault as any).api_sync === 'function') {
+            console.log('[SW] SYNC: Calling api_sync')
+            const syncResult = await (vault as any).api_sync(configStr)
+            console.log('[SW] SYNC: api_sync completed successfully')
+          } else if (typeof (vault as any).api_push === 'function') {
+            // api_sync が利用できない場合は api_push で代替
+            console.log('[SW] SYNC: api_sync not available, using api_push instead')
+            const pushResult = await (vault as any).api_push(configStr)
+            console.log('[SW] SYNC: api_push completed successfully')
+          } else {
+            throw new Error('Neither api_sync nor api_push is available')
+          }
+
+          // 同期後、vault bytes と ETag を更新
+          const vaultBytes = (vault as any).api_get_vault_bytes()
+          console.log('[SW] SYNC: Got vault bytes after sync, size:', vaultBytes?.length)
+          await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
+          const newEtag = (vault as any).api_get_vault_etag?.() ?? null
+          await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
+          await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, new Date().toISOString())
+
+          console.log('[SW] SYNC: Sync completed successfully')
+          sendResponse({ success: true, status: 'synced' })
+        } catch (err) {
+          console.error('[SW] SYNC: Error:', err)
+          sendResponse({ success: false, error: String(err) })
+        }
         break
       }
 
-      case 'GET_SYNC_STATUS': {
-        const lastSyncTime = await getFromStorage('lastSyncTime')
-        sendResponse({ success: true, status: 'idle', lastSyncTime })
-        break
-      }
-
-      case 'GET_SYNC_CONFLICTS': {
-        sendResponse({ success: true, conflicts: [] })
-        break
-      }
-
-      case 'RESOLVE_SYNC_CONFLICTS': {
-        sendResponse({ success: true })
-        break
-      }
+      // ========== Settings ==========
 
       case 'GET_SETTINGS': {
         const settings = await loadSettings()
@@ -367,7 +775,7 @@ async function handleMessage(
 
       case 'SAVE_SETTINGS': {
         try {
-          await saveToStorage('settings', message.settings)
+          await saveToStorage(STORAGE_KEYS.APP_SETTINGS, message.settings)
           if (unlocked) {
             chrome.alarms.create('autolock', { delayInMinutes: message.settings.autolockMinutes })
           }
@@ -393,30 +801,17 @@ async function handleMessage(
       }
 
       default:
-        sendResponse({ error: 'Unknown message type' })
+        sendResponse({ success: false, error: 'Unknown message type' })
     }
   } catch (error) {
     console.error('[SW] Message handling error:', error)
-    sendResponse({ error: String(error) })
+    sendResponse({ success: false, error: String(error) })
   }
 }
 
-// ヘルパー関数
-async function loadSettings() {
-  const settings = await getFromStorage('settings')
-  return settings || {
-    autolockMinutes: 5,
-    clipboardClearSeconds: 30,
-    clipboardAutoClean: true,
-  }
-}
+// ========== Alarm Setup ==========
 
-// Alarm のセットアップ（オートロック・クリップボードクリア）
 function setupAlarms() {
-  // オートロック用 alarm
-  chrome.alarms.create('autolock', { delayInMinutes: 5 })
-
-  // Alarm イベントハンドラー
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === 'autolock') {
       handleAutolockAlarm()
@@ -431,7 +826,7 @@ async function handleAutolockAlarm() {
   if (!unlocked) return
   try {
     const vaultBytes = (vault as any).api_lock()
-    await saveToStorage('vaultBytes', Array.from(vaultBytes))
+    await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
     unlocked = false
     console.log('[SW] Vault locked')
   } catch (err) {

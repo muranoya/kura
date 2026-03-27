@@ -29,9 +29,16 @@ mod wasm_impl {
             };
             match &self.config.endpoint {
                 Some(ep) => {
+                    let ep_trimmed = ep.trim_end_matches('/');
+                    // Add https:// if not already present
+                    let full_endpoint = if ep_trimmed.starts_with("http://") || ep_trimmed.starts_with("https://") {
+                        ep_trimmed.to_string()
+                    } else {
+                        format!("https://{}", ep_trimmed)
+                    };
                     format!(
                         "{}/{}/{}",
-                        ep.trim_end_matches('/'),
+                        full_endpoint,
                         self.config.bucket,
                         key
                     )

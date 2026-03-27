@@ -1,226 +1,108 @@
-import { useNavigate, useParams } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-
-interface EntryData {
-  id: string
-  type: string
-  name: string
-  typed_value: any
-  notes?: string
-}
+import { useParams, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import * as commands from '../../commands'
+import { Entry, Label, CustomField } from '../../shared/types'
+import { Button } from '../../components/ui/button'
+import { PageHeader } from '../../components/layout/PageHeader'
+import EntryForm from '../../components/entries/EntryForm'
 
 export default function EntryEdit() {
-  const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
-  const [entry, setEntry] = useState<EntryData | null>(null)
+  const navigate = useNavigate()
+  const [entry, setEntry] = useState<Entry | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [formData, setFormData] = useState({
-    name: '',
-    url: '',
-    username: '',
-    password: '',
-    notes: '',
-  })
+  const [name, setName] = useState('')
+  const [notes, setNotes] = useState<string | null>(null)
+  const [typedValue, setTypedValue] = useState<Record<string, any>>({})
+  const [customFields, setCustomFields] = useState<CustomField[]>([])
+  const [allLabels, setAllLabels] = useState<Label[]>([])
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
 
   useEffect(() => {
-    loadEntry()
+    const load = async () => {
+      if (id) {
+        try {
+          const data = await commands.getEntry(id)
+          const labels = await commands.listLabels()
+          setEntry(data)
+          setName(data.name)
+          setNotes(data.notes)
+          setTypedValue(data.typedValue)
+          setCustomFields(data.customFields || [])
+          setSelectedLabelIds(data.labels || [])
+          setAllLabels(labels)
+        } catch (err) {
+          setError(`アイテム読み込み失敗: ${err}`)
+        } finally {
+          setLoading(false)
+        }
+      }
+    }
+    load()
   }, [id])
 
-  const loadEntry = async () => {
-    setLoading(true)
-    setError('')
-    try {
-      const response = await new Promise<any>((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: 'GET_ENTRY', id },
-          (response) => resolve(response)
-        )
-      })
-      if (response?.success && response.entry) {
-        const e = response.entry
-        setEntry(e)
-        setFormData({
-          name: e.name || '',
-          url: e.typed_value?.url || '',
-          username: e.typed_value?.username || '',
-          password: e.typed_value?.password || '',
-          notes: e.notes || '',
-        })
-      } else {
-        setError(response?.error || 'エントリの読み込みに失敗しました')
-      }
-    } catch (err) {
-      setError(String(err))
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleSave = async () => {
-    if (!entry || !formData.name) {
-      setError('名前は必須です')
+    if (!name.trim()) {
+      setError('名前を入力してください')
       return
     }
 
     setSaving(true)
     setError('')
     try {
-      const typed_value = {
-        url: formData.url || null,
-        username: formData.username || null,
-        password: formData.password || null,
-        totp: null,
-      }
-
-      const response = await new Promise<any>((resolve) => {
-        chrome.runtime.sendMessage(
-          {
-            type: 'UPDATE_ENTRY',
-            id: entry.id,
-            name: formData.name,
-            typed_value,
-            notes: formData.notes || null,
-          },
-          (response) => resolve(response)
-        )
-      })
-
-      if (response?.success) {
-        navigate(`/entries/${entry.id}`)
-      } else {
-        setError(response?.error || '保存に失敗しました')
-      }
+      const typedValueJson = JSON.stringify(typedValue)
+      const customFieldsJson = customFields.length > 0
+        ? JSON.stringify(customFields.map((f) => ({ id: f.id, name: f.name, field_type: f.fieldType, value: f.value })))
+        : undefined
+      await commands.updateEntry(id!, name, typedValueJson, notes || undefined, selectedLabelIds, customFieldsJson)
+      navigate(`/entries/${id}`)
     } catch (err) {
-      setError(String(err))
+      setError(`保存失敗: ${err}`)
     } finally {
       setSaving(false)
     }
   }
 
-  if (loading) {
-    return <div style={{ padding: '1rem', textAlign: 'center' }}>読み込み中...</div>
-  }
-
-  if (!entry) {
-    return (
-      <div style={{ padding: '1rem', textAlign: 'center' }}>
-        <p style={{ color: '#dc2626' }}>エントリが見つかりません</p>
-      </div>
-    )
-  }
+  if (loading) return <PageHeader title="読み込み中..." showBackButton={true} />
+  if (!entry) return <PageHeader title="アイテムが見つかりません" showBackButton={true} />
 
   return (
-    <div style={{ padding: '1rem' }}>
-      <h2>エントリを編集</h2>
+    <div className="h-full overflow-y-auto pb-20 flex flex-col">
+      <PageHeader
+        title="アイテム編集"
+        showBackButton={true}
+        action={
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={saving || !name.trim()}
+            className="text-xs"
+          >
+            {saving ? '保存中...' : '保存'}
+          </Button>
+        }
+      />
 
-      {error && (
-        <div
-          style={{
-            marginTop: '1rem',
-            padding: '0.5rem',
-            backgroundColor: '#fee2e2',
-            color: '#991b1b',
-            borderRadius: '0.375rem',
-            fontSize: '0.875rem',
-          }}
-        >
-          {error}
-        </div>
-      )}
-
-      <div style={{ marginTop: '1rem' }}>
-        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-          名前
-        </label>
-        <input
-          type="text"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          style={{ width: '100%' }}
+      <div className="flex-1 overflow-y-auto p-3">
+        {error && <div className="mb-3 p-2 bg-danger/10 text-danger text-xs rounded-md">{error}</div>}
+        <EntryForm
+          mode="edit"
+          entryType={entry.entryType}
+          name={name}
+          onNameChange={setName}
+          typedValue={typedValue}
+          onTypedValueChange={(key, value) => setTypedValue((prev) => ({ ...prev, [key]: value }))}
+          notes={notes}
+          onNotesChange={setNotes}
+          customFields={customFields}
+          onCustomFieldsChange={setCustomFields}
+          allLabels={allLabels}
+          selectedLabelIds={selectedLabelIds}
+          onSelectedLabelIdsChange={setSelectedLabelIds}
         />
       </div>
-
-      {entry.type === 'login' && (
-        <>
-          <div style={{ marginTop: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-              URL
-            </label>
-            <input
-              type="text"
-              value={formData.url}
-              onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-              placeholder="https://example.com"
-              style={{ width: '100%' }}
-            />
-          </div>
-
-          <div style={{ marginTop: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-              ユーザー名
-            </label>
-            <input
-              type="text"
-              value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-              style={{ width: '100%' }}
-            />
-          </div>
-
-          <div style={{ marginTop: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-              パスワード
-            </label>
-            <input
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              style={{ width: '100%' }}
-            />
-          </div>
-        </>
-      )}
-
-      <div style={{ marginTop: '1rem' }}>
-        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-          メモ
-        </label>
-        <textarea
-          value={formData.notes}
-          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-          placeholder="メモを入力..."
-          style={{ width: '100%', height: '100px', fontFamily: 'inherit' }}
-        />
-      </div>
-
-      <button
-        className="btn-primary"
-        onClick={handleSave}
-        disabled={saving || !formData.name}
-        style={{
-          marginTop: '1.5rem',
-          width: '100%',
-          opacity: saving || !formData.name ? 0.5 : 1,
-        }}
-      >
-        {saving ? '保存中...' : '保存'}
-      </button>
-
-      <button
-        onClick={() => navigate(`/entries/${entry.id}`)}
-        style={{
-          marginTop: '0.5rem',
-          width: '100%',
-          background: 'none',
-          color: '#2563eb',
-          fontSize: '0.875rem',
-          padding: '0.5rem',
-        }}
-      >
-        キャンセル
-      </button>
     </div>
   )
 }

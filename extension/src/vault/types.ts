@@ -1,19 +1,17 @@
-export interface EntryRow {
-  id: string
-  type: string
-  name: string
-  is_favorite: boolean
-  label_ids: string[]
-  typed_value: any
-  notes?: string
-  deleted_at?: number | null
-}
+// Re-export from shared/types for backward compatibility
+export type {
+  EntryType,
+  CustomFieldType,
+  CustomField,
+  EntryRow,
+  Entry,
+  Label,
+  EntryFilter,
+  S3Config,
+  AppSettings,
+} from '../shared/types'
 
-export interface Label {
-  id: string
-  name: string
-}
-
+// Legacy types for backward compatibility
 export interface VaultMeta {
   encrypted_dek_master: string
   encrypted_dek_recovery: string
@@ -30,13 +28,6 @@ export interface Vault {
   schema_version: number
   meta: VaultMeta
   encrypted_vault: string
-}
-
-export interface EntryFilter {
-  searchQuery?: string
-  labelId?: string
-  type?: string
-  includeTrash?: boolean
 }
 
 export interface SyncConflict {

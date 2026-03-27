@@ -1,0 +1,225 @@
+/**
+ * Commands layer for extension popup
+ * Wraps chrome.runtime.sendMessage to provide a typed interface
+ */
+
+import { sendMessage } from '../../shared/messages'
+import { Entry, EntryFilter, EntryRow, Label, AppSettings } from '../../shared/types'
+
+// Auth
+export async function isUnlocked(): Promise<boolean> {
+  const res = await sendMessage({ type: 'IS_UNLOCKED' })
+  return (res as any).unlocked ?? false
+}
+
+export async function unlock(password: string): Promise<void> {
+  const res = await sendMessage({ type: 'UNLOCK', password })
+  if (!res.success) throw new Error((res as any).error)
+}
+
+export async function unlockExisting(password: string): Promise<void> {
+  const res = await sendMessage({ type: 'UNLOCK_EXISTING', password })
+  if (!res.success) throw new Error((res as any).error)
+}
+
+export async function recoverWithRecoveryKey(recoveryKey: string, newPassword: string): Promise<void> {
+  const res = await sendMessage({ type: 'RECOVER', recoveryKey, newPassword })
+  if (!res.success) throw new Error((res as any).error)
+}
+
+export async function lock(): Promise<void> {
+  const res = await sendMessage({ type: 'LOCK' })
+  if (!res.success) throw new Error((res as any).error)
+}
+
+export async function createVault(masterPassword: string, s3Config: Record<string, string>): Promise<string> {
+  const res = await sendMessage({ type: 'CREATE_VAULT', masterPassword, s3Config })
+  if (!res.success) throw new Error((res as any).error)
+  return (res as any).recoveryKey ?? ''
+}
+
+// Entries
+export async function listEntries(filter?: EntryFilter): Promise<EntryRow[]> {
+  const res = await sendMessage({ type: 'LIST_ENTRIES', filter: filter ?? {} })
+  if (!res.success) throw new Error((res as any).error)
+  return (res as any).entries ?? []
+}
+
+export async function getEntry(id: string): Promise<Entry> {
+  const res = await sendMessage({ type: 'GET_ENTRY', id })
+  if (!res.success) throw new Error((res as any).error)
+  return (res as any).entry
+}
+
+export async function createEntry(
+  entryType: string,
+  name: string,
+  typedValueJson: string,
+  notes?: string,
+  labelIds?: string[],
+  customFieldsJson?: string
+): Promise<string> {
+  const typedValue = JSON.parse(typedValueJson)
+  const customFields = customFieldsJson ? JSON.parse(customFieldsJson) : undefined
+  const res = await sendMessage({
+    type: 'CREATE_ENTRY',
+    entryType,
+    name,
+    typedValue,
+    notes,
+    labelIds,
+    customFields,
+  })
+  if (!res.success) throw new Error((res as any).error)
+  return (res as any).entryId ?? ''
+}
+
+export async function updateEntry(
+  id: string,
+  name: string,
+  typedValueJson: string,
+  notes?: string,
+  labelIds?: string[],
+  customFieldsJson?: string
+): Promise<void> {
+  const typedValue = JSON.parse(typedValueJson)
+  const customFields = customFieldsJson ? JSON.parse(customFieldsJson) : undefined
+  const res = await sendMessage({
+    type: 'UPDATE_ENTRY',
+    id,
+    name,
+    typedValue,
+    notes,
+    labelIds,
+    customFields,
+  })
+  if (!res.success) throw new Error((res as any).error)
+}
+
+export async function deleteEntry(id: string): Promise<void> {
+  const res = await sendMessage({ type: 'DELETE_ENTRY', id })
+  if (!res.success) throw new Error((res as any).error)
+}
+
+export async function restoreEntry(id: string): Promise<void> {
+  const res = await sendMessage({ type: 'RESTORE_ENTRY', id })
+  if (!res.success) throw new Error((res as any).error)
+}
+
+export async function purgeEntry(id: string): Promise<void> {
+  const res = await sendMessage({ type: 'PURGE_ENTRY', id })
+  if (!res.success) throw new Error((res as any).error)
+}
+
+export async function setFavorite(id: string, isFavorite: boolean): Promise<void> {
+  const res = await sendMessage({ type: 'SET_FAVORITE', id, isFavorite })
+  if (!res.success) throw new Error((res as any).error)
+}
+
+// Trash
+export async function listTrash(filter?: EntryFilter): Promise<EntryRow[]> {
+  const res = await sendMessage({ type: 'LIST_TRASH', filter: { ...filter, includeTrash: true } })
+  if (!res.success) throw new Error((res as any).error)
+  return (res as any).entries ?? []
+}
+
+// Labels
+export async function listLabels(): Promise<Label[]> {
+  const res = await sendMessage({ type: 'LIST_LABELS' })
+  if (!res.success) throw new Error((res as any).error)
+  return (res as any).labels ?? []
+}
+
+export async function createLabel(name: string): Promise<string> {
+  const res = await sendMessage({ type: 'CREATE_LABEL', name })
+  if (!res.success) throw new Error((res as any).error)
+  return (res as any).labelId ?? ''
+}
+
+export async function deleteLabel(id: string): Promise<void> {
+  const res = await sendMessage({ type: 'DELETE_LABEL', id })
+  if (!res.success) throw new Error((res as any).error)
+}
+
+export async function renameLabel(id: string, newName: string): Promise<void> {
+  const res = await sendMessage({ type: 'RENAME_LABEL', id, newName })
+  if (!res.success) throw new Error((res as any).error)
+}
+
+export async function setEntryLabels(entryId: string, labelIds: string[]): Promise<void> {
+  const res = await sendMessage({ type: 'SET_ENTRY_LABELS', entryId, labelIds })
+  if (!res.success) throw new Error((res as any).error)
+}
+
+// Password & TOTP
+export async function generatePassword(
+  length = 16,
+  includeUppercase = true,
+  includeLowercase = true,
+  includeNumbers = true,
+  includeSymbols = true
+): Promise<string> {
+  const res = await sendMessage({
+    type: 'GENERATE_PASSWORD',
+    length,
+    includeUppercase,
+    includeLowercase,
+    includeNumbers,
+    includeSymbols,
+  })
+  if (!res.success) throw new Error((res as any).error)
+  return (res as any).password ?? ''
+}
+
+export async function generateTotp(secret: string): Promise<string> {
+  const res = await sendMessage({ type: 'GENERATE_TOTP', secret })
+  if (!res.success) throw new Error((res as any).error)
+  return (res as any).totp ?? ''
+}
+
+// Security
+export async function changeMasterPassword(oldPassword: string, newPassword: string): Promise<void> {
+  const res = await sendMessage({ type: 'CHANGE_MASTER_PASSWORD', oldPassword, newPassword })
+  if (!res.success) throw new Error((res as any).error)
+}
+
+export async function rotateDek(password: string): Promise<string> {
+  const res = await sendMessage({ type: 'ROTATE_DEK', password })
+  if (!res.success) throw new Error((res as any).error)
+  return (res as any).recoveryKey ?? ''
+}
+
+export async function regenerateRecoveryKey(password: string): Promise<string> {
+  const res = await sendMessage({ type: 'REGENERATE_RECOVERY_KEY', password })
+  if (!res.success) throw new Error((res as any).error)
+  return (res as any).recoveryKey ?? ''
+}
+
+// Storage & Sync
+export async function downloadVault(): Promise<boolean> {
+  const res = await sendMessage({ type: 'DOWNLOAD_VAULT' })
+  if (!res.success) throw new Error((res as any).error)
+  return (res as any).vaultExists ?? false
+}
+
+export async function pushVault(): Promise<void> {
+  const res = await sendMessage({ type: 'PUSH_VAULT' })
+  if (!res.success) throw new Error((res as any).error)
+}
+
+export async function sync(): Promise<void> {
+  const res = await sendMessage({ type: 'SYNC' })
+  if (!res.success) throw new Error((res as any).error)
+}
+
+// Settings
+export async function getSettings(): Promise<AppSettings> {
+  const res = await sendMessage({ type: 'GET_SETTINGS' })
+  if (!res.success) throw new Error((res as any).error)
+  return (res as any).settings ?? {}
+}
+
+export async function saveSettings(settings: Partial<AppSettings>): Promise<void> {
+  const res = await sendMessage({ type: 'SAVE_SETTINGS', settings })
+  if (!res.success) throw new Error((res as any).error)
+}

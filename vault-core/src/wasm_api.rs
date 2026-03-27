@@ -149,6 +149,18 @@ pub fn api_get_vault_bytes() -> Result<Vec<u8>, JsValue> {
     }
 }
 
+/// 現在セッションに保持されているETagを取得（ストレージ永続化用）
+#[wasm_bindgen]
+pub fn api_get_vault_etag() -> Option<String> {
+    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+
+    match session.as_ref() {
+        Some(SessionState::Locked(locked)) => locked.get_etag().cloned(),
+        Some(SessionState::Unlocked(unlocked)) => unlocked.get_etag().cloned(),
+        None => None,
+    }
+}
+
 // ============================================================================
 // エントリ操作API
 // ============================================================================

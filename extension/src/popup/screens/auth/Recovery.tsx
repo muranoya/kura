@@ -1,5 +1,11 @@
 import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
+import { ArrowLeft } from 'lucide-react'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { Label } from '../../components/ui/label'
+import { Card, CardContent } from '../../components/ui/card'
+import * as commands from '../../commands'
 
 export default function Recovery() {
   const navigate = useNavigate()
@@ -10,6 +16,10 @@ export default function Recovery() {
   const [error, setError] = useState('')
 
   const handleRecover = async () => {
+    if (!recoveryKey || !newPassword || !confirmPassword) {
+      setError('すべてのフィールドを入力してください')
+      return
+    }
     if (newPassword !== confirmPassword) {
       setError('新しいパスワードが一致しません')
       return
@@ -18,110 +28,116 @@ export default function Recovery() {
     setLoading(true)
     setError('')
     try {
-      // リカバリーキーでアンロック
-      const response = await new Promise<any>((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: 'RECOVER', recoveryKey, newPassword },
-          (response) => resolve(response)
-        )
-      })
-
-      if (response?.success) {
-        navigate('/entries')
-      } else {
-        setError(response?.error || 'リカバリー失敗')
-      }
+      await commands.recoverWithRecoveryKey(recoveryKey, newPassword)
+      window.location.reload()
     } catch (err) {
-      setError(String(err))
+      setError(`リカバリー失敗: ${err}`)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div style={{ padding: '1.5rem' }}>
-      <h2>リカバリーキーで復旧</h2>
-
-      <div style={{ marginTop: '1.5rem' }}>
-        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-          リカバリーキー
-        </label>
-        <input
-          type="text"
-          value={recoveryKey}
-          onChange={(e) => setRecoveryKey(e.target.value)}
-          placeholder="XXXX-XXXX-..."
-          style={{ width: '100%' }}
-        />
-      </div>
-
-      <div style={{ marginTop: '1rem' }}>
-        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-          新しいマスターパスワード
-        </label>
-        <input
-          type="password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          placeholder="新しいパスワード"
-          style={{ width: '100%' }}
-        />
-      </div>
-
-      <div style={{ marginTop: '1rem' }}>
-        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-          パスワード確認
-        </label>
-        <input
-          type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          placeholder="パスワードを再入力"
-          style={{ width: '100%' }}
-        />
-      </div>
-
-      {error && (
-        <div
-          style={{
-            marginTop: '1rem',
-            padding: '0.5rem',
-            backgroundColor: '#fee2e2',
-            color: '#991b1b',
-            borderRadius: '0.375rem',
-            fontSize: '0.875rem',
-          }}
+    <div className="flex items-center justify-center min-h-screen bg-bg-base px-4">
+      <div className="w-full max-w-sm">
+        {/* ヘッダー */}
+        <button
+          onClick={() => navigate('/auth/lock')}
+          className="flex items-center gap-1 text-accent hover:text-accent-hover mb-6 text-xs"
         >
-          {error}
+          <ArrowLeft size={14} />
+          戻る
+        </button>
+
+        {/* タイトル */}
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-text-primary mb-1">リカバリーキーで復旧</h1>
+          <p className="text-xs text-text-secondary">
+            マスターパスワードを忘れた場合、リカバリーキーを使って新しいパスワードを設定できます
+          </p>
         </div>
-      )}
 
-      <button
-        className="btn-primary"
-        onClick={handleRecover}
-        disabled={loading || !recoveryKey || !newPassword}
-        style={{
-          marginTop: '1.5rem',
-          width: '100%',
-          opacity: loading || !recoveryKey || !newPassword ? 0.5 : 1,
-        }}
-      >
-        {loading ? '復旧中...' : '復旧'}
-      </button>
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            {/* エラーメッセージ */}
+            {error && (
+              <div className="p-3 rounded-md bg-danger/10 border border-danger/20">
+                <p className="text-xs text-danger">{error}</p>
+              </div>
+            )}
 
-      <button
-        onClick={() => navigate('/auth/lock')}
-        style={{
-          marginTop: '0.5rem',
-          width: '100%',
-          background: 'none',
-          color: '#2563eb',
-          fontSize: '0.875rem',
-          padding: '0.5rem',
-        }}
-      >
-        戻る
-      </button>
+            {/* リカバリーキー入力 */}
+            <div className="space-y-1.5">
+              <Label htmlFor="recovery-key" className="text-xs">
+                リカバリーキー
+              </Label>
+              <Input
+                id="recovery-key"
+                type="text"
+                placeholder="XXXX-XXXX-XXXX-..."
+                value={recoveryKey}
+                onChange={(e) => {
+                  setRecoveryKey(e.target.value)
+                  setError('')
+                }}
+                disabled={loading}
+                className="text-sm font-mono"
+              />
+              <p className="text-xs text-text-muted mt-1">
+                セットアップ時に保管したリカバリーキーを入力してください
+              </p>
+            </div>
+
+            {/* 新しいパスワード入力 */}
+            <div className="space-y-1.5">
+              <Label htmlFor="new-password" className="text-xs">
+                新しいマスターパスワード
+              </Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="新しいパスワード"
+                value={newPassword}
+                onChange={(e) => {
+                  setNewPassword(e.target.value)
+                  setError('')
+                }}
+                disabled={loading}
+                className="text-sm"
+              />
+            </div>
+
+            {/* パスワード確認 */}
+            <div className="space-y-1.5">
+              <Label htmlFor="confirm-password" className="text-xs">
+                パスワード確認
+              </Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                placeholder="パスワードを再入力"
+                value={confirmPassword}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value)
+                  setError('')
+                }}
+                onKeyPress={(e) => e.key === 'Enter' && handleRecover()}
+                disabled={loading}
+                className="text-sm"
+              />
+            </div>
+
+            {/* 復旧ボタン */}
+            <Button
+              onClick={handleRecover}
+              disabled={loading || !recoveryKey || !newPassword || !confirmPassword}
+              className="w-full text-sm mt-2"
+            >
+              {loading ? '復旧中...' : '復旧'}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

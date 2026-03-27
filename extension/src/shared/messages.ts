@@ -6,6 +6,7 @@ export type Message =
   // Auth
   | { type: 'IS_UNLOCKED' }
   | { type: 'UNLOCK'; password: string }
+  | { type: 'UNLOCK_EXISTING'; password: string }
   | { type: 'RECOVER'; recoveryKey: string; newPassword: string }
   | { type: 'LOCK' }
   | { type: 'CREATE_VAULT'; masterPassword: string; s3Config: Record<string, string> }
@@ -13,8 +14,8 @@ export type Message =
   // Entries
   | { type: 'LIST_ENTRIES'; filter: EntryFilter }
   | { type: 'GET_ENTRY'; id: string }
-  | { type: 'CREATE_ENTRY'; entryType: string; name: string; typed_value: any; notes?: string }
-  | { type: 'UPDATE_ENTRY'; id: string; name: string; typed_value: any; notes?: string }
+  | { type: 'CREATE_ENTRY'; entryType: string; name: string; typedValue: any; notes?: string; labelIds?: string[]; customFields?: any[] }
+  | { type: 'UPDATE_ENTRY'; id: string; name: string; typedValue: any; notes?: string; labelIds?: string[]; customFields?: any[] }
   | { type: 'DELETE_ENTRY'; id: string }
   | { type: 'RESTORE_ENTRY'; id: string }
   | { type: 'PURGE_ENTRY'; id: string }
@@ -27,9 +28,21 @@ export type Message =
   | { type: 'LIST_LABELS' }
   | { type: 'CREATE_LABEL'; name: string }
   | { type: 'DELETE_LABEL'; id: string }
+  | { type: 'RENAME_LABEL'; id: string; newName: string }
   | { type: 'SET_ENTRY_LABELS'; entryId: string; labelIds: string[] }
 
-  // Sync
+  // Password & TOTP
+  | { type: 'GENERATE_PASSWORD'; length: number; includeUppercase: boolean; includeLowercase: boolean; includeNumbers: boolean; includeSymbols: boolean }
+  | { type: 'GENERATE_TOTP'; secret: string }
+
+  // Security
+  | { type: 'CHANGE_MASTER_PASSWORD'; oldPassword: string; newPassword: string }
+  | { type: 'ROTATE_DEK'; password: string }
+  | { type: 'REGENERATE_RECOVERY_KEY'; password: string }
+
+  // Storage & Sync
+  | { type: 'DOWNLOAD_VAULT' }
+  | { type: 'PUSH_VAULT' }
   | { type: 'SYNC' }
   | { type: 'GET_SYNC_STATUS' }
   | { type: 'GET_SYNC_CONFLICTS' }
@@ -50,18 +63,31 @@ export type MessageResponse =
       unlocked?: boolean
       recoveryKey?: string
       vaultBytes?: string
+      vaultExists?: boolean
     })
 
   // Entry responses
   | ({ success: true } & {
       entry?: EntryRow | null
       entries?: EntryRow[]
+      entryId?: string
     })
 
   // Label responses
   | ({ success: true } & {
       label?: Label | null
       labels?: Label[]
+    })
+
+  // Password & TOTP responses
+  | ({ success: true } & {
+      password?: string
+      totp?: string
+    })
+
+  // Security responses
+  | ({ success: true } & {
+      recoveryKey?: string
     })
 
   // Sync responses

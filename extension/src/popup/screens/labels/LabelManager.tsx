@@ -1,18 +1,26 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-
-interface Label {
-  id: string
-  name: string
-}
+import { Plus, Trash2, Edit2, Check, X } from 'lucide-react'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { Label } from '../../components/ui/label'
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { PageHeader } from '../../components/layout/PageHeader'
+import { EmptyState } from '../../components/layout/EmptyState'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import * as commands from '../../commands'
 
 export default function LabelManager() {
   const navigate = useNavigate()
-  const [labels, setLabels] = useState<Label[]>([])
+  const [labels, setLabels] = useState<{ id: string; name: string }[]>([])
   const [newLabelName, setNewLabelName] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [selectedDeleteId, setSelectedDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     loadLabels()
@@ -22,19 +30,10 @@ export default function LabelManager() {
     setLoading(true)
     setError('')
     try {
-      const response = await new Promise<any>((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: 'LIST_LABELS' },
-          (response) => resolve(response)
-        )
-      })
-      if (response?.success) {
-        setLabels(response.labels || [])
-      } else {
-        setError(response?.error || 'ラベルの読み込みに失敗しました')
-      }
+      const result = await commands.listLabels()
+      setLabels(result)
     } catch (err) {
-      setError(String(err))
+      setError(String(err) || 'ラベルの読み込みに失敗しました')
     } finally {
       setLoading(false)
     }
@@ -49,145 +48,195 @@ export default function LabelManager() {
     setCreating(true)
     setError('')
     try {
-      const response = await new Promise<any>((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: 'CREATE_LABEL', name: newLabelName },
-          (response) => resolve(response)
-        )
-      })
-
-      if (response?.success) {
-        setLabels([...labels, response.label])
-        setNewLabelName('')
-      } else {
-        setError(response?.error || 'ラベルの作成に失敗しました')
-      }
+      const newLabelId = await commands.createLabel(newLabelName)
+      setLabels([...labels, { id: newLabelId, name: newLabelName }])
+      setNewLabelName('')
     } catch (err) {
-      setError(String(err))
+      setError(String(err) || 'ラベルの作成に失敗しました')
     } finally {
       setCreating(false)
     }
   }
 
-  const handleDeleteLabel = async (id: string) => {
-    if (!window.confirm('このラベルを削除しますか？')) return
+  const startEdit = (id: string, currentName: string) => {
+    setEditingId(id)
+    setEditingName(currentName)
+  }
+
+  const saveEdit = async (id: string) => {
+    if (!editingName.trim()) {
+      setError('ラベル名を入力してください')
+      return
+    }
+
+    setError('')
+    try {
+      await commands.renameLabel(id, editingName)
+      setLabels((prev) =>
+        prev.map((label) => (label.id === id ? { ...label, name: editingName } : label))
+      )
+      setEditingId(null)
+      setEditingName('')
+    } catch (err) {
+      setError(String(err) || 'ラベルの更新に失敗しました')
+    }
+  }
+
+  const openDeleteConfirm = (id: string) => {
+    setSelectedDeleteId(id)
+    setConfirmDeleteOpen(true)
+  }
+
+  const handleDeleteLabel = async () => {
+    if (!selectedDeleteId) return
 
     try {
-      const response = await new Promise<any>((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: 'DELETE_LABEL', id },
-          (response) => resolve(response)
-        )
-      })
-
-      if (response?.success) {
-        setLabels(labels.filter((label) => label.id !== id))
-      } else {
-        alert(response?.error || '削除に失敗しました')
-      }
+      await commands.deleteLabel(selectedDeleteId)
+      setLabels((prev) => prev.filter((label) => label.id !== selectedDeleteId))
+      setConfirmDeleteOpen(false)
+      setSelectedDeleteId(null)
     } catch (err) {
-      alert(String(err))
+      setError(String(err) || '削除に失敗しました')
     }
   }
 
   return (
-    <div style={{ padding: '1rem' }}>
-      <h2>ラベル管理</h2>
+    <div className="h-full overflow-y-auto pb-20 flex flex-col">
+      <PageHeader title="ラベル管理" showBackButton={true} />
 
-      {error && (
-        <div
-          style={{
-            marginTop: '1rem',
-            padding: '0.5rem',
-            backgroundColor: '#fee2e2',
-            color: '#991b1b',
-            borderRadius: '0.375rem',
-            fontSize: '0.875rem',
-          }}
-        >
-          {error}
-        </div>
-      )}
+      <div className="p-4 space-y-4">
+        {error && (
+          <div className="p-3 rounded-md bg-danger/10 border border-danger/20">
+            <p className="text-xs text-danger">{error}</p>
+          </div>
+        )}
 
-      <div style={{ marginTop: '1rem' }}>
-        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-          新しいラベル
-        </label>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <input
-            type="text"
-            value={newLabelName}
-            onChange={(e) => setNewLabelName(e.target.value)}
-            placeholder="ラベル名を入力"
-            style={{ flex: 1 }}
-          />
-          <button
-            onClick={handleCreateLabel}
-            disabled={creating || !newLabelName.trim()}
-            style={{
-              padding: '0.5rem 1rem',
-              opacity: creating || !newLabelName.trim() ? 0.5 : 1,
-            }}
-          >
-            {creating ? '作成中...' : '追加'}
-          </button>
-        </div>
-      </div>
-
-      {loading && <p style={{ textAlign: 'center', color: '#666' }}>読み込み中...</p>}
-
-      <div style={{ marginTop: '1.5rem' }}>
-        <h3 style={{ fontSize: '0.875rem', marginBottom: '0.75rem' }}>ラベル一覧</h3>
-        {labels.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999', fontSize: '0.875rem' }}>
-            ラベルがありません
-          </p>
-        ) : (
-          labels.map((label) => (
-            <div
-              key={label.id}
-              style={{
-                padding: '0.75rem',
-                marginBottom: '0.5rem',
-                borderBottom: '1px solid #e5e7eb',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <span style={{ fontSize: '0.875rem' }}>{label.name}</span>
-              <button
-                onClick={() => handleDeleteLabel(label.id)}
-                style={{
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.75rem',
-                  background: '#dc2626',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '0.25rem',
-                  cursor: 'pointer',
+        {/* 新規ラベル作成 */}
+        <Card>
+          <CardHeader className="px-3 py-2">
+            <CardTitle className="text-xs font-medium">新しいラベル</CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3 pt-2 space-y-2">
+            <div className="space-y-1">
+              <Label htmlFor="new-label-name" className="text-xs">
+                ラベル名
+              </Label>
+              <Input
+                id="new-label-name"
+                type="text"
+                placeholder="ラベル名を入力"
+                value={newLabelName}
+                onChange={(e) => {
+                  setNewLabelName(e.target.value)
+                  setError('')
                 }}
-              >
-                削除
-              </button>
+                onKeyPress={(e) => e.key === 'Enter' && handleCreateLabel()}
+                disabled={creating}
+                className="text-xs"
+              />
             </div>
-          ))
+            <Button
+              onClick={handleCreateLabel}
+              disabled={creating || !newLabelName.trim()}
+              className="w-full text-xs gap-1"
+              size="sm"
+            >
+              <Plus size={14} />
+              追加
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* ラベル一覧 */}
+        {loading ? (
+          <div className="text-center py-8 text-text-muted text-xs">読み込み中...</div>
+        ) : labels.length === 0 ? (
+          <EmptyState
+            title="ラベルがありません"
+            description="新しいラベルを作成してください"
+          />
+        ) : (
+          <Card>
+            <CardHeader className="px-3 py-2">
+              <CardTitle className="text-xs font-medium">ラベル一覧</CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3 pt-2 space-y-2">
+              {labels.map((label) => (
+                <div
+                  key={label.id}
+                  className="flex items-center gap-2 p-2 rounded-md border border-border bg-bg-elevated"
+                >
+                  {editingId === label.id ? (
+                    <>
+                      <Input
+                        type="text"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        className="flex-1 text-xs"
+                        autoFocus
+                      />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => saveEdit(label.id)}
+                        className="text-xs px-2"
+                      >
+                        <Check size={12} />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          setEditingId(null)
+                          setEditingName('')
+                        }}
+                        className="text-xs px-2"
+                      >
+                        <X size={12} />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex-1 text-xs text-text-primary font-medium">
+                        {label.name}
+                      </span>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => startEdit(label.id, label.name)}
+                        className="text-xs px-2"
+                      >
+                        <Edit2 size={12} />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => openDeleteConfirm(label.id)}
+                        className="text-xs px-2"
+                      >
+                        <Trash2 size={12} />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         )}
       </div>
 
-      <button
-        onClick={() => navigate('/entries')}
-        style={{
-          marginTop: '1.5rem',
-          width: '100%',
-          background: 'none',
-          color: '#2563eb',
-          fontSize: '0.875rem',
-          padding: '0.5rem',
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        title="ラベル削除"
+        description="このラベルを削除します。このラベルで分類されたアイテムのラベルは削除されますが、アイテム自体は削除されません。"
+        confirmText="削除"
+        isDangerous={true}
+        onConfirm={handleDeleteLabel}
+        onCancel={() => {
+          setConfirmDeleteOpen(false)
+          setSelectedDeleteId(null)
         }}
-      >
-        戻る
-      </button>
+      />
     </div>
   )
 }

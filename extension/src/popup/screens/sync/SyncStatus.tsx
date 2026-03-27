@@ -1,5 +1,10 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import { RefreshCw, CheckCircle, AlertCircle, XCircle, Clock } from 'lucide-react'
+import { Button } from '../../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { PageHeader } from '../../components/layout/PageHeader'
+import * as commands from '../../commands'
 
 export default function SyncStatus() {
   const navigate = useNavigate()
@@ -35,123 +40,116 @@ export default function SyncStatus() {
     setError('')
 
     try {
-      const response = await new Promise<any>((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: 'SYNC' },
-          (response) => resolve(response)
-        )
-      })
-
-      if (response?.success) {
-        setSyncStatus('success')
-        setLastSyncTime(new Date().toLocaleString())
-      } else if (response?.conflict) {
-        setSyncStatus('conflict')
-        navigate('/sync/conflict-resolver')
-      } else {
-        setSyncStatus('error')
-        setError(response?.error || '同期に失敗しました')
-      }
+      await commands.sync()
+      setSyncStatus('success')
+      setLastSyncTime(new Date().toLocaleString('ja-JP'))
     } catch (err) {
       setSyncStatus('error')
-      setError(String(err))
+      setError(String(err) || '同期に失敗しました')
     } finally {
       setSyncing(false)
     }
   }
 
+  const getStatusDisplay = () => {
+    switch (syncStatus) {
+      case 'success':
+        return {
+          icon: <CheckCircle size={24} className="text-success" />,
+          title: '同期成功',
+          color: 'text-success',
+        }
+      case 'syncing':
+        return {
+          icon: <RefreshCw size={24} className="text-accent animate-spin" />,
+          title: '同期中...',
+          color: 'text-accent',
+        }
+      case 'conflict':
+        return {
+          icon: <AlertCircle size={24} className="text-warning" />,
+          title: '同期コンフリクト',
+          color: 'text-warning',
+        }
+      case 'error':
+        return {
+          icon: <XCircle size={24} className="text-danger" />,
+          title: '同期失敗',
+          color: 'text-danger',
+        }
+      default:
+        return {
+          icon: <Clock size={24} className="text-text-muted" />,
+          title: 'アイドル状態',
+          color: 'text-text-muted',
+        }
+    }
+  }
+
+  const display = getStatusDisplay()
+
   return (
-    <div style={{ padding: '1rem' }}>
-      <h2>同期状態</h2>
+    <div className="h-full overflow-y-auto pb-20 flex flex-col">
+      <PageHeader title="同期" showBackButton={false} />
 
-      <div
-        style={{
-          marginTop: '1.5rem',
-          padding: '1rem',
-          backgroundColor: '#f3f4f6',
-          borderRadius: '0.375rem',
-          textAlign: 'center',
-        }}
-      >
-        {syncStatus === 'success' && (
-          <>
-            <p style={{ margin: 0, fontSize: '0.875rem', color: '#16a34a', fontWeight: 500 }}>
-              ✓ 同期成功
-            </p>
-            {lastSyncTime && (
-              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#666' }}>
-                最終同期: {lastSyncTime}
-              </p>
-            )}
-          </>
-        )}
-        {syncStatus === 'syncing' && (
-          <p style={{ margin: 0, fontSize: '0.875rem', color: '#2563eb' }}>同期中...</p>
-        )}
-        {syncStatus === 'conflict' && (
-          <p style={{ margin: 0, fontSize: '0.875rem', color: '#ea580c' }}>
-            ⚠️ 同期コンフリクトが発生しました
-          </p>
-        )}
-        {syncStatus === 'error' && (
-          <>
-            <p style={{ margin: 0, fontSize: '0.875rem', color: '#dc2626' }}>
-              ✗ 同期失敗
-            </p>
+      <div className="p-4 space-y-4">
+        {/* 同期ステータス表示 */}
+        <Card>
+          <CardContent className="pt-6 pb-6 flex flex-col items-center gap-3">
+            {display.icon}
+            <div className="text-center">
+              <p className={`text-sm font-medium ${display.color}`}>{display.title}</p>
+              {lastSyncTime && syncStatus !== 'syncing' && (
+                <p className="text-xs text-text-muted mt-1">
+                  最終同期: {lastSyncTime}
+                </p>
+              )}
+            </div>
+
             {error && (
-              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#666' }}>
-                {error}
-              </p>
+              <div className="w-full mt-2 p-2 rounded-md bg-danger/10 border border-danger/20">
+                <p className="text-xs text-danger text-center">{error}</p>
+              </div>
             )}
-          </>
-        )}
-        {syncStatus === 'idle' && lastSyncTime && (
-          <p style={{ margin: '0 0 0 0', fontSize: '0.75rem', color: '#666' }}>
-            最終同期: {lastSyncTime}
-          </p>
-        )}
+          </CardContent>
+        </Card>
+
+        {/* 同期情報 */}
+        <Card>
+          <CardHeader className="px-3 py-2">
+            <CardTitle className="text-xs font-medium">同期設定</CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3 pt-2 space-y-2 text-xs text-text-secondary">
+            <p>• 自動同期: オフ（手動で実行してください）</p>
+            <p>• 保存時同期: オン（エントリ保存時に自動同期）</p>
+            <p>• オフラインモード: 対応</p>
+          </CardContent>
+        </Card>
+
+        {/* アクションボタン */}
+        <div className="space-y-2">
+          <Button
+            onClick={handleSync}
+            disabled={syncing}
+            className="w-full text-sm gap-2"
+            size="sm"
+          >
+            <RefreshCw size={16} />
+            {syncing ? '同期中...' : '今すぐ同期'}
+          </Button>
+
+          {syncStatus === 'conflict' && (
+            <Button
+              variant="secondary"
+              onClick={() => navigate('/sync/conflict-resolver')}
+              className="w-full text-sm"
+              size="sm"
+            >
+              コンフリクトを解決
+            </Button>
+          )}
+        </div>
       </div>
-
-      <button
-        onClick={handleSync}
-        disabled={syncing}
-        style={{
-          marginTop: '1.5rem',
-          width: '100%',
-          opacity: syncing ? 0.5 : 1,
-        }}
-        className="btn-primary"
-      >
-        {syncing ? '同期中...' : '今すぐ同期'}
-      </button>
-
-      {syncStatus === 'conflict' && (
-        <button
-          onClick={() => navigate('/sync/conflict-resolver')}
-          style={{
-            marginTop: '0.5rem',
-            width: '100%',
-            background: '#ea580c',
-            color: '#fff',
-          }}
-        >
-          コンフリクトを解決
-        </button>
-      )}
-
-      <button
-        onClick={() => navigate('/entries')}
-        style={{
-          marginTop: '0.5rem',
-          width: '100%',
-          background: 'none',
-          color: '#2563eb',
-          fontSize: '0.875rem',
-          padding: '0.5rem',
-        }}
-      >
-        戻る
-      </button>
     </div>
   )
 }

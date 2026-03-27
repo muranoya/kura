@@ -1,16 +1,21 @@
-import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-
-interface Entry {
-  id: string
-  type: string
-  name: string
-}
+import { useNavigate } from 'react-router-dom'
+import { RotateCcw, Trash2 } from 'lucide-react'
+import { Button } from '../../components/ui/button'
+import EntryCard from '../../components/entries/EntryCard'
+import { PageHeader } from '../../components/layout/PageHeader'
+import { EmptyState } from '../../components/layout/EmptyState'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import * as commands from '../../commands'
+import { EntryRow } from '../../shared/types'
 
 export default function Trash() {
   const navigate = useNavigate()
-  const [entries, setEntries] = useState<Entry[]>([])
-  const [loading, setLoading] = useState(false)
+  const [entries, setEntries] = useState<EntryRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [confirmPurgeOpen, setConfirmPurgeOpen] = useState(false)
+  const [selectedPurgeId, setSelectedPurgeId] = useState<string | null>(null)
 
   useEffect(() => {
     loadTrash()
@@ -18,18 +23,12 @@ export default function Trash() {
 
   const loadTrash = async () => {
     setLoading(true)
+    setError(null)
     try {
-      const response = await new Promise<any>((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: 'LIST_TRASH', filter: {} },
-          (response) => resolve(response)
-        )
-      })
-      if (response?.success) {
-        setEntries(response.entries || [])
-      }
+      const result = await commands.listTrash()
+      setEntries(result)
     } catch (err) {
-      console.error('Failed to load trash:', err)
+      setError(String(err) || 'ゴミ箱の読み込みに失敗しました')
     } finally {
       setLoading(false)
     }
@@ -37,121 +36,94 @@ export default function Trash() {
 
   const handleRestore = async (id: string) => {
     try {
-      const response = await new Promise<any>((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: 'RESTORE_ENTRY', id },
-          (response) => resolve(response)
-        )
-      })
-      if (response?.success) {
-        setEntries(entries.filter((e) => e.id !== id))
-      } else {
-        alert(response?.error || '復元に失敗しました')
-      }
+      await commands.restoreEntry(id)
+      setEntries((prev) => prev.filter((e) => e.id !== id))
     } catch (err) {
-      alert(String(err))
+      setError(String(err) || '復元に失敗しました')
     }
   }
 
-  const handlePermanentDelete = async (id: string) => {
-    if (!window.confirm('このエントリを完全に削除しますか？この操作は取り消せません。')) return
+  const handlePurgeConfirm = async () => {
+    if (!selectedPurgeId) return
 
     try {
-      const response = await new Promise<any>((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: 'PURGE_ENTRY', id },
-          (response) => resolve(response)
-        )
-      })
-      if (response?.success) {
-        setEntries(entries.filter((e) => e.id !== id))
-      } else {
-        alert(response?.error || '削除に失敗しました')
-      }
+      await commands.purgeEntry(selectedPurgeId)
+      setEntries((prev) => prev.filter((e) => e.id !== selectedPurgeId))
+      setConfirmPurgeOpen(false)
+      setSelectedPurgeId(null)
     } catch (err) {
-      alert(String(err))
+      setError(String(err) || '削除に失敗しました')
     }
+  }
+
+  const openPurgeConfirm = (id: string) => {
+    setSelectedPurgeId(id)
+    setConfirmPurgeOpen(true)
   }
 
   return (
-    <div style={{ padding: '1rem' }}>
-      <h2>ゴミ箱</h2>
+    <div className="h-full overflow-y-auto pb-20 flex flex-col">
+      <PageHeader title="ゴミ箱" showBackButton={false} />
 
-      {loading && <p style={{ textAlign: 'center', color: '#666' }}>読み込み中...</p>}
+      {error && (
+        <div className="mx-4 mt-4 p-3 bg-danger/10 text-danger text-sm rounded-md">{error}</div>
+      )}
 
-      <div style={{ marginTop: '1rem' }}>
-        {entries.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999', fontSize: '0.875rem' }}>
-            削除済みのエントリはありません
-          </p>
-        ) : (
-          entries.map((entry) => (
-            <div
-              key={entry.id}
-              style={{
-                padding: '0.75rem',
-                borderBottom: '1px solid #e5e7eb',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <div>
-                <p style={{ margin: 0, fontWeight: 500, fontSize: '0.875rem' }}>
-                  {entry.name}
-                </p>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#666' }}>
-                  {entry.type}
-                </p>
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-text-muted">読み込み中...</div>
+        </div>
+      ) : entries.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center p-4">
+          <EmptyState
+            title="ゴミ箱は空です"
+            description="削除したアイテムがここに表示されます"
+          />
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {entries.map((entry) => (
+            <div key={entry.id} className="flex items-center gap-2 p-3 bg-bg-elevated rounded-lg border border-border">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-text-primary truncate">{entry.name}</p>
+                <p className="text-xs text-text-muted mt-0.5">{entry.entryType}</p>
               </div>
-              <div style={{ display: 'flex', gap: '0.25rem' }}>
-                <button
+              <div className="flex gap-1 shrink-0">
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => handleRestore(entry.id)}
-                  style={{
-                    padding: '0.25rem 0.5rem',
-                    fontSize: '0.75rem',
-                    background: '#16a34a',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '0.25rem',
-                    cursor: 'pointer',
-                  }}
+                  className="text-xs gap-1 px-2"
                 >
+                  <RotateCcw size={12} />
                   復元
-                </button>
-                <button
-                  onClick={() => handlePermanentDelete(entry.id)}
-                  style={{
-                    padding: '0.25rem 0.5rem',
-                    fontSize: '0.75rem',
-                    background: '#dc2626',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '0.25rem',
-                    cursor: 'pointer',
-                  }}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => openPurgeConfirm(entry.id)}
+                  className="text-xs gap-1 px-2"
                 >
-                  削除
-                </button>
+                  <Trash2 size={12} />
+                </Button>
               </div>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
-      <button
-        onClick={() => navigate('/entries')}
-        style={{
-          marginTop: '1.5rem',
-          width: '100%',
-          background: 'none',
-          color: '#2563eb',
-          fontSize: '0.875rem',
-          padding: '0.5rem',
+      <ConfirmDialog
+        open={confirmPurgeOpen}
+        title="完全削除"
+        description="このアイテムを完全に削除します。この操作は取り消せません。よろしいですか？"
+        confirmText="削除"
+        isDangerous={true}
+        onConfirm={handlePurgeConfirm}
+        onCancel={() => {
+          setConfirmPurgeOpen(false)
+          setSelectedPurgeId(null)
         }}
-      >
-        戻る
-      </button>
+      />
     </div>
   )
 }

@@ -1,68 +1,75 @@
-// TypeScript 型定義
+// Entry types supported by kura
+export type EntryType = 'login' | 'bank' | 'ssh_key' | 'secure_note' | 'credit_card' | 'passkey'
 
-export interface AppSettings {
-  clipboardClearSeconds: number
-  autolockMinutes: number
-  autolockOnBackground: boolean
-  screenshotPreventionEnabled: boolean
+// Custom field types
+export type CustomFieldType = 'text' | 'password' | 'email' | 'url' | 'phone'
+
+// Custom field
+export interface CustomField {
+  id: string
+  name: string
+  fieldType: CustomFieldType
+  value: string
 }
 
-export interface S3Config {
-  region: string
-  bucket: string
-  key: string
-  access_key_id: string
-  secret_access_key: string
-  endpoint?: string
-}
-
+// Entry row for list display
 export interface EntryRow {
   id: string
-  entry_type: string
+  entryType: EntryType
   name: string
-  is_favorite: boolean
-  updated_at: number
-  deleted_at: number | null
+  isFavorite: boolean
+  updatedAt: number
+  deletedAt: number | null
 }
 
+// Entry with full details
 export interface Entry extends EntryRow {
   notes: string | null
-  typed_value: string // JSON
+  typedValue: Record<string, unknown>
   labels: string[]
+  customFields: CustomField[]
 }
 
+// Label
 export interface Label {
   id: string
   name: string
 }
 
-export type EntryType = 'login' | 'bank' | 'ssh_key' | 'secure_note' | 'credit_card' | 'passkey'
-
-export interface LoginData {
-  url?: string
-  username?: string
-  password?: string
-  totp?: string
+// Filter for list_entries
+export interface EntryFilter {
+  searchQuery?: string
+  type?: EntryType
+  labelId?: string
+  includeTrash?: boolean
+  onlyFavorites?: boolean
 }
 
-export interface BankData {
-  bank_name?: string
-  account_number?: string
-  pin?: string
+// Storage config for S3
+export interface S3Config {
+  region: string
+  bucket: string
+  key?: string
+  endpoint?: string
+  accessKeyId: string
+  secretAccessKey: string
 }
 
-export interface SshKeyData {
-  private_key?: string
-  passphrase?: string
+// Onboarding draft state
+export interface OnboardingDraft {
+  storageType: string
+  endpoint: string
+  bucket: string
+  region: string
+  key: string
+  accessKeyId: string
+  secretAccessKey: string
 }
 
-export interface SecureNoteData {
-  content?: string
-}
-
-export interface CreditCardData {
-  cardholder?: string
-  number?: string
-  expiry?: string
-  cvv?: string
+// App settings
+export interface AppSettings {
+  clipboardClearSeconds: number
+  autolockMinutes: number
+  autolockOnBackground: boolean
+  theme?: 'light' | 'dark'
 }
