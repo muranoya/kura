@@ -72,12 +72,14 @@ body,
   height: 100%;
   margin: 0;
   padding: 0;
+  overflow: hidden;
 }
 
 body {
   width: 720px;
   height: 616px;
   padding: 8px;
+  overflow: hidden;
   background-color: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-sans);
