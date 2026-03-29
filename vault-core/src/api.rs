@@ -46,6 +46,7 @@ pub struct DartLabel {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct DartSyncResult {
     pub synced: bool,
+    pub last_synced_at: Option<i64>,
 }
 
 /// セッション状態
@@ -56,6 +57,16 @@ enum SessionState {
 
 /// グローバルセッション管理
 static VAULT_SESSION: Lazy<Mutex<Option<SessionState>>> = Lazy::new(|| Mutex::new(None));
+
+/// 最終同期時刻（UNIXタイムスタンプ、秒）
+static LAST_SYNC_TIME: Lazy<Mutex<Option<i64>>> = Lazy::new(|| Mutex::new(None));
+
+fn unix_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64
+}
 
 // ============================================================================
 // セッション管理API
@@ -665,7 +676,10 @@ pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> 
                         }
                     }
 
-                    return Ok(DartSyncResult { synced: true });
+                    let ts = unix_now();
+                    *LAST_SYNC_TIME.lock().unwrap_or_else(|p| p.into_inner()) = Some(ts);
+
+                    return Ok(DartSyncResult { synced: true, last_synced_at: Some(ts) });
                 }
             }; // Lock is released here
 
@@ -692,7 +706,8 @@ pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> 
                 entries: merge_result.merged_entries,
                 labels: merge_result.merged_labels,
             };
-            crate::sync::apply_gc_to_contents(&mut merged_contents);
+            let now = crate::get_timestamp();
+            crate::sync::apply_gc_to_contents(&mut merged_contents, now);
 
             // Apply merged state to session
             {
@@ -727,7 +742,9 @@ pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> 
                             u.set_etag(new_etag);
                         }
                     }
-                    return Ok(DartSyncResult { synced: true });
+                    let ts = unix_now();
+                    *LAST_SYNC_TIME.lock().unwrap_or_else(|p| p.into_inner()) = Some(ts);
+                    return Ok(DartSyncResult { synced: true, last_synced_at: Some(ts) });
                 }
                 Err(crate::error::VaultError::ConflictDetected) => {
                     // 409: リトライ
@@ -751,7 +768,7 @@ pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> 
 
 /// S3へプッシュ
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
-pub async fn api_push(storage_config: String) -> Result<(), String> {
+pub async fn api_push(storage_config: String) -> Result<i64, String> {
     let s3_config = parse_s3_config(&storage_config)?;
 
     // Get vault bytes and etag (scoped to release lock before async)
@@ -802,7 +819,11 @@ pub async fn api_push(storage_config: String) -> Result<(), String> {
             }
         }
 
-        Ok(())
+        // Record sync timestamp
+        let ts = unix_now();
+        *LAST_SYNC_TIME.lock().unwrap_or_else(|p| p.into_inner()) = Some(ts);
+
+        Ok(ts)
     }
 
     #[cfg(not(feature = "storage-s3"))]
@@ -872,4 +893,14 @@ pub async fn api_download(storage_config: String) -> Result<bool, String> {
 pub fn api_is_unlocked() -> bool {
     VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner()).as_ref()
         .map_or(false, |s| matches!(s, SessionState::Unlocked(_)))
+}
+
+/// 最終同期時刻を取得（UNIXタイムスタンプ、秒）
+pub fn api_get_last_sync_time() -> Option<i64> {
+    *LAST_SYNC_TIME.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// 最終同期時刻を復元（プラットフォーム側の永続ストレージから復元時に使用）
+pub fn api_restore_last_sync_time(ts: i64) {
+    *LAST_SYNC_TIME.lock().unwrap_or_else(|p| p.into_inner()) = Some(ts);
 }

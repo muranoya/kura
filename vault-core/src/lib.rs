@@ -34,3 +34,24 @@ pub use totp::{generate_totp, generate_totp_default};
 
 // Re-export useful types for clients
 pub use serde_json;
+
+// ============================================================================
+// Timestamp utilities
+// ============================================================================
+
+/// Get current Unix timestamp in seconds
+/// In WASM targets, uses JavaScript Date API
+/// In other targets, uses chrono
+#[inline]
+#[cfg(target_arch = "wasm32")]
+pub fn get_timestamp() -> i64 {
+    (js_sys::Date::now() / 1000.0) as i64
+}
+
+/// Get current Unix timestamp in seconds
+/// In non-WASM targets, uses chrono
+#[inline]
+#[cfg(not(target_arch = "wasm32"))]
+pub fn get_timestamp() -> i64 {
+    chrono::Utc::now().timestamp()
+}

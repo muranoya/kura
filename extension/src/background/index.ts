@@ -114,8 +114,9 @@ async function autoSaveAndPush() {
           // Save updated ETag and sync time
           const newEtag = (vault as any).api_get_vault_etag?.() ?? null
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
-          await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, new Date().toISOString())
-          console.log('[SW] Auto-push successful')
+          const syncTime = Math.floor(Date.now() / 1000)
+          await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, syncTime)
+          console.log('[SW] Auto-push successful, syncTime:', syncTime)
         } else {
           console.warn('[SW] autoSaveAndPush: api_push not available in WASM')
         }
@@ -734,16 +735,21 @@ async function handleMessage(
 
           const configStr = JSON.stringify(s3Config)
 
+          let lastSyncedAt: number | null = null
           // api_sync が実装されている場合、それを使用
           if (typeof (vault as any).api_sync === 'function') {
             console.log('[SW] SYNC: Calling api_sync')
             const syncResult = await (vault as any).api_sync(configStr)
-            console.log('[SW] SYNC: api_sync completed successfully')
+            console.log('[SW] SYNC: api_sync completed successfully, syncResult:', syncResult)
+            console.log('[SW] SYNC: syncResult type:', typeof syncResult)
+            console.log('[SW] SYNC: syncResult.last_synced_at:', syncResult?.last_synced_at)
+            lastSyncedAt = syncResult?.last_synced_at ?? null
           } else if (typeof (vault as any).api_push === 'function') {
             // api_sync が利用できない場合は api_push で代替
             console.log('[SW] SYNC: api_sync not available, using api_push instead')
             const pushResult = await (vault as any).api_push(configStr)
             console.log('[SW] SYNC: api_push completed successfully')
+            lastSyncedAt = null
           } else {
             throw new Error('Neither api_sync nor api_push is available')
           }
@@ -754,10 +760,13 @@ async function handleMessage(
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
           const newEtag = (vault as any).api_get_vault_etag?.() ?? null
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
-          await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, new Date().toISOString())
 
-          console.log('[SW] SYNC: Sync completed successfully')
-          sendResponse({ success: true, status: 'synced' })
+          // lastSyncedAt がない場合はフォールバック
+          const syncTime = lastSyncedAt ?? Math.floor(Date.now() / 1000)
+          await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, syncTime)
+
+          console.log('[SW] SYNC: Sync completed successfully, lastSyncedAt:', syncTime)
+          sendResponse({ success: true, status: 'synced', last_synced_at: syncTime })
         } catch (err) {
           console.error('[SW] SYNC: Error:', err)
           sendResponse({ success: false, error: String(err) })

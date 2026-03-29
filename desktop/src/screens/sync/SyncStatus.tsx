@@ -1,15 +1,34 @@
 import { useState, useEffect } from 'react'
-import { getFromStorage } from '../../shared/storage'
+import { getFromStorage, saveToStorage } from '../../shared/storage'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { CheckCircle2, RefreshCw, Loader2, AlertCircle } from 'lucide-react'
-import { syncVault } from '../../commands'
+import { syncVault, getLastSyncTime } from '../../commands'
+import { STORAGE_KEYS } from '../../shared/constants'
+
+function formatDateTime(unixSecs: number): string {
+  return new Date(unixSecs * 1000).toLocaleString('ja-JP', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
+function formatRelativeTime(unixSecs: number): string {
+  const diffMin = Math.floor((Date.now() / 1000 - unixSecs) / 60)
+  if (diffMin < 1) return 'たった今'
+  if (diffMin < 60) return `${diffMin}分前`
+  const h = Math.floor(diffMin / 60)
+  if (h < 24) return `${h}時間前`
+  return `${Math.floor(h / 24)}日前`
+}
 
 export default function SyncStatus() {
   const [storageConfig, setStorageConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle')
   const [syncMessage, setSyncMessage] = useState<string>('')
+  const [lastSyncTime, setLastSyncTime] = useState<number | null>(null)
+  const [tick, setTick] = useState(0)
 
   useEffect(() => {
     const loadStorageConfig = async () => {
@@ -17,6 +36,11 @@ export default function SyncStatus() {
         const config = await getFromStorage<any>('s3Config')
         if (config) {
           setStorageConfig(config)
+        }
+        // Load last sync time from storage
+        const stored = await getFromStorage<number>(STORAGE_KEYS.LAST_SYNC_TIME)
+        if (stored) {
+          setLastSyncTime(stored)
         }
       } catch (err) {
         console.error('Failed to load storage config:', err)
@@ -26,6 +50,13 @@ export default function SyncStatus() {
     }
     loadStorageConfig()
   }, [])
+
+  // Auto-update relative time every minute
+  useEffect(() => {
+    if (!lastSyncTime) return
+    const timer = setInterval(() => setTick(t => t + 1), 60000)
+    return () => clearInterval(timer)
+  }, [lastSyncTime])
 
   const handleSync = async () => {
     if (!storageConfig) return
@@ -39,6 +70,12 @@ export default function SyncStatus() {
 
       setSyncStatus('success')
       setSyncMessage('同期が完了しました')
+
+      // Save last sync time
+      if (result.last_synced_at) {
+        await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, result.last_synced_at)
+        setLastSyncTime(result.last_synced_at)
+      }
 
       // Auto-clear success message after 3 seconds
       setTimeout(() => {
@@ -68,8 +105,12 @@ export default function SyncStatus() {
                 <CheckCircle2 className="w-6 h-6 text-success" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-text-primary">同期準備完了</p>
-                <p className="text-sm text-text-muted">クラウドストレージが正常に接続されています</p>
+                <p className="font-semibold text-text-primary">
+                  {lastSyncTime ? `最終同期: ${formatDateTime(lastSyncTime)}` : '未同期'}
+                </p>
+                <p className="text-sm text-text-muted">
+                  {lastSyncTime ? formatRelativeTime(lastSyncTime) : 'まだ同期していません'}
+                </p>
               </div>
               <Button
                 onClick={handleSync}

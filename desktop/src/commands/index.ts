@@ -1,5 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { EntryRow, Entry, Label, EntryFilter } from '../shared/types'
+import { saveToStorage } from '../shared/storage'
+import { STORAGE_KEYS } from '../shared/constants'
 
 // ============================================================================
 // Session Management
@@ -203,14 +205,25 @@ export async function generateTotpDefault(secret: string): Promise<string> {
 
 export async function syncVault(storageConfig: string): Promise<{
   synced: boolean
+  last_synced_at: number | null
 }> {
-  return invoke<{ synced: boolean }>('sync_vault', {
+  return invoke<{ synced: boolean; last_synced_at: number | null }>('sync_vault', {
     storageConfig,
   })
 }
 
-export async function pushVault(storageConfig: string): Promise<void> {
-  return invoke<void>('push_vault', { storageConfig })
+export async function pushVault(storageConfig: string): Promise<number> {
+  return invoke<number>('push_vault', { storageConfig })
+}
+
+/// ヘルパー: pushVaultを実行して、タイムスタンプをストレージに保存
+export async function pushVaultAndTrack(storageConfig: string): Promise<void> {
+  const ts = await pushVault(storageConfig)
+  await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, ts)
+}
+
+export async function getLastSyncTime(): Promise<number | null> {
+  return invoke<number | null>('get_last_sync_time')
 }
 
 export async function downloadVault(storageConfig: string): Promise<boolean> {

@@ -50,7 +50,7 @@ export default function LabelManager() {
       await commands.writeVaultFile(vaultBytes)
       const s3Config = await getFromStorage<any>('s3Config')
       if (s3Config) {
-        await commands.pushVault(JSON.stringify(s3Config))
+        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
       }
       setLabels([...labels, newLabel])
       setNewLabelName('')
@@ -70,7 +70,7 @@ export default function LabelManager() {
       await commands.writeVaultFile(vaultBytes)
       const s3Config = await getFromStorage<any>('s3Config')
       if (s3Config) {
-        await commands.pushVault(JSON.stringify(s3Config))
+        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
       }
       setLabels(labels.filter(l => l.id !== deleteTargetId))
       setDeleteDialogOpen(false)
@@ -107,7 +107,7 @@ export default function LabelManager() {
       await commands.writeVaultFile(vaultBytes)
       const s3Config = await getFromStorage<any>('s3Config')
       if (s3Config) {
-        await commands.pushVault(JSON.stringify(s3Config))
+        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
       }
       setLabels(labels.map(l => l.id === editingLabelId ? { ...l, name: editingName } : l))
       setEditingLabelId(null)

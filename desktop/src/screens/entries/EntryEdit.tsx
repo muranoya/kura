@@ -61,7 +61,7 @@ export default function EntryEdit() {
       // S3にプッシュ
       const s3Config = await getFromStorage<any>('s3Config')
       if (s3Config) {
-        await commands.pushVault(JSON.stringify(s3Config))
+        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
       }
       navigate(`/entries/${id}`)
     } catch (err) {

@@ -22,7 +22,7 @@ impl VaultMeta {
             encrypted_dek_master: engine.encode(&encrypted_dek_master),
             encrypted_dek_recovery: engine.encode(&encrypted_dek_recovery),
             argon2_params,
-            created_at: chrono::Utc::now().timestamp(),
+            created_at: crate::get_timestamp(),
         }
     }
 }

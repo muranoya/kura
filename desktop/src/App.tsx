@@ -17,6 +17,7 @@ import PasswordGenerator from './screens/entries/PasswordGenerator'
 import SyncStatus from './screens/sync/SyncStatus'
 import ConflictResolver from './screens/sync/ConflictResolver'
 import LabelManager from './screens/labels/LabelManager'
+import LabelEntries from './screens/entries/LabelEntries'
 import Settings from './screens/settings/Settings'
 import Sidebar from './components/Sidebar'
 
@@ -109,6 +110,7 @@ export default function App() {
                   <Route path="/sync" element={<SyncStatus />} />
                   <Route path="/sync/conflict-resolver" element={<ConflictResolver />} />
                   <Route path="/labels" element={<LabelManager />} />
+                  <Route path="/labels/:labelId/entries" element={<LabelEntries />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="*" element={<Navigate to="/entries" replace />} />
                 </Routes>

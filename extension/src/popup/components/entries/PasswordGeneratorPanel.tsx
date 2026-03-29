@@ -56,7 +56,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
 
   const containerClass = isInline
     ? 'space-y-2'
-    : 'flex flex-col h-screen bg-bg-base'
+    : ''
 
   const wrapperClass = isInline
     ? 'border border-accent/30 rounded-md p-3 space-y-3 bg-bg-surface'

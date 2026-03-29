@@ -26,6 +26,7 @@ export const STORAGE_KEYS = {
   VAULT_ETAG: 'vaultETag',
   S3_CONFIG: 's3Config',
   APP_SETTINGS: 'appSettings',
+  LAST_SYNC_TIME: 'lastSyncTime',
 }
 
 // Password generation defaults

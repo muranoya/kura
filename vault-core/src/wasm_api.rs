@@ -15,6 +15,12 @@ use serde_json::Value;
 use std::sync::Mutex;
 use wasm_bindgen::prelude::*;
 
+#[cfg(feature = "storage-s3-wasm")]
+#[wasm_bindgen(start)]
+pub fn init_panic_hook() {
+    console_error_panic_hook::set_once();
+}
+
 /// JavaScript側で受け渡す型は JSON 文字列で受け渡し
 /// wasm-bindgen は基本型のみをサポートするため、JSON シリアライゼーションを使用
 
@@ -51,7 +57,7 @@ pub fn api_create_new_vault(master_password: String) -> Result<String, JsValue> 
         .lock()
         .map_err(|e| JsValue::from_str(&format!("Failed to lock: {}", e)))?;
 
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
     *session = Some(SessionState::Locked(locked_vault));
 
     Ok(recovery_key.to_display_string())
@@ -63,7 +69,7 @@ pub fn api_load_vault(vault_bytes: &[u8], etag: String) -> Result<(), JsValue> {
     let locked_vault = LockedVault::open(vault_bytes.to_vec(), Some(etag))
         .map_err(|e| JsValue::from_str(&format!("Failed to load vault: {}", e)))?;
 
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
     *session = Some(SessionState::Locked(locked_vault));
 
     Ok(())
@@ -72,7 +78,7 @@ pub fn api_load_vault(vault_bytes: &[u8], etag: String) -> Result<(), JsValue> {
 /// マスターパスワードでアンロック
 #[wasm_bindgen]
 pub fn api_unlock(master_password: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     let locked = match session.take() {
         Some(SessionState::Locked(v)) => v,
@@ -93,7 +99,7 @@ pub fn api_unlock(master_password: String) -> Result<(), JsValue> {
 /// リカバリーキーでアンロック（新しいマスターパスワード設定フロー）
 #[wasm_bindgen]
 pub fn api_unlock_with_recovery_key(recovery_key: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     let locked = match session.take() {
         Some(SessionState::Locked(v)) => v,
@@ -114,7 +120,7 @@ pub fn api_unlock_with_recovery_key(recovery_key: String) -> Result<(), JsValue>
 /// ロック（vault_bytesを返す）
 #[wasm_bindgen]
 pub fn api_lock() -> Result<Vec<u8>, JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     match session.take() {
         Some(SessionState::Unlocked(unlocked)) => {
@@ -136,7 +142,7 @@ pub fn api_lock() -> Result<Vec<u8>, JsValue> {
 /// 現在のvault_bytesを取得
 #[wasm_bindgen]
 pub fn api_get_vault_bytes() -> Result<Vec<u8>, JsValue> {
-    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     match session.as_ref() {
         Some(SessionState::Locked(locked)) => locked
@@ -152,7 +158,7 @@ pub fn api_get_vault_bytes() -> Result<Vec<u8>, JsValue> {
 /// 現在セッションに保持されているETagを取得（ストレージ永続化用）
 #[wasm_bindgen]
 pub fn api_get_vault_etag() -> Option<String> {
-    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let session = VAULT_SESSION.lock().ok()?;
 
     match session.as_ref() {
         Some(SessionState::Locked(locked)) => locked.get_etag().cloned(),
@@ -175,7 +181,7 @@ pub fn api_list_entries(
     include_trash: bool,
     only_favorites: bool,
 ) -> Result<String, JsValue> {
-    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
     let unlocked = match session.as_ref() {
         Some(SessionState::Unlocked(v)) => v,
         _ => return Err(JsValue::from_str("Vault not unlocked")),
@@ -222,7 +228,7 @@ pub fn api_list_entries(
 /// 戻り値は JSON 文字列
 #[wasm_bindgen]
 pub fn api_get_entry(id: String) -> Result<String, JsValue> {
-    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
     let unlocked = match session.as_ref() {
         Some(SessionState::Unlocked(v)) => v,
         _ => return Err(JsValue::from_str("Vault not unlocked")),
@@ -261,7 +267,7 @@ pub fn api_create_entry(
     label_ids: Vec<String>,
     custom_fields_json: Option<String>,
 ) -> Result<String, JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     let typed_value: Value = serde_json::from_str(&typed_value_json)
         .map_err(|e| JsValue::from_str(&format!("Invalid typed_value JSON: {}", e)))?;
@@ -303,7 +309,7 @@ pub fn api_update_entry(
     label_ids: Option<Vec<String>>,
     custom_fields_json: Option<String>,
 ) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         // Get current entry to preserve typed_value if not provided
@@ -352,7 +358,7 @@ pub fn api_update_entry(
 /// エントリをゴミ箱へ移動
 #[wasm_bindgen]
 pub fn api_delete_entry(id: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked
@@ -366,7 +372,7 @@ pub fn api_delete_entry(id: String) -> Result<(), JsValue> {
 /// ゴミ箱から復元
 #[wasm_bindgen]
 pub fn api_restore_entry(id: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked
@@ -380,7 +386,7 @@ pub fn api_restore_entry(id: String) -> Result<(), JsValue> {
 /// 完全削除
 #[wasm_bindgen]
 pub fn api_purge_entry(id: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked
@@ -394,7 +400,7 @@ pub fn api_purge_entry(id: String) -> Result<(), JsValue> {
 /// お気に入り設定
 #[wasm_bindgen]
 pub fn api_set_favorite(id: String, is_favorite: bool) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked
@@ -413,7 +419,7 @@ pub fn api_set_favorite(id: String, is_favorite: bool) -> Result<(), JsValue> {
 /// 戻り値は JSON 文字列（ラベル配列）
 #[wasm_bindgen]
 pub fn api_list_labels() -> Result<String, JsValue> {
-    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
     let unlocked = match session.as_ref() {
         Some(SessionState::Unlocked(v)) => v,
         _ => return Err(JsValue::from_str("Vault not unlocked")),
@@ -440,7 +446,7 @@ pub fn api_list_labels() -> Result<String, JsValue> {
 /// ラベル作成
 #[wasm_bindgen]
 pub fn api_create_label(name: String) -> Result<String, JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         let label = unlocked
@@ -455,7 +461,7 @@ pub fn api_create_label(name: String) -> Result<String, JsValue> {
 /// ラベル削除
 #[wasm_bindgen]
 pub fn api_delete_label(id: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked
@@ -469,7 +475,7 @@ pub fn api_delete_label(id: String) -> Result<(), JsValue> {
 /// ラベル名変更
 #[wasm_bindgen]
 pub fn api_rename_label(id: String, new_name: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked
@@ -483,7 +489,7 @@ pub fn api_rename_label(id: String, new_name: String) -> Result<(), JsValue> {
 /// エントリにラベルを紐付け
 #[wasm_bindgen]
 pub fn api_set_entry_labels(entry_id: String, label_ids: Vec<String>) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked
@@ -501,7 +507,7 @@ pub fn api_set_entry_labels(entry_id: String, label_ids: Vec<String>) -> Result<
 /// マスターパスワード変更
 #[wasm_bindgen]
 pub fn api_change_master_password(old_password: String, new_password: String) -> Result<(), JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         unlocked
@@ -520,7 +526,7 @@ pub fn api_upgrade_argon2_params(
     memory: u32,
     parallelism: u32,
 ) -> Result<String, JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     let new_params = crate::models::Argon2Params {
         salt: crate::codec::base32::encode(&rand::random::<[u8; 16]>()),
@@ -542,7 +548,7 @@ pub fn api_upgrade_argon2_params(
 /// DEK ローテーション（新しいリカバリーキーを返す）
 #[wasm_bindgen]
 pub fn api_rotate_dek(password: String) -> Result<String, JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         let recovery_key = unlocked
@@ -557,7 +563,7 @@ pub fn api_rotate_dek(password: String) -> Result<String, JsValue> {
 /// リカバリーキー再発行
 #[wasm_bindgen]
 pub fn api_regenerate_recovery_key(password: String) -> Result<String, JsValue> {
-    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
 
     if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
         let recovery_key = unlocked
@@ -659,132 +665,107 @@ pub fn api_sync(storage_config: String) -> js_sys::Promise {
 }
 
 #[cfg(feature = "storage-s3-wasm")]
-async fn do_sync_inner(storage_config: String) -> Result<(), String> {
+fn unix_now_wasm() -> i64 {
+    // Use JavaScript Date.now() which returns milliseconds since epoch
+    // Convert to seconds (Unix timestamp)
+    (js_sys::Date::now() / 1000.0) as i64
+}
+
+#[cfg(feature = "storage-s3-wasm")]
+async fn do_sync_inner(storage_config: String) -> Result<i64, String> {
     use crate::store::VaultFile;
 
     const MAX_RETRIES: usize = 5;
+    let sync_time = unix_now_wasm();
 
     let s3_config = parse_s3_config(&storage_config)?;
     let storage = crate::storage::WasmS3Storage::new(s3_config)
         .map_err(|e| format!("Failed to create S3 storage: {}", e))?;
 
     for attempt in 0..MAX_RETRIES {
-        // (1) ローカルコンテンツを取得（lock即座にdrop）
-        let local_contents = {
-            let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
-            match session.as_ref() {
-                Some(SessionState::Unlocked(u)) => u.contents.clone(),
-                _ => return Err("Vault not unlocked".to_string()),
-            }
-        };
-
-        // (2) リモートからダウンロード
+        // リモートをダウンロード
         let remote_option = storage
             .download()
             .await
             .map_err(|e| format!("S3 download failed: {}", e))?;
 
-        let (remote_bytes, remote_etag) = match remote_option {
-            None => {
-                // リモートに存在しない → ローカルをアップロード
-                let (vault_bytes, local_etag) = {
-                    let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
-                    match session.as_ref() {
-                        Some(SessionState::Unlocked(u)) => (
-                            u.to_vault_bytes()
-                                .map_err(|e| format!("Failed to serialize vault: {}", e))?,
-                            u.get_etag().cloned(),
-                        ),
-                        _ => return Err("Vault not unlocked".to_string()),
+        // ローカル・リモートデータを処理（一度のロック内で完結）
+        let (vault_bytes, new_etag_for_upload) = {
+            let mut session = VAULT_SESSION.lock()
+                .map_err(|e| format!("Mutex lock failed: {}", e))?;
+
+            let session_state = session.as_mut()
+                .ok_or_else(|| "Session not initialized".to_string())?;
+
+            match session_state {
+                SessionState::Unlocked(u) => {
+                    match remote_option {
+                        None => {
+                            // リモートに存在しない → ローカル状態をそのままアップロード
+                            let vb = u.to_vault_bytes()
+                                .map_err(|e| format!("Serialization failed: {}", e))?;
+                            let etag = u.get_etag().cloned();
+                            (vb, etag)
+                        }
+                        Some((remote_bytes, remote_etag)) => {
+                            // リモート存在 → マージして更新
+                            let remote_vault_file = VaultFile::from_bytes(&remote_bytes)
+                                .map_err(|e| format!("Remote vault parse failed: {}", e))?;
+
+                            let remote_contents = crate::crypto::encryption::decrypt_vault(
+                                &remote_vault_file.encrypted_vault,
+                                &u.dek,
+                            )
+                            .map_err(|e| format!("Decryption failed: {}", e))?;
+
+                            // マージ
+                            let merge_result = crate::sync::auto_merge(&u.contents, &remote_contents)
+                                .map_err(|e| format!("Merge failed: {}", e))?;
+
+                            // GC
+                            let mut merged = crate::store::VaultContents {
+                                entries: merge_result.merged_entries,
+                                labels: merge_result.merged_labels,
+                            };
+                            crate::sync::apply_gc_to_contents(&mut merged, sync_time);
+
+                            // セッション更新
+                            u.contents = merged;
+                            u.set_etag(remote_etag.clone());
+
+                            // シリアライズ
+                            let vb = u.to_vault_bytes()
+                                .map_err(|e| format!("Serialization failed: {}", e))?;
+                            (vb, Some(remote_etag))
+                        }
                     }
-                };
-
-                let new_etag = storage
-                    .upload(&vault_bytes, local_etag.as_deref())
-                    .await
-                    .map_err(|e| format!("S3 upload failed: {}", e))?;
-
-                {
-                    let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
-                    if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
-                        u.set_etag(new_etag);
-                    }
-                }
-
-                return Ok(());
-            }
-            Some(pair) => pair,
-        };
-
-        // (3) リモートVaultをロック解除用にDEKで復号
-        let remote_contents = {
-            let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
-            match session.as_ref() {
-                Some(SessionState::Unlocked(u)) => {
-                    let remote_vault_file = VaultFile::from_bytes(&remote_bytes)
-                        .map_err(|e| format!("Failed to parse remote vault: {}", e))?;
-                    crate::crypto::encryption::decrypt_vault(
-                        &remote_vault_file.encrypted_vault,
-                        &u.dek,
-                    )
-                    .map_err(|e| format!("Failed to decrypt remote vault: {}", e))?
                 }
                 _ => return Err("Vault not unlocked".to_string()),
             }
         };
 
-        // (4) auto_merge
-        let merge_result = crate::sync::auto_merge(&local_contents, &remote_contents)
-            .map_err(|e| format!("Merge failed: {}", e))?;
-
-        // (5) GC適用 - GC前のmerge_resultをVaultContentsにまとめてからGCを適用する
-        let mut merged_contents = crate::store::VaultContents {
-            entries: merge_result.merged_entries,
-            labels: merge_result.merged_labels,
-        };
-        crate::sync::apply_gc_to_contents(&mut merged_contents);
-
-        // (6) session に GC後のmerged state を適用
-        {
-            let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
-            if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
-                u.contents.entries = merged_contents.entries;
-                u.contents.labels = merged_contents.labels;
-                u.set_etag(remote_etag.clone());
-            }
-        }
-
-        // (7) 再シリアライズ
-        let vault_bytes = {
-            let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
-            match session.as_ref() {
-                Some(SessionState::Unlocked(u)) => u
-                    .to_vault_bytes()
-                    .map_err(|e| format!("Failed to serialize vault: {}", e))?,
-                _ => return Err("Vault not unlocked".to_string()),
-            }
-        };
-
-        // (8) Conditional PUT (If-Match: remote_etag) - GC後のETagで再試行
+        // アップロード
         match storage
-            .upload(&vault_bytes, Some(&remote_etag))
+            .upload(&vault_bytes, new_etag_for_upload.as_deref())
             .await
         {
             Ok(new_etag) => {
-                let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+                // 成功 → ETag を更新
+                let mut session = VAULT_SESSION.lock()
+                    .map_err(|e| format!("Mutex lock failed: {}", e))?;
                 if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
                     u.set_etag(new_etag);
                 }
-                return Ok(());
+                return Ok(sync_time);
             }
             Err(crate::error::VaultError::ConflictDetected) => {
-                // 409: リトライ
+                // 409 Conflict → リトライ
                 if attempt + 1 == MAX_RETRIES {
                     return Err("Sync failed after maximum retries".to_string());
                 }
                 continue;
             }
-            Err(e) => return Err(format!("S3 upload failed: {}", e)),
+            Err(e) => return Err(format!("Upload failed: {}", e)),
         }
     }
 
@@ -810,7 +791,7 @@ async fn do_push_inner(storage_config: String) -> Result<(), String> {
         .map_err(|e| format!("Failed to create S3 storage: {}", e))?;
 
     let (vault_bytes, etag) = {
-        let session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+        let session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
         match session.as_ref() {
             Some(SessionState::Locked(l)) => (
                 l.to_vault_bytes()
@@ -832,7 +813,7 @@ async fn do_push_inner(storage_config: String) -> Result<(), String> {
         .map_err(|e| format!("S3 upload failed: {}", e))?;
 
     {
-        let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+        let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
         match session.as_mut() {
             Some(SessionState::Locked(ref mut l)) => l.set_etag(new_etag),
             Some(SessionState::Unlocked(ref mut u)) => u.set_etag(new_etag),
@@ -869,7 +850,7 @@ async fn do_download_inner(storage_config: String) -> Result<bool, String> {
         Some((vault_bytes, etag)) => {
             let locked = LockedVault::open(vault_bytes, Some(etag))
                 .map_err(|e| format!("Failed to open vault: {}", e))?;
-            let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
+            let mut session = VAULT_SESSION.lock().map_err(|e| format!("Session lock error: {}", e))?;
             *session = Some(SessionState::Locked(locked));
             Ok(true)
         }

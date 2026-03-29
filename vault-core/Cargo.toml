@@ -40,6 +40,7 @@ wasm-bindgen-futures = { version = "0", optional = true }
 js-sys = { version = "0", optional = true }
 web-sys = { version = "0", features = ["Window", "Headers", "Request", "Response", "RequestInit", "RequestMode"], optional = true }
 serde-wasm-bindgen = { version = "0", optional = true }
+console_error_panic_hook = { version = "0", optional = true }
 
 [features]
 default = ["storage-s3", "dep:rand"]
@@ -50,7 +51,7 @@ mobile = ["dep:flutter_rust_bridge", "storage-s3"]
 desktop = ["storage-s3"]
 # WASM feature: does NOT include storage-s3 due to tokio incompatibility
 # WASM S3 access uses web-sys + manual AWS Signature V4 implementation
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:web-sys", "dep:serde-wasm-bindgen", "dep:rand"]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:web-sys", "dep:serde-wasm-bindgen", "dep:rand", "dep:console_error_panic_hook"]
 storage-s3-wasm = ["wasm", "dep:rand"]
 
 [lib]

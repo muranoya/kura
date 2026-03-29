@@ -5943,6 +5943,7 @@ dependencies = [
  "base32",
  "base64 0.22.1",
  "chrono",
+ "console_error_panic_hook",
  "flutter_rust_bridge",
  "getrandom 0.2.17",
  "hmac",

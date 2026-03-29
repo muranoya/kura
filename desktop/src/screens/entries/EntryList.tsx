@@ -11,9 +11,11 @@ import EntryListPanel from '../../components/entries/EntryListPanel'
 
 interface EntryListProps {
   onlyFavorites?: boolean
+  labelId?: string
+  labelName?: string
 }
 
-export default function EntryList({ onlyFavorites = false }: EntryListProps) {
+export default function EntryList({ onlyFavorites = false, labelId, labelName }: EntryListProps) {
   const navigate = useNavigate()
   const [entries, setEntries] = useState<EntryRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -26,18 +28,19 @@ export default function EntryList({ onlyFavorites = false }: EntryListProps) {
 
   useEffect(() => {
     loadEntries()
-  }, [onlyFavorites, searchQuery, selectedType])
+  }, [onlyFavorites, searchQuery, selectedType, labelId])
 
   const loadEntries = async () => {
     try {
       setLoading(true)
-      console.log('DEBUG: loadEntries called with onlyFavorites=', onlyFavorites, 'searchQuery=', searchQuery, 'selectedType=', selectedType)
+      console.log('DEBUG: loadEntries called with onlyFavorites=', onlyFavorites, 'searchQuery=', searchQuery, 'selectedType=', selectedType, 'labelId=', labelId)
       const data = await commands.listEntries({
         onlyFavorites,
         searchQuery: searchQuery || undefined,
         type: selectedType,
+        labelId,
       })
-      console.log('DEBUG: received entries count=', data.length, 'filter onlyFavorites=', onlyFavorites, 'searchQuery=', searchQuery, 'type=', selectedType)
+      console.log('DEBUG: received entries count=', data.length, 'filter onlyFavorites=', onlyFavorites, 'searchQuery=', searchQuery, 'type=', selectedType, 'labelId=', labelId)
       setEntries(data)
     } catch (err) {
       setError(`アイテム読み込み失敗: ${err}`)
@@ -72,7 +75,7 @@ export default function EntryList({ onlyFavorites = false }: EntryListProps) {
       await commands.writeVaultFile(vaultBytes)
       const s3Config = await getFromStorage<any>('s3Config')
       if (s3Config) {
-        await commands.pushVault(JSON.stringify(s3Config))
+        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
       }
 
       const updated = entries.map(e =>
@@ -94,7 +97,7 @@ export default function EntryList({ onlyFavorites = false }: EntryListProps) {
       await commands.writeVaultFile(vaultBytes)
       const s3Config = await getFromStorage<any>('s3Config')
       if (s3Config) {
-        await commands.pushVault(JSON.stringify(s3Config))
+        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
       }
 
       // お気に入りビューで削除された場合、リストから削除する
@@ -115,7 +118,7 @@ export default function EntryList({ onlyFavorites = false }: EntryListProps) {
     <div className="flex flex-col h-screen bg-bg-base">
       {/* sticky ヘッダー */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
-        <h1 className="text-sm font-semibold text-text-primary flex-1">{onlyFavorites ? 'お気に入り' : 'アイテム一覧'}</h1>
+        <h1 className="text-sm font-semibold text-text-primary flex-1">{labelName || (onlyFavorites ? 'お気に入り' : 'アイテム一覧')}</h1>
         {!onlyFavorites && (
           <Button
             onClick={() => navigate('/entries/create')}

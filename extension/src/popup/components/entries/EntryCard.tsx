@@ -42,7 +42,6 @@ interface EntryCardNormalProps {
   entry: EntryRow
   onClick: (id: string) => void
   onFavorite: (id: string, current: boolean) => void
-  onDelete: (id: string) => void
   isSelected?: boolean
   compact?: boolean
 }
@@ -107,19 +106,6 @@ export default function EntryCard(props: EntryCardProps) {
                 className={props.entry.isFavorite ? 'fill-accent text-accent' : 'text-text-muted'}
               />
             </button>
-
-            {/* 削除ボタン */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation()
-                props.onDelete(props.entry.id)
-              }}
-              className={`text-danger hover:text-danger gap-1 opacity-0 group-hover:opacity-100 transition-opacity ${isCompact ? 'h-7 w-7 p-0' : ''}`}
-            >
-              <Trash2 size={isCompact ? 14 : 16} />
-            </Button>
           </div>
         </div>
       </Card>

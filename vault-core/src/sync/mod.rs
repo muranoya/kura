@@ -1,6 +1,5 @@
 use crate::error::Result;
 use crate::store::{LabelValue, VaultContents, VaultEntry};
-use chrono::Utc;
 use std::collections::{HashMap, HashSet};
 
 /// GC retention period for purged tombstones (in days)
@@ -95,10 +94,12 @@ pub fn auto_merge(
 
 /// Apply garbage collection to vault contents
 /// Removes tombstones (purged entries and deleted labels) older than GC_RETENTION_DAYS
-pub fn apply_gc_to_contents(contents: &mut VaultContents) -> usize {
+/// Apply GC to purged tombstones older than retention period
+/// now: current timestamp in seconds since epoch
+pub fn apply_gc_to_contents(contents: &mut VaultContents, now: i64) -> usize {
     let mut gc_count = 0;
-    gc_count += apply_gc(&mut contents.entries);
-    apply_gc_labels(&mut contents.labels);
+    gc_count += apply_gc(&mut contents.entries, now);
+    apply_gc_labels(&mut contents.labels, now);
     gc_count
 }
 
@@ -215,8 +216,8 @@ fn cleanup_orphaned_label_refs(
 }
 
 /// Apply GC to purged tombstones older than retention period
-fn apply_gc(entries: &mut HashMap<String, VaultEntry>) -> usize {
-    let now = Utc::now().timestamp();
+/// now: current timestamp in seconds since epoch
+fn apply_gc(entries: &mut HashMap<String, VaultEntry>, now: i64) -> usize {
     let cutoff = now - (GC_RETENTION_DAYS as i64) * 86400;
     let mut count = 0;
 
@@ -234,8 +235,8 @@ fn apply_gc(entries: &mut HashMap<String, VaultEntry>) -> usize {
 }
 
 /// Apply GC to deleted labels
-fn apply_gc_labels(labels: &mut HashMap<String, LabelValue>) {
-    let now = Utc::now().timestamp();
+/// now: current timestamp in seconds since epoch
+fn apply_gc_labels(labels: &mut HashMap<String, LabelValue>, now: i64) {
     let cutoff = now - (GC_RETENTION_DAYS as i64) * 86400;
 
     labels.retain(|_, label| {
@@ -469,7 +470,7 @@ mod tests {
     fn test_auto_merge_label_tombstone() {
         // ラベルのtombstone伝播テスト
         // ローカル: active, リモート: deleted -> remoteの削除状態を採用
-        let now = chrono::Utc::now().timestamp();
+        let now = crate::get_timestamp();
 
         let mut local_labels = HashMap::new();
         local_labels.insert(

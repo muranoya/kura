@@ -163,7 +163,7 @@ impl UnlockedVault {
         label_ids: Vec<String>,
     ) -> Result<Entry> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now().timestamp();
+        let now = crate::get_timestamp();
 
         let vault_entry = VaultEntry {
             entry_type,
@@ -202,7 +202,7 @@ impl UnlockedVault {
         entry.typed_value = zeroize::Zeroizing::new(data.typed_value.to_string());
         entry.notes = data.notes.clone();
         entry.custom_fields = data.custom_fields.clone();
-        entry.updated_at = chrono::Utc::now().timestamp();
+        entry.updated_at = crate::get_timestamp();
 
         Ok(())
     }
@@ -211,7 +211,7 @@ impl UnlockedVault {
     pub fn delete_entry(&mut self, id: &str) -> Result<()> {
         let entry = self.contents.entries.get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
-        let now = chrono::Utc::now().timestamp();
+        let now = crate::get_timestamp();
         entry.deleted_at = Some(now);
         entry.updated_at = now;
         Ok(())
@@ -228,12 +228,10 @@ impl UnlockedVault {
     /// Permanently delete entry (converts to tombstone)
     /// Clears sensitive data and marks as purged for sync-safe deletion
     pub fn purge_entry(&mut self, id: &str) -> Result<()> {
-        use chrono::Utc;
-
         let entry = self.contents.entries.get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
 
-        let now = Utc::now().timestamp();
+        let now = crate::get_timestamp();
 
         // Ensure entry is marked as deleted first
         if entry.deleted_at.is_none() {
@@ -285,12 +283,10 @@ impl UnlockedVault {
     /// Delete label (converts to tombstone)
     /// Marks label as deleted for sync-safe deletion, removes from entries
     pub fn delete_label(&mut self, id: &str) -> Result<()> {
-        use chrono::Utc;
-
         let label = self.contents.labels.get_mut(id)
             .ok_or_else(|| VaultError::LabelNotFound(id.to_string()))?;
 
-        let now = Utc::now().timestamp();
+        let now = crate::get_timestamp();
         label.deleted_at = Some(now);
 
         // Remove label_id from all entries
@@ -451,7 +447,8 @@ impl UnlockedVault {
         self.etag = Some(remote_etag.clone());
 
         // Apply garbage collection to remove old tombstones
-        crate::sync::apply_gc_to_contents(&mut self.contents);
+        let now = crate::get_timestamp();
+        crate::sync::apply_gc_to_contents(&mut self.contents, now);
 
         // Push merged state back to remote
         let new_etag = self.push(storage).await?;

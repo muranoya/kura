@@ -128,9 +128,10 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
                   variant="primary"
                   size="sm"
                   onClick={() => navigate('/entries/create')}
-                  className="h-7 w-7 p-0 rounded-full"
+                  className="gap-1 text-sm"
                 >
                   <Plus size={14} />
+                  新規追加
                 </Button>
               )
             }
@@ -180,7 +181,6 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
                 isSelected={selectedId === entry.id}
                 onClick={(id) => setSelectedId(id)}
                 onFavorite={handleFavorite}
-                onDelete={handleDelete}
               />
             )}
           />
@@ -201,9 +201,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
           ) : (
             <div className="h-full flex items-center justify-center">
               <EmptyState
-                icon="👈"
-                title="アイテムを選択"
-                description="左側のリストからアイテムを選択してください"
+                title="アイテムを選択してください"
               />
             </div>
           )}

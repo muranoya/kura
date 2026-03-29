@@ -1,6 +1,9 @@
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import * as commands from '../commands'
+import { Label } from '../shared/types'
 import { Separator } from './ui/separator'
-import { KeyRound, Star, Tags, RefreshCw, Settings, Trash2, Wand2 } from 'lucide-react'
+import { KeyRound, Star, Tags, RefreshCw, Settings, Trash2, Wand2, Tag } from 'lucide-react'
 import { cn } from '../lib/utils'
 
 interface SidebarProps {}
@@ -26,6 +29,11 @@ const bottomNavItems: NavItem[] = [
 export default function Sidebar({}: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const [labels, setLabels] = useState<Label[]>([])
+
+  useEffect(() => {
+    commands.listLabels().then(setLabels).catch(() => {})
+  }, [location.pathname])
 
   return (
     <div className="flex flex-col w-sidebar h-screen bg-bg-sidebar border-r border-border">
@@ -36,25 +44,56 @@ export default function Sidebar({}: SidebarProps) {
       </div>
 
       {/* ナビゲーション */}
-      <nav className="flex-1 px-2 py-4">
+      <nav className="flex-1 px-2 py-4 overflow-y-auto">
         <ul className="space-y-2">
           {mainNavItems.map((item) => {
-            const isActive = location.pathname.startsWith(item.path)
+            // ラベル行は厳密一致で判定（/labels/:id/entries との区別のため）
+            const isActive = item.path === '/labels'
+              ? location.pathname === item.path
+              : location.pathname.startsWith(item.path)
+
             return (
-              <li key={item.path}>
-                <button
-                  onClick={() => navigate(item.path)}
-                  className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-accent text-white'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
-                  )}
-                >
-                  {item.icon}
-                  <span>{item.label}</span>
-                </button>
-              </li>
+              <div key={item.path}>
+                <li>
+                  <button
+                    onClick={() => navigate(item.path)}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-accent text-white'
+                        : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
+                    )}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </button>
+                </li>
+
+                {/* ラベルサブリスト */}
+                {item.path === '/labels' && labels.length > 0 && (
+                  <ul className="mt-1 ml-4 space-y-0.5">
+                    {labels.map(label => {
+                      const isLabelActive = location.pathname === `/labels/${label.id}/entries`
+                      return (
+                        <li key={label.id}>
+                          <button
+                            onClick={() => navigate(`/labels/${label.id}/entries`)}
+                            className={cn(
+                              'w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                              isLabelActive
+                                ? 'bg-accent text-white'
+                                : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
+                            )}
+                          >
+                            <Tag size={12} />
+                            <span className="truncate">{label.name}</span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
             )
           })}
         </ul>

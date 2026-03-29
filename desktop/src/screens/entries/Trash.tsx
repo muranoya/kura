@@ -68,7 +68,7 @@ export default function Trash() {
       await commands.writeVaultFile(vaultBytes)
       const s3Config = await getFromStorage<any>('s3Config')
       if (s3Config) {
-        await commands.pushVault(JSON.stringify(s3Config))
+        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
       }
       setAllEntries(allEntries.filter(e => e.id !== id))
     } catch (err) {
@@ -84,7 +84,7 @@ export default function Trash() {
       await commands.writeVaultFile(vaultBytes)
       const s3Config = await getFromStorage<any>('s3Config')
       if (s3Config) {
-        await commands.pushVault(JSON.stringify(s3Config))
+        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
       }
       setAllEntries(allEntries.filter(e => e.id !== purgeTargetId))
       setPurgeDialogOpen(false)

@@ -1,6 +1,7 @@
 import { EntryRow, EntryType } from '../../shared/types'
 import { EmptyState } from '../layout/EmptyState'
 import { Search, X } from 'lucide-react'
+import TypeFilterDropdown from '../ui/type-filter-dropdown'
 
 interface EntryListPanelProps {
   // フィルター
@@ -79,22 +80,12 @@ export default function EntryListPanel({
         {headerAction && <div className="flex-shrink-0">{headerAction}</div>}
       </div>
 
-      {/* タイプフィルタータブ */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {ENTRY_TYPES.map((t) => (
-          <button
-            key={t.value}
-            onClick={() => onTypeChange(t.value === 'all' ? undefined : (t.value as EntryType))}
-            className={`px-2.5 py-1.5 text-sm whitespace-nowrap rounded-md transition-colors font-medium ${
-              (t.value === 'all' && !selectedType) || (t.value !== 'all' && selectedType === t.value)
-                ? 'bg-accent text-white border-b-2 border-accent'
-                : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* タイプフィルタードロップダウン */}
+      <TypeFilterDropdown
+        value={selectedType ?? 'all'}
+        onChange={(v) => onTypeChange(v === 'all' ? undefined : (v as EntryType))}
+        options={ENTRY_TYPES}
+      />
 
       {/* エラーメッセージ */}
       {error && (

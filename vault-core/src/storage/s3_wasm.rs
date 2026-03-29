@@ -11,6 +11,25 @@ mod wasm_impl {
     use crate::error::{Result, VaultError};
     use wasm_bindgen::JsCast;
 
+    /// Get current time as ISO8601 string suitable for AWS Signature V4
+    /// Uses JavaScript Date.now() instead of std::time which is not available in WASM
+    fn get_wasm_datetime() -> String {
+        // JavaScript Date.now() returns milliseconds since epoch
+        let now_ms = js_sys::Date::now() as i64;
+        let now_secs = now_ms / 1000;
+        let nanos = ((now_ms % 1000) * 1_000_000) as u32;
+
+        // Convert to chrono DateTime for formatting
+        // Use chrono's timestamp_opt which doesn't require system time
+        match chrono::DateTime::<chrono::Utc>::from_timestamp(now_secs, nanos) {
+            Some(dt) => dt.format("%Y%m%dT%H%M%SZ").to_string(),
+            None => {
+                // Fallback (should not happen in practice)
+                format!("{}T000000Z", now_secs / 86400 + 719162)
+            }
+        }
+    }
+
     pub struct WasmS3Storage {
         config: S3Config,
     }
@@ -53,9 +72,7 @@ mod wasm_impl {
         /// Download vault file from S3 with conditional read
         pub async fn download(&self) -> Result<Option<(Vec<u8>, String)>> {
             let url = self.object_url();
-            let datetime = chrono::Utc::now()
-                .format("%Y%m%dT%H%M%SZ")
-                .to_string();
+            let datetime = get_wasm_datetime();
 
             let signed = super::super::s3_sigv4::sign_get_request(
                 &url,
@@ -94,12 +111,19 @@ mod wasm_impl {
             let request = web_sys::Request::new_with_str_and_init(&url, &init)
                 .map_err(|_| VaultError::StorageError("Failed to create request".into()))?;
 
-            // Fetch
-            let window = web_sys::window()
-                .ok_or_else(|| VaultError::StorageError("No window object".into()))?;
-
-            let resp_promise = window.fetch_with_request(&request);
-            let resp_val = wasm_bindgen_futures::JsFuture::from(resp_promise)
+            // Fetch - works in both Window and Service Worker contexts
+            let global = js_sys::global();
+            let fetch_fn = js_sys::Reflect::get(&global, &wasm_bindgen::JsValue::from_str("fetch"))
+                .map_err(|_| VaultError::StorageError("Failed to get fetch from global".into()))?
+                .dyn_into::<js_sys::Function>()
+                .map_err(|_| VaultError::StorageError("fetch is not a function".into()))?;
+            let fetch_result = fetch_fn
+                .call1(&global, &request)
+                .map_err(|_| VaultError::StorageError("Failed to call fetch".into()))?;
+            let promise: js_sys::Promise = fetch_result
+                .dyn_into()
+                .map_err(|_| VaultError::StorageError("Fetch result is not a Promise".into()))?;
+            let resp_val = wasm_bindgen_futures::JsFuture::from(promise)
                 .await
                 .map_err(|e| {
                     VaultError::StorageError(format!("Fetch failed: {:?}", e))
@@ -150,9 +174,7 @@ mod wasm_impl {
         /// Upload vault file to S3 with conditional write (If-Match)
         pub async fn upload(&self, data: &[u8], etag: Option<&str>) -> Result<String> {
             let url = self.object_url();
-            let datetime = chrono::Utc::now()
-                .format("%Y%m%dT%H%M%SZ")
-                .to_string();
+            let datetime = get_wasm_datetime();
 
             let signed = super::super::s3_sigv4::sign_put_request(
                 &url,
@@ -209,12 +231,19 @@ mod wasm_impl {
             let request = web_sys::Request::new_with_str_and_init(&url, &init)
                 .map_err(|_| VaultError::StorageError("Failed to create request".into()))?;
 
-            // Fetch
-            let window = web_sys::window()
-                .ok_or_else(|| VaultError::StorageError("No window object".into()))?;
-
-            let resp_promise = window.fetch_with_request(&request);
-            let resp_val = wasm_bindgen_futures::JsFuture::from(resp_promise)
+            // Fetch - works in both Window and Service Worker contexts
+            let global = js_sys::global();
+            let fetch_fn = js_sys::Reflect::get(&global, &wasm_bindgen::JsValue::from_str("fetch"))
+                .map_err(|_| VaultError::StorageError("Failed to get fetch from global".into()))?
+                .dyn_into::<js_sys::Function>()
+                .map_err(|_| VaultError::StorageError("fetch is not a function".into()))?;
+            let fetch_result = fetch_fn
+                .call1(&global, &request)
+                .map_err(|_| VaultError::StorageError("Failed to call fetch".into()))?;
+            let promise: js_sys::Promise = fetch_result
+                .dyn_into()
+                .map_err(|_| VaultError::StorageError("Fetch result is not a Promise".into()))?;
+            let resp_val = wasm_bindgen_futures::JsFuture::from(promise)
                 .await
                 .map_err(|e| {
                     VaultError::StorageError(format!("Fetch failed: {:?}", e))
