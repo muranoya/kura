@@ -23,6 +23,9 @@ interface EntryListPanelProps {
   emptyDescription: string
   emptyAction?: React.ReactNode
 
+  // アクションボタン（フィルターバー右端に表示）
+  actionButton?: React.ReactNode
+
   // カードのレンダリング（差分部分のみ render prop）
   renderCard: (entry: EntryRow) => React.ReactNode
 }
@@ -48,6 +51,7 @@ export default function EntryListPanel({
   emptyTitle,
   emptyDescription,
   emptyAction,
+  actionButton,
   renderCard,
 }: EntryListPanelProps) {
   return (
@@ -90,6 +94,9 @@ export default function EntryListPanel({
             </button>
           )}
         </div>
+
+        {/* アクションボタン */}
+        {actionButton}
       </div>
 
       {/* エラーメッセージ */}

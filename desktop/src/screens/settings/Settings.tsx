@@ -1,7 +1,6 @@
-import { useState } from 'react'
-import { Sun, Moon, ExternalLink, Copy, Check } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ExternalLink, Copy, Check } from 'lucide-react'
 import { clearStorage, getFromStorage } from '../../shared/storage'
-import { useTheme } from '../../shared/ThemeContext'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -15,11 +14,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog'
+import { STORAGE_KEYS } from '../../shared/constants'
 import * as commands from '../../commands'
+import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 
 export default function Settings() {
-  const { theme, toggleTheme } = useTheme()
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
+  const [storageConfig, setStorageConfig] = useState<any>(null)
+  const [storageLoading, setStorageLoading] = useState(true)
+
+  // Load storage config
+  useEffect(() => {
+    const loadStorageConfig = async () => {
+      try {
+        const config = await getFromStorage<any>(STORAGE_KEYS.S3_CONFIG)
+        setStorageConfig(config ?? null)
+      } catch (err) {
+        console.error('Failed to load storage config:', err)
+      } finally {
+        setStorageLoading(false)
+      }
+    }
+    loadStorageConfig()
+  }, [])
 
   // Change Master Password Dialog
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
@@ -158,34 +175,12 @@ export default function Settings() {
     <div className="flex flex-col h-screen bg-bg-base">
       {/* sticky ヘッダー */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
-        <h1 className="text-sm font-semibold text-text-primary">設定</h1>
+        <h1 className="text-sm font-semibold text-text-primary flex-1">設定</h1>
+        <SyncHeaderActions />
       </div>
 
       {/* コンテンツ */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        {/* 外観 */}
-        <Card>
-          <CardHeader className="px-3 py-2">
-            <CardTitle className="text-sm font-medium">外観</CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3 pt-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-text-primary">テーマ</p>
-                  <p className="text-xs text-text-muted mt-1">
-                    {theme === 'light' ? 'ライトモード' : 'ダークモード'}
-                  </p>
-                </div>
-                <Button variant="secondary" size="sm" onClick={toggleTheme}>
-                  {theme === 'light'
-                    ? <><Moon size={16} className="mr-2" /> ダーク</>
-                    : <><Sun size={16} className="mr-2" /> ライト</>
-                  }
-                </Button>
-              </div>
-            </CardContent>
-        </Card>
-
         {/* セキュリティ */}
         <Card>
           <CardHeader className="px-3 py-2">
@@ -220,6 +215,41 @@ export default function Settings() {
             >
               ログアウト
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* ストレージ設定 */}
+        <Card>
+          <CardHeader className="px-3 py-2">
+            <CardTitle className="text-sm font-medium">ストレージ設定</CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3 pt-2">
+            {storageLoading ? (
+              <p className="text-sm text-text-muted">読み込み中...</p>
+            ) : storageConfig ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-text-secondary block mb-1">バケット</label>
+                  <p className="text-sm text-text-primary font-mono">{storageConfig.bucket || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-text-secondary block mb-1">リージョン</label>
+                  <p className="text-sm text-text-primary font-mono">{storageConfig.region || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-text-secondary block mb-1">ファイルパス</label>
+                  <p className="text-sm text-text-primary font-mono">{storageConfig.key || 'vault.json'}</p>
+                </div>
+                {storageConfig.endpoint && (
+                  <div>
+                    <label className="text-xs font-medium text-text-secondary block mb-1">エンドポイント</label>
+                    <p className="text-sm text-text-primary font-mono break-all">{storageConfig.endpoint}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-text-muted">ストレージ設定が見つかりません</p>
+            )}
           </CardContent>
         </Card>
 

@@ -30,7 +30,7 @@
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
 }
 
-/* ライトモード（デフォルト） */
+/* ライトモード */
 :root {
   --bg-base: #f5f6f8;
   --bg-surface: #ffffff;
@@ -44,24 +44,6 @@
   --accent-subtle: #eef2ff;
   --border: #e2e4eb;
   --border-strong: #c8ccd8;
-  --danger: #ef4444;
-  --success: #22c55e;
-}
-
-/* ダークモード */
-html.dark {
-  --bg-base: #0f1117;
-  --bg-surface: #1a1d27;
-  --bg-elevated: #232736;
-  --bg-sidebar: #13151f;
-  --text-primary: #f0f2f5;
-  --text-secondary: #8b92a9;
-  --text-muted: #4a5068;
-  --accent: #6366f1;
-  --accent-hover: #4f52d1;
-  --accent-subtle: #1e2045;
-  --border: #2a2f45;
-  --border-strong: #3d4460;
   --danger: #ef4444;
   --success: #22c55e;
 }

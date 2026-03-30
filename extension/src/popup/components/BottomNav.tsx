@@ -1,5 +1,5 @@
 import { useLocation, Link } from 'react-router-dom'
-import { KeyRound, Star, Wand2, RefreshCw, Settings } from 'lucide-react'
+import { KeyRound, Star, Wand2, Tags, Settings } from 'lucide-react'
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
@@ -10,8 +10,8 @@ function cn(...inputs: ClassValue[]) {
 const TAB_ROUTES = [
   { path: '/entries', icon: KeyRound, label: 'アイテム' },
   { path: '/favorites', icon: Star, label: 'お気に入り' },
+  { path: '/labels', icon: Tags, label: 'ラベル' },
   { path: '/password-generator', icon: Wand2, label: '生成' },
-  { path: '/sync', icon: RefreshCw, label: '同期' },
   { path: '/settings', icon: Settings, label: '設定' },
 ]
 

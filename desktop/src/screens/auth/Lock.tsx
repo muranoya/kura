@@ -26,6 +26,7 @@ export default function LockScreen() {
     setLoading(true)
     try {
       await commands.unlock(password)
+      commands.syncVaultIfConfigured().catch(() => {}) // バックグラウンド
       window.location.reload()
     } catch (err) {
       setError(`ロック解除失敗: ${err}`)

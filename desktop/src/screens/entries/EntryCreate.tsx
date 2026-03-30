@@ -5,6 +5,7 @@ import { getFromStorage } from '../../shared/storage'
 import { Label, CustomField } from '../../shared/types'
 import { Button } from '../../components/ui/button'
 import EntryForm from '../../components/entries/EntryForm'
+import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 
 export default function EntryCreate() {
   const navigate = useNavigate()
@@ -43,13 +44,10 @@ export default function EntryCreate() {
         : undefined
       const id = await commands.createEntry(entryType, name, typedValueJson, notes || undefined, selectedLabelIds, customFieldsJson)
 
-      // Save vault to file and push to S3
+      // Save vault to file and sync to S3 (background)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      const s3Config = await getFromStorage<any>('s3Config')
-      if (s3Config) {
-        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
-      }
+      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
 
       navigate(`/entries/${id}`)
     } catch (err) {
@@ -64,20 +62,7 @@ export default function EntryCreate() {
       {/* sticky ヘッダー */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
         <h1 className="text-sm font-semibold text-text-primary flex-1">新規アイテム</h1>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => navigate('/entries')}
-        >
-          キャンセル
-        </Button>
-        <Button
-          size="sm"
-          onClick={handleCreate}
-          disabled={loading}
-        >
-          {loading ? '作成中...' : '作成'}
-        </Button>
+        <SyncHeaderActions />
       </div>
 
       {/* フォーム */}
@@ -98,6 +83,24 @@ export default function EntryCreate() {
           selectedLabelIds={selectedLabelIds}
           onSelectedLabelIdsChange={setSelectedLabelIds}
         />
+      </div>
+
+      {/* sticky ボタンバー */}
+      <div className="shrink-0 sticky bottom-0 flex justify-end gap-2 px-3 py-2 border-t border-border bg-bg-surface">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => navigate('/entries')}
+        >
+          キャンセル
+        </Button>
+        <Button
+          size="sm"
+          onClick={handleCreate}
+          disabled={loading}
+        >
+          {loading ? '作成中...' : '作成'}
+        </Button>
       </div>
     </div>
   )

@@ -6,6 +6,7 @@ import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { PageHeader } from '../../components/layout/PageHeader'
+import { SyncActions } from '../../components/layout/SyncActions'
 import { EmptyState } from '../../components/layout/EmptyState'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import * as commands from '../../commands'
@@ -102,7 +103,7 @@ export default function LabelManager() {
 
   return (
     <div className="h-full overflow-y-auto pb-20 flex flex-col">
-      <PageHeader title="ラベル管理" showBackButton={true} />
+      <PageHeader title="ラベル" showBackButton={false} action={<SyncActions />} />
 
       <div className="p-4 space-y-4">
         {error && (
@@ -116,11 +117,11 @@ export default function LabelManager() {
           <CardHeader className="px-3 py-2">
             <CardTitle className="text-sm font-medium">新しいラベル</CardTitle>
           </CardHeader>
-          <CardContent className="px-3 pb-3 pt-2 space-y-2">
-            <div className="space-y-1">
-              <Label htmlFor="new-label-name" className="text-sm">
-                ラベル名
-              </Label>
+          <CardContent className="px-3 pb-3 pt-2 space-y-1">
+            <Label htmlFor="new-label-name" className="text-sm">
+              ラベル名
+            </Label>
+            <div className="flex gap-2">
               <Input
                 id="new-label-name"
                 type="text"
@@ -132,18 +133,18 @@ export default function LabelManager() {
                 }}
                 onKeyPress={(e) => e.key === 'Enter' && handleCreateLabel()}
                 disabled={creating}
-                className="text-sm"
+                className="flex-1 text-sm"
               />
+              <Button
+                onClick={handleCreateLabel}
+                disabled={creating || !newLabelName.trim()}
+                className="text-sm gap-1"
+                size="sm"
+              >
+                <Plus size={14} />
+                追加
+              </Button>
             </div>
-            <Button
-              onClick={handleCreateLabel}
-              disabled={creating || !newLabelName.trim()}
-              className="w-full text-sm gap-1"
-              size="sm"
-            >
-              <Plus size={14} />
-              追加
-            </Button>
           </CardContent>
         </Card>
 
@@ -164,7 +165,7 @@ export default function LabelManager() {
               {labels.map((label) => (
                 <div
                   key={label.id}
-                  className="flex items-center gap-2 p-2 rounded-md border border-border bg-bg-elevated"
+                  className="flex items-center gap-2 p-2 rounded-md border border-border bg-white"
                 >
                   {editingId === label.id ? (
                     <>

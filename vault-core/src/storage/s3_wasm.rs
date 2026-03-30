@@ -102,17 +102,35 @@ mod wasm_impl {
                     VaultError::StorageError("Failed to set x-amz-content-sha256 header".into())
                 })?;
 
-            // Build request
+            // Set up AbortController for 3-second timeout
+            let abort_controller = web_sys::AbortController::new()
+                .map_err(|_| VaultError::StorageError("AbortController creation failed".into()))?;
+            let signal = abort_controller.signal();
+
+            // Build request with abort signal
             let mut init = web_sys::RequestInit::new();
-            init.method("GET");
-            init.headers(&headers);
-            init.mode(web_sys::RequestMode::Cors);
+            init.set_method("GET");
+            init.set_headers(&headers);
+            init.set_mode(web_sys::RequestMode::Cors);
+            init.set_signal(Some(&signal));
 
             let request = web_sys::Request::new_with_str_and_init(&url, &init)
                 .map_err(|_| VaultError::StorageError("Failed to create request".into()))?;
 
-            // Fetch - works in both Window and Service Worker contexts
+            // Set timeout to abort after 3000ms
+            let closure = wasm_bindgen::closure::Closure::once(move || {
+                abort_controller.abort();
+            });
             let global = js_sys::global();
+            let set_timeout = js_sys::Reflect::get(&global, &"setTimeout".into())
+                .and_then(|v| v.dyn_into::<js_sys::Function>())
+                .map_err(|_| VaultError::StorageError("setTimeout not available".into()))?;
+            set_timeout
+                .call2(&global, closure.as_ref().unchecked_ref(), &wasm_bindgen::JsValue::from(3000u32))
+                .map_err(|_| VaultError::StorageError("Failed to set timeout".into()))?;
+            closure.forget();
+
+            // Fetch - works in both Window and Service Worker contexts
             let fetch_fn = js_sys::Reflect::get(&global, &wasm_bindgen::JsValue::from_str("fetch"))
                 .map_err(|_| VaultError::StorageError("Failed to get fetch from global".into()))?
                 .dyn_into::<js_sys::Function>()
@@ -221,18 +239,36 @@ mod wasm_impl {
             let uint8_array = js_sys::Uint8Array::from(data);
             let body_val: wasm_bindgen::JsValue = uint8_array.into();
 
-            // Build request
+            // Set up AbortController for 3-second timeout
+            let abort_controller = web_sys::AbortController::new()
+                .map_err(|_| VaultError::StorageError("AbortController creation failed".into()))?;
+            let signal = abort_controller.signal();
+
+            // Build request with abort signal
             let mut init = web_sys::RequestInit::new();
-            init.method("PUT");
-            init.headers(&headers);
-            init.body(Some(&body_val));
-            init.mode(web_sys::RequestMode::Cors);
+            init.set_method("PUT");
+            init.set_headers(&headers);
+            init.set_body(&body_val);
+            init.set_mode(web_sys::RequestMode::Cors);
+            init.set_signal(Some(&signal));
 
             let request = web_sys::Request::new_with_str_and_init(&url, &init)
                 .map_err(|_| VaultError::StorageError("Failed to create request".into()))?;
 
-            // Fetch - works in both Window and Service Worker contexts
+            // Set timeout to abort after 3000ms
+            let closure = wasm_bindgen::closure::Closure::once(move || {
+                abort_controller.abort();
+            });
             let global = js_sys::global();
+            let set_timeout = js_sys::Reflect::get(&global, &"setTimeout".into())
+                .and_then(|v| v.dyn_into::<js_sys::Function>())
+                .map_err(|_| VaultError::StorageError("setTimeout not available".into()))?;
+            set_timeout
+                .call2(&global, closure.as_ref().unchecked_ref(), &wasm_bindgen::JsValue::from(3000u32))
+                .map_err(|_| VaultError::StorageError("Failed to set timeout".into()))?;
+            closure.forget();
+
+            // Fetch - works in both Window and Service Worker contexts
             let fetch_fn = js_sys::Reflect::get(&global, &wasm_bindgen::JsValue::from_str("fetch"))
                 .map_err(|_| VaultError::StorageError("Failed to get fetch from global".into()))?
                 .dyn_into::<js_sys::Function>()

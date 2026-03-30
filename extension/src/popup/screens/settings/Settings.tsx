@@ -1,7 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sun, Moon, Copy, Check, ExternalLink } from 'lucide-react'
-import { useTheme } from '../../shared/ThemeContext'
+import { Copy, Check, ExternalLink } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -16,11 +15,14 @@ import {
   DialogTitle,
 } from '../../components/ui/dialog'
 import { PageHeader } from '../../components/layout/PageHeader'
+import { SyncActions } from '../../components/layout/SyncActions'
+import { getFromStorage } from '../../../shared/storage'
+import { STORAGE_KEYS } from '../../../shared/constants'
 import * as commands from '../../commands'
 
 export default function Settings() {
   const navigate = useNavigate()
-  const { theme, toggleTheme } = useTheme()
+  const [storageConfig, setStorageConfig] = useState<any>(null)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
   // Change Master Password Dialog
@@ -47,6 +49,21 @@ export default function Settings() {
   const [recoveryKeyDisplayOpen, setRecoveryKeyDisplayOpen] = useState(false)
   const [recoveryKeyDisplayValue, setRecoveryKeyDisplayValue] = useState('')
   const [recoveryKeyCopied, setRecoveryKeyCopied] = useState(false)
+
+  useEffect(() => {
+    loadStorageConfig()
+  }, [])
+
+  const loadStorageConfig = async () => {
+    try {
+      const config = await getFromStorage<any>(STORAGE_KEYS.S3_CONFIG)
+      if (config) {
+        setStorageConfig(config)
+      }
+    } catch (err) {
+      console.error('Failed to load storage config:', err)
+    }
+  }
 
   const handleLogoutConfirmed = async () => {
     try {
@@ -153,39 +170,9 @@ export default function Settings() {
 
   return (
     <div className="h-full overflow-y-auto pb-20">
-      <PageHeader title="設定" showBackButton={false} />
+      <PageHeader title="設定" showBackButton={false} action={<SyncActions />} />
 
       <div className="p-3 space-y-2">
-        {/* 外観 */}
-        <Card>
-          <CardHeader className="px-3 py-2">
-            <CardTitle className="text-sm font-medium">外観</CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3 pt-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-text-primary">テーマ</p>
-                <p className="text-sm text-text-muted mt-0.5">
-                  {theme === 'light' ? 'ライトモード' : 'ダークモード'}
-                </p>
-              </div>
-              <Button variant="secondary" size="sm" onClick={toggleTheme} className="text-sm gap-1">
-                {theme === 'light' ? (
-                  <>
-                    <Moon size={14} />
-                    ダーク
-                  </>
-                ) : (
-                  <>
-                    <Sun size={14} />
-                    ライト
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* セキュリティ */}
         <Card>
           <CardHeader className="px-3 py-2">
@@ -193,7 +180,6 @@ export default function Settings() {
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2 space-y-1.5">
             <Button
-              variant="secondary"
               onClick={() => setChangePasswordOpen(true)}
               className="w-full text-sm"
               size="sm"
@@ -201,7 +187,6 @@ export default function Settings() {
               マスターパスワード変更
             </Button>
             <Button
-              variant="secondary"
               onClick={() => setRotateDekOpen(true)}
               className="w-full text-sm"
               size="sm"
@@ -209,7 +194,6 @@ export default function Settings() {
               DEK更新
             </Button>
             <Button
-              variant="secondary"
               onClick={() => setRegenerateRecoveryOpen(true)}
               className="w-full text-sm"
               size="sm"
@@ -224,6 +208,39 @@ export default function Settings() {
             >
               ログアウト
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* ストレージ設定 */}
+        <Card>
+          <CardHeader className="px-3 py-2">
+            <CardTitle className="text-sm font-medium">ストレージ設定</CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3 pt-2">
+            {storageConfig ? (
+              <div className="space-y-3 text-sm">
+                <div>
+                  <label className="font-medium text-text-secondary block mb-1">バケット</label>
+                  <p className="text-text-primary font-mono">{storageConfig.bucket || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="font-medium text-text-secondary block mb-1">リージョン</label>
+                  <p className="text-text-primary font-mono">{storageConfig.region || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="font-medium text-text-secondary block mb-1">ファイルパス</label>
+                  <p className="text-text-primary font-mono break-all">{storageConfig.key || 'vault.json'}</p>
+                </div>
+                {storageConfig.endpoint && (
+                  <div>
+                    <label className="font-medium text-text-secondary block mb-1">エンドポイント</label>
+                    <p className="text-text-primary font-mono text-xs break-all">{storageConfig.endpoint}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-text-muted text-sm">ストレージ設定が見つかりません</p>
+            )}
           </CardContent>
         </Card>
 

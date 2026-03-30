@@ -1,6 +1,5 @@
 import { EntryRow, EntryType } from '../../shared/types'
 import { EmptyState } from '../layout/EmptyState'
-import { Search, X } from 'lucide-react'
 import TypeFilterDropdown from '../ui/type-filter-dropdown'
 
 interface EntryListPanelProps {
@@ -8,10 +7,10 @@ interface EntryListPanelProps {
   selectedType: EntryType | undefined
   onTypeChange: (type: EntryType | undefined) => void
 
-  // 検索
-  searchQuery: string
-  onSearchChange: (query: string) => void
-  onSearchClear: () => void
+  // ラベルフィルター
+  labels: Array<{ id: string; name: string }>
+  selectedLabelId: string | undefined
+  onLabelChange: (labelId: string | undefined) => void
 
   // データ
   entries: EntryRow[]
@@ -21,17 +20,13 @@ interface EntryListPanelProps {
   // 空状態テキスト
   emptyTitle: string
   emptyDescription: string
-  emptyAction?: React.ReactNode
 
   // カードのレンダリング（差分部分のみ render prop）
   renderCard: (entry: EntryRow) => React.ReactNode
-
-  // ヘッダーアクション（「+」ボタン等）
-  headerAction?: React.ReactNode
 }
 
 const ENTRY_TYPES: Array<{ value: string; label: string }> = [
-  { value: 'all', label: 'すべて' },
+  { value: 'all', label: 'すべての種類' },
   { value: 'login', label: 'ログイン' },
   { value: 'bank', label: '銀行口座' },
   { value: 'ssh_key', label: 'SSH キー' },
@@ -42,50 +37,38 @@ const ENTRY_TYPES: Array<{ value: string; label: string }> = [
 export default function EntryListPanel({
   selectedType,
   onTypeChange,
-  searchQuery,
-  onSearchChange,
-  onSearchClear,
+  labels,
+  selectedLabelId,
+  onLabelChange,
   entries,
   loading,
   error,
   emptyTitle,
   emptyDescription,
-  emptyAction,
   renderCard,
-  headerAction,
 }: EntryListPanelProps) {
+  const labelOptions = [
+    { value: 'all', label: 'すべてのラベル' },
+    ...labels.map((l) => ({ value: l.id, label: l.name })),
+  ]
+
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-3">
-      {/* 検索ボックス + アクション */}
-      <div className="flex gap-2 items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted" size={14} />
-          <input
-            type="text"
-            placeholder="検索..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-9 pr-8 py-1.5 text-sm rounded-md border border-border bg-bg-surface text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
-          />
-          {searchQuery && (
-            <button
-              onClick={onSearchClear}
-              className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
-              title="検索をクリア"
-            >
-              <X size={14} />
-            </button>
-          )}
-        </div>
-        {headerAction && <div className="flex-shrink-0">{headerAction}</div>}
-      </div>
-
       {/* タイプフィルタードロップダウン */}
       <TypeFilterDropdown
         value={selectedType ?? 'all'}
         onChange={(v) => onTypeChange(v === 'all' ? undefined : (v as EntryType))}
         options={ENTRY_TYPES}
       />
+
+      {/* ラベルフィルタードロップダウン（ラベルが1件以上の場合のみ表示） */}
+      {labels.length > 0 && (
+        <TypeFilterDropdown
+          value={selectedLabelId ?? 'all'}
+          onChange={(v) => onLabelChange(v === 'all' ? undefined : v)}
+          options={labelOptions}
+        />
+      )}
 
       {/* エラーメッセージ */}
       {error && (
@@ -106,7 +89,6 @@ export default function EntryListPanel({
           icon="🔑"
           title={emptyTitle}
           description={emptyDescription}
-          action={emptyAction}
         />
       ) : (
         <div className="space-y-2">

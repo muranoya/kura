@@ -7,6 +7,7 @@ use crate::{
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use std::sync::Mutex;
+use tokio::time::{timeout, Duration};
 
 /// Dart側で受け渡すエントリ行データ
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -622,6 +623,7 @@ fn parse_s3_config(storage_config: &str) -> Result<S3Config, String> {
 #[cfg_attr(feature = "mobile", flutter_rust_bridge::frb)]
 pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> {
     const MAX_RETRIES: usize = 5;
+    const S3_TIMEOUT: Duration = Duration::from_secs(3);
 
     let s3_config = parse_s3_config(&storage_config)?;
 
@@ -644,9 +646,10 @@ pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> 
                 }
             }; // Lock is released here
 
-            // Download remote version
-            let remote_option = s3_storage.download()
+            // Download remote version with timeout
+            let remote_option = timeout(S3_TIMEOUT, s3_storage.download())
                 .await
+                .map_err(|_| "S3 operation timed out".to_string())?
                 .map_err(|e| format!("S3 download failed: {}", e))?;
 
             let (remote_bytes, remote_etag) = match remote_option {
@@ -665,8 +668,9 @@ pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> 
                         }
                     }; // Lock is released here
 
-                    let new_etag = s3_storage.upload(&vault_bytes, etag.as_deref())
+                    let new_etag = timeout(S3_TIMEOUT, s3_storage.upload(&vault_bytes, etag.as_deref()))
                         .await
+                        .map_err(|_| "S3 operation timed out".to_string())?
                         .map_err(|e| format!("S3 upload failed: {}", e))?;
 
                     {
@@ -733,8 +737,8 @@ pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> 
             }; // Lock is released here
 
             // Upload merged vault with conditional write
-            match s3_storage.upload(&merged_vault_bytes, merged_etag.as_deref()).await {
-                Ok(new_etag) => {
+            match timeout(S3_TIMEOUT, s3_storage.upload(&merged_vault_bytes, merged_etag.as_deref())).await {
+                Ok(Ok(new_etag)) => {
                     // Update etag in session
                     {
                         let mut session = VAULT_SESSION.lock().unwrap_or_else(|p| p.into_inner());
@@ -746,14 +750,15 @@ pub async fn api_sync(storage_config: String) -> Result<DartSyncResult, String> 
                     *LAST_SYNC_TIME.lock().unwrap_or_else(|p| p.into_inner()) = Some(ts);
                     return Ok(DartSyncResult { synced: true, last_synced_at: Some(ts) });
                 }
-                Err(crate::error::VaultError::ConflictDetected) => {
+                Ok(Err(crate::error::VaultError::ConflictDetected)) => {
                     // 409: リトライ
                     if attempt + 1 == MAX_RETRIES {
                         return Err("Sync failed after maximum retries".to_string());
                     }
                     continue;
                 }
-                Err(e) => return Err(format!("S3 upload failed: {}", e)),
+                Ok(Err(e)) => return Err(format!("S3 upload failed: {}", e)),
+                Err(_) => return Err("S3 operation timed out".to_string()),
             }
         }
 
@@ -796,13 +801,16 @@ pub async fn api_push(storage_config: String) -> Result<i64, String> {
     #[cfg(feature = "storage-s3")]
     {
         use crate::storage::StorageBackend;
+        const S3_TIMEOUT: Duration = Duration::from_secs(3);
+
         let s3_storage = crate::storage::s3::S3Storage::new(s3_config)
             .await
             .map_err(|e| format!("Failed to create S3 storage: {}", e))?;
 
-        // Upload with conditional write
-        let _new_etag = s3_storage.upload(&vault_bytes, etag.as_deref())
+        // Upload with conditional write and timeout
+        let _new_etag = timeout(S3_TIMEOUT, s3_storage.upload(&vault_bytes, etag.as_deref()))
             .await
+            .map_err(|_| "S3 operation timed out".to_string())?
             .map_err(|e| format!("S3 upload failed: {}", e))?;
 
         // Update etag in session (scoped)
@@ -856,12 +864,15 @@ pub async fn api_download(storage_config: String) -> Result<bool, String> {
     #[cfg(feature = "storage-s3")]
     {
         use crate::storage::StorageBackend;
+        const S3_TIMEOUT: Duration = Duration::from_secs(3);
+
         let s3_storage = crate::storage::s3::S3Storage::new(s3_config)
             .await
             .map_err(|e| format!("Failed to create S3 storage: {}", e))?;
 
-        match s3_storage.download()
+        match timeout(S3_TIMEOUT, s3_storage.download())
             .await
+            .map_err(|_| "S3 operation timed out".to_string())?
             .map_err(|e| format!("S3 download failed: {}", e))?
         {
             Some((vault_bytes, etag)) => {
