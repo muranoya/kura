@@ -6,6 +6,8 @@ MOBILE_DIR := "mobile"
 DESKTOP_DIR := "desktop"
 EXTENSION_DIR := "extension"
 VAULT_CORE_DIR := "vault-core"
+ANDROID_DIR := "android"
+ANDROID_JNI_DIR := "android/rust-jni"
 
 # デフォルトレシピ
 default: help
@@ -155,6 +157,80 @@ default: help
 	echo "🔌 Starting extension dev server..."
 	cd {{EXTENSION_DIR}} && pnpm run dev
 
+# Android app - Build native libraries (Rust → .so)
+@build-android-jni:
+	echo ""
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "🦀 Building vault_jni native libraries for Android..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	if ! command -v cargo-ndk &> /dev/null; then \
+		echo "📥 Installing cargo-ndk..."; \
+		cargo install cargo-ndk; \
+	fi
+	echo "🔧 Building for arm64-v8a (aarch64)..."
+	cargo ndk -t arm64-v8a -o {{ANDROID_DIR}}/app/src/main/jniLibs build --manifest-path {{ANDROID_JNI_DIR}}/Cargo.toml --release
+	echo ""
+	echo "🔧 Building for armeabi-v7a (armv7)..."
+	cargo ndk -t armeabi-v7a -o {{ANDROID_DIR}}/app/src/main/jniLibs build --manifest-path {{ANDROID_JNI_DIR}}/Cargo.toml --release
+	echo ""
+	echo "🔧 Building for x86_64..."
+	cargo ndk -t x86_64 -o {{ANDROID_DIR}}/app/src/main/jniLibs build --manifest-path {{ANDROID_JNI_DIR}}/Cargo.toml --release
+	echo ""
+	echo "🔧 Building for x86..."
+	cargo ndk -t x86 -o {{ANDROID_DIR}}/app/src/main/jniLibs build --manifest-path {{ANDROID_JNI_DIR}}/Cargo.toml --release
+	echo ""
+	echo "✅ Native libraries built!"
+	echo "  - Output: {{ANDROID_DIR}}/app/src/main/jniLibs/"
+
+# Android app - Debug build
+@build-android-debug: build-android-jni
+	echo ""
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "🤖 Building Android app (debug)..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	cd {{ANDROID_DIR}} && ./gradlew assembleDebug
+	echo ""
+	echo "✅ Android debug build completed!"
+	echo "  - APK: {{ANDROID_DIR}}/app/build/outputs/apk/debug/app-debug.apk"
+
+# Android app - Release build
+@release-android: build-android-jni
+	echo ""
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "🤖 Building Android app (release)..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	cd {{ANDROID_DIR}} && ./gradlew assembleRelease
+	echo ""
+	echo "✅ Android release build completed!"
+	echo "  - APK: {{ANDROID_DIR}}/app/build/outputs/apk/release/app-release-unsigned.apk"
+
+# Android app - Build native libraries for single ABI (fast development)
+@build-android-jni-fast:
+	echo ""
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "🦀 Building vault_jni for arm64-v8a only (fast dev build)..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	if ! command -v cargo-ndk &> /dev/null; then \
+		echo "📥 Installing cargo-ndk..."; \
+		cargo install cargo-ndk; \
+	fi
+	cargo ndk -t arm64-v8a -o {{ANDROID_DIR}}/app/src/main/jniLibs build --manifest-path {{ANDROID_JNI_DIR}}/Cargo.toml --release
+	echo ""
+	echo "✅ Native library built (arm64-v8a only)"
+
+# Android app - Debug build (fast, arm64 only)
+@build-android-debug-fast: build-android-jni-fast
+	echo ""
+	echo "🤖 Building Android app (debug, arm64 only)..."
+	cd {{ANDROID_DIR}} && ./gradlew assembleDebug
+	echo ""
+	echo "✅ Android debug build completed!"
+	echo "  - APK: {{ANDROID_DIR}}/app/build/outputs/apk/debug/app-debug.apk"
+
 # Build all releases
 @release-all: check-dependencies
 	echo ""
@@ -164,6 +240,7 @@ default: help
 	echo "║         Desktop (macOS/Windows/Linux), Extension       ║"
 	echo "╚━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╝"
 	just release-mobile
+	just release-android
 	just release-desktop
 	just release-extension-chrome
 	just release-extension-firefox
@@ -182,6 +259,8 @@ default: help
 	cd {{DESKTOP_DIR}}/src-tauri && cargo clean
 	echo "  - Extension..."
 	cd {{EXTENSION_DIR}} && rm -rf dist/ build/ node_modules/ wasm/
+	echo "  - Android..."
+	cd {{ANDROID_DIR}} && rm -rf app/build/ app/src/main/jniLibs/ .gradle/ build/
 	echo "✅ Cleanup completed!"
 
 # ヘルプ表示
@@ -192,6 +271,13 @@ default: help
 	echo "Usage:"
 	echo "  📱 Mobile:"
 	echo "    just release-mobile       - Build mobile app (iOS + Android)"
+	echo ""
+	echo "  🤖 Android:"
+	echo "    just build-android-debug       - Build Android debug APK (all ABIs)"
+	echo "    just build-android-debug-fast  - Build Android debug APK (arm64 only, fast)"
+	echo "    just release-android           - Build Android release APK"
+	echo "    just build-android-jni         - Build Rust native libraries only"
+	echo "    just build-android-jni-fast    - Build Rust native library (arm64 only)"
 	echo ""
 	echo "  🖥️  Desktop:"
 	echo "    just dev-desktop          - Start desktop app in dev mode (hot reload)"
