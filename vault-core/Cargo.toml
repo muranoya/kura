@@ -49,6 +49,7 @@ default = ["storage-s3", "dep:rand"]
 storage-s3 = ["dep:rand", "dep:aws-sdk-s3", "dep:aws-config", "dep:tokio"]
 mobile = ["dep:flutter_rust_bridge", "storage-s3"]
 desktop = ["storage-s3"]
+android = ["storage-s3"]
 # WASM feature: does NOT include storage-s3 due to tokio incompatibility
 # WASM S3 access uses web-sys + manual AWS Signature V4 implementation
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:web-sys", "dep:serde-wasm-bindgen", "dep:rand", "dep:console_error_panic_hook"]
