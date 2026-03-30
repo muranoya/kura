@@ -59,6 +59,17 @@ export default function App() {
     initApp()
   }, [])
 
+  // Set up periodic sync when unlocked
+  useEffect(() => {
+    if (appState !== 'unlocked') return
+
+    const timer = setInterval(() => {
+      commands.syncVaultIfConfigured().catch(e => console.warn('Periodic sync failed:', e))
+    }, 60_000) // 1 minute
+
+    return () => clearInterval(timer)
+  }, [appState])
+
   if (appState === 'loading') {
     return (
       <div className="flex items-center justify-center h-screen bg-bg-base">

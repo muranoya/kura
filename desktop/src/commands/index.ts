@@ -222,6 +222,17 @@ export async function pushVaultAndTrack(storageConfig: string): Promise<void> {
   await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, ts)
 }
 
+/// S3設定がある場合のみ syncVault を呼び出す（エラーはサイレント無視）
+export async function syncVaultIfConfigured(): Promise<void> {
+  const config = await getFromStorage<any>(STORAGE_KEYS.S3_CONFIG)
+  if (!config) return
+  try {
+    await syncVault(JSON.stringify(config))
+  } catch (e) {
+    console.warn('Background sync failed:', e)
+  }
+}
+
 export async function getLastSyncTime(): Promise<number | null> {
   return invoke<number | null>('get_last_sync_time')
 }

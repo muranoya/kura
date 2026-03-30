@@ -25,6 +25,7 @@ export default function UnlockExistingVault() {
       await commands.unlock(password)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
+      commands.syncVaultIfConfigured().catch(() => {}) // バックグラウンド
       window.location.reload()
     } catch (err) {
       setError('パスワードが違います')

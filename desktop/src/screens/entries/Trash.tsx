@@ -66,10 +66,7 @@ export default function Trash() {
       await commands.restoreEntry(id)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      const s3Config = await getFromStorage<any>('s3Config')
-      if (s3Config) {
-        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
-      }
+      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
       setAllEntries(allEntries.filter(e => e.id !== id))
     } catch (err) {
       setError(`復元失敗: ${err}`)

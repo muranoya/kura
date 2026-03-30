@@ -70,13 +70,10 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
     try {
       await commands.setFavorite(id, !currentFavorite)
 
-      // Save vault to file and push to S3
+      // Save vault to file and sync to S3 (background)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      const s3Config = await getFromStorage<any>('s3Config')
-      if (s3Config) {
-        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
-      }
+      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
 
       const updated = entries.map(e =>
         e.id === id ? { ...e, isFavorite: !currentFavorite } : e
@@ -92,13 +89,10 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
     try {
       await commands.deleteEntry(deleteTargetId)
 
-      // Save vault to file and push to S3
+      // Save vault to file and sync to S3 (background)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      const s3Config = await getFromStorage<any>('s3Config')
-      if (s3Config) {
-        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
-      }
+      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
 
       // お気に入りビューで削除された場合、リストから削除する
       setEntries(entries.filter(e => e.id !== deleteTargetId))

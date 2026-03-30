@@ -38,7 +38,7 @@ rand = { version = "0", features = ["getrandom"] }
 wasm-bindgen = { version = "0", optional = true }
 wasm-bindgen-futures = { version = "0", optional = true }
 js-sys = { version = "0", optional = true }
-web-sys = { version = "0", features = ["Window", "Headers", "Request", "Response", "RequestInit", "RequestMode"], optional = true }
+web-sys = { version = "0", features = ["Window", "Headers", "Request", "Response", "RequestInit", "RequestMode", "AbortController", "AbortSignal"], optional = true }
 serde-wasm-bindgen = { version = "0", optional = true }
 console_error_panic_hook = { version = "0", optional = true }
 

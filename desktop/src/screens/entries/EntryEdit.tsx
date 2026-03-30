@@ -58,11 +58,8 @@ export default function EntryEdit() {
       await commands.updateEntry(id!, name, typedValueJson, notes || undefined, selectedLabelIds, customFieldsJson)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      // S3にプッシュ
-      const s3Config = await getFromStorage<any>('s3Config')
-      if (s3Config) {
-        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
-      }
+      // S3に同期（バックグラウンド）
+      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
       navigate(`/entries/${id}`)
     } catch (err) {
       setError(`保存失敗: ${err}`)

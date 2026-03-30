@@ -91,43 +91,47 @@ function normalizeEntries(entries: any[]): any[] {
 }
 
 /**
- * 自動保存 & S3 へのプッシュ
+ * 自動同期（api_sync を優先、失敗時は api_push にフォールバック）
  */
-async function autoSaveAndPush() {
+async function autoSync() {
   try {
-    console.log('[SW] autoSaveAndPush: Starting')
-    const vaultBytes = (vault as any).api_get_vault_bytes()
-    console.log('[SW] autoSaveAndPush: Got vault bytes, size:', vaultBytes?.length)
-    await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
+    console.log('[SW] autoSync: Starting')
 
+    // S3設定がない場合はローカル保存のみ
     const s3Config = await getFromStorage(STORAGE_KEYS.S3_CONFIG)
-    console.log('[SW] autoSaveAndPush: s3Config exists:', !!s3Config)
-    console.log('[SW] autoSaveAndPush: api_push type:', typeof (vault as any).api_push)
-
-    if (s3Config) {
-      try {
-        // api_push が存在する場合のみ実行
-        if (typeof (vault as any).api_push === 'function') {
-          console.log('[SW] autoSaveAndPush: Calling api_push')
-          const pushResult = await (vault as any).api_push(JSON.stringify(s3Config))
-          console.log('[SW] autoSaveAndPush: api_push returned:', pushResult)
-          // Save updated ETag and sync time
-          const newEtag = (vault as any).api_get_vault_etag?.() ?? null
-          await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
-          const syncTime = Math.floor(Date.now() / 1000)
-          await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, syncTime)
-          console.log('[SW] Auto-push successful, syncTime:', syncTime)
-        } else {
-          console.warn('[SW] autoSaveAndPush: api_push not available in WASM')
-        }
-      } catch (e) {
-        console.warn('[SW] Auto-push failed:', e)
-      }
-    } else {
-      console.log('[SW] autoSaveAndPush: No S3 config, skipping push')
+    if (!s3Config) {
+      console.log('[SW] autoSync: No S3 config, saving locally only')
+      const vaultBytes = (vault as any).api_get_vault_bytes()
+      await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
+      return
     }
+
+    const configStr = JSON.stringify(s3Config)
+
+    // api_sync を優先使用（マージ + アップロード）
+    if (typeof (vault as any).api_sync === 'function') {
+      console.log('[SW] autoSync: Calling api_sync')
+      await (vault as any).api_sync(configStr)
+      console.log('[SW] autoSync: api_sync completed successfully')
+    } else if (typeof (vault as any).api_push === 'function') {
+      // api_sync が利用不可の場合は api_push で代替
+      console.log('[SW] autoSync: api_sync not available, using api_push')
+      await (vault as any).api_push(configStr)
+      console.log('[SW] autoSync: api_push completed successfully')
+    } else {
+      throw new Error('Neither api_sync nor api_push is available')
+    }
+
+    // 同期後に vault bytes / ETag / lastSyncTime を更新
+    const vaultBytes = (vault as any).api_get_vault_bytes()
+    await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
+    const newEtag = (vault as any).api_get_vault_etag?.() ?? null
+    await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
+    const syncTime = Math.floor(Date.now() / 1000)
+    await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, syncTime)
+    console.log('[SW] autoSync completed, syncTime:', syncTime)
   } catch (err) {
-    console.error('[SW] autoSaveAndPush failed:', err)
+    console.warn('[SW] autoSync failed:', err)
   }
 }
 
@@ -194,7 +198,11 @@ async function handleMessage(
           // オートロック alarm を設定
           const settings = await loadSettings()
           chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
+          // 定期同期アラームを設定
+          chrome.alarms.create('autosync', { periodInMinutes: 1 })
           sendResponse({ success: true })
+          // アンロック後に同期（バックグラウンド）
+          autoSync().catch(e => console.warn('[SW] Post-unlock sync failed:', e))
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }
@@ -218,7 +226,11 @@ async function handleMessage(
           unlocked = true
           const settings = await loadSettings()
           chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
+          // 定期同期アラームを設定
+          chrome.alarms.create('autosync', { periodInMinutes: 1 })
           sendResponse({ success: true })
+          // アンロック後に同期（バックグラウンド）
+          autoSync().catch(e => console.warn('[SW] Post-unlock sync failed:', e))
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }
@@ -231,6 +243,7 @@ async function handleMessage(
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
           unlocked = false
           chrome.alarms.clear('autolock')
+          chrome.alarms.clear('autosync')
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -287,7 +300,7 @@ async function handleMessage(
           const vaultBytes = (vault as any).api_get_vault_bytes()
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, null)
-          await autoSaveAndPush()
+          await autoSync()
           unlocked = true
           const settings = await loadSettings()
           chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
@@ -356,7 +369,7 @@ async function handleMessage(
             message.labelIds || [],
             message.customFields ? JSON.stringify(message.customFields) : null
           )
-          await autoSaveAndPush()
+          await autoSync()
           sendResponse({ success: true, entryId })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -378,7 +391,7 @@ async function handleMessage(
             message.labelIds || [],
             message.customFields ? JSON.stringify(message.customFields) : null
           )
-          await autoSaveAndPush()
+          await autoSync()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -393,7 +406,7 @@ async function handleMessage(
         }
         try {
           ;(vault as any).api_delete_entry(message.id)
-          await autoSaveAndPush()
+          await autoSync()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -408,7 +421,7 @@ async function handleMessage(
         }
         try {
           ;(vault as any).api_restore_entry(message.id)
-          await autoSaveAndPush()
+          await autoSync()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -423,7 +436,7 @@ async function handleMessage(
         }
         try {
           ;(vault as any).api_purge_entry(message.id)
-          await autoSaveAndPush()
+          await autoSync()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -438,7 +451,7 @@ async function handleMessage(
         }
         try {
           ;(vault as any).api_set_favorite(message.id, message.isFavorite)
-          await autoSaveAndPush()
+          await autoSync()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -488,7 +501,7 @@ async function handleMessage(
         }
         try {
           const labelId = (vault as any).api_create_label(message.name)
-          await autoSaveAndPush()
+          await autoSync()
           sendResponse({ success: true, labelId })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -503,7 +516,7 @@ async function handleMessage(
         }
         try {
           ;(vault as any).api_delete_label(message.id)
-          await autoSaveAndPush()
+          await autoSync()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -518,7 +531,7 @@ async function handleMessage(
         }
         try {
           ;(vault as any).api_rename_label(message.id, message.newName)
-          await autoSaveAndPush()
+          await autoSync()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -533,7 +546,7 @@ async function handleMessage(
         }
         try {
           ;(vault as any).api_set_entry_labels(message.entryId, message.labelIds || [])
-          await autoSaveAndPush()
+          await autoSync()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -578,7 +591,7 @@ async function handleMessage(
         }
         try {
           ;(vault as any).api_change_master_password(message.oldPassword, message.newPassword)
-          await autoSaveAndPush()
+          await autoSync()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -593,7 +606,7 @@ async function handleMessage(
         }
         try {
           const recoveryKey = (vault as any).api_rotate_dek(message.password)
-          await autoSaveAndPush()
+          await autoSync()
           sendResponse({ success: true, recoveryKey })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -608,7 +621,7 @@ async function handleMessage(
         }
         try {
           const recoveryKey = (vault as any).api_regenerate_recovery_key(message.password)
-          await autoSaveAndPush()
+          await autoSync()
           sendResponse({ success: true, recoveryKey })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -826,6 +839,8 @@ function setupAlarms() {
       handleAutolockAlarm()
     } else if (alarm.name === 'clipboard-clear') {
       handleClipboardClearAlarm()
+    } else if (alarm.name === 'autosync') {
+      handleAutosyncAlarm()
     }
   })
 }
@@ -861,6 +876,15 @@ async function handleClipboardClearAlarm() {
   } catch (err) {
     console.error('[SW] Clipboard clear failed:', err)
   }
+}
+
+async function handleAutosyncAlarm() {
+  console.log('[SW] Autosync alarm triggered')
+  if (!unlocked) {
+    console.log('[SW] Vault is locked, skipping sync')
+    return
+  }
+  autoSync().catch(e => console.warn('[SW] Periodic sync failed:', e))
 }
 
 export {}

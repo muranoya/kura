@@ -43,13 +43,10 @@ export default function EntryCreate() {
         : undefined
       const id = await commands.createEntry(entryType, name, typedValueJson, notes || undefined, selectedLabelIds, customFieldsJson)
 
-      // Save vault to file and push to S3
+      // Save vault to file and sync to S3 (background)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      const s3Config = await getFromStorage<any>('s3Config')
-      if (s3Config) {
-        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
-      }
+      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
 
       navigate(`/entries/${id}`)
     } catch (err) {
