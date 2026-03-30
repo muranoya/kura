@@ -1,9 +1,9 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import * as commands from '../commands'
+import { useSyncVersion } from '../contexts/SyncContext'
 import { Label } from '../shared/types'
-import { Separator } from './ui/separator'
-import { KeyRound, Star, Tags, RefreshCw, Settings, Trash2, Wand2, Tag } from 'lucide-react'
+import { KeyRound, Star, Tags, Settings, Trash2, Wand2, Tag } from 'lucide-react'
 import { cn } from '../lib/utils'
 
 interface SidebarProps {}
@@ -22,18 +22,18 @@ const mainNavItems: NavItem[] = [
 ]
 
 const bottomNavItems: NavItem[] = [
-  { icon: <RefreshCw size={18} />, label: '同期', path: '/sync' },
   { icon: <Settings size={18} />, label: '設定', path: '/settings' },
 ]
 
 export default function Sidebar({}: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const syncVersion = useSyncVersion()
   const [labels, setLabels] = useState<Label[]>([])
 
   useEffect(() => {
     commands.listLabels().then(setLabels).catch(() => {})
-  }, [location.pathname])
+  }, [location.pathname, syncVersion])
 
   return (
     <div className="flex flex-col w-sidebar h-screen bg-bg-sidebar border-r border-border">
@@ -101,7 +101,21 @@ export default function Sidebar({}: SidebarProps) {
 
       {/* 下部セクション */}
       <div className="border-t border-border px-2 py-4 space-y-2">
-        {/* 同期・設定 */}
+        {/* ゴミ箱ボタン */}
+        <button
+          onClick={() => navigate('/trash')}
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
+            location.pathname === '/trash'
+              ? 'bg-accent text-white'
+              : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
+          )}
+        >
+          <Trash2 size={18} />
+          <span>ゴミ箱</span>
+        </button>
+
+        {/* 設定 */}
         {bottomNavItems.map((item) => {
           const isActive = location.pathname.startsWith(item.path)
           return (
@@ -120,23 +134,6 @@ export default function Sidebar({}: SidebarProps) {
             </button>
           )
         })}
-
-        {/* 区切り線 */}
-        <Separator className="my-2" />
-
-        {/* ゴミ箱ボタン */}
-        <button
-          onClick={() => navigate('/trash')}
-          className={cn(
-            'w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
-            location.pathname === '/trash'
-              ? 'bg-accent text-white'
-              : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
-          )}
-        >
-          <Trash2 size={18} />
-          <span>ゴミ箱</span>
-        </button>
       </div>
     </div>
   )

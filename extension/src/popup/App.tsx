@@ -1,6 +1,5 @@
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { ThemeProvider } from './shared/ThemeContext'
 import { BottomNav } from './components/BottomNav'
 import Welcome from './screens/onboarding/Welcome'
 import StorageSetup from './screens/onboarding/StorageSetup'
@@ -15,15 +14,14 @@ import EntryEdit from './screens/entries/EntryEdit'
 import EntryCreate from './screens/entries/EntryCreate'
 import PasswordGenerator from './screens/entries/PasswordGenerator'
 import Trash from './screens/entries/Trash'
-import SyncStatus from './screens/sync/SyncStatus'
 import ConflictResolver from './screens/sync/ConflictResolver'
 import LabelManager from './screens/labels/LabelManager'
 import Settings from './screens/settings/Settings'
 
 type AppState = 'loading' | 'onboarding' | 'locked' | 'unlocked'
 
-const TAB_ROUTES = ['/entries', '/favorites', '/password-generator', '/sync', '/settings']
-const DETAIL_ROUTES = ['/entries/create', '/entries/:id', '/entries/:id/edit', '/trash', '/labels']
+const TAB_ROUTES = ['/entries', '/favorites', '/labels', '/password-generator', '/settings']
+const DETAIL_ROUTES = ['/entries/create', '/entries/:id', '/entries/:id/edit', '/trash']
 
 // BottomNav を表示すべきかチェック
 function shouldShowBottomNav(pathname: string, appState: AppState): boolean {
@@ -119,8 +117,8 @@ function AppContent() {
             {/* Tab routes with BottomNav */}
             <Route path="/entries" element={<EntryList />} />
             <Route path="/favorites" element={<EntryList isFavorites />} />
+            <Route path="/labels" element={<LabelManager />} />
             <Route path="/password-generator" element={<PasswordGenerator />} />
-            <Route path="/sync" element={<SyncStatus />} />
             <Route path="/settings" element={<Settings />} />
 
             {/* Detail routes without BottomNav */}
@@ -128,7 +126,6 @@ function AppContent() {
             <Route path="/entries/:id" element={<EntryDetail />} />
             <Route path="/entries/:id/edit" element={<EntryEdit />} />
             <Route path="/trash" element={<Trash />} />
-            <Route path="/labels" element={<LabelManager />} />
             <Route path="/sync/conflict-resolver" element={<ConflictResolver />} />
 
             <Route path="*" element={<Navigate to="/entries" replace />} />
@@ -144,10 +141,8 @@ function AppContent() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <HashRouter>
-        <AppContent />
-      </HashRouter>
-    </ThemeProvider>
+    <HashRouter>
+      <AppContent />
+    </HashRouter>
   )
 }

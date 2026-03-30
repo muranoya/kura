@@ -1,11 +1,13 @@
 import PasswordGeneratorPanel from '../../components/entries/PasswordGeneratorPanel'
+import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 
 export default function PasswordGenerator() {
   return (
     <div className="flex flex-col h-full bg-bg-base">
       {/* sticky ヘッダー */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
-        <h1 className="text-sm font-semibold text-text-primary">パスワードジェネレータ</h1>
+        <h1 className="text-sm font-semibold text-text-primary flex-1">パスワードジェネレータ</h1>
+        <SyncHeaderActions />
       </div>
 
       {/* コンテンツ */}

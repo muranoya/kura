@@ -1,12 +1,15 @@
 import { useEffect, useState, useCallback } from 'react'
 import * as commands from '../../commands'
 import { getFromStorage } from '../../shared/storage'
+import { useSyncVersion } from '../../contexts/SyncContext'
 import { EntryRow, EntryType } from '../../shared/types'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import EntryCard from '../../components/entries/EntryCard'
 import EntryListPanel from '../../components/entries/EntryListPanel'
+import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 
 export default function Trash() {
+  const syncVersion = useSyncVersion()
   const [allEntries, setAllEntries] = useState<EntryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -17,7 +20,7 @@ export default function Trash() {
 
   useEffect(() => {
     loadTrashEntries()
-  }, [])
+  }, [syncVersion])
 
   const loadTrashEntries = async () => {
     try {
@@ -100,7 +103,8 @@ export default function Trash() {
     <div className="flex flex-col h-screen bg-bg-base">
       {/* sticky ヘッダー */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
-        <h1 className="text-sm font-semibold text-text-primary">ゴミ箱</h1>
+        <h1 className="text-sm font-semibold text-text-primary flex-1">ゴミ箱</h1>
+        <SyncHeaderActions />
       </div>
 
       <EntryListPanel

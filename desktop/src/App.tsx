@@ -1,6 +1,7 @@
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import * as commands from './commands'
+import { SyncProvider, useNotifySynced } from './contexts/SyncContext'
 import Welcome from './screens/onboarding/Welcome'
 import StorageSetup from './screens/onboarding/StorageSetup'
 import MasterPassword from './screens/onboarding/MasterPassword'
@@ -14,7 +15,6 @@ import EntryEdit from './screens/entries/EntryEdit'
 import EntryCreate from './screens/entries/EntryCreate'
 import Trash from './screens/entries/Trash'
 import PasswordGenerator from './screens/entries/PasswordGenerator'
-import SyncStatus from './screens/sync/SyncStatus'
 import ConflictResolver from './screens/sync/ConflictResolver'
 import LabelManager from './screens/labels/LabelManager'
 import LabelEntries from './screens/entries/LabelEntries'
@@ -23,7 +23,8 @@ import Sidebar from './components/Sidebar'
 
 type AppState = 'loading' | 'onboarding' | 'locked' | 'unlocked'
 
-export default function App() {
+function AppContent() {
+  const notifySynced = useNotifySynced()
   const [appState, setAppState] = useState<AppState>('loading')
 
   useEffect(() => {
@@ -63,12 +64,19 @@ export default function App() {
   useEffect(() => {
     if (appState !== 'unlocked') return
 
-    const timer = setInterval(() => {
-      commands.syncVaultIfConfigured().catch(e => console.warn('Periodic sync failed:', e))
+    const timer = setInterval(async () => {
+      try {
+        const synced = await commands.syncVaultIfConfigured()
+        if (synced) {
+          notifySynced()
+        }
+      } catch (e) {
+        console.warn('Periodic sync failed:', e)
+      }
     }, 60_000) // 1 minute
 
     return () => clearInterval(timer)
-  }, [appState])
+  }, [appState, notifySynced])
 
   if (appState === 'loading') {
     return (
@@ -118,7 +126,6 @@ export default function App() {
                   <Route path="/entries/:id/edit" element={<EntryEdit />} />
                   <Route path="/password-generator" element={<PasswordGenerator />} />
                   <Route path="/trash" element={<Trash />} />
-                  <Route path="/sync" element={<SyncStatus />} />
                   <Route path="/sync/conflict-resolver" element={<ConflictResolver />} />
                   <Route path="/labels" element={<LabelManager />} />
                   <Route path="/labels/:labelId/entries" element={<LabelEntries />} />
@@ -131,5 +138,13 @@ export default function App() {
         )}
       </Routes>
     </MemoryRouter>
+  )
+}
+
+export default function App() {
+  return (
+    <SyncProvider>
+      <AppContent />
+    </SyncProvider>
   )
 }

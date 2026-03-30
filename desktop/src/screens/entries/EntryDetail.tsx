@@ -10,6 +10,7 @@ import { Badge } from '../../components/ui/badge'
 import { Separator } from '../../components/ui/separator'
 import { ArrowLeft, Copy, Eye, EyeOff } from 'lucide-react'
 import { getEntryTypeLabel } from '../../shared/constants'
+import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 
 interface FieldDisplayProps {
   label: string
@@ -127,13 +128,17 @@ export default function EntryDetail() {
         >
           <ArrowLeft size={16} />
         </button>
-        <h1 className="text-sm font-semibold text-text-primary truncate flex-1">{entry.name}</h1>
         <Badge variant="secondary" className="text-xs shrink-0">{getEntryTypeLabel(entry.entryType)}</Badge>
-        <Button size="sm" onClick={() => navigate(`/entries/${id}/edit`)}>編集</Button>
+        <h1 className="text-sm font-semibold text-text-primary truncate flex-1">{entry.name}</h1>
+        <SyncHeaderActions />
       </div>
 
       {/* スクロール可能コンテンツ */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        {/* 編集ボタン */}
+        <div className="flex justify-start mb-3">
+          <Button size="sm" onClick={() => navigate(`/entries/${id}/edit`)}>編集</Button>
+        </div>
 
         {/* 基本情報 */}
         {entry.entryType === 'login' && (v.url || v.username || v.password || v.totp) && (

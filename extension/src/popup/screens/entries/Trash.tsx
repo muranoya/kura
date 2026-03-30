@@ -4,6 +4,7 @@ import { RotateCcw, Trash2 } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import EntryCard from '../../components/entries/EntryCard'
 import { PageHeader } from '../../components/layout/PageHeader'
+import { SyncActions } from '../../components/layout/SyncActions'
 import { EmptyState } from '../../components/layout/EmptyState'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import * as commands from '../../commands'
@@ -63,7 +64,7 @@ export default function Trash() {
 
   return (
     <div className="h-full overflow-y-auto pb-20 flex flex-col">
-      <PageHeader title="ゴミ箱" showBackButton={false} />
+      <PageHeader title="ゴミ箱" showBackButton={false} action={<SyncActions />} />
 
       {error && (
         <div className="mx-4 mt-4 p-3 bg-danger/10 text-danger text-sm rounded-md">{error}</div>

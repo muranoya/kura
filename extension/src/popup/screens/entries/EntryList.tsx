@@ -2,12 +2,12 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/button'
 import EntryCard, { getTypeLabel } from '../../components/entries/EntryCard'
-import { PageHeader } from '../../components/layout/PageHeader'
+import { SyncActions } from '../../components/layout/SyncActions'
 import { EmptyState } from '../../components/layout/EmptyState'
 import EntryListPanel from '../../components/entries/EntryListPanel'
 import * as commands from '../../commands'
 import { EntryRow, EntryType, Entry } from '../../shared/types'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Badge } from '../../components/ui/badge'
 
@@ -24,6 +24,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
   // フィルター・検索
   const [selectedType, setSelectedType] = useState<EntryType | undefined>(undefined)
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedLabelId, setSelectedLabelId] = useState<string | undefined>(undefined)
 
   // 詳細ペイン
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -32,9 +33,14 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
   const [allLabels, setAllLabels] = useState<Array<{ id: string; name: string }>>([])
   const [passwordMasked, setPasswordMasked] = useState(true)
 
+  // マウント時にラベル一覧を取得（フィルターUI用）
+  useEffect(() => {
+    commands.listLabels().then(setAllLabels).catch(console.error)
+  }, [])
+
   useEffect(() => {
     loadEntries()
-  }, [isFavorites])
+  }, [isFavorites, selectedLabelId])
 
   // 詳細ペインを読み込み
   useEffect(() => {
@@ -46,12 +52,8 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
     const loadDetail = async () => {
       setSelectedLoading(true)
       try {
-        const [entry, labels] = await Promise.all([
-          commands.getEntry(selectedId),
-          commands.listLabels(),
-        ])
+        const entry = await commands.getEntry(selectedId)
         setSelectedEntry(entry)
-        setAllLabels(labels)
       } catch (err) {
         console.error('Failed to load entry:', err)
       } finally {
@@ -68,6 +70,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
     try {
       const result = await commands.listEntries({
         onlyFavorites: isFavorites,
+        labelId: selectedLabelId,
       })
       setEntries(result)
     } catch (err) {
@@ -113,29 +116,54 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
 
   return (
     <div className="h-full flex flex-col">
+      {/* 全幅 sticky ヘッダー（左右ペインにまたがる） */}
+      <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
+        <h1 className="text-sm font-semibold text-text-primary whitespace-nowrap">
+          {isFavorites ? 'お気に入り' : 'アイテム'}
+        </h1>
+
+        {/* 検索ボックス */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted" size={14} />
+          <input
+            type="text"
+            placeholder="検索..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-8 py-1.5 text-sm rounded-md border border-border bg-bg-elevated text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
+              title="検索をクリア"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* 新規追加ボタン */}
+        {!isFavorites && (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => navigate('/entries/create')}
+            className="gap-1 text-sm flex-shrink-0"
+          >
+            <Plus size={14} />
+            新規追加
+          </Button>
+        )}
+
+        {/* 同期ボタン */}
+        <SyncActions />
+      </div>
+
       {/* 左右分割レイアウト */}
       <div className="flex-1 flex overflow-hidden">
         {/* 左ペイン: リスト */}
         <div className="w-60 border-r border-border bg-sidebar flex flex-col">
-          {/* ヘッダー */}
-          <PageHeader
-            title={isFavorites ? 'お気に入り' : 'アイテム'}
-            size="compact"
-            showBackButton={false}
-            action={
-              !isFavorites && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => navigate('/entries/create')}
-                  className="gap-1 text-sm"
-                >
-                  <Plus size={14} />
-                  新規追加
-                </Button>
-              )
-            }
-          />
 
           {/* エラーメッセージ */}
           {error && (
@@ -148,9 +176,9 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
           <EntryListPanel
             selectedType={selectedType}
             onTypeChange={setSelectedType}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onSearchClear={() => setSearchQuery('')}
+            labels={allLabels}
+            selectedLabelId={selectedLabelId}
+            onLabelChange={setSelectedLabelId}
             entries={filteredEntries}
             loading={loading}
             error={error ?? ''}
@@ -159,19 +187,6 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
               isFavorites
                 ? 'お気に入りのアイテムをここに表示します'
                 : '新しいアイテムを作成してください'
-            }
-            emptyAction={
-              !isFavorites && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => navigate('/entries/create')}
-                  className="gap-1 text-sm"
-                >
-                  <Plus size={14} />
-                  新規作成
-                </Button>
-              )
             }
             renderCard={(entry) => (
               <EntryCard

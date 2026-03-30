@@ -222,6 +222,7 @@ impl UnlockedVault {
         let entry = self.contents.entries.get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
         entry.deleted_at = None;
+        entry.updated_at = crate::get_timestamp();
         Ok(())
     }
 
@@ -255,6 +256,7 @@ impl UnlockedVault {
         let entry = self.contents.entries.get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
         entry.is_favorite = is_favorite;
+        entry.updated_at = crate::get_timestamp();
         Ok(())
     }
 
@@ -262,10 +264,12 @@ impl UnlockedVault {
     pub fn list_labels(&self) -> Result<Vec<Label>> {
         let mut result = Vec::new();
         for (id, label) in &self.contents.labels {
-            result.push(Label {
-                id: id.clone(),
-                name: label.name.clone(),
-            });
+            if label.deleted_at.is_none() {
+                result.push(Label {
+                    id: id.clone(),
+                    name: label.name.clone(),
+                });
+            }
         }
         Ok(result)
     }
@@ -310,6 +314,7 @@ impl UnlockedVault {
         let entry = self.contents.entries.get_mut(entry_id)
             .ok_or_else(|| VaultError::EntryNotFound(entry_id.to_string()))?;
         entry.label_ids = label_ids;
+        entry.updated_at = crate::get_timestamp();
         Ok(())
     }
 

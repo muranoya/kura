@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import * as commands from '../../commands'
-import { getFromStorage } from '../../shared/storage'
+import { useSyncVersion, useNotifySynced } from '../../contexts/SyncContext'
 import { Label } from '../../shared/types'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -9,8 +9,11 @@ import { Badge } from '../../components/ui/badge'
 import { EmptyState } from '../../components/layout/EmptyState'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Plus, Trash2, Pencil, X, Check } from 'lucide-react'
+import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 
 export default function LabelManager() {
+  const syncVersion = useSyncVersion()
+  const notifySynced = useNotifySynced()
   const [labels, setLabels] = useState<Label[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -23,7 +26,7 @@ export default function LabelManager() {
 
   useEffect(() => {
     loadLabels()
-  }, [])
+  }, [syncVersion])
 
   const loadLabels = async () => {
     try {
@@ -52,12 +55,13 @@ export default function LabelManager() {
       setLabels([...labels, newLabel])
       setNewLabelName('')
       setError('')
+      notifySynced()
     } catch (err) {
       setError(`ラベル作成失敗: ${err}`)
     } finally {
       setCreating(false)
     }
-  }, [newLabelName, labels])
+  }, [newLabelName, labels, notifySynced])
 
   const handleDeleteLabelConfirmed = useCallback(async () => {
     if (!deleteTargetId) return
@@ -65,17 +69,15 @@ export default function LabelManager() {
       await commands.deleteLabel(deleteTargetId)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      const s3Config = await getFromStorage<any>('s3Config')
-      if (s3Config) {
-        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
-      }
+      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
       setLabels(labels.filter(l => l.id !== deleteTargetId))
       setDeleteDialogOpen(false)
       setDeleteTargetId(null)
+      notifySynced()
     } catch (err) {
       setError(`ラベル削除失敗: ${err}`)
     }
-  }, [labels, deleteTargetId])
+  }, [labels, deleteTargetId, notifySynced])
 
   const handleDeleteLabelClick = (id: string) => {
     setDeleteTargetId(id)
@@ -102,24 +104,23 @@ export default function LabelManager() {
       await commands.renameLabel(editingLabelId, editingName)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      const s3Config = await getFromStorage<any>('s3Config')
-      if (s3Config) {
-        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
-      }
+      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
       setLabels(labels.map(l => l.id === editingLabelId ? { ...l, name: editingName } : l))
       setEditingLabelId(null)
       setEditingName('')
       setError('')
+      notifySynced()
     } catch (err) {
       setError(`ラベル更新失敗: ${err}`)
     }
-  }, [editingLabelId, editingName, labels])
+  }, [editingLabelId, editingName, labels, notifySynced])
 
   return (
     <div className="flex flex-col h-screen bg-bg-base">
       {/* sticky ヘッダー */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
-        <h1 className="text-sm font-semibold text-text-primary">ラベル管理</h1>
+        <h1 className="text-sm font-semibold text-text-primary flex-1">ラベル管理</h1>
+        <SyncHeaderActions />
       </div>
 
       {/* コンテンツ */}

@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { EntryRow, Entry, Label, EntryFilter } from '../shared/types'
-import { saveToStorage } from '../shared/storage'
+import { getFromStorage, saveToStorage } from '../shared/storage'
 import { STORAGE_KEYS } from '../shared/constants'
 
 // ============================================================================
@@ -223,13 +223,19 @@ export async function pushVaultAndTrack(storageConfig: string): Promise<void> {
 }
 
 /// S3設定がある場合のみ syncVault を呼び出す（エラーはサイレント無視）
-export async function syncVaultIfConfigured(): Promise<void> {
+/// 実際にデータが同期された場合は true を返す
+export async function syncVaultIfConfigured(): Promise<boolean> {
   const config = await getFromStorage<any>(STORAGE_KEYS.S3_CONFIG)
-  if (!config) return
+  if (!config) return false
   try {
-    await syncVault(JSON.stringify(config))
+    const result = await syncVault(JSON.stringify(config))
+    if (result.last_synced_at) {
+      await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, result.last_synced_at)
+    }
+    return result.synced
   } catch (e) {
     console.warn('Background sync failed:', e)
+    return false
   }
 }
 

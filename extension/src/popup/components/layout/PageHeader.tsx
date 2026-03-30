@@ -38,7 +38,7 @@ export function PageHeader({
   const titleClass = isCompact ? 'text-base font-semibold' : 'text-lg font-bold'
 
   return (
-    <div className={cn('flex items-center justify-between gap-3 border-b border-border', paddingClass, className)}>
+    <div className={cn('sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-bg-surface', paddingClass, className)}>
       <div className="min-w-0 flex-1 flex items-center gap-2">
         {showBackButton && (
           <Button

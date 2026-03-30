@@ -17,7 +17,6 @@ export const DEFAULT_SETTINGS = {
   clipboardClearSeconds: 30,
   autolockMinutes: 5,
   autolockOnBackground: true,
-  theme: 'light' as const,
 }
 
 // Storage keys

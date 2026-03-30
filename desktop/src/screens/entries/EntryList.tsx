@@ -2,12 +2,13 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import { getFromStorage } from '../../shared/storage'
+import { useSyncVersion } from '../../contexts/SyncContext'
 import { EntryRow, EntryType } from '../../shared/types'
 import { Button } from '../../components/ui/button'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { Plus } from 'lucide-react'
 import EntryCard from '../../components/entries/EntryCard'
 import EntryListPanel from '../../components/entries/EntryListPanel'
+import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 
 interface EntryListProps {
   onlyFavorites?: boolean
@@ -17,6 +18,7 @@ interface EntryListProps {
 
 export default function EntryList({ onlyFavorites = false, labelId, labelName }: EntryListProps) {
   const navigate = useNavigate()
+  const syncVersion = useSyncVersion()
   const [entries, setEntries] = useState<EntryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -28,7 +30,7 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
 
   useEffect(() => {
     loadEntries()
-  }, [onlyFavorites, searchQuery, selectedType, labelId])
+  }, [onlyFavorites, searchQuery, selectedType, labelId, syncVersion])
 
   const loadEntries = async () => {
     try {
@@ -113,16 +115,7 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
       {/* sticky ヘッダー */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
         <h1 className="text-sm font-semibold text-text-primary flex-1">{labelName || (onlyFavorites ? 'お気に入り' : 'アイテム一覧')}</h1>
-        {!onlyFavorites && (
-          <Button
-            onClick={() => navigate('/entries/create')}
-            size="sm"
-            className="gap-2"
-          >
-            <Plus size={18} />
-            新規作成
-          </Button>
-        )}
+        <SyncHeaderActions />
       </div>
 
       <EntryListPanel
@@ -144,6 +137,16 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
           !onlyFavorites && (
             <Button onClick={() => navigate('/entries/create')}>
               最初のアイテムを作成
+            </Button>
+          )
+        }
+        actionButton={
+          !onlyFavorites && (
+            <Button
+              onClick={() => navigate('/entries/create')}
+              size="sm"
+            >
+              新規作成
             </Button>
           )
         }
