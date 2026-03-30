@@ -13,7 +13,7 @@ pub mod password_gen;
 pub mod codec;
 pub mod totp;
 
-#[cfg(any(feature = "mobile", feature = "desktop"))]
+#[cfg(any(feature = "mobile", feature = "desktop", feature = "android"))]
 pub mod api;
 
 #[cfg(feature = "wasm")]

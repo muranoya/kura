@@ -5966,6 +5966,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "vault_jni"
+version = "0.1.0"
+dependencies = [
+ "jni",
+ "serde_json",
+ "tokio",
+ "vault_core",
+]
+
+[[package]]
 name = "version-compare"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
