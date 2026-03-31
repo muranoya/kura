@@ -1,3 +1,5 @@
+pub mod engine;
+
 use crate::error::Result;
 use crate::store::{LabelValue, VaultContents, VaultEntry};
 use std::collections::{HashMap, HashSet};

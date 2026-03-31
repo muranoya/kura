@@ -1,20 +1,8 @@
 use jni::objects::{JByteArray, JClass, JString};
 use jni::sys::{jboolean, jbyteArray, jint, jlong, jstring, JNI_FALSE, JNI_TRUE};
 use jni::JNIEnv;
-use std::sync::OnceLock;
 
 use vault_core::api::*;
-
-static TOKIO_RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
-
-fn runtime() -> &'static tokio::runtime::Runtime {
-    TOKIO_RT.get_or_init(|| {
-        tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .expect("Failed to create Tokio runtime")
-    })
-}
 
 // ============================================================================
 // Helper macros
@@ -465,63 +453,43 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_generateTotpDefault(
 }
 
 // ============================================================================
-// Sync Operations (async - uses tokio runtime)
+// Sync Operations
 // ============================================================================
 
 #[no_mangle]
-pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_syncVault(
+pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_mergeRemoteVault(
     mut env: JNIEnv,
     _class: JClass,
-    storage_config_json: JString,
+    remote_bytes: JByteArray,
+    remote_etag: JString,
+) {
+    let bytes = get_byte_array(&mut env, &remote_bytes);
+    let etag = get_string(&mut env, &remote_etag);
+    if let Err(e) = api_merge_remote_vault(bytes, etag) {
+        let _ = env.throw_new("java/lang/RuntimeException", &e);
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_updateEtag(
+    mut env: JNIEnv,
+    _class: JClass,
+    etag: JString,
+) {
+    let etag_str = get_string(&mut env, &etag);
+    if let Err(e) = api_update_etag(etag_str) {
+        let _ = env.throw_new("java/lang/RuntimeException", &e);
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_getEtag(
+    env: JNIEnv,
+    _class: JClass,
 ) -> jstring {
-    let config = get_string(&mut env, &storage_config_json);
-    let rt = runtime();
-    match rt.block_on(api_sync(config)) {
-        Ok(result) => {
-            let json = serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string());
-            env.new_string(json).unwrap().into_raw()
-        }
-        Err(e) => throw_err(&mut env, &e),
-    }
-}
-
-#[no_mangle]
-pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_pushVault(
-    mut env: JNIEnv,
-    _class: JClass,
-    storage_config_json: JString,
-) -> jlong {
-    let config = get_string(&mut env, &storage_config_json);
-    let rt = runtime();
-    match rt.block_on(api_push(config)) {
-        Ok(ts) => ts,
-        Err(e) => {
-            let _ = env.throw_new("java/lang/RuntimeException", &e);
-            -1
-        }
-    }
-}
-
-#[no_mangle]
-pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_downloadVault(
-    mut env: JNIEnv,
-    _class: JClass,
-    storage_config_json: JString,
-) -> jboolean {
-    let config = get_string(&mut env, &storage_config_json);
-    let rt = runtime();
-    match rt.block_on(api_download(config)) {
-        Ok(exists) => {
-            if exists {
-                JNI_TRUE
-            } else {
-                JNI_FALSE
-            }
-        }
-        Err(e) => {
-            let _ = env.throw_new("java/lang/RuntimeException", &e);
-            JNI_FALSE
-        }
+    match api_get_etag() {
+        Some(etag) => env.new_string(etag).unwrap().into_raw(),
+        None => std::ptr::null_mut(),
     }
 }
 

@@ -1,4 +1,4 @@
-import * as wasm from '../../wasm/vault_core'
+import * as wasm from '../../wasm/wasm_bridge'
 import { EntryRow, Label, Vault, EntryFilter, SyncConflict } from './types'
 
 let wasmReady = false

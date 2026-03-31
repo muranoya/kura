@@ -47,6 +47,7 @@ data class SyncResult(
     @SerialName("last_synced_at") val lastSyncedAt: Long? = null
 )
 
+@Serializable
 data class S3Config(
     val region: String,
     val bucket: String,

@@ -1,5 +1,3 @@
-#[cfg(feature = "mobile")]
-mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be accurate, and you can change it according to your needs. */
 mod raw_json_serde;
 pub mod config;
 pub mod error;
@@ -13,11 +11,8 @@ pub mod password_gen;
 pub mod codec;
 pub mod totp;
 
-#[cfg(any(feature = "mobile", feature = "desktop", feature = "android"))]
+#[cfg(any(feature = "desktop", feature = "android"))]
 pub mod api;
-
-#[cfg(feature = "wasm")]
-pub mod wasm_api;
 
 pub use config::{VaultConfig, StorageConfig, S3Config};
 pub use error::{VaultError, Result};
@@ -40,18 +35,7 @@ pub use serde_json;
 // ============================================================================
 
 /// Get current Unix timestamp in seconds
-/// In WASM targets, uses JavaScript Date API
-/// In other targets, uses chrono
 #[inline]
-#[cfg(target_arch = "wasm32")]
-pub fn get_timestamp() -> i64 {
-    (js_sys::Date::now() / 1000.0) as i64
-}
-
-/// Get current Unix timestamp in seconds
-/// In non-WASM targets, uses chrono
-#[inline]
-#[cfg(not(target_arch = "wasm32"))]
 pub fn get_timestamp() -> i64 {
     chrono::Utc::now().timestamp()
 }

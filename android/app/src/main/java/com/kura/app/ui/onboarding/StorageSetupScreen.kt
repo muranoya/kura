@@ -1,5 +1,6 @@
 package com.kura.app.ui.onboarding
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -137,7 +138,8 @@ fun StorageSetupScreen(
                                 val exists = appViewModel.repository.downloadVault(configJson)
                                 if (exists) onExistingVault() else onNewVault()
                             } catch (e: Exception) {
-                                error = "ストレージへのアクセスに失敗しました: ${e.message}"
+                                Log.e("StorageSetup", "S3 access failed", e)
+                                error = "ストレージへのアクセスに失敗しました: ${e.message ?: e.toString()}"
                             } finally {
                                 isLoading = false
                             }

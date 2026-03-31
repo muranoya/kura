@@ -3,6 +3,8 @@ package com.kura.app.data.repository
 import android.content.Context
 import com.kura.app.bridge.VaultBridge
 import com.kura.app.data.model.*
+import com.kura.app.data.s3.ConflictException
+import com.kura.app.data.s3.VaultS3Client
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
@@ -200,17 +202,82 @@ class VaultRepository(private val context: Context) {
     // Sync
     // ========================================================================
 
-    suspend fun syncVault(storageConfigJson: String): SyncResult = withContext(Dispatchers.IO) {
-        val resultJson = VaultBridge.syncVault(storageConfigJson)
-        json.decodeFromString<SyncResult>(resultJson)
+    private fun parseS3Config(configJson: String): S3Config =
+        json.decodeFromString<S3Config>(configJson)
+
+    private suspend fun mergeRemoteVault(remoteBytes: ByteArray, remoteEtag: String) = withContext(Dispatchers.IO) {
+        VaultBridge.mergeRemoteVault(remoteBytes, remoteEtag)
     }
 
-    suspend fun pushVault(storageConfigJson: String): Long = withContext(Dispatchers.IO) {
-        VaultBridge.pushVault(storageConfigJson)
+    private suspend fun updateEtag(etag: String) = withContext(Dispatchers.IO) {
+        VaultBridge.updateEtag(etag)
     }
 
-    suspend fun downloadVault(storageConfigJson: String): Boolean = withContext(Dispatchers.IO) {
-        VaultBridge.downloadVault(storageConfigJson)
+    private suspend fun getEtag(): String? = withContext(Dispatchers.IO) {
+        VaultBridge.getEtag()
+    }
+
+    suspend fun syncVault(configJson: String): SyncResult = withContext(Dispatchers.IO) {
+        val s3Config = parseS3Config(configJson)
+        val client = VaultS3Client(s3Config)
+        val maxRetries = 5
+
+        for (attempt in 0 until maxRetries) {
+            val remote = client.download()
+
+            if (remote == null) {
+                // リモートに存在しない → ローカルをアップロード
+                val bytes = getVaultBytes()
+                val etag = getEtag()
+                val newEtag = client.upload(bytes, etag)
+                updateEtag(newEtag)
+                return@withContext SyncResult(synced = true, lastSyncedAt = System.currentTimeMillis() / 1000)
+            }
+
+            val (remoteBytes, remoteEtag) = remote
+
+            // Rust側でマージ（復号→auto_merge→GC→セッション更新）
+            mergeRemoteVault(remoteBytes, remoteEtag)
+
+            // マージ済みvaultをアップロード
+            val mergedBytes = getVaultBytes()
+            val currentEtag = getEtag()
+
+            try {
+                val newEtag = client.upload(mergedBytes, currentEtag)
+                updateEtag(newEtag)
+                return@withContext SyncResult(synced = true, lastSyncedAt = System.currentTimeMillis() / 1000)
+            } catch (_: ConflictException) {
+                if (attempt + 1 == maxRetries) {
+                    throw RuntimeException("Sync failed after maximum retries")
+                }
+            }
+        }
+
+        throw RuntimeException("Sync failed after maximum retries")
+    }
+
+    suspend fun pushVault(configJson: String): Long = withContext(Dispatchers.IO) {
+        val s3Config = parseS3Config(configJson)
+        val client = VaultS3Client(s3Config)
+        val vaultBytes = getVaultBytes()
+        val etag = getEtag()
+        val newEtag = client.upload(vaultBytes, etag)
+        updateEtag(newEtag)
+        System.currentTimeMillis() / 1000
+    }
+
+    suspend fun downloadVault(configJson: String): Boolean = withContext(Dispatchers.IO) {
+        val s3Config = parseS3Config(configJson)
+        val client = VaultS3Client(s3Config)
+        val remote = client.download()
+        if (remote == null) {
+            false
+        } else {
+            val (remoteBytes, remoteEtag) = remote
+            loadVault(remoteBytes, remoteEtag)
+            true
+        }
     }
 
     suspend fun getLastSyncTime(): Long = withContext(Dispatchers.IO) {

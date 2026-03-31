@@ -71,10 +71,10 @@ object VaultBridge {
     external fun generateTotp(secret: String, digits: Int, period: Int): String
     external fun generateTotpDefault(secret: String): String
 
-    // Sync (blocking - call from IO dispatcher)
-    external fun syncVault(storageConfigJson: String): String
-    external fun pushVault(storageConfigJson: String): Long
-    external fun downloadVault(storageConfigJson: String): Boolean
+    // Sync
+    external fun mergeRemoteVault(remoteBytes: ByteArray, remoteEtag: String)
+    external fun updateEtag(etag: String)
+    external fun getEtag(): String?
     external fun getLastSyncTime(): Long
     external fun restoreLastSyncTime(ts: Long)
 }

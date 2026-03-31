@@ -84,7 +84,7 @@ default: help
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo ""
 	echo "🦀 Building WASM package from vault-core..."
-	wasm-pack build {{VAULT_CORE_DIR}} --target bundler --out-dir ../{{EXTENSION_DIR}}/wasm --features storage-s3-wasm --no-default-features
+	wasm-pack build {{EXTENSION_DIR}}/wasm-bridge --target bundler --out-dir ../wasm
 	echo ""
 	echo "📥 Installing dependencies..."
 	cd {{EXTENSION_DIR}} && pnpm install
@@ -107,7 +107,7 @@ default: help
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo ""
 	echo "🦀 Building WASM package from vault-core..."
-	wasm-pack build {{VAULT_CORE_DIR}} --target bundler --out-dir ../{{EXTENSION_DIR}}/wasm --features storage-s3-wasm --no-default-features
+	wasm-pack build {{EXTENSION_DIR}}/wasm-bridge --target bundler --out-dir ../wasm
 	echo ""
 	echo "📥 Installing dependencies..."
 	cd {{EXTENSION_DIR}} && pnpm install
@@ -130,7 +130,7 @@ default: help
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo ""
 	echo "🦀 Building WASM package from vault-core..."
-	wasm-pack build {{VAULT_CORE_DIR}} --target web --out-dir ../{{EXTENSION_DIR}}/wasm --features storage-s3-wasm --no-default-features
+	wasm-pack build {{EXTENSION_DIR}}/wasm-bridge --target web --out-dir ../wasm
 	echo ""
 	echo "📥 Installing dependencies..."
 	cd {{EXTENSION_DIR}} && pnpm install

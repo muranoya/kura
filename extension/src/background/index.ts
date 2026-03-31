@@ -1,7 +1,7 @@
 // Service Worker エントリーポイント
 // WASM の初期化とメッセージハンドラーのセットアップ
 
-import * as vault from '../../wasm/vault_core'
+import * as vault from '../../wasm/wasm_bridge'
 import { getFromStorage, saveToStorage } from '../shared/storage'
 import { STORAGE_KEYS } from '../shared/constants'
 

@@ -35,7 +35,7 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["wasm/vault_core_bg.wasm"],
+      "resources": ["wasm/wasm_bridge_bg.wasm"],
       "matches": ["<all_urls>"]
     }
   ],

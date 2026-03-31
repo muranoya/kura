@@ -1,4 +1,5 @@
 mod commands;
+pub mod storage;
 
 pub fn run() {
     tauri::Builder::default()

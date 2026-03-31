@@ -1,55 +1,53 @@
 use async_trait::async_trait;
-use crate::error::{Result, VaultError};
-use crate::config::S3Config;
-use super::StorageBackend;
+use aws_sdk_s3::error::ProvideErrorMetadata;
+use tokio::time::{timeout, Duration};
+use vault_core::error::{Result, VaultError};
+use vault_core::config::S3Config;
+use vault_core::StorageBackend;
 
-#[cfg(feature = "storage-s3")]
-mod native {
-    use super::*;
-    use aws_sdk_s3::error::ProvideErrorMetadata;
+const S3_TIMEOUT: Duration = Duration::from_secs(3);
 
-    pub struct S3Storage {
-        client: aws_sdk_s3::Client,
-        bucket: String,
-        key: String,
-    }
+pub struct S3Storage {
+    client: aws_sdk_s3::Client,
+    bucket: String,
+    key: String,
+}
 
-    impl S3Storage {
-        pub async fn new(config: S3Config) -> Result<Self> {
-            config.validate()?;
+impl S3Storage {
+    pub async fn new(config: S3Config) -> Result<Self> {
+        config.validate()?;
 
-            // Create AWS config with explicit credentials
-            let credentials = aws_sdk_s3::config::Credentials::new(
-                config.access_key_id.clone(),
-                config.secret_access_key.clone(),
-                None,
-                None,
-                "static",
-            );
+        let credentials = aws_sdk_s3::config::Credentials::new(
+            config.access_key_id.clone(),
+            config.secret_access_key.clone(),
+            None,
+            None,
+            "static",
+        );
 
-            let mut sdk_config_builder = aws_config::defaults(aws_config::BehaviorVersion::latest())
-                .credentials_provider(credentials)
-                .region(aws_config::Region::new(config.region.clone()));
+        let mut sdk_config_builder = aws_config::defaults(aws_config::BehaviorVersion::latest())
+            .credentials_provider(credentials)
+            .region(aws_config::Region::new(config.region.clone()));
 
-            // Set endpoint if provided (for S3-compatible services)
-            if let Some(endpoint) = &config.endpoint {
-                sdk_config_builder = sdk_config_builder.endpoint_url(endpoint);
-            }
-
-            let sdk_config = sdk_config_builder.load().await;
-            let client = aws_sdk_s3::Client::new(&sdk_config);
-
-            Ok(S3Storage {
-                client,
-                bucket: config.bucket,
-                key: config.key,
-            })
+        if let Some(endpoint) = &config.endpoint {
+            sdk_config_builder = sdk_config_builder.endpoint_url(endpoint);
         }
-    }
 
-    #[async_trait]
-    impl StorageBackend for S3Storage {
-        async fn download(&self) -> Result<Option<(Vec<u8>, String)>> {
+        let sdk_config = sdk_config_builder.load().await;
+        let client = aws_sdk_s3::Client::new(&sdk_config);
+
+        Ok(S3Storage {
+            client,
+            bucket: config.bucket,
+            key: config.key,
+        })
+    }
+}
+
+#[async_trait]
+impl StorageBackend for S3Storage {
+    async fn download(&self) -> Result<Option<(Vec<u8>, String)>> {
+        let result = timeout(S3_TIMEOUT, async {
             match self.client
                 .get_object()
                 .bucket(&self.bucket)
@@ -58,13 +56,11 @@ mod native {
                 .await
             {
                 Ok(response) => {
-                    // Extract ETag
                     let etag = response.e_tag()
                         .unwrap_or(&String::new())
                         .trim_matches('"')
                         .to_string();
 
-                    // Read object body
                     let data = response.body
                         .collect()
                         .await
@@ -89,24 +85,26 @@ mod native {
                     Err(VaultError::StorageError(error_msg))
                 }
             }
-        }
+        }).await
+        .map_err(|_| VaultError::StorageError("S3 operation timed out".to_string()))?;
 
-        async fn upload(&self, data: &[u8], etag: Option<&str>) -> Result<String> {
-            // Build PutObject request
+        result
+    }
+
+    async fn upload(&self, data: &[u8], etag: Option<&str>) -> Result<String> {
+        let result = timeout(S3_TIMEOUT, async {
             let mut put_request = self.client
                 .put_object()
                 .bucket(&self.bucket)
                 .key(&self.key)
                 .body(aws_sdk_s3::primitives::ByteStream::from(data.to_vec()));
 
-            // Add If-Match condition if provided and not empty
             if let Some(expected_etag) = etag {
                 if !expected_etag.is_empty() {
                     put_request = put_request.if_match(expected_etag);
                 }
             }
 
-            // Send request
             match put_request.send().await {
                 Ok(response) => {
                     let new_etag = response.e_tag()
@@ -117,14 +115,12 @@ mod native {
                     Ok(new_etag)
                 }
                 Err(e) => {
-                    // Check for precondition failed (If-Match mismatch) by error code
                     if let aws_sdk_s3::error::SdkError::ServiceError(service_err) = &e {
                         if let Some("PreconditionFailed") = service_err.err().code() {
                             return Err(VaultError::ConflictDetected);
                         }
                     }
 
-                    // Generic error message
                     let error_msg = match &e {
                         aws_sdk_s3::error::SdkError::ServiceError(service_err) => {
                             let code = service_err.err().code().unwrap_or("Unknown");
@@ -135,11 +131,9 @@ mod native {
                     Err(VaultError::StorageError(error_msg))
                 }
             }
-        }
+        }).await
+        .map_err(|_| VaultError::StorageError("S3 operation timed out".to_string()))?;
+
+        result
     }
 }
-
-
-// Re-export the native S3 implementation (storage-s3 feature, native-only)
-#[cfg(feature = "storage-s3")]
-pub use native::S3Storage;
