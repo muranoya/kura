@@ -5,7 +5,7 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-dependencyResolution {
+dependencyResolutionManagement {
     @Suppress("UnstableApiUsage")
     repositories {
         google()

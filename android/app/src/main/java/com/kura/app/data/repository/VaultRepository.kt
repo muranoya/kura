@@ -5,6 +5,8 @@ import com.kura.app.bridge.VaultBridge
 import com.kura.app.data.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import java.io.File
 
@@ -96,7 +98,7 @@ class VaultRepository(private val context: Context) {
         labelIds: List<String>,
         customFieldsJson: String?
     ): String = withContext(Dispatchers.IO) {
-        val labelIdsJson = Json.encodeToString(kotlinx.serialization.builtins.ListSerializer(kotlinx.serialization.builtins.serializer<String>()), labelIds)
+        val labelIdsJson = json.encodeToString(ListSerializer(String.serializer()), labelIds)
         VaultBridge.createEntry(entryType, name, notes, typedValueJson, labelIdsJson, customFieldsJson)
     }
 
@@ -109,7 +111,7 @@ class VaultRepository(private val context: Context) {
         customFieldsJson: String?
     ) = withContext(Dispatchers.IO) {
         val labelIdsJson = labelIds?.let {
-            Json.encodeToString(kotlinx.serialization.builtins.ListSerializer(kotlinx.serialization.builtins.serializer<String>()), it)
+            json.encodeToString(ListSerializer(String.serializer()), it)
         }
         VaultBridge.updateEntry(id, name, typedValueJson, notes, labelIdsJson, customFieldsJson)
     }
@@ -152,7 +154,7 @@ class VaultRepository(private val context: Context) {
     }
 
     suspend fun setEntryLabels(entryId: String, labelIds: List<String>) = withContext(Dispatchers.IO) {
-        val labelIdsJson = Json.encodeToString(kotlinx.serialization.builtins.ListSerializer(kotlinx.serialization.builtins.serializer<String>()), labelIds)
+        val labelIdsJson = json.encodeToString(ListSerializer(String.serializer()), labelIds)
         VaultBridge.setEntryLabels(entryId, labelIdsJson)
     }
 

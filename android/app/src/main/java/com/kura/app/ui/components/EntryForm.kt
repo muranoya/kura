@@ -20,7 +20,7 @@ import com.kura.app.data.model.Label
 import kotlinx.serialization.json.*
 import java.util.UUID
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun EntryForm(
     entryType: String,
@@ -291,6 +291,7 @@ fun PasswordField(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomFieldEditor(
     field: CustomField,

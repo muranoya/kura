@@ -9,6 +9,11 @@ VAULT_CORE_DIR := "vault-core"
 ANDROID_DIR := "android"
 ANDROID_JNI_DIR := "android/rust-jni"
 
+# Android SDK
+ANDROID_HOME := env("ANDROID_HOME", env("ANDROID_SDK_ROOT", "~/Android/Sdk"))
+ADB := ANDROID_HOME / "platform-tools/adb"
+EMULATOR := ANDROID_HOME / "emulator/emulator"
+
 # デフォルトレシピ
 default: help
 
@@ -207,6 +212,48 @@ default: help
 	echo "✅ Android debug build completed!"
 	echo "  - APK: {{ANDROID_DIR}}/app/build/outputs/apk/debug/app-debug.apk"
 
+# Android app - Build, launch emulator, install and start (all ABIs)
+@run-android: build-android-debug
+	just _run-android-emulator
+
+# Android app - Build, launch emulator, install and start (arm64 only, fast)
+@run-android-fast: build-android-debug-fast
+	just _run-android-emulator
+
+# Android app - Launch emulator, install APK and start app
+@_run-android-emulator:
+	echo ""
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "📱 Launching Android emulator and installing app..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	AVD=$({{EMULATOR}} -list-avds | head -1); \
+	if [ -z "$AVD" ]; then \
+		echo "❌ No AVD found. Create one with Android Studio or avdmanager."; \
+		exit 1; \
+	fi; \
+	echo "🔍 Using AVD: $AVD"; \
+	if ! {{ADB}} devices | grep -q "emulator.*device"; then \
+		echo "🚀 Starting emulator..."; \
+		{{EMULATOR}} -avd "$AVD" &>/dev/null & \
+		echo "⏳ Waiting for emulator to boot..."; \
+		{{ADB}} wait-for-device; \
+		while [ "$({{ADB}} shell getprop sys.boot_completed 2>/dev/null)" != "1" ]; do \
+			sleep 1; \
+		done; \
+		echo "✅ Emulator booted!"; \
+	else \
+		echo "✅ Emulator already running"; \
+	fi
+	echo ""
+	echo "📦 Installing APK..."
+	{{ADB}} install -r {{ANDROID_DIR}}/app/build/outputs/apk/debug/app-debug.apk
+	echo ""
+	echo "🚀 Starting app..."
+	{{ADB}} shell am start -n com.kura.app/.MainActivity
+	echo ""
+	echo "✅ App is running! Use '{{ADB}} logcat | grep kura' for logs"
+
 # Build all releases
 @release-all: check-dependencies
 	echo ""
@@ -248,6 +295,8 @@ default: help
 	echo "    just release-android           - Build Android release APK"
 	echo "    just build-android-jni         - Build Rust native libraries only"
 	echo "    just build-android-jni-fast    - Build Rust native library (arm64 only)"
+	echo "    just run-android               - Build & run on emulator (all ABIs)"
+	echo "    just run-android-fast          - Build & run on emulator (arm64 only, fast)"
 	echo ""
 	echo "  🖥️  Desktop:"
 	echo "    just dev-desktop          - Start desktop app in dev mode (hot reload)"
