@@ -100,7 +100,7 @@ pub fn auto_merge(
 /// now: current timestamp in seconds since epoch
 pub fn apply_gc_to_contents(contents: &mut VaultContents, now: i64) -> usize {
     let mut gc_count = 0;
-    gc_count += apply_gc(&mut contents.entries, now);
+    gc_count += apply_gc_entries(&mut contents.entries, now);
     apply_gc_labels(&mut contents.labels, now);
     gc_count
 }
@@ -219,7 +219,7 @@ fn cleanup_orphaned_label_refs(
 
 /// Apply GC to purged tombstones older than retention period
 /// now: current timestamp in seconds since epoch
-fn apply_gc(entries: &mut HashMap<String, VaultEntry>, now: i64) -> usize {
+fn apply_gc_entries(entries: &mut HashMap<String, VaultEntry>, now: i64) -> usize {
     let cutoff = now - (GC_RETENTION_DAYS as i64) * 86400;
     let mut count = 0;
 
@@ -276,241 +276,592 @@ mod tests {
         )
     }
 
-    fn make_map(entries: Vec<(String, VaultEntry)>) -> HashMap<String, VaultEntry> {
-        entries.into_iter().collect()
+    fn create_soft_deleted(id: &str, name: &str, updated_at: i64, deleted_at: i64) -> (String, VaultEntry) {
+        let (id, mut entry) = create_entry(id, name, updated_at);
+        entry.updated_at = updated_at;
+        entry.deleted_at = Some(deleted_at);
+        (id, entry)
     }
 
-    // ===== auto_merge tests =====
+    fn create_purged(id: &str, updated_at: i64, deleted_at: i64, purged_at: i64) -> (String, VaultEntry) {
+        let (id, mut entry) = create_entry(id, "", updated_at);
+        entry.updated_at = updated_at;
+        entry.deleted_at = Some(deleted_at);
+        entry.purged_at = Some(purged_at);
+        entry.typed_value = Zeroizing::new(String::new());
+        (id, entry)
+    }
+
+    fn make_contents(
+        entries: Vec<(String, VaultEntry)>,
+        labels: Vec<(String, LabelValue)>,
+    ) -> VaultContents {
+        VaultContents {
+            entries: entries.into_iter().collect(),
+            labels: labels.into_iter().collect(),
+        }
+    }
+
+    fn empty_contents() -> VaultContents {
+        make_contents(vec![], vec![])
+    }
+
+    fn merge(local: &VaultContents, remote: &VaultContents) -> MergeResult {
+        auto_merge(local, remote).expect("auto_merge failed")
+    }
+
+    // ===== Group B: 片方にのみ存在 =====
 
     #[test]
-    fn test_auto_merge_group_b_local_only() {
-        // B-1: ローカルのみ存在 (active) -> ローカル採用
-        let (id, local_entry) = create_entry("id1", "Local Entry", 1000);
-        let local = VaultContents {
-            labels: HashMap::new(),
-            entries: make_map(vec![(id.clone(), local_entry.clone())]),
-        };
-
-        let remote = VaultContents {
-            labels: HashMap::new(),
-            entries: make_map(vec![]),
-        };
-
-        let result = auto_merge(&local, &remote).unwrap();
+    fn test_b1_local_active_only() {
+        let (id, entry) = create_entry("id1", "Local", 1000);
+        let local = make_contents(vec![(id.clone(), entry)], vec![]);
+        let result = merge(&local, &empty_contents());
         assert_eq!(result.merged_entries.len(), 1);
-        assert!(result.merged_entries.contains_key(&id));
-    }
-
-    #[test]
-    fn test_auto_merge_group_b_remote_only() {
-        // B-4: リモートのみ存在 (active) -> リモート採用
-        let (id, remote_entry) = create_entry("id1", "Remote Entry", 1000);
-        let local = VaultContents {
-            labels: HashMap::new(),
-            entries: make_map(vec![]),
-        };
-
-        let remote = VaultContents {
-            labels: HashMap::new(),
-            entries: make_map(vec![(id.clone(), remote_entry.clone())]),
-        };
-
-        let result = auto_merge(&local, &remote).unwrap();
-        assert_eq!(result.merged_entries.len(), 1);
-        assert!(result.merged_entries.contains_key(&id));
-    }
-
-    #[test]
-    fn test_auto_merge_lww_local_newer() {
-        // C-1: 両方に存在、ローカルが新しい -> LWW でローカル採用
-        let (id, mut local_entry) = create_entry("id1", "Local", 2000);
-        let (_, mut remote_entry) = create_entry("id1", "Remote", 1000);
-
-        local_entry.updated_at = 2000;
-        remote_entry.updated_at = 1000;
-
-        let local = VaultContents {
-            labels: HashMap::new(),
-            entries: make_map(vec![(id.clone(), local_entry)]),
-        };
-
-        let remote = VaultContents {
-            labels: HashMap::new(),
-            entries: make_map(vec![(id.clone(), remote_entry)]),
-        };
-
-        let result = auto_merge(&local, &remote).unwrap();
         assert_eq!(result.merged_entries[&id].name, "Local");
+        assert!(result.merged_entries[&id].deleted_at.is_none());
     }
 
     #[test]
-    fn test_auto_merge_lww_remote_newer() {
-        // C-2: 両方に存在、リモートが新しい -> LWW でリモート採用
-        let (id, mut local_entry) = create_entry("id1", "Local", 1000);
-        let (_, mut remote_entry) = create_entry("id1", "Remote", 2000);
+    fn test_b2_local_soft_deleted_only() {
+        let (id, entry) = create_soft_deleted("id1", "Deleted", 1000, 1000);
+        let local = make_contents(vec![(id.clone(), entry)], vec![]);
+        let result = merge(&local, &empty_contents());
+        assert_eq!(result.merged_entries.len(), 1);
+        assert!(result.merged_entries[&id].deleted_at.is_some());
+    }
 
-        local_entry.updated_at = 1000;
-        remote_entry.updated_at = 2000;
+    #[test]
+    fn test_b3_local_purged_only() {
+        let (id, entry) = create_purged("id1", 1000, 1000, 1000);
+        let local = make_contents(vec![(id.clone(), entry)], vec![]);
+        let result = merge(&local, &empty_contents());
+        assert_eq!(result.merged_entries.len(), 1);
+        assert!(result.merged_entries[&id].purged_at.is_some());
+    }
 
-        let local = VaultContents {
-            labels: HashMap::new(),
-            entries: make_map(vec![(id.clone(), local_entry)]),
-        };
-
-        let remote = VaultContents {
-            labels: HashMap::new(),
-            entries: make_map(vec![(id.clone(), remote_entry)]),
-        };
-
-        let result = auto_merge(&local, &remote).unwrap();
+    #[test]
+    fn test_b4_remote_active_only() {
+        let (id, entry) = create_entry("id1", "Remote", 1000);
+        let remote = make_contents(vec![(id.clone(), entry)], vec![]);
+        let result = merge(&empty_contents(), &remote);
+        assert_eq!(result.merged_entries.len(), 1);
         assert_eq!(result.merged_entries[&id].name, "Remote");
     }
 
     #[test]
-    fn test_auto_merge_tie_breaking_purged_priority() {
-        // D-12: purged vs active (同タイムスタンプ) -> purged優先
-        // Simpler test: just verify that LWW with tie-breaking works
-        let (id1, mut l_entry) = create_entry("id1", "Local", 1500);
-        let (_, mut r_entry) = create_entry("id1", "Remote", 1000);
-
-        l_entry.updated_at = 1500;
-        r_entry.updated_at = 1000;
-
-        let mut local_map = HashMap::new();
-        local_map.insert(id1.clone(), l_entry);
-
-        let mut remote_map = HashMap::new();
-        remote_map.insert(id1.clone(), r_entry);
-
-        let local = VaultContents {
-            labels: HashMap::new(),
-            entries: local_map,
-        };
-
-        let remote = VaultContents {
-            labels: HashMap::new(),
-            entries: remote_map,
-        };
-
-        let result = auto_merge(&local, &remote).expect("auto_merge failed");
-        assert!(result.merged_entries.contains_key(&id1));
-        assert_eq!(result.merged_entries[&id1].name, "Local");
+    fn test_b5_remote_soft_deleted_only() {
+        let (id, entry) = create_soft_deleted("id1", "Deleted", 1000, 1000);
+        let remote = make_contents(vec![(id.clone(), entry)], vec![]);
+        let result = merge(&empty_contents(), &remote);
+        assert_eq!(result.merged_entries.len(), 1);
+        assert!(result.merged_entries[&id].deleted_at.is_some());
     }
 
     #[test]
-    fn test_auto_merge_d13_soft_deleted_newer_than_purged() {
-        // D-13: soft-deleted(新) vs purged(古) -> soft-deleted採用
-        let (id, mut local_entry) = create_entry("id1", "SoftDeleted", 2000);
-        let (_, mut remote_entry) = create_entry("id1", "Purged", 1000);
+    fn test_b6_remote_purged_only() {
+        let (id, entry) = create_purged("id1", 1000, 1000, 1000);
+        let remote = make_contents(vec![(id.clone(), entry)], vec![]);
+        let result = merge(&empty_contents(), &remote);
+        assert_eq!(result.merged_entries.len(), 1);
+        assert!(result.merged_entries[&id].purged_at.is_some());
+    }
 
+    // ===== Group C: 両方active =====
+
+    #[test]
+    fn test_c1_both_active_local_newer() {
+        let (id, mut local_entry) = create_entry("id1", "Local", 2000);
+        let (_, remote_entry) = create_entry("id1", "Remote", 1000);
         local_entry.updated_at = 2000;
-        local_entry.deleted_at = Some(2000);
-        local_entry.purged_at = None;
-        local_entry.name = "SoftDeleted".to_string();
 
-        remote_entry.updated_at = 1000;
-        remote_entry.deleted_at = Some(1000);
-        remote_entry.purged_at = Some(1000);
-        remote_entry.name = String::new();
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert_eq!(result.merged_entries[&id].name, "Local");
+    }
 
-        let local = VaultContents {
-            labels: HashMap::new(),
-            entries: make_map(vec![(id.clone(), local_entry)]),
-        };
+    #[test]
+    fn test_c2_both_active_remote_newer() {
+        let (id, local_entry) = create_entry("id1", "Local", 1000);
+        let (_, mut remote_entry) = create_entry("id1", "Remote", 2000);
+        remote_entry.updated_at = 2000;
 
-        // Use same ID for remote entry
-        let mut remote_map = HashMap::new();
-        remote_map.insert(id.clone(), remote_entry);
-        let remote = VaultContents {
-            labels: HashMap::new(),
-            entries: remote_map,
-        };
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert_eq!(result.merged_entries[&id].name, "Remote");
+    }
 
-        let result = auto_merge(&local, &remote).unwrap();
+    #[test]
+    fn test_c3_both_active_same_timestamp_same_content() {
+        let (id, local_entry) = create_entry("id1", "Same", 1000);
+        let (_, remote_entry) = create_entry("id1", "Same", 1000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert_eq!(result.merged_entries[&id].name, "Same");
+    }
+
+    #[test]
+    fn test_c4_both_active_same_timestamp_different_content() {
+        // 同タイムスタンプ・内容違い → 同state(active)でローカルのdeletion_priority >= リモート → ローカル採用
+        let (id, local_entry) = create_entry("id1", "Local", 1000);
+        let (_, remote_entry) = create_entry("id1", "Remote", 1000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        // 実装上はローカルが採用される（deletion_priority同値でlocal >= remote）
+        assert_eq!(result.merged_entries[&id].name, "Local");
+    }
+
+    // ===== Group D: active vs soft-deleted =====
+
+    #[test]
+    fn test_d1_active_vs_soft_deleted_local_newer() {
+        let (id, mut local_entry) = create_entry("id1", "Active", 2000);
+        local_entry.updated_at = 2000;
+        let (_, remote_entry) = create_soft_deleted("id1", "Deleted", 1000, 1000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert_eq!(result.merged_entries[&id].name, "Active");
+        assert!(result.merged_entries[&id].deleted_at.is_none());
+    }
+
+    #[test]
+    fn test_d2_active_vs_soft_deleted_remote_newer() {
+        let (id, local_entry) = create_entry("id1", "Active", 1000);
+        let (_, remote_entry) = create_soft_deleted("id1", "Deleted", 2000, 2000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert!(result.merged_entries[&id].deleted_at.is_some());
+    }
+
+    #[test]
+    fn test_d3_active_vs_soft_deleted_same_timestamp() {
+        // 同タイムスタンプ → soft-deleted優先
+        let (id, local_entry) = create_entry("id1", "Active", 1000);
+        let (_, remote_entry) = create_soft_deleted("id1", "Deleted", 1000, 1000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert!(result.merged_entries[&id].deleted_at.is_some());
+    }
+
+    #[test]
+    fn test_d4_soft_deleted_vs_active_local_newer() {
+        let (id, local_entry) = create_soft_deleted("id1", "Deleted", 2000, 2000);
+        let (_, remote_entry) = create_entry("id1", "Active", 1000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert!(result.merged_entries[&id].deleted_at.is_some());
+    }
+
+    #[test]
+    fn test_d5_soft_deleted_vs_active_remote_newer() {
+        let (id, local_entry) = create_soft_deleted("id1", "Deleted", 1000, 1000);
+        let (_, mut remote_entry) = create_entry("id1", "Active", 2000);
+        remote_entry.updated_at = 2000;
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert_eq!(result.merged_entries[&id].name, "Active");
+        assert!(result.merged_entries[&id].deleted_at.is_none());
+    }
+
+    #[test]
+    fn test_d6_soft_deleted_vs_active_same_timestamp() {
+        // 同タイムスタンプ → soft-deleted優先
+        let (id, local_entry) = create_soft_deleted("id1", "Deleted", 1000, 1000);
+        let (_, remote_entry) = create_entry("id1", "Active", 1000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert!(result.merged_entries[&id].deleted_at.is_some());
+    }
+
+    // ===== Group D: active vs purged =====
+
+    #[test]
+    fn test_d7_active_vs_purged_local_newer() {
+        // purge後に復元・再編集 → ローカル(active)採用
+        let (id, mut local_entry) = create_entry("id1", "Restored", 2000);
+        local_entry.updated_at = 2000;
+        let (_, remote_entry) = create_purged("id1", 1000, 1000, 1000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert_eq!(result.merged_entries[&id].name, "Restored");
+        assert!(result.merged_entries[&id].deleted_at.is_none());
+        assert!(result.merged_entries[&id].purged_at.is_none());
+    }
+
+    #[test]
+    fn test_d8_active_vs_purged_remote_newer() {
+        let (id, local_entry) = create_entry("id1", "Active", 1000);
+        let (_, remote_entry) = create_purged("id1", 2000, 2000, 2000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert!(result.merged_entries[&id].purged_at.is_some());
+    }
+
+    #[test]
+    fn test_d9_active_vs_purged_same_timestamp() {
+        // 同タイムスタンプ → purged優先
+        let (id, local_entry) = create_entry("id1", "Active", 1000);
+        let (_, remote_entry) = create_purged("id1", 1000, 1000, 1000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert!(result.merged_entries[&id].purged_at.is_some());
+    }
+
+    #[test]
+    fn test_d10_purged_vs_active_local_newer() {
+        let (id, local_entry) = create_purged("id1", 2000, 2000, 2000);
+        let (_, remote_entry) = create_entry("id1", "Active", 1000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert!(result.merged_entries[&id].purged_at.is_some());
+    }
+
+    #[test]
+    fn test_d11_purged_vs_active_remote_newer() {
+        // purge後に復元・再編集 → リモート(active)採用
+        let (id, local_entry) = create_purged("id1", 1000, 1000, 1000);
+        let (_, mut remote_entry) = create_entry("id1", "Restored", 2000);
+        remote_entry.updated_at = 2000;
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert_eq!(result.merged_entries[&id].name, "Restored");
+        assert!(result.merged_entries[&id].purged_at.is_none());
+    }
+
+    #[test]
+    fn test_d12_purged_vs_active_same_timestamp() {
+        // 同タイムスタンプ → purged優先
+        let (id, local_entry) = create_purged("id1", 1000, 1000, 1000);
+        let (_, remote_entry) = create_entry("id1", "Active", 1000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert!(result.merged_entries[&id].purged_at.is_some());
+    }
+
+    // ===== Group D: soft-deleted vs purged =====
+
+    #[test]
+    fn test_d13_soft_deleted_newer_than_purged() {
+        // soft-deleted(新) vs purged(古) → soft-deleted採用（不可逆操作を優先しない）
+        let (id, local_entry) = create_soft_deleted("id1", "SoftDeleted", 2000, 2000);
+        let (_, remote_entry) = create_purged("id1", 1000, 1000, 1000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
         assert!(result.merged_entries[&id].deleted_at.is_some());
         assert!(result.merged_entries[&id].purged_at.is_none());
     }
 
     #[test]
-    fn test_auto_merge_multiple_entries() {
-        // 複数エントリのマージ：追加・編集・削除が混在
-        let (id1, mut entry1_local) = create_entry("id1", "Local Only", 1000);
-        let (id2, mut entry2_local) = create_entry("id2", "Edited Local", 2000);
-        let (id2_remote, mut entry2_remote) = create_entry("id2", "Edited Remote", 1500);
-        let (id3, mut entry3_remote) = create_entry("id3", "Remote Only", 1000);
+    fn test_d14_soft_deleted_vs_purged_remote_newer() {
+        let (id, local_entry) = create_soft_deleted("id1", "SoftDeleted", 1000, 1000);
+        let (_, remote_entry) = create_purged("id1", 2000, 2000, 2000);
 
-        entry1_local.updated_at = 1000;
-        entry2_local.updated_at = 2000;
-        entry2_remote.updated_at = 1500;
-        entry3_remote.updated_at = 1000;
-
-        let local = VaultContents {
-            labels: HashMap::new(),
-            entries: make_map(vec![
-                (id1.clone(), entry1_local),
-                (id2.clone(), entry2_local),
-            ]),
-        };
-
-        let remote = VaultContents {
-            labels: HashMap::new(),
-            entries: make_map(vec![
-                (id2_remote, entry2_remote),
-                (id3.clone(), entry3_remote),
-            ]),
-        };
-
-        let result = auto_merge(&local, &remote).unwrap();
-        assert_eq!(result.merged_entries.len(), 3);
-        assert!(result.merged_entries.contains_key(&id1)); // Local Only
-        assert!(result.merged_entries.contains_key(&id2)); // Edited (LWW)
-        assert!(result.merged_entries.contains_key(&id3)); // Remote Only
-        assert_eq!(result.merged_entries[&id2].name, "Edited Local"); // ローカル(新しい)が採用
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert!(result.merged_entries[&id].purged_at.is_some());
     }
 
     #[test]
-    fn test_auto_merge_label_tombstone() {
-        // ラベルのtombstone伝播テスト
-        // ローカル: active, リモート: deleted -> remoteの削除状態を採用
-        let now = crate::get_timestamp();
+    fn test_d15_soft_deleted_vs_purged_same_timestamp() {
+        // 同タイムスタンプ → purged優先
+        let (id, local_entry) = create_soft_deleted("id1", "SoftDeleted", 1000, 1000);
+        let (_, remote_entry) = create_purged("id1", 1000, 1000, 1000);
 
-        let mut local_labels = HashMap::new();
-        local_labels.insert(
-            "label1".to_string(),
-            LabelValue {
-                name: "Work".to_string(),
-                deleted_at: None,
-            },
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert!(result.merged_entries[&id].purged_at.is_some());
+    }
+
+    #[test]
+    fn test_d16_purged_newer_vs_soft_deleted() {
+        let (id, local_entry) = create_purged("id1", 2000, 2000, 2000);
+        let (_, remote_entry) = create_soft_deleted("id1", "SoftDeleted", 1000, 1000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert!(result.merged_entries[&id].purged_at.is_some());
+    }
+
+    #[test]
+    fn test_d17_purged_older_vs_soft_deleted_newer() {
+        // D-13の逆パターン: リモートのsoft-deletedがローカルのpurgedより新しい → soft-deleted採用
+        let (id, local_entry) = create_purged("id1", 1000, 1000, 1000);
+        let (_, remote_entry) = create_soft_deleted("id1", "SoftDeleted", 2000, 2000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert!(result.merged_entries[&id].deleted_at.is_some());
+        assert!(result.merged_entries[&id].purged_at.is_none());
+    }
+
+    #[test]
+    fn test_d18_purged_vs_soft_deleted_same_timestamp() {
+        // 同タイムスタンプ → purged優先
+        let (id, local_entry) = create_purged("id1", 1000, 1000, 1000);
+        let (_, remote_entry) = create_soft_deleted("id1", "SoftDeleted", 1000, 1000);
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+        assert!(result.merged_entries[&id].purged_at.is_some());
+    }
+
+    // ===== 複合テスト =====
+
+    #[test]
+    fn test_multiple_entries_mixed() {
+        let (id1, entry1) = create_entry("id1", "Local Only", 1000);
+        let (id2, mut entry2_local) = create_entry("id2", "Edited Local", 2000);
+        entry2_local.updated_at = 2000;
+        let (_, entry2_remote) = create_entry("id2", "Edited Remote", 1500);
+        let (id3, entry3) = create_entry("id3", "Remote Only", 1000);
+
+        let local = make_contents(vec![
+            (id1.clone(), entry1),
+            (id2.clone(), entry2_local),
+        ], vec![]);
+        let remote = make_contents(vec![
+            (id2.clone(), entry2_remote),
+            (id3.clone(), entry3),
+        ], vec![]);
+
+        let result = merge(&local, &remote);
+        assert_eq!(result.merged_entries.len(), 3);
+        assert_eq!(result.merged_entries[&id1].name, "Local Only");
+        assert_eq!(result.merged_entries[&id2].name, "Edited Local");
+        assert_eq!(result.merged_entries[&id3].name, "Remote Only");
+    }
+
+    #[test]
+    fn test_empty_vaults() {
+        let result = merge(&empty_contents(), &empty_contents());
+        assert!(result.merged_entries.is_empty());
+        assert!(result.merged_labels.is_empty());
+    }
+
+    // ===== ラベルマージ =====
+
+    fn label(name: &str) -> LabelValue {
+        LabelValue { name: name.to_string(), created_at: 0, deleted_at: None }
+    }
+
+    fn deleted_label(name: &str, deleted_at: i64) -> LabelValue {
+        LabelValue { name: name.to_string(), created_at: 0, deleted_at: Some(deleted_at) }
+    }
+
+    #[test]
+    fn test_label_local_only() {
+        let local = make_contents(vec![], vec![("l1".into(), label("Work"))]);
+        let result = merge(&local, &empty_contents());
+        assert_eq!(result.merged_labels["l1"].name, "Work");
+        assert!(result.merged_labels["l1"].deleted_at.is_none());
+    }
+
+    #[test]
+    fn test_label_remote_only() {
+        let remote = make_contents(vec![], vec![("l1".into(), label("Work"))]);
+        let result = merge(&empty_contents(), &remote);
+        assert_eq!(result.merged_labels["l1"].name, "Work");
+    }
+
+    #[test]
+    fn test_label_both_active() {
+        let local = make_contents(vec![], vec![("l1".into(), label("Work"))]);
+        let remote = make_contents(vec![], vec![("l1".into(), label("仕事"))]);
+        let result = merge(&local, &remote);
+        // 両方activeの場合はローカル採用
+        assert_eq!(result.merged_labels["l1"].name, "Work");
+    }
+
+    #[test]
+    fn test_label_active_vs_deleted() {
+        let local = make_contents(vec![], vec![("l1".into(), label("Work"))]);
+        let remote = make_contents(vec![], vec![("l1".into(), deleted_label("Work", 2000))]);
+        let result = merge(&local, &remote);
+        assert!(result.merged_labels["l1"].deleted_at.is_some());
+    }
+
+    #[test]
+    fn test_label_deleted_vs_active() {
+        let local = make_contents(vec![], vec![("l1".into(), deleted_label("Work", 2000))]);
+        let remote = make_contents(vec![], vec![("l1".into(), label("Work"))]);
+        let result = merge(&local, &remote);
+        assert!(result.merged_labels["l1"].deleted_at.is_some());
+    }
+
+    #[test]
+    fn test_label_both_deleted_newer_wins() {
+        let local = make_contents(vec![], vec![("l1".into(), deleted_label("Work", 1000))]);
+        let remote = make_contents(vec![], vec![("l1".into(), deleted_label("Work", 2000))]);
+        let result = merge(&local, &remote);
+        assert_eq!(result.merged_labels["l1"].deleted_at, Some(2000));
+    }
+
+    // ===== 孤立ラベル参照のクリーンアップ =====
+
+    #[test]
+    fn test_cleanup_orphaned_label_refs() {
+        let (id, mut entry) = create_entry("id1", "Entry", 1000);
+        entry.label_ids = vec!["l1".into(), "l2".into(), "l3".into()];
+
+        let labels = vec![
+            ("l1".into(), label("Active")),
+            ("l2".into(), deleted_label("Deleted", 1000)),
+            // l3 は存在しないラベル（削除済みではないので残る）
+        ];
+
+        let local = make_contents(vec![(id.clone(), entry)], labels.clone());
+        let remote = make_contents(vec![], vec![]);
+        let result = merge(&local, &remote);
+
+        let merged_entry = &result.merged_entries[&id];
+        // l2は削除ラベルなのでクリーンアップされる、l1とl3は残る
+        assert!(merged_entry.label_ids.contains(&"l1".to_string()));
+        assert!(!merged_entry.label_ids.contains(&"l2".to_string()));
+        assert!(merged_entry.label_ids.contains(&"l3".to_string()));
+    }
+
+    // ===== GC (Garbage Collection) =====
+
+    #[test]
+    fn test_gc_removes_old_purged_entries() {
+        let now = 200 * 86400; // 200日目
+        let old_purge = 10 * 86400; // 10日目にpurge（190日前 > 180日）
+        let recent_purge = 30 * 86400; // 30日目にpurge（170日前 < 180日）
+
+        let (id_old, entry_old) = create_purged("old", old_purge, old_purge, old_purge);
+        let (id_recent, entry_recent) = create_purged("recent", recent_purge, recent_purge, recent_purge);
+        let (id_active, entry_active) = create_entry("active", "Active", now);
+
+        let mut contents = make_contents(
+            vec![
+                (id_old.clone(), entry_old),
+                (id_recent.clone(), entry_recent),
+                (id_active.clone(), entry_active),
+            ],
+            vec![],
         );
 
-        let mut remote_labels = HashMap::new();
-        remote_labels.insert(
-            "label1".to_string(),
-            LabelValue {
-                name: "Work".to_string(),
-                deleted_at: Some(now - 100), // Recent deletion, not GC'd yet
-            },
+        let gc_count = apply_gc_to_contents(&mut contents, now);
+        assert_eq!(gc_count, 1);
+        assert!(!contents.entries.contains_key(&id_old));
+        assert!(contents.entries.contains_key(&id_recent));
+        assert!(contents.entries.contains_key(&id_active));
+    }
+
+    #[test]
+    fn test_gc_boundary_exactly_180_days() {
+        let now = 180 * 86400;
+        let exactly_cutoff = 0; // ちょうど180日前
+
+        let (id, entry) = create_purged("edge", exactly_cutoff, exactly_cutoff, exactly_cutoff);
+        let mut contents = make_contents(vec![(id.clone(), entry)], vec![]);
+
+        // cutoff = now - 180*86400 = 0, purged_at = 0, 0 < 0 は false なので残る
+        let gc_count = apply_gc_to_contents(&mut contents, now);
+        assert_eq!(gc_count, 0);
+        assert!(contents.entries.contains_key(&id));
+    }
+
+    #[test]
+    fn test_gc_boundary_one_second_over() {
+        let now = 180 * 86400 + 1;
+        let purged_at = 0; // 180日+1秒前
+
+        let (id, entry) = create_purged("edge", purged_at, purged_at, purged_at);
+        let mut contents = make_contents(vec![(id.clone(), entry)], vec![]);
+
+        // cutoff = 1, purged_at = 0, 0 < 1 なので削除される
+        let gc_count = apply_gc_to_contents(&mut contents, now);
+        assert_eq!(gc_count, 1);
+        assert!(!contents.entries.contains_key(&id));
+    }
+
+    #[test]
+    fn test_gc_removes_old_deleted_labels() {
+        let now = 200 * 86400;
+        let old_delete = 10 * 86400;
+        let recent_delete = 30 * 86400;
+
+        let mut contents = make_contents(
+            vec![],
+            vec![
+                ("old".into(), deleted_label("Old", old_delete)),
+                ("recent".into(), deleted_label("Recent", recent_delete)),
+                ("active".into(), label("Active")),
+            ],
         );
 
-        let local = VaultContents {
-            labels: local_labels,
-            entries: HashMap::new(),
-        };
+        apply_gc_to_contents(&mut contents, now);
+        assert!(!contents.labels.contains_key("old"));
+        assert!(contents.labels.contains_key("recent"));
+        assert!(contents.labels.contains_key("active"));
+    }
 
-        let remote = VaultContents {
-            labels: remote_labels,
-            entries: HashMap::new(),
-        };
+    #[test]
+    fn test_gc_no_entries_to_remove() {
+        let now = 100 * 86400;
+        let (id, entry) = create_entry("active", "Active", now);
+        let mut contents = make_contents(vec![(id.clone(), entry)], vec![]);
 
-        let result = auto_merge(&local, &remote).expect("auto_merge should succeed");
-        // deleted_atが設定されているラベルが保持されていることを確認
-        assert!(
-            result.merged_labels.contains_key("label1"),
-            "label1 should exist in merged_labels"
-        );
-        assert!(
-            result.merged_labels.get("label1").unwrap().deleted_at.is_some(),
-            "Label should be marked as deleted"
-        );
+        let gc_count = apply_gc_to_contents(&mut contents, now);
+        assert_eq!(gc_count, 0);
+        assert!(contents.entries.contains_key(&id));
+    }
+
+    // ===== EntryState =====
+
+    #[test]
+    fn test_entry_state_from_entry() {
+        let (_, active) = create_entry("id", "Active", 1000);
+        assert_eq!(EntryState::from_entry(&active), EntryState::Active);
+
+        let (_, soft_del) = create_soft_deleted("id", "Del", 1000, 1000);
+        assert_eq!(EntryState::from_entry(&soft_del), EntryState::SoftDeleted);
+
+        let (_, purged) = create_purged("id", 1000, 1000, 1000);
+        assert_eq!(EntryState::from_entry(&purged), EntryState::Purged);
+    }
+
+    #[test]
+    fn test_deletion_priority_ordering() {
+        assert!(EntryState::Purged.deletion_priority() > EntryState::SoftDeleted.deletion_priority());
+        assert!(EntryState::SoftDeleted.deletion_priority() > EntryState::Active.deletion_priority());
     }
 }

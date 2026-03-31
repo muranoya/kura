@@ -50,6 +50,7 @@ pub struct Entry {
     pub name: String,
     pub entry_type: EntryType,
     pub is_favorite: bool,
+    pub created_at: i64,
     pub updated_at: i64,
     pub deleted_at: Option<i64>,
     pub data: EntryData,

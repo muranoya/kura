@@ -32,7 +32,7 @@ fn test_vault_create_unlock_lock_cycle() {
     let locked_again = unlocked.lock().expect("Failed to lock vault");
 
     // Verify we can unlock again
-    let mut unlocked_again = locked_again
+    let unlocked_again = locked_again
         .unlock(master_password)
         .expect("Failed to unlock vault again");
 

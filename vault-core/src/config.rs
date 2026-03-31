@@ -1,16 +1,9 @@
 use crate::error::{Result, VaultError};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct VaultConfig {
-    pub storage: StorageConfig,
-}
-
-#[derive(Debug, Clone)]
-pub enum StorageConfig {
-    Local { dir: PathBuf },
-    S3(S3Config),
+    pub storage: S3Config,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,16 +19,8 @@ pub struct S3Config {
 }
 
 impl VaultConfig {
-    pub fn new_local(dir: PathBuf) -> Self {
-        VaultConfig {
-            storage: StorageConfig::Local { dir },
-        }
-    }
-
-    pub fn new_s3(config: S3Config) -> Self {
-        VaultConfig {
-            storage: StorageConfig::S3(config),
-        }
+    pub fn new(storage: S3Config) -> Self {
+        VaultConfig { storage }
     }
 }
 

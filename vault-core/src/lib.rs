@@ -14,7 +14,7 @@ pub mod totp;
 #[cfg(any(feature = "desktop", feature = "android"))]
 pub mod api;
 
-pub use config::{VaultConfig, StorageConfig, S3Config};
+pub use config::{VaultConfig, S3Config};
 pub use error::{VaultError, Result};
 pub use models::{
     Entry, EntryType, EntryFilter, EntryData, Label, VaultMeta, Argon2Params,

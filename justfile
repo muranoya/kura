@@ -17,33 +17,8 @@ EMULATOR := ANDROID_HOME / "emulator/emulator"
 # デフォルトレシピ
 default: help
 
-# 依存関係の確認
-@check-dependencies:
-	echo "🔍 Checking dependencies..."
-	if ! command -v node &> /dev/null; then \
-		echo "❌ node not found. Please install Node.js."; \
-		exit 1; \
-	fi
-	if ! command -v pnpm &> /dev/null; then \
-		echo "❌ pnpm not found. Please install pnpm."; \
-		exit 1; \
-	fi
-	if ! command -v cargo &> /dev/null; then \
-		echo "❌ cargo not found. Please install Rust/Cargo."; \
-		exit 1; \
-	fi
-	if ! command -v wasm-pack &> /dev/null; then \
-		echo "❌ wasm-pack not found. Please install wasm-pack."; \
-		exit 1; \
-	fi
-	echo "✅ All dependencies found"
-	echo "  - Node.js: $(node --version)"
-	echo "  - pnpm: $(pnpm --version)"
-	echo "  - Cargo: $(cargo --version | head -1)"
-	echo "  - wasm-pack: $(wasm-pack --version)"
-
 # Desktop app - Development (Tauri with hot reload)
-@dev-desktop: check-dependencies
+@dev-desktop:
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🚀 Starting desktop app in development mode..."
@@ -58,7 +33,7 @@ default: help
 	cd {{DESKTOP_DIR}} && pnpm tauri dev --config src-tauri/tauri.conf.dev.json
 
 # Desktop app (Tauri)
-@release-desktop: check-dependencies
+@release-desktop:
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building desktop app (Tauri)..."
@@ -77,7 +52,7 @@ default: help
 	echo "  - Output: {{DESKTOP_DIR}}/src-tauri/target/release/"
 
 # Browser extension - Chrome
-@release-extension-chrome: check-dependencies
+@release-extension-chrome:
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building Chrome extension..."
@@ -100,7 +75,7 @@ default: help
 	echo "  - Package: {{EXTENSION_DIR}}/kura-extension-chrome.zip"
 
 # Browser extension - Firefox
-@release-extension-firefox: check-dependencies
+@release-extension-firefox:
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building Firefox extension..."
@@ -123,7 +98,7 @@ default: help
 	echo "  - Package: {{EXTENSION_DIR}}/kura-extension-firefox.zip"
 
 # Browser extension - Development (HMR付き)
-@dev-extension: check-dependencies
+@dev-extension:
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🚀 Starting extension in development mode..."
@@ -188,36 +163,8 @@ default: help
 	echo "✅ Android release build completed!"
 	echo "  - APK: {{ANDROID_DIR}}/app/build/outputs/apk/release/app-release-unsigned.apk"
 
-# Android app - Build native libraries for single ABI (fast development)
-@build-android-jni-fast:
-	echo ""
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo "🦀 Building vault_jni for arm64-v8a only (fast dev build)..."
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo ""
-	if ! command -v cargo-ndk &> /dev/null; then \
-		echo "📥 Installing cargo-ndk..."; \
-		cargo install cargo-ndk; \
-	fi
-	cargo ndk -t arm64-v8a -o {{ANDROID_DIR}}/app/src/main/jniLibs build --manifest-path {{ANDROID_JNI_DIR}}/Cargo.toml --release
-	echo ""
-	echo "✅ Native library built (arm64-v8a only)"
-
-# Android app - Debug build (fast, arm64 only)
-@build-android-debug-fast: build-android-jni-fast
-	echo ""
-	echo "🤖 Building Android app (debug, arm64 only)..."
-	cd {{ANDROID_DIR}} && ./gradlew assembleDebug
-	echo ""
-	echo "✅ Android debug build completed!"
-	echo "  - APK: {{ANDROID_DIR}}/app/build/outputs/apk/debug/app-debug.apk"
-
 # Android app - Build, launch emulator, install and start (all ABIs)
 @run-android: build-android-debug
-	just _run-android-emulator
-
-# Android app - Build, launch emulator, install and start (arm64 only, fast)
-@run-android-fast: build-android-debug-fast
 	just _run-android-emulator
 
 # Android app - Launch emulator, install APK and start app
@@ -255,7 +202,7 @@ default: help
 	echo "✅ App is running! Use '{{ADB}} logcat | grep kura' for logs"
 
 # Build all releases
-@release-all: check-dependencies
+@release-all:
 	echo ""
 	echo "╔━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╗"
 	echo "║                    kura Release Build                  ║"
@@ -271,6 +218,39 @@ default: help
 	echo "║                  🎉 All releases completed!                ║"
 	echo "╚━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╝"
 
+# vault-core のテスト
+@test-vault-core:
+	echo "🧪 Testing vault-core..."
+	cargo test --manifest-path {{VAULT_CORE_DIR}}/Cargo.toml
+	echo "✅ vault-core tests passed!"
+
+# extension のテスト
+@test-extension:
+	echo "🧪 Testing extension..."
+	cd {{EXTENSION_DIR}} && pnpm install && pnpm test
+	echo "✅ extension tests passed!"
+
+# Android のテスト
+@test-android:
+	echo "🧪 Testing Android..."
+	cd {{ANDROID_DIR}} && ./gradlew test
+	echo "✅ Android tests passed!"
+
+# Desktop のテスト
+@test-desktop:
+	echo "🧪 Testing desktop..."
+	cd {{DESKTOP_DIR}} && pnpm install && pnpm test
+	echo "✅ desktop tests passed!"
+
+# 全テスト実行
+@test-all:
+	just test-vault-core
+	just test-extension
+	just test-android
+	just test-desktop
+	echo ""
+	echo "✅ All tests passed!"
+
 # クリーンアップ
 @clean:
 	echo "🧹 Cleaning build artifacts..."
@@ -285,18 +265,12 @@ default: help
 
 # ヘルプ表示
 @help:
-	echo ""
-	echo "kura - Release Build Helper"
-	echo ""
 	echo "Usage:"
 	echo "  🤖 Android:"
-	echo "    just build-android-debug       - Build Android debug APK (all ABIs)"
-	echo "    just build-android-debug-fast  - Build Android debug APK (arm64 only, fast)"
+	echo "    just build-android-debug       - Build Android debug APK"
 	echo "    just release-android           - Build Android release APK"
 	echo "    just build-android-jni         - Build Rust native libraries only"
-	echo "    just build-android-jni-fast    - Build Rust native library (arm64 only)"
-	echo "    just run-android               - Build & run on emulator (all ABIs)"
-	echo "    just run-android-fast          - Build & run on emulator (arm64 only, fast)"
+	echo "    just run-android               - Build & run on emulator"
 	echo ""
 	echo "  🖥️  Desktop:"
 	echo "    just dev-desktop          - Start desktop app in dev mode (hot reload)"
@@ -307,9 +281,15 @@ default: help
 	echo "    just release-extension-chrome - Build Chrome extension"
 	echo "    just release-extension-firefox - Build Firefox extension"
 	echo ""
+	echo "  🧪 Test:"
+	echo "    just test-vault-core      - Run vault-core tests"
+	echo "    just test-extension       - Run extension tests"
+	echo "    just test-android         - Run Android tests"
+	echo "    just test-desktop         - Run desktop tests"
+	echo "    just test-all             - Run all tests"
+	echo ""
 	echo "  🔧 Utilities:"
 	echo "    just release-all          - Build all apps for release"
-	echo "    just check-dependencies   - Check if all tools are installed"
 	echo "    just clean                - Clean build artifacts"
 	echo ""
 	echo "Examples:"

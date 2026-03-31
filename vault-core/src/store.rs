@@ -24,6 +24,8 @@ pub struct VaultContents {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LabelValue {
     pub name: String,
+    #[serde(default)]
+    pub created_at: i64,
     /// Tombstone marker for deleted labels (no soft-delete for labels)
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub deleted_at: Option<i64>,
