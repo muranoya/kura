@@ -110,7 +110,8 @@ S3 / Cloudflare R2 / MinIO（ユーザーが選ぶ）
 
 ```
 vault_core（Rust）
-    ├── FFI（flutter_rust_bridge）     → モバイル
+    ├── JNI（Java Native Interface）   → Android
+    ├── Objective-C FFI                → iOS
     ├── ネイティブFFI                  → デスクトップ (Tauri backend)
     └── WASM（wasm-pack）              → ブラウザ拡張
 ```
@@ -119,8 +120,8 @@ vault_core（Rust）
 
 **モバイルアプリ**
 
-- Flutter（iOS/Android共通コードベース）
-- flutter_rust_bridgeでvault_coreをFFI呼び出し
+- ネイティブアプリ（iOS/Android個別実装）
+- Rust JNIでvault_coreをネイティブ呼び出し
 - Access KeyはOSのKeychain（iOS） / Keystore（Android）に保存
 
 **デスクトップアプリ**

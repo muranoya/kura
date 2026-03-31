@@ -15,10 +15,6 @@ default: help
 # 依存関係の確認
 @check-dependencies:
 	echo "🔍 Checking dependencies..."
-	if ! command -v flutter &> /dev/null; then \
-		echo "❌ flutter not found. Please install Flutter."; \
-		exit 1; \
-	fi
 	if ! command -v node &> /dev/null; then \
 		echo "❌ node not found. Please install Node.js."; \
 		exit 1; \
@@ -36,7 +32,6 @@ default: help
 		exit 1; \
 	fi
 	echo "✅ All dependencies found"
-	echo "  - Flutter: $(flutter --version | head -1)"
 	echo "  - Node.js: $(node --version)"
 	echo "  - pnpm: $(pnpm --version)"
 	echo "  - Cargo: $(cargo --version | head -1)"

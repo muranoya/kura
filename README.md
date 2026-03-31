@@ -15,7 +15,6 @@ just check-dependencies
 ```
 
 以下が必要です：
-- Flutter
 - Node.js
 - pnpm
 - Rust / Cargo
@@ -55,11 +54,6 @@ just build-android-jni
 just build-android-jni-fast
 ```
 
-**出力:**
-- デバッグAPK: `android/app/build/outputs/apk/debug/app-debug.apk`
-- リリースAPK: `android/app/build/outputs/apk/release/app-release-unsigned.apk`
-- ネイティブライブラリ: `android/app/src/main/jniLibs/`
-
 ### 🖥️ デスクトップアプリ
 
 ```bash
@@ -69,12 +63,6 @@ just dev-desktop
 # リリース版をビルド
 just release-desktop
 ```
-
-**開発モードの注意:**
-- 右クリック → Inspect でDevToolsを開くことができます
-
-**出力:**
-- リリース版: `desktop/src-tauri/target/release/`
 
 ### 🔌 ブラウザ拡張
 
@@ -88,10 +76,6 @@ just release-extension-firefox
 # 拡張を開発モード（HMR 付き）で実行
 just dev-extension
 ```
-
-**出力:**
-- Chrome ビルド: `extension/dist/` → `extension/kura-extension-chrome.zip`
-- Firefox ビルド: `extension/dist/` → `extension/kura-extension-firefox.zip`
 
 ### 🔧 ユーティリティ
 
