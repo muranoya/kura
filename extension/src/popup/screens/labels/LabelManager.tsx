@@ -5,11 +5,10 @@ import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { EmptyState } from '../../components/layout/EmptyState'
 import { PageHeader } from '../../components/layout/PageHeader'
-import { SyncActions } from '../../components/layout/SyncActions'
 import { Button } from '../../components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { Separator } from '../../components/ui/separator'
 
 export default function LabelManager() {
   const _navigate = useNavigate()
@@ -102,22 +101,22 @@ export default function LabelManager() {
   }
 
   return (
-    <div className="h-full overflow-y-auto pb-20 flex flex-col">
-      <PageHeader title="ラベル" showBackButton={false} action={<SyncActions />} />
+    <div className="h-full overflow-y-auto flex flex-col">
+      <PageHeader title="ラベル" showBackButton={true} />
 
-      <div className="p-4 space-y-4">
+      <div className="p-4">
         {error && (
-          <div className="p-3 rounded-md bg-danger/10 border border-danger/20">
+          <div className="p-3 rounded-md bg-danger/10 border border-danger/20 mb-4">
             <p className="text-sm text-danger">{error}</p>
           </div>
         )}
 
         {/* 新規ラベル作成 */}
-        <Card>
-          <CardHeader className="px-3 py-2">
-            <CardTitle className="text-sm font-medium">新しいラベル</CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3 pt-2 space-y-1">
+        <section>
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+            新しいラベル
+          </h2>
+          <div className="space-y-1">
             <Label htmlFor="new-label-name" className="text-sm">
               ラベル名
             </Label>
@@ -145,8 +144,10 @@ export default function LabelManager() {
                 追加
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
+
+        <Separator className="my-4" />
 
         {/* ラベル一覧 */}
         {loading ? (
@@ -154,11 +155,11 @@ export default function LabelManager() {
         ) : labels.length === 0 ? (
           <EmptyState title="ラベルがありません" description="新しいラベルを作成してください" />
         ) : (
-          <Card>
-            <CardHeader className="px-3 py-2">
-              <CardTitle className="text-sm font-medium">ラベル一覧</CardTitle>
-            </CardHeader>
-            <CardContent className="px-3 pb-3 pt-2 space-y-2">
+          <section>
+            <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+              ラベル一覧
+            </h2>
+            <div className="space-y-2">
               {labels.map((label) => (
                 <div
                   key={label.id}
@@ -218,8 +219,8 @@ export default function LabelManager() {
                   )}
                 </div>
               ))}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         )}
       </div>
 

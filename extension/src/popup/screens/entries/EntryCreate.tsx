@@ -66,7 +66,7 @@ export default function EntryCreate() {
   }
 
   return (
-    <div className="h-full overflow-y-auto pb-20 flex flex-col">
+    <div className="h-full overflow-y-auto flex flex-col">
       <PageHeader
         title="新規アイテム"
         showBackButton={true}

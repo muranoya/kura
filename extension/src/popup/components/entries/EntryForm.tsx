@@ -13,10 +13,10 @@ interface MdProps {
 }
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
 import { Label as UILabel } from '../ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Separator } from '../ui/separator'
 import { Textarea } from '../ui/textarea'
 import PasswordGeneratorPanel from './PasswordGeneratorPanel'
 
@@ -430,7 +430,7 @@ export default function EntryForm({
       <div className="space-y-2">
         <h3 className="text-sm font-semibold text-text-primary">カスタムフィールド</h3>
         {customFields.map((field) => (
-          <Card key={field.id} className="p-2 space-y-1.5">
+          <div key={field.id} className="p-2 space-y-1.5 rounded-md border border-border">
             <div className="flex items-end gap-2">
               <div className="flex-1 space-y-0.5">
                 <UILabel htmlFor={`field-type-${field.id}`} className="text-sm">
@@ -502,7 +502,7 @@ export default function EntryForm({
                   </div>
                 )}
             </div>
-          </Card>
+          </div>
         ))}
         <Button variant="secondary" size="sm" onClick={addCustomField} className="w-full gap-2">
           <Plus size={16} />
@@ -538,11 +538,11 @@ export default function EntryForm({
       )}
 
       {/* 基本情報 */}
-      <Card className="mb-3">
-        <CardHeader className="px-3 py-2">
-          <CardTitle className="text-sm font-medium">基本情報</CardTitle>
-        </CardHeader>
-        <CardContent className="px-3 pb-3 pt-2 space-y-3">
+      <section>
+        <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+          基本情報
+        </h2>
+        <div className="space-y-3">
           <div>
             <UILabel htmlFor="entry-type">アイテム種別</UILabel>
             {mode === 'create' ? (
@@ -571,66 +571,70 @@ export default function EntryForm({
               placeholder="例: Gmail アカウント"
             />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
+
+      <Separator className="my-3" />
 
       {/* アイテム種別別フォーム */}
-      <Card className="mb-3">
-        <CardHeader className="px-3 py-2">
-          <CardTitle className="text-sm font-medium">{getTypeLabel()}</CardTitle>
-        </CardHeader>
-        <CardContent className="px-3 pb-3 pt-2">{renderForm()}</CardContent>
-      </Card>
+      <section>
+        <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+          {getTypeLabel()}
+        </h2>
+        {renderForm()}
+      </section>
+
+      <Separator className="my-3" />
 
       {/* カスタムフィールド */}
-      <div className="mb-3">{renderCustomFields()}</div>
+      <section>{renderCustomFields()}</section>
+
+      <Separator className="my-3" />
 
       {/* ラベル */}
-      <Card className="mb-3">
-        <CardHeader className="px-3 py-2">
-          <CardTitle className="text-sm font-medium">ラベル</CardTitle>
-        </CardHeader>
-        <CardContent className="px-3 pb-3 pt-2">
-          {allLabels.length === 0 ? (
-            <p className="text-sm text-text-muted">ラベルがありません</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {allLabels.map((label) => (
-                <label key={label.id} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedLabelIds.includes(label.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        onSelectedLabelIdsChange([...selectedLabelIds, label.id])
-                      } else {
-                        onSelectedLabelIdsChange(selectedLabelIds.filter((lid) => lid !== label.id))
-                      }
-                    }}
-                    className="w-4 h-4 rounded border-border"
-                  />
-                  <span className="text-sm">{label.name}</span>
-                </label>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <section>
+        <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+          ラベル
+        </h2>
+        {allLabels.length === 0 ? (
+          <p className="text-sm text-text-muted">ラベルがありません</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {allLabels.map((label) => (
+              <label key={label.id} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedLabelIds.includes(label.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      onSelectedLabelIdsChange([...selectedLabelIds, label.id])
+                    } else {
+                      onSelectedLabelIdsChange(selectedLabelIds.filter((lid) => lid !== label.id))
+                    }
+                  }}
+                  className="w-4 h-4 rounded border-border"
+                />
+                <span className="text-sm">{label.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <Separator className="my-3" />
 
       {/* メモ */}
-      <Card className="mb-3">
-        <CardHeader className="px-3 py-2">
-          <CardTitle className="text-sm font-medium">メモ</CardTitle>
-        </CardHeader>
-        <CardContent className="px-3 pb-3 pt-2">
-          <Textarea
-            value={notes || ''}
-            onChange={(e) => onNotesChange(e.target.value)}
-            placeholder="メモを入力（オプション）"
-            className="min-h-24"
-          />
-        </CardContent>
-      </Card>
+      <section>
+        <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+          メモ
+        </h2>
+        <Textarea
+          value={notes || ''}
+          onChange={(e) => onNotesChange(e.target.value)}
+          placeholder="メモを入力（オプション）"
+          className="min-h-24"
+        />
+      </section>
     </>
   )
 }

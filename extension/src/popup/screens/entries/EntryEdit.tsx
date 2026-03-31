@@ -85,7 +85,7 @@ export default function EntryEdit() {
   if (!entry) return <PageHeader title="アイテムが見つかりません" showBackButton={true} />
 
   return (
-    <div className="h-full overflow-y-auto pb-20 flex flex-col">
+    <div className="h-full overflow-y-auto flex flex-col">
       <PageHeader
         title="アイテム編集"
         showBackButton={true}

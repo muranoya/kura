@@ -16,11 +16,10 @@ import StorageSetup from './screens/onboarding/StorageSetup'
 import UnlockExistingVault from './screens/onboarding/UnlockExistingVault'
 import Welcome from './screens/onboarding/Welcome'
 import Settings from './screens/settings/Settings'
-import ConflictResolver from './screens/sync/ConflictResolver'
 
 type AppState = 'loading' | 'onboarding' | 'locked' | 'unlocked'
 
-const TAB_ROUTES = ['/entries', '/favorites', '/labels', '/password-generator', '/settings']
+const TAB_ROUTES = ['/entries', '/favorites', '/password-generator']
 
 // BottomNav を表示すべきかチェック
 function shouldShowBottomNav(pathname: string, appState: AppState): boolean {
@@ -87,7 +86,7 @@ function AppContent() {
   const showBottomNav = shouldShowBottomNav(location.pathname, appState)
 
   return (
-    <div className="relative w-full" style={{ height: '600px' }}>
+    <div className="relative w-full" style={{ height: '504px' }}>
       <Routes>
         {/* Onboarding */}
         {appState === 'onboarding' && (
@@ -125,8 +124,6 @@ function AppContent() {
             <Route path="/entries/:id" element={<EntryDetail />} />
             <Route path="/entries/:id/edit" element={<EntryEdit />} />
             <Route path="/trash" element={<Trash />} />
-            <Route path="/sync/conflict-resolver" element={<ConflictResolver />} />
-
             <Route path="*" element={<Navigate to="/entries" replace />} />
           </>
         )}

@@ -1,4 +1,4 @@
-import { Check, Copy, ExternalLink } from 'lucide-react'
+import { Check, Copy, ExternalLink, Tags, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { STORAGE_KEYS } from '../../../shared/constants'
@@ -6,9 +6,7 @@ import { getFromStorage } from '../../../shared/storage'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { PageHeader } from '../../components/layout/PageHeader'
-import { SyncActions } from '../../components/layout/SyncActions'
 import { Button } from '../../components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -19,9 +17,10 @@ import {
 } from '../../components/ui/dialog'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { Separator } from '../../components/ui/separator'
 
 export default function Settings() {
-  const _navigate = useNavigate()
+  const navigate = useNavigate()
   const [storageConfig, setStorageConfig] = useState<Record<string, string> | null>(null)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
@@ -80,7 +79,7 @@ export default function Settings() {
           resolve()
         }
       })
-      window.location.href = '/'
+      window.close()
     } catch (err) {
       console.error('Failed to logout:', err)
     }
@@ -169,16 +168,45 @@ export default function Settings() {
   }
 
   return (
-    <div className="h-full overflow-y-auto pb-20">
-      <PageHeader title="設定" showBackButton={false} action={<SyncActions />} />
+    <div className="h-full overflow-y-auto">
+      <PageHeader title="設定" showBackButton={true} />
 
-      <div className="p-3 space-y-2">
+      <div className="p-3">
+        {/* 管理 */}
+        <section>
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+            管理
+          </h2>
+          <div className="space-y-1.5">
+            <Button
+              variant="secondary"
+              onClick={() => navigate('/labels')}
+              className="w-full text-sm justify-start gap-2"
+              size="sm"
+            >
+              <Tags size={14} />
+              ラベル管理
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => navigate('/trash')}
+              className="w-full text-sm justify-start gap-2"
+              size="sm"
+            >
+              <Trash2 size={14} />
+              ゴミ箱
+            </Button>
+          </div>
+        </section>
+
+        <Separator className="my-3" />
+
         {/* セキュリティ */}
-        <Card>
-          <CardHeader className="px-3 py-2">
-            <CardTitle className="text-sm font-medium">セキュリティ</CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3 pt-2 space-y-1.5">
+        <section>
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+            セキュリティ
+          </h2>
+          <div className="space-y-1.5">
             <Button
               onClick={() => setChangePasswordOpen(true)}
               className="w-full text-sm"
@@ -204,54 +232,54 @@ export default function Settings() {
             >
               ログアウト
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
+
+        <Separator className="my-3" />
 
         {/* ストレージ設定 */}
-        <Card>
-          <CardHeader className="px-3 py-2">
-            <CardTitle className="text-sm font-medium">ストレージ設定</CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3 pt-2">
-            {storageConfig ? (
-              <div className="space-y-3 text-sm">
+        <section>
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+            ストレージ設定
+          </h2>
+          {storageConfig ? (
+            <div className="space-y-3 text-sm">
+              <div>
+                <span className="font-medium text-text-secondary block mb-1">バケット</span>
+                <p className="text-text-primary font-mono">{storageConfig.bucket || 'N/A'}</p>
+              </div>
+              <div>
+                <span className="font-medium text-text-secondary block mb-1">リージョン</span>
+                <p className="text-text-primary font-mono">{storageConfig.region || 'N/A'}</p>
+              </div>
+              <div>
+                <span className="font-medium text-text-secondary block mb-1">ファイルパス</span>
+                <p className="text-text-primary font-mono break-all">
+                  {storageConfig.key || 'vault.json'}
+                </p>
+              </div>
+              {storageConfig.endpoint && (
                 <div>
-                  <span className="font-medium text-text-secondary block mb-1">バケット</span>
-                  <p className="text-text-primary font-mono">{storageConfig.bucket || 'N/A'}</p>
-                </div>
-                <div>
-                  <span className="font-medium text-text-secondary block mb-1">リージョン</span>
-                  <p className="text-text-primary font-mono">{storageConfig.region || 'N/A'}</p>
-                </div>
-                <div>
-                  <span className="font-medium text-text-secondary block mb-1">ファイルパス</span>
-                  <p className="text-text-primary font-mono break-all">
-                    {storageConfig.key || 'vault.json'}
+                  <span className="font-medium text-text-secondary block mb-1">エンドポイント</span>
+                  <p className="text-text-primary font-mono text-xs break-all">
+                    {storageConfig.endpoint}
                   </p>
                 </div>
-                {storageConfig.endpoint && (
-                  <div>
-                    <span className="font-medium text-text-secondary block mb-1">
-                      エンドポイント
-                    </span>
-                    <p className="text-text-primary font-mono text-xs break-all">
-                      {storageConfig.endpoint}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-text-muted text-sm">ストレージ設定が見つかりません</p>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </div>
+          ) : (
+            <p className="text-text-muted text-sm">ストレージ設定が見つかりません</p>
+          )}
+        </section>
+
+        <Separator className="my-3" />
 
         {/* このアプリについて */}
-        <Card>
-          <CardHeader className="px-3 py-2">
-            <CardTitle className="text-sm font-medium">このアプリについて</CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3 pt-2 space-y-1.5">
+        <section>
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+            このアプリについて
+          </h2>
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between text-sm">
               <p className="text-text-muted">バージョン</p>
               <p className="text-text-primary">v0.1.0</p>
@@ -267,8 +295,8 @@ export default function Settings() {
                 GitHub <ExternalLink size={10} />
               </a>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       </div>
 
       {/* ログアウト確認ダイアログ */}

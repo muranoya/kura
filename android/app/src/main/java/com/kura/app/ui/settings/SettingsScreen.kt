@@ -27,6 +27,8 @@ fun SettingsScreen(
     appViewModel: AppViewModel,
     onTrash: () -> Unit,
     onLabels: () -> Unit,
+    onSync: () -> Unit = {},
+    onBack: () -> Unit = {},
     onLogout: () -> Unit
 ) {
     var showChangePasswordDialog by remember { mutableStateOf(false) }
@@ -39,7 +41,16 @@ fun SettingsScreen(
     val context = LocalContext.current
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("設定") }) }
+        topBar = {
+            TopAppBar(
+                title = { Text("設定") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "戻る")
+                    }
+                }
+            )
+        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -49,24 +60,7 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Navigation
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column {
-                    Text("管理", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
-                    ListItem(
-                        headlineContent = { Text("ラベル管理") },
-                        leadingContent = { Icon(Icons.Default.Label, contentDescription = null) },
-                        modifier = Modifier.let { modifier ->
-                            @Suppress("DEPRECATION")
-                            modifier
-                        }
-                    )
-                    // Make it clickable using a wrapper
-                    Spacer(modifier = Modifier.height(0.dp))
-                }
-            }
-
-            // Clickable cards for navigation
+            // 管理
             Card(onClick = onLabels, modifier = Modifier.fillMaxWidth()) {
                 ListItem(
                     headlineContent = { Text("ラベル管理") },
@@ -78,6 +72,13 @@ fun SettingsScreen(
                 ListItem(
                     headlineContent = { Text("ゴミ箱") },
                     leadingContent = { Icon(Icons.Default.Delete, contentDescription = null) }
+                )
+            }
+
+            Card(onClick = onSync, modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    headlineContent = { Text("同期") },
+                    leadingContent = { Icon(Icons.Default.Sync, contentDescription = null) }
                 )
             }
 

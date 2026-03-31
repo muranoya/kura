@@ -1,5 +1,5 @@
 import { type ClassValue, clsx } from 'clsx'
-import { KeyRound, Settings, Star, Tags, Wand2 } from 'lucide-react'
+import { KeyRound, Star, Wand2 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { twMerge } from 'tailwind-merge'
 
@@ -10,9 +10,7 @@ function cn(...inputs: ClassValue[]) {
 const TAB_ROUTES = [
   { path: '/entries', icon: KeyRound, label: 'アイテム' },
   { path: '/favorites', icon: Star, label: 'お気に入り' },
-  { path: '/labels', icon: Tags, label: 'ラベル' },
   { path: '/password-generator', icon: Wand2, label: '生成' },
-  { path: '/settings', icon: Settings, label: '設定' },
 ]
 
 export function BottomNav() {
@@ -30,14 +28,14 @@ export function BottomNav() {
             key={path}
             to={path}
             className={cn(
-              'flex flex-col items-center justify-center gap-1 px-4 py-3 transition-colors',
-              'flex-1 text-center text-sm',
+              'flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 transition-colors',
+              'flex-1 text-center text-xs',
               isActiveTab(path)
                 ? 'text-accent border-t-2 border-accent'
                 : 'text-text-secondary hover:text-text-primary',
             )}
           >
-            <Icon size={20} />
+            <Icon size={16} />
             <span>{label}</span>
           </Link>
         ))}

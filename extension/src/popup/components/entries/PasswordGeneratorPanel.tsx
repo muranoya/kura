@@ -1,9 +1,9 @@
 import { Check, Copy, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import * as commands from '../../commands'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
 import { Label as UILabel } from '../ui/label'
+import { Separator } from '../ui/separator'
 
 interface PasswordGeneratorPanelProps {
   onUse?: (password: string) => void
@@ -65,50 +65,48 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
       {isInline && (
         <div className={wrapperClass}>
           {/* パスワード表示 */}
-          <Card className="border-0 shadow-none bg-bg-base">
-            <CardContent className="px-2 py-2">
-              {password ? (
-                <div className="flex items-center gap-2 p-2 rounded-md bg-bg-elevated border border-border">
-                  <span className="font-mono text-sm text-text-primary flex-1 break-all">
-                    {password}
-                  </span>
-                  <div className="flex gap-1 shrink-0">
+          <div className="px-2 py-2">
+            {password ? (
+              <div className="flex items-center gap-2 p-2 rounded-md bg-bg-elevated border border-border">
+                <span className="font-mono text-sm text-text-primary flex-1 break-all">
+                  {password}
+                </span>
+                <div className="flex gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleCopy}
+                    className="p-1 text-text-muted hover:text-text-primary transition-colors"
+                    title="コピー"
+                  >
+                    {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={loading}
+                    className="p-1 text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
+                    title="再生成"
+                  >
+                    <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                  </button>
+                  {onUse && (
                     <button
                       type="button"
-                      onClick={handleCopy}
-                      className="p-1 text-text-muted hover:text-text-primary transition-colors"
-                      title="コピー"
+                      onClick={() => onUse(password)}
+                      className="px-2 py-1 text-sm bg-accent text-white hover:bg-accent-hover rounded transition-colors whitespace-nowrap"
+                      title="このパスワードを使用"
                     >
-                      {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                      使用する
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleGenerate}
-                      disabled={loading}
-                      className="p-1 text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
-                      title="再生成"
-                    >
-                      <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                    </button>
-                    {onUse && (
-                      <button
-                        type="button"
-                        onClick={() => onUse(password)}
-                        className="px-2 py-1 text-sm bg-accent text-white hover:bg-accent-hover rounded transition-colors whitespace-nowrap"
-                        title="このパスワードを使用"
-                      >
-                        使用する
-                      </button>
-                    )}
-                  </div>
+                  )}
                 </div>
-              ) : (
-                <div className="p-2 rounded-md bg-bg-elevated border border-border text-center text-text-secondary text-sm">
-                  パスワードをまだ生成していません
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            ) : (
+              <div className="p-2 rounded-md bg-bg-elevated border border-border text-center text-text-secondary text-sm">
+                パスワードをまだ生成していません
+              </div>
+            )}
+          </div>
 
           {/* 設定（コンパクト版） */}
           <div className="space-y-2">
@@ -202,52 +200,52 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
       )}
 
       {!isInline && (
-        <div className="space-y-3">
+        <div>
           {/* パスワード表示 */}
-          <Card>
-            <CardHeader className="px-3 py-2">
-              <CardTitle className="text-sm font-medium">生成されたパスワード</CardTitle>
-            </CardHeader>
-            <CardContent className="px-3 pb-3 pt-2">
-              {password ? (
-                <div className="flex items-center gap-2 p-3 rounded-md bg-bg-elevated border border-border">
-                  <span className="font-mono text-sm text-text-primary flex-1 break-all">
-                    {password}
-                  </span>
-                  <div className="flex gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={handleCopy}
-                      className="p-1 text-text-muted hover:text-text-primary transition-colors"
-                      title="コピー"
-                    >
-                      {copied ? <Check size={16} className="text-success" /> : <Copy size={16} />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleGenerate}
-                      disabled={loading}
-                      className="p-1 text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
-                      title="再生成"
-                    >
-                      <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                    </button>
-                  </div>
+          <section>
+            <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+              生成されたパスワード
+            </h2>
+            {password ? (
+              <div className="flex items-center gap-2 p-3 rounded-md bg-bg-elevated border border-border">
+                <span className="font-mono text-sm text-text-primary flex-1 break-all">
+                  {password}
+                </span>
+                <div className="flex gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleCopy}
+                    className="p-1 text-text-muted hover:text-text-primary transition-colors"
+                    title="コピー"
+                  >
+                    {copied ? <Check size={16} className="text-success" /> : <Copy size={16} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={loading}
+                    className="p-1 text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
+                    title="再生成"
+                  >
+                    <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                  </button>
                 </div>
-              ) : (
-                <div className="p-3 rounded-md bg-bg-elevated border border-border text-center text-text-secondary text-sm">
-                  パスワードをまだ生成していません
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            ) : (
+              <div className="p-3 rounded-md bg-bg-elevated border border-border text-center text-text-secondary text-sm">
+                パスワードをまだ生成していません
+              </div>
+            )}
+          </section>
+
+          <Separator className="my-4" />
 
           {/* 設定 */}
-          <Card>
-            <CardHeader className="px-3 py-2">
-              <CardTitle className="text-sm font-medium">設定</CardTitle>
-            </CardHeader>
-            <CardContent className="px-3 pb-3 pt-2 space-y-3">
+          <section>
+            <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+              設定
+            </h2>
+            <div className="space-y-3">
               <div className="space-y-3">
                 <UILabel htmlFor="length" className="text-sm">
                   長さ: {length}
@@ -323,8 +321,8 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                   </label>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         </div>
       )}
     </div>

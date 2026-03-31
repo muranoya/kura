@@ -2,6 +2,7 @@ package com.kura.app.ui.sync
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Sync
@@ -18,7 +19,7 @@ enum class SyncStatus { IDLE, SYNCING, SUCCESS, ERROR }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SyncScreen(appViewModel: AppViewModel) {
+fun SyncScreen(appViewModel: AppViewModel, onBack: () -> Unit = {}) {
     var syncStatus by remember { mutableStateOf(SyncStatus.IDLE) }
     var lastSyncTime by remember { mutableStateOf<Long?>(null) }
     var errorMessage by remember { mutableStateOf("") }
@@ -33,7 +34,16 @@ fun SyncScreen(appViewModel: AppViewModel) {
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("同期") }) }
+        topBar = {
+            TopAppBar(
+                title = { Text("同期") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "戻る")
+                    }
+                }
+            )
+        }
     ) { padding ->
         Column(
             modifier = Modifier

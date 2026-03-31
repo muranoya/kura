@@ -27,6 +27,7 @@ fun EntryListScreen(
     onCreateClick: () -> Unit,
     onlyFavorites: Boolean = false,
     labelId: String? = null,
+    onSettings: (() -> Unit)? = null,
 ) {
     var entries by remember { mutableStateOf<List<EntryRow>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -79,6 +80,11 @@ fun EntryListScreen(
                                     onClick = { selectedType = type.value; filterExpanded = false }
                                 )
                             }
+                        }
+                    }
+                    if (onSettings != null) {
+                        IconButton(onClick = onSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "設定")
                         }
                     }
                 }

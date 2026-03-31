@@ -1,4 +1,4 @@
-import { Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { Pencil, Plus, Search, Settings, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
@@ -163,6 +163,17 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
 
         {/* 同期ボタン */}
         <SyncActions />
+
+        {/* 設定ボタン */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate('/settings')}
+          className="h-8 w-8 p-0 flex-shrink-0"
+          title="設定"
+        >
+          <Settings size={16} />
+        </Button>
       </div>
 
       {/* 左右分割レイアウト */}

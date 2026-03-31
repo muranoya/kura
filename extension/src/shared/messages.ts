@@ -126,14 +126,25 @@ export type MessageResponse =
       settings?: Record<string, unknown>
     })
 
-export function sendMessage<T extends Message>(message: T): Promise<MessageResponse> {
+export function sendMessage<T extends Message>(
+  message: T,
+  maxRetries = 2,
+  delayMs = 500,
+): Promise<MessageResponse> {
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(message, (response) => {
-      if (chrome.runtime.lastError) {
-        reject(chrome.runtime.lastError)
-      } else {
-        resolve(response || { success: false, error: 'No response' })
-      }
-    })
+    const attempt = (retriesLeft: number) => {
+      chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError) {
+          if (retriesLeft > 0) {
+            setTimeout(() => attempt(retriesLeft - 1), delayMs)
+          } else {
+            reject(chrome.runtime.lastError)
+          }
+        } else {
+          resolve(response || { success: false, error: 'No response' })
+        }
+      })
+    }
+    attempt(maxRetries)
   })
 }

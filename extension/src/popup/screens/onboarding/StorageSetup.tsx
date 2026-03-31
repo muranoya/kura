@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { STORAGE_KEYS } from '../../../shared/constants'
+import { sendMessage } from '../../../shared/messages'
 import { saveToStorage } from '../../../shared/storage'
 import type { S3Config } from '../../../shared/types'
 import { PageHeader } from '../../components/layout/PageHeader'
@@ -39,29 +40,18 @@ export default function StorageSetup() {
       console.log('[StorageSetup] Config saved successfully')
 
       // DOWNLOAD_VAULT メッセージを送信してVault存在確認
-      const response = await new Promise<{
-        success?: boolean
-        error?: string
-        vaultExists?: boolean
-      }>((resolve, reject) => {
-        chrome.runtime.sendMessage({ type: 'DOWNLOAD_VAULT' }, (resp) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message))
-          } else {
-            resolve(resp)
-          }
-        })
-      })
+      const response = await sendMessage({ type: 'DOWNLOAD_VAULT' as const })
 
-      if (!response?.success) {
-        throw new Error(response?.error || 'Vault確認に失敗しました')
+      if (!response.success) {
+        const errorMsg = 'error' in response ? response.error : 'Vault確認に失敗しました'
+        throw new Error(errorMsg)
       }
 
       // clearDraftは成功後のみ実行
       await clearDraft()
 
       // vaultExists の結果に基づいて分岐
-      if (response.vaultExists) {
+      if ('vaultExists' in response && response.vaultExists) {
         // 既存Vault使用フロー
         console.log('[StorageSetup] Vault exists, navigating to unlock-existing')
         navigate('/onb/unlock-existing', { state: { fromOnboarding: true } })
@@ -86,7 +76,7 @@ export default function StorageSetup() {
   }
 
   return (
-    <div className="h-full overflow-y-auto pb-20 flex flex-col">
+    <div className="h-full overflow-y-auto pb-4 flex flex-col">
       <PageHeader title="ストレージ設定" subtitle="S3互換のクラウドストレージを設定します" />
 
       <div className="p-4 space-y-4">

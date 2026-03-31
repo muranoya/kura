@@ -5,7 +5,6 @@ import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { EmptyState } from '../../components/layout/EmptyState'
 import { PageHeader } from '../../components/layout/PageHeader'
-import { SyncActions } from '../../components/layout/SyncActions'
 import { Button } from '../../components/ui/button'
 import type { EntryRow } from '../../shared/types'
 
@@ -62,8 +61,8 @@ export default function Trash() {
   }
 
   return (
-    <div className="h-full overflow-y-auto pb-20 flex flex-col">
-      <PageHeader title="ゴミ箱" showBackButton={false} action={<SyncActions />} />
+    <div className="h-full overflow-y-auto flex flex-col">
+      <PageHeader title="ゴミ箱" showBackButton={true} />
 
       {error && (
         <div className="mx-4 mt-4 p-3 bg-danger/10 text-danger text-sm rounded-md">{error}</div>

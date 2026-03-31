@@ -58,8 +58,8 @@ body,
 }
 
 body {
-  width: 720px;
-  height: 616px;
+  width: 640px;
+  height: 520px;
   padding: 8px;
   overflow: hidden;
   background-color: var(--bg-base);
@@ -71,7 +71,7 @@ body {
 
 #root {
   width: 100%;
-  height: 600px;
+  height: 504px;
   background-color: var(--bg-surface);
   border-radius: 8px;
   overflow: hidden;

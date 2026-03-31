@@ -64,8 +64,6 @@ val bottomNavItems = listOf(
     BottomNavItem.Items,
     BottomNavItem.Favorites,
     BottomNavItem.Generator,
-    BottomNavItem.Sync,
-    BottomNavItem.Settings,
 )
 
 @Composable
@@ -203,7 +201,8 @@ fun MainNavHost(appViewModel: AppViewModel) {
                     appViewModel = appViewModel,
                     onEntryClick = { id -> navController.navigate(Routes.entryDetail(id)) },
                     onCreateClick = { navController.navigate(Routes.ENTRY_CREATE) },
-                    onlyFavorites = false
+                    onlyFavorites = false,
+                    onSettings = { navController.navigate(Routes.SETTINGS) }
                 )
             }
             composable(Routes.FAVORITES) {
@@ -211,7 +210,8 @@ fun MainNavHost(appViewModel: AppViewModel) {
                     appViewModel = appViewModel,
                     onEntryClick = { id -> navController.navigate(Routes.entryDetail(id)) },
                     onCreateClick = { navController.navigate(Routes.ENTRY_CREATE) },
-                    onlyFavorites = true
+                    onlyFavorites = true,
+                    onSettings = { navController.navigate(Routes.SETTINGS) }
                 )
             }
             composable(
@@ -276,16 +276,24 @@ fun MainNavHost(appViewModel: AppViewModel) {
                 )
             }
             composable(Routes.PASSWORD_GENERATOR) {
-                PasswordGeneratorScreen(appViewModel = appViewModel)
+                PasswordGeneratorScreen(
+                    appViewModel = appViewModel,
+                    onSettings = { navController.navigate(Routes.SETTINGS) }
+                )
             }
             composable(Routes.SYNC) {
-                SyncScreen(appViewModel = appViewModel)
+                SyncScreen(
+                    appViewModel = appViewModel,
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(Routes.SETTINGS) {
                 SettingsScreen(
                     appViewModel = appViewModel,
                     onTrash = { navController.navigate(Routes.TRASH) },
                     onLabels = { navController.navigate(Routes.LABEL_MANAGER) },
+                    onSync = { navController.navigate(Routes.SYNC) },
+                    onBack = { navController.popBackStack() },
                     onLogout = {
                         appViewModel.setAppState(AppState.ONBOARDING)
                     }
