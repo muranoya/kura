@@ -59,7 +59,7 @@ impl RecoveryKey {
 
     /// Derive KEK from recovery key using Argon2
     pub fn derive_kek(&self, params: &crate::models::Argon2Params) -> Result<super::Kek> {
-        let recovery_key_str = self.to_display_string();
+        let recovery_key_str = zeroize::Zeroizing::new(self.to_display_string());
         super::kdf::derive_kek(&recovery_key_str, params)
     }
 }

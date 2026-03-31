@@ -10,7 +10,7 @@ impl UnlockedVault {
         let mut result = Vec::new();
         for (id, vault_entry) in &self.contents.entries {
             if filter.matches(vault_entry) {
-                result.push(vault_entry_to_entry(id.clone(), vault_entry));
+                result.push(vault_entry_to_entry(id.clone(), vault_entry)?);
             }
         }
         result.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -19,7 +19,10 @@ impl UnlockedVault {
 
     /// Get single entry (decrypted)
     pub fn get_entry(&self, id: &str) -> Result<Option<Entry>> {
-        Ok(self.contents.entries.get(id).map(|e| vault_entry_to_entry(id.to_string(), e)))
+        match self.contents.entries.get(id) {
+            Some(e) => Ok(Some(vault_entry_to_entry(id.to_string(), e)?)),
+            None => Ok(None),
+        }
     }
 
     /// Create entry
@@ -62,10 +65,14 @@ impl UnlockedVault {
         })
     }
 
-    /// Update entry
+    /// Update entry (only active entries can be updated)
     pub fn update_entry(&mut self, id: &str, name: String, data: EntryData) -> Result<()> {
         let entry = self.contents.entries.get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
+
+        if entry.deleted_at.is_some() || entry.purged_at.is_some() {
+            return Err(VaultError::EntryNotFound(id.to_string()));
+        }
 
         entry.name = name;
         entry.typed_value = zeroize::Zeroizing::new(data.typed_value.to_string());
@@ -86,20 +93,31 @@ impl UnlockedVault {
         Ok(())
     }
 
-    /// Restore entry from trash
+    /// Restore entry from trash (only soft-deleted entries can be restored)
     pub fn restore_entry(&mut self, id: &str) -> Result<()> {
         let entry = self.contents.entries.get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
+
+        if entry.purged_at.is_some() {
+            return Err(VaultError::InvalidInput("Cannot restore a purged entry".to_string()));
+        }
+
         entry.deleted_at = None;
         entry.updated_at = crate::get_timestamp();
         Ok(())
     }
 
     /// Permanently delete entry (converts to tombstone)
-    /// Clears sensitive data and marks as purged for sync-safe deletion
+    /// Clears sensitive data and marks as purged for sync-safe deletion.
+    /// Idempotent: calling on an already-purged entry is a no-op.
     pub fn purge_entry(&mut self, id: &str) -> Result<()> {
         let entry = self.contents.entries.get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
+
+        // Already purged — no-op for idempotency
+        if entry.purged_at.is_some() {
+            return Ok(());
+        }
 
         let now = crate::get_timestamp();
 
@@ -120,10 +138,15 @@ impl UnlockedVault {
         Ok(())
     }
 
-    /// Set entry favorite
+    /// Set entry favorite (only active entries)
     pub fn set_favorite(&mut self, id: &str, is_favorite: bool) -> Result<()> {
         let entry = self.contents.entries.get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
+
+        if entry.deleted_at.is_some() || entry.purged_at.is_some() {
+            return Err(VaultError::EntryNotFound(id.to_string()));
+        }
+
         entry.is_favorite = is_favorite;
         entry.updated_at = crate::get_timestamp();
         Ok(())
@@ -388,14 +411,83 @@ mod tests {
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].name, "GitHub Login");
     }
+
+    // ===== State transition guard tests =====
+
+    #[test]
+    fn test_update_deleted_entry_fails() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "Test", 1000);
+        vault.delete_entry("e1").unwrap();
+
+        let data = make_login_data();
+        let result = vault.update_entry("e1", "Updated".into(), data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_update_purged_entry_fails() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "Test", 1000);
+        vault.purge_entry("e1").unwrap();
+
+        let data = make_login_data();
+        let result = vault.update_entry("e1", "Updated".into(), data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_restore_purged_entry_fails() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "Test", 1000);
+        vault.purge_entry("e1").unwrap();
+
+        let result = vault.restore_entry("e1");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_purge_is_idempotent() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "Test", 1000);
+        vault.purge_entry("e1").unwrap();
+
+        let first_purged_at = vault.contents.entries["e1"].purged_at;
+
+        // Second purge should be a no-op
+        vault.purge_entry("e1").unwrap();
+        assert_eq!(vault.contents.entries["e1"].purged_at, first_purged_at);
+    }
+
+    #[test]
+    fn test_set_favorite_deleted_entry_fails() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "Test", 1000);
+        vault.delete_entry("e1").unwrap();
+
+        let result = vault.set_favorite("e1", true);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_set_favorite_purged_entry_fails() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "Test", 1000);
+        vault.purge_entry("e1").unwrap();
+
+        let result = vault.set_favorite("e1", true);
+        assert!(result.is_err());
+    }
 }
 
 /// Helper function to convert VaultEntry to Entry
-pub(crate) fn vault_entry_to_entry(id: String, e: &VaultEntry) -> Entry {
+pub(crate) fn vault_entry_to_entry(id: String, e: &VaultEntry) -> Result<Entry> {
     // Convert typed_value back to EntryData
     // Zeroizing<String> contains JSON that needs to be parsed
-    let typed_value = serde_json::from_str(e.typed_value.as_ref())
-        .unwrap_or_else(|_| serde_json::json!({}));
+    let typed_value: serde_json::Value = serde_json::from_str(e.typed_value.as_ref())
+        .map_err(|err| VaultError::InvalidInput(
+            format!("Corrupted typed_value for entry {}: {}", id, err)
+        ))?;
 
     let data = EntryData {
         entry_type: e.entry_type,
@@ -404,7 +496,7 @@ pub(crate) fn vault_entry_to_entry(id: String, e: &VaultEntry) -> Entry {
         custom_fields: e.custom_fields.clone(),
     };
 
-    Entry {
+    Ok(Entry {
         id,
         name: e.name.clone(),
         entry_type: e.entry_type,
@@ -414,5 +506,5 @@ pub(crate) fn vault_entry_to_entry(id: String, e: &VaultEntry) -> Entry {
         deleted_at: e.deleted_at,
         data,
         labels: e.label_ids.clone(),
-    }
+    })
 }

@@ -864,4 +864,92 @@ mod tests {
         assert!(EntryState::Purged.deletion_priority() > EntryState::SoftDeleted.deletion_priority());
         assert!(EntryState::SoftDeleted.deletion_priority() > EntryState::Active.deletion_priority());
     }
+
+    // ===== Commutativity tests =====
+
+    /// Helper to compare merge results ignoring HashMap ordering
+    fn merge_results_equal(a: &MergeResult, b: &MergeResult) -> bool {
+        if a.merged_entries.len() != b.merged_entries.len() {
+            return false;
+        }
+        if a.merged_labels.len() != b.merged_labels.len() {
+            return false;
+        }
+        for (id, entry_a) in &a.merged_entries {
+            match b.merged_entries.get(id) {
+                None => return false,
+                Some(entry_b) => {
+                    if entry_a.name != entry_b.name
+                        || entry_a.updated_at != entry_b.updated_at
+                        || entry_a.deleted_at != entry_b.deleted_at
+                        || entry_a.purged_at != entry_b.purged_at
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+        for (id, label_a) in &a.merged_labels {
+            match b.merged_labels.get(id) {
+                None => return false,
+                Some(label_b) => {
+                    if label_a.name != label_b.name || label_a.deleted_at != label_b.deleted_at {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
+
+    #[test]
+    fn test_merge_commutativity_active_entries() {
+        let (id, entry_a) = create_entry("id1", "A", 1000);
+        let (_, mut entry_b) = create_entry("id1", "B", 2000);
+        entry_b.updated_at = 2000;
+
+        let a = make_contents(vec![(id.clone(), entry_a.clone())], vec![]);
+        let b = make_contents(vec![(id.clone(), entry_b.clone())], vec![]);
+
+        let ab = merge(&a, &b);
+        let ba = merge(&b, &a);
+        assert!(merge_results_equal(&ab, &ba));
+    }
+
+    #[test]
+    fn test_merge_commutativity_mixed_states() {
+        let (id1, entry1) = create_entry("id1", "Active", 2000);
+        let (id2, entry2) = create_soft_deleted("id2", "SoftDel", 1500, 1500);
+        let (id3, entry3) = create_purged("id3", 1000, 1000, 1000);
+        let (_, entry1r) = create_soft_deleted("id1", "Deleted", 1800, 1800);
+        let (_, mut entry2r) = create_entry("id2", "Restored", 2000);
+        entry2r.updated_at = 2000;
+
+        let a = make_contents(
+            vec![(id1.clone(), entry1), (id2.clone(), entry2), (id3.clone(), entry3.clone())],
+            vec![("l1".into(), label("Work")), ("l2".into(), deleted_label("Old", 500))],
+        );
+        let b = make_contents(
+            vec![(id1.clone(), entry1r), (id2.clone(), entry2r), (id3.clone(), entry3)],
+            vec![("l1".into(), deleted_label("Work", 1000)), ("l2".into(), label("Old"))],
+        );
+
+        let ab = merge(&a, &b);
+        let ba = merge(&b, &a);
+        assert!(merge_results_equal(&ab, &ba));
+    }
+
+    #[test]
+    fn test_merge_commutativity_soft_deleted_vs_purged() {
+        // D-13/D-17 special case
+        let (id, entry_sd) = create_soft_deleted("id1", "SoftDeleted", 2000, 2000);
+        let (_, entry_p) = create_purged("id1", 1000, 1000, 1000);
+
+        let a = make_contents(vec![(id.clone(), entry_sd)], vec![]);
+        let b = make_contents(vec![(id.clone(), entry_p)], vec![]);
+
+        let ab = merge(&a, &b);
+        let ba = merge(&b, &a);
+        assert!(merge_results_equal(&ab, &ba));
+    }
 }

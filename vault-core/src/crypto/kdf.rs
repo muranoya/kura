@@ -24,10 +24,33 @@ impl Kek {
     }
 }
 
+/// Minimum Argon2 parameters to prevent intentionally weak configurations
+const MIN_ARGON2_ITERATIONS: u32 = 3;
+const MIN_ARGON2_MEMORY: u32 = 65536; // 64 MiB
+const MIN_SALT_LENGTH: usize = 16;
+
 /// Derive KEK from password using Argon2
 pub fn derive_kek(password: &str, params: &crate::models::Argon2Params) -> Result<Kek> {
     let salt_bytes = base32_decode(&params.salt)
         .ok_or_else(|| VaultError::InvalidConfiguration("Invalid salt encoding".to_string()))?;
+
+    if salt_bytes.len() < MIN_SALT_LENGTH {
+        return Err(VaultError::InvalidConfiguration(
+            format!("Salt must be at least {} bytes, got {}", MIN_SALT_LENGTH, salt_bytes.len())
+        ));
+    }
+
+    if params.iterations < MIN_ARGON2_ITERATIONS {
+        return Err(VaultError::InvalidConfiguration(
+            format!("Argon2 iterations must be at least {}", MIN_ARGON2_ITERATIONS)
+        ));
+    }
+
+    if params.memory < MIN_ARGON2_MEMORY {
+        return Err(VaultError::InvalidConfiguration(
+            format!("Argon2 memory must be at least {} KiB", MIN_ARGON2_MEMORY)
+        ));
+    }
 
     let argon2_params = Params::new(
         params.memory,

@@ -39,7 +39,8 @@ pub fn decrypt_vault(encrypted_b64: &str, dek: &super::Dek) -> Result<VaultConte
     let encrypted_data = engine.decode(encrypted_b64)
         .map_err(|_| VaultError::DecryptionError("Invalid base64 encoding".to_string()))?;
 
-    if encrypted_data.len() < 12 {
+    // Minimum: 12-byte IV + 16-byte GCM tag + at least 1 byte ciphertext
+    if encrypted_data.len() < 29 {
         return Err(VaultError::DecryptionError(
             "Encrypted data too short".to_string(),
         ));
