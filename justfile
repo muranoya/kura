@@ -42,25 +42,6 @@ default: help
 	echo "  - Cargo: $(cargo --version | head -1)"
 	echo "  - wasm-pack: $(wasm-pack --version)"
 
-# Mobile app (iOS + Android)
-@release-mobile: check-dependencies
-	echo ""
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo "🔨 Building mobile app (iOS + Android)..."
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo ""
-	cd {{MOBILE_DIR}} && flutter pub get
-	echo ""
-	echo "📱 Building iOS release..."
-	cd {{MOBILE_DIR}} && flutter build ios --release
-	echo ""
-	echo "🤖 Building Android release (AAB - Google Play)..."
-	cd {{MOBILE_DIR}} && flutter build appbundle --release
-	echo ""
-	echo "✅ Mobile builds completed!"
-	echo "  - iOS: {{MOBILE_DIR}}/build/ios/Release-iphoneos/"
-	echo "  - Android AAB: {{MOBILE_DIR}}/build/app/outputs/bundle/release/"
-
 # Desktop app - Development (Tauri with hot reload)
 @dev-desktop: check-dependencies
 	echo ""
@@ -236,10 +217,9 @@ default: help
 	echo ""
 	echo "╔━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╗"
 	echo "║                    kura Release Build                  ║"
-	echo "║             Building all apps: iOS, Android,           ║"
-	echo "║         Desktop (macOS/Windows/Linux), Extension       ║"
+	echo "║         Building all apps: Android, Desktop,           ║"
+	echo "║              Extension, and other clients              ║"
 	echo "╚━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╝"
-	just release-mobile
 	just release-android
 	just release-desktop
 	just release-extension-chrome
@@ -252,8 +232,6 @@ default: help
 # クリーンアップ
 @clean:
 	echo "🧹 Cleaning build artifacts..."
-	echo "  - Mobile..."
-	cd {{MOBILE_DIR}} && flutter clean
 	echo "  - Desktop..."
 	cd {{DESKTOP_DIR}} && rm -rf dist/ build/ node_modules/
 	cd {{DESKTOP_DIR}}/src-tauri && cargo clean
@@ -269,9 +247,6 @@ default: help
 	echo "kura - Release Build Helper"
 	echo ""
 	echo "Usage:"
-	echo "  📱 Mobile:"
-	echo "    just release-mobile       - Build mobile app (iOS + Android)"
-	echo ""
 	echo "  🤖 Android:"
 	echo "    just build-android-debug       - Build Android debug APK (all ABIs)"
 	echo "    just build-android-debug-fast  - Build Android debug APK (arm64 only, fast)"
