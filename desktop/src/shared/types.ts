@@ -60,4 +60,3 @@ export interface AppSettings {
   autolockMinutes: number
   autolockOnBackground: boolean
 }
-

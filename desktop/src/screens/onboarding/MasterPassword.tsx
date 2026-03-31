@@ -1,12 +1,12 @@
+import { AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
+import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
+import { Card, CardContent } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import { PageHeader } from '../../components/layout/PageHeader'
-import { AlertCircle, CheckCircle2 } from 'lucide-react'
 
 export default function MasterPassword() {
   const navigate = useNavigate()
@@ -46,7 +46,10 @@ export default function MasterPassword() {
 
   return (
     <div className="min-h-screen bg-bg-base">
-      <PageHeader title="マスターパスワード設定" subtitle="Vault全体を保護するパスワードを設定します" />
+      <PageHeader
+        title="マスターパスワード設定"
+        subtitle="Vault全体を保護するパスワードを設定します"
+      />
 
       <div className="max-w-2xl mx-auto p-6">
         {/* セキュリティアラート */}
@@ -85,7 +88,9 @@ export default function MasterPassword() {
                     setError('')
                   }}
                 />
-                <p className="text-xs text-text-muted mt-1.5">8文字以上の強力なパスワードを設定してください</p>
+                <p className="text-xs text-text-muted mt-1.5">
+                  8文字以上の強力なパスワードを設定してください
+                </p>
               </div>
 
               {/* パスワード確認 */}

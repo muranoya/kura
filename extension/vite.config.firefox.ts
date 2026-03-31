@@ -1,19 +1,13 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
 import { crx } from '@crxjs/vite-plugin'
-import wasm from 'vite-plugin-wasm'
-import topLevelAwait from 'vite-plugin-top-level-await'
 import tailwindcss from '@tailwindcss/vite'
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
+import topLevelAwait from 'vite-plugin-top-level-await'
+import wasm from 'vite-plugin-wasm'
 import manifest from './manifest.firefox.json'
 
 export default defineConfig({
-  plugins: [
-    react(),
-    wasm(),
-    topLevelAwait(),
-    tailwindcss(),
-    crx({ manifest }),
-  ],
+  plugins: [react(), wasm(), topLevelAwait(), tailwindcss(), crx({ manifest })],
   build: {
     target: 'esnext',
     rollupOptions: {

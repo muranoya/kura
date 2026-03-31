@@ -1,4 +1,5 @@
-import { useState, ReactNode } from 'react'
+import { AlertCircle } from 'lucide-react'
+import { useState } from 'react'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -8,7 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog'
-import { AlertCircle } from 'lucide-react'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -56,18 +56,12 @@ export function ConfirmDialog({
             )}
             <div className="flex-1">
               <DialogTitle>{title}</DialogTitle>
-              <DialogDescription className="mt-2">
-                {description}
-              </DialogDescription>
+              <DialogDescription className="mt-2">{description}</DialogDescription>
             </div>
           </div>
         </DialogHeader>
         <DialogFooter className="gap-2">
-          <Button
-            variant="secondary"
-            onClick={onCancel}
-            disabled={isProcessing || isLoading}
-          >
+          <Button variant="secondary" onClick={onCancel} disabled={isProcessing || isLoading}>
             {cancelText}
           </Button>
           <Button

@@ -1,12 +1,12 @@
-import { useNavigate, useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { KeyRound, Settings, Star, Tag, Tags, Trash2, Wand2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import * as commands from '../commands'
 import { useSyncVersion } from '../contexts/SyncContext'
-import { Label } from '../shared/types'
-import { KeyRound, Star, Tags, Settings, Trash2, Wand2, Tag } from 'lucide-react'
 import { cn } from '../lib/utils'
+import type { Label } from '../shared/types'
 
-interface SidebarProps {}
+type SidebarProps = Record<string, never>
 
 interface NavItem {
   icon: React.ReactNode
@@ -25,14 +25,18 @@ const bottomNavItems: NavItem[] = [
   { icon: <Settings size={18} />, label: '設定', path: '/settings' },
 ]
 
-export default function Sidebar({}: SidebarProps) {
+export default function Sidebar(_props: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const syncVersion = useSyncVersion()
   const [labels, setLabels] = useState<Label[]>([])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally re-fetch labels on navigation and sync
   useEffect(() => {
-    commands.listLabels().then(setLabels).catch(() => {})
+    commands
+      .listLabels()
+      .then(setLabels)
+      .catch(() => {})
   }, [location.pathname, syncVersion])
 
   return (
@@ -48,20 +52,22 @@ export default function Sidebar({}: SidebarProps) {
         <ul className="space-y-2">
           {mainNavItems.map((item) => {
             // ラベル行は厳密一致で判定（/labels/:id/entries との区別のため）
-            const isActive = item.path === '/labels'
-              ? location.pathname === item.path
-              : location.pathname.startsWith(item.path)
+            const isActive =
+              item.path === '/labels'
+                ? location.pathname === item.path
+                : location.pathname.startsWith(item.path)
 
             return (
               <div key={item.path}>
                 <li>
                   <button
+                    type="button"
                     onClick={() => navigate(item.path)}
                     className={cn(
                       'w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
                       isActive
                         ? 'bg-accent text-white'
-                        : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
+                        : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated',
                     )}
                   >
                     {item.icon}
@@ -72,17 +78,18 @@ export default function Sidebar({}: SidebarProps) {
                 {/* ラベルサブリスト */}
                 {item.path === '/labels' && labels.length > 0 && (
                   <ul className="mt-1 ml-4 space-y-0.5">
-                    {labels.map(label => {
+                    {labels.map((label) => {
                       const isLabelActive = location.pathname === `/labels/${label.id}/entries`
                       return (
                         <li key={label.id}>
                           <button
+                            type="button"
                             onClick={() => navigate(`/labels/${label.id}/entries`)}
                             className={cn(
                               'w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
                               isLabelActive
                                 ? 'bg-accent text-white'
-                                : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
+                                : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated',
                             )}
                           >
                             <Tag size={12} />
@@ -103,12 +110,13 @@ export default function Sidebar({}: SidebarProps) {
       <div className="border-t border-border px-2 py-4 space-y-2">
         {/* ゴミ箱ボタン */}
         <button
+          type="button"
           onClick={() => navigate('/trash')}
           className={cn(
             'w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
             location.pathname === '/trash'
               ? 'bg-accent text-white'
-              : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
+              : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated',
           )}
         >
           <Trash2 size={18} />
@@ -120,13 +128,14 @@ export default function Sidebar({}: SidebarProps) {
           const isActive = location.pathname.startsWith(item.path)
           return (
             <button
+              type="button"
               key={item.path}
               onClick={() => navigate(item.path)}
               className={cn(
                 'w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
                 isActive
                   ? 'bg-accent text-white'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated',
               )}
             >
               {item.icon}

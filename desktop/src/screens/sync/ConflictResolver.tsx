@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
+import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
-import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 
 export default function ConflictResolver() {
   const navigate = useNavigate()

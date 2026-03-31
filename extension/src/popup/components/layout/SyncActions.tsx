@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
-import { RefreshCw, Loader2 } from 'lucide-react'
-import { Button } from '../ui/button'
-import { getFromStorage } from '../../../shared/storage'
+import { Loader2, RefreshCw } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { STORAGE_KEYS } from '../../../shared/constants'
+import { getFromStorage } from '../../../shared/storage'
 import * as commands from '../../commands'
+import { Button } from '../ui/button'
 
 function formatRelativeTime(unixSecs: number): string {
   const diffMin = Math.floor((Date.now() / 1000 - unixSecs) / 60)
@@ -18,7 +18,7 @@ export function SyncActions() {
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [storageConfigExists, setStorageConfigExists] = useState(true)
-  const [tick, setTick] = useState(0)
+  const [_tick, setTick] = useState(0)
 
   useEffect(() => {
     loadLastSyncTime()
@@ -27,13 +27,13 @@ export function SyncActions() {
   // Auto-update relative time every minute
   useEffect(() => {
     if (!lastSyncTime) return
-    const timer = setInterval(() => setTick(t => t + 1), 60000)
+    const timer = setInterval(() => setTick((t) => t + 1), 60000)
     return () => clearInterval(timer)
   }, [lastSyncTime])
 
   const loadLastSyncTime = async () => {
     try {
-      const config = await getFromStorage<any>(STORAGE_KEYS.S3_CONFIG)
+      const config = await getFromStorage<Record<string, string>>(STORAGE_KEYS.S3_CONFIG)
       setStorageConfigExists(!!config)
 
       const stored = await getFromStorage<number | string>(STORAGE_KEYS.LAST_SYNC_TIME)
@@ -85,11 +85,7 @@ export function SyncActions() {
         variant="ghost"
         className="text-xs px-1.5 h-6"
       >
-        {syncing ? (
-          <Loader2 className="w-3 h-3 animate-spin" />
-        ) : (
-          <RefreshCw className="w-3 h-3" />
-        )}
+        {syncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
       </Button>
     </div>
   )

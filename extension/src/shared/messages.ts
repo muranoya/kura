@@ -1,6 +1,6 @@
 // Type-safe messaging between popup and Service Worker
 
-import { EntryRow, Label, EntryFilter, SyncConflict } from '../vault/types'
+import type { EntryFilter, EntryRow, Label, SyncConflict } from '../vault/types'
 
 export type Message =
   // Auth
@@ -14,8 +14,24 @@ export type Message =
   // Entries
   | { type: 'LIST_ENTRIES'; filter: EntryFilter }
   | { type: 'GET_ENTRY'; id: string }
-  | { type: 'CREATE_ENTRY'; entryType: string; name: string; typedValue: any; notes?: string; labelIds?: string[]; customFields?: any[] }
-  | { type: 'UPDATE_ENTRY'; id: string; name: string; typedValue: any; notes?: string; labelIds?: string[]; customFields?: any[] }
+  | {
+      type: 'CREATE_ENTRY'
+      entryType: string
+      name: string
+      typedValue: Record<string, unknown>
+      notes?: string
+      labelIds?: string[]
+      customFields?: Record<string, unknown>[]
+    }
+  | {
+      type: 'UPDATE_ENTRY'
+      id: string
+      name: string
+      typedValue: Record<string, unknown>
+      notes?: string
+      labelIds?: string[]
+      customFields?: Record<string, unknown>[]
+    }
   | { type: 'DELETE_ENTRY'; id: string }
   | { type: 'RESTORE_ENTRY'; id: string }
   | { type: 'PURGE_ENTRY'; id: string }
@@ -32,7 +48,14 @@ export type Message =
   | { type: 'SET_ENTRY_LABELS'; entryId: string; labelIds: string[] }
 
   // Password & TOTP
-  | { type: 'GENERATE_PASSWORD'; length: number; includeUppercase: boolean; includeLowercase: boolean; includeNumbers: boolean; includeSymbols: boolean }
+  | {
+      type: 'GENERATE_PASSWORD'
+      length: number
+      includeUppercase: boolean
+      includeLowercase: boolean
+      includeNumbers: boolean
+      includeSymbols: boolean
+    }
   | { type: 'GENERATE_TOTP'; secret: string }
 
   // Security
@@ -50,7 +73,7 @@ export type Message =
 
   // Settings
   | { type: 'GET_SETTINGS' }
-  | { type: 'SAVE_SETTINGS'; settings: Record<string, any> }
+  | { type: 'SAVE_SETTINGS'; settings: Record<string, unknown> }
   | { type: 'CLIPBOARD_COPIED' }
 
 export type MessageResponse =
@@ -100,12 +123,10 @@ export type MessageResponse =
 
   // Settings responses
   | ({ success: true } & {
-      settings?: Record<string, any>
+      settings?: Record<string, unknown>
     })
 
-export function sendMessage<T extends Message>(
-  message: T
-): Promise<MessageResponse> {
+export function sendMessage<T extends Message>(message: T): Promise<MessageResponse> {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(message, (response) => {
       if (chrome.runtime.lastError) {

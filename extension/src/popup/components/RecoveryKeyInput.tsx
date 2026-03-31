@@ -10,7 +10,7 @@ export default function RecoveryKeyInput({
   placeholder = 'XXXX-XXXX-...',
 }: RecoveryKeyInputProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let input = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '')
+    const input = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '')
 
     // Auto-format with dashes every 4 characters
     const parts = input.split('-').filter((p) => p)

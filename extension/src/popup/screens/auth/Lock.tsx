@@ -1,12 +1,12 @@
-import { useState, useCallback } from 'react'
+import { Lock } from 'lucide-react'
+import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Button } from '../../components/ui/button'
+import { Card, CardContent } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { Lock } from 'lucide-react'
 
 export default function LockScreen() {
   const navigate = useNavigate()

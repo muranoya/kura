@@ -1,17 +1,16 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
 import * as commands from '../../commands'
-import { getFromStorage } from '../../shared/storage'
-import { Label, CustomField } from '../../shared/types'
-import { Button } from '../../components/ui/button'
 import EntryForm from '../../components/entries/EntryForm'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
+import { Button } from '../../components/ui/button'
+import type { CustomField, Label } from '../../shared/types'
 
 export default function EntryCreate() {
   const navigate = useNavigate()
   const [entryType, setEntryType] = useState('login')
   const [name, setName] = useState('')
-  const [typedValue, setTypedValue] = useState<Record<string, any>>({})
+  const [typedValue, setTypedValue] = useState<Record<string, string | null>>({})
   const [notes, setNotes] = useState<string | null>(null)
   const [customFields, setCustomFields] = useState<CustomField[]>([])
   const [allLabels, setAllLabels] = useState<Label[]>([])
@@ -39,15 +38,30 @@ export default function EntryCreate() {
     setLoading(true)
     try {
       const typedValueJson = JSON.stringify(typedValue)
-      const customFieldsJson = customFields.length > 0
-        ? JSON.stringify(customFields.map(f => ({ id: f.id, name: f.name, field_type: f.fieldType, value: f.value })))
-        : undefined
-      const id = await commands.createEntry(entryType, name, typedValueJson, notes || undefined, selectedLabelIds, customFieldsJson)
+      const customFieldsJson =
+        customFields.length > 0
+          ? JSON.stringify(
+              customFields.map((f) => ({
+                id: f.id,
+                name: f.name,
+                field_type: f.fieldType,
+                value: f.value,
+              })),
+            )
+          : undefined
+      const id = await commands.createEntry(
+        entryType,
+        name,
+        typedValueJson,
+        notes || undefined,
+        selectedLabelIds,
+        customFieldsJson,
+      )
 
       // Save vault to file and sync to S3 (background)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
+      commands.syncVaultIfConfigured().catch((e) => console.warn('Sync failed:', e))
 
       navigate(`/entries/${id}`)
     } catch (err) {
@@ -74,7 +88,7 @@ export default function EntryCreate() {
           name={name}
           onNameChange={setName}
           typedValue={typedValue}
-          onTypedValueChange={(key, value) => setTypedValue(prev => ({ ...prev, [key]: value }))}
+          onTypedValueChange={(key, value) => setTypedValue((prev) => ({ ...prev, [key]: value }))}
           notes={notes}
           onNotesChange={setNotes}
           customFields={customFields}
@@ -87,18 +101,10 @@ export default function EntryCreate() {
 
       {/* sticky ボタンバー */}
       <div className="shrink-0 sticky bottom-0 flex justify-end gap-2 px-3 py-2 border-t border-border bg-bg-surface">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => navigate('/entries')}
-        >
+        <Button variant="secondary" size="sm" onClick={() => navigate('/entries')}>
           キャンセル
         </Button>
-        <Button
-          size="sm"
-          onClick={handleCreate}
-          disabled={loading}
-        >
+        <Button size="sm" onClick={handleCreate} disabled={loading}>
           {loading ? '作成中...' : '作成'}
         </Button>
       </div>

@@ -1,4 +1,4 @@
-import { EntryRow, EntryType } from '../../shared/types'
+import type { EntryRow, EntryType } from '../../shared/types'
 import { EmptyState } from '../layout/EmptyState'
 import TypeFilterDropdown from '../ui/type-filter-dropdown'
 
@@ -79,23 +79,13 @@ export default function EntryListPanel({
 
       {/* コンテンツ */}
       {loading ? (
-        <EmptyState
-          icon="⏳"
-          title="読み込み中..."
-          description="エントリを読み込んでいます"
-        />
+        <EmptyState icon="⏳" title="読み込み中..." description="エントリを読み込んでいます" />
       ) : entries.length === 0 ? (
-        <EmptyState
-          icon="🔑"
-          title={emptyTitle}
-          description={emptyDescription}
-        />
+        <EmptyState icon="🔑" title={emptyTitle} description={emptyDescription} />
       ) : (
         <div className="space-y-2">
           {entries.map((entry) => (
-            <div key={entry.id}>
-              {renderCard(entry)}
-            </div>
+            <div key={entry.id}>{renderCard(entry)}</div>
           ))}
         </div>
       )}

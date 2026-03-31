@@ -1,6 +1,6 @@
-import { useLocation, Link } from 'react-router-dom'
-import { KeyRound, Star, Wand2, Tags, Settings } from 'lucide-react'
 import { type ClassValue, clsx } from 'clsx'
+import { KeyRound, Settings, Star, Tags, Wand2 } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
 import { twMerge } from 'tailwind-merge'
 
 function cn(...inputs: ClassValue[]) {
@@ -34,7 +34,7 @@ export function BottomNav() {
               'flex-1 text-center text-sm',
               isActiveTab(path)
                 ? 'text-accent border-t-2 border-accent'
-                : 'text-text-secondary hover:text-text-primary'
+                : 'text-text-secondary hover:text-text-primary',
             )}
           >
             <Icon size={20} />

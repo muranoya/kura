@@ -1,7 +1,7 @@
 // Offscreen Document
 // Service Worker からのメッセージを受信し、clipboard 操作を実行
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'CLEAR_CLIPBOARD') {
     navigator.clipboard
       .writeText('')

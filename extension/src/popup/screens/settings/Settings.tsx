@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react'
+import { Check, Copy, ExternalLink } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Copy, Check, ExternalLink } from 'lucide-react'
+import { STORAGE_KEYS } from '../../../shared/constants'
+import { getFromStorage } from '../../../shared/storage'
+import * as commands from '../../commands'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { PageHeader } from '../../components/layout/PageHeader'
+import { SyncActions } from '../../components/layout/SyncActions'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { Input } from '../../components/ui/input'
-import { Label } from '../../components/ui/label'
 import {
   Dialog,
   DialogContent,
@@ -14,15 +17,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog'
-import { PageHeader } from '../../components/layout/PageHeader'
-import { SyncActions } from '../../components/layout/SyncActions'
-import { getFromStorage } from '../../../shared/storage'
-import { STORAGE_KEYS } from '../../../shared/constants'
-import * as commands from '../../commands'
+import { Input } from '../../components/ui/input'
+import { Label } from '../../components/ui/label'
 
 export default function Settings() {
-  const navigate = useNavigate()
-  const [storageConfig, setStorageConfig] = useState<any>(null)
+  const _navigate = useNavigate()
+  const [storageConfig, setStorageConfig] = useState<Record<string, string> | null>(null)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
   // Change Master Password Dialog
@@ -56,7 +56,7 @@ export default function Settings() {
 
   const loadStorageConfig = async () => {
     try {
-      const config = await getFromStorage<any>(STORAGE_KEYS.S3_CONFIG)
+      const config = await getFromStorage<Record<string, string>>(STORAGE_KEYS.S3_CONFIG)
       if (config) {
         setStorageConfig(config)
       }
@@ -109,8 +109,8 @@ export default function Settings() {
       setNewPassword('')
       setConfirmPassword('')
       alert('パスワードを変更しました')
-    } catch (err: any) {
-      setChangePasswordError(err?.message || 'パスワード変更に失敗しました')
+    } catch (err: unknown) {
+      setChangePasswordError(err instanceof Error ? err.message : 'パスワード変更に失敗しました')
     } finally {
       setChangePasswordLoading(false)
     }
@@ -130,8 +130,8 @@ export default function Settings() {
       setRotateDekPassword('')
       setRecoveryKeyDisplayValue(newRecoveryKey)
       setRecoveryKeyDisplayOpen(true)
-    } catch (err: any) {
-      setRotateDekError(err?.message || 'DEK更新に失敗しました')
+    } catch (err: unknown) {
+      setRotateDekError(err instanceof Error ? err.message : 'DEK更新に失敗しました')
     } finally {
       setRotateDekLoading(false)
     }
@@ -151,8 +151,8 @@ export default function Settings() {
       setRegeneratePassword('')
       setRecoveryKeyDisplayValue(newRecoveryKey)
       setRecoveryKeyDisplayOpen(true)
-    } catch (err: any) {
-      setRegenerateError(err?.message || 'リカバリーキー再生成に失敗しました')
+    } catch (err: unknown) {
+      setRegenerateError(err instanceof Error ? err.message : 'リカバリーキー再生成に失敗しました')
     } finally {
       setRegenerateLoading(false)
     }
@@ -186,11 +186,7 @@ export default function Settings() {
             >
               マスターパスワード変更
             </Button>
-            <Button
-              onClick={() => setRotateDekOpen(true)}
-              className="w-full text-sm"
-              size="sm"
-            >
+            <Button onClick={() => setRotateDekOpen(true)} className="w-full text-sm" size="sm">
               DEK更新
             </Button>
             <Button
@@ -220,21 +216,27 @@ export default function Settings() {
             {storageConfig ? (
               <div className="space-y-3 text-sm">
                 <div>
-                  <label className="font-medium text-text-secondary block mb-1">バケット</label>
+                  <span className="font-medium text-text-secondary block mb-1">バケット</span>
                   <p className="text-text-primary font-mono">{storageConfig.bucket || 'N/A'}</p>
                 </div>
                 <div>
-                  <label className="font-medium text-text-secondary block mb-1">リージョン</label>
+                  <span className="font-medium text-text-secondary block mb-1">リージョン</span>
                   <p className="text-text-primary font-mono">{storageConfig.region || 'N/A'}</p>
                 </div>
                 <div>
-                  <label className="font-medium text-text-secondary block mb-1">ファイルパス</label>
-                  <p className="text-text-primary font-mono break-all">{storageConfig.key || 'vault.json'}</p>
+                  <span className="font-medium text-text-secondary block mb-1">ファイルパス</span>
+                  <p className="text-text-primary font-mono break-all">
+                    {storageConfig.key || 'vault.json'}
+                  </p>
                 </div>
                 {storageConfig.endpoint && (
                   <div>
-                    <label className="font-medium text-text-secondary block mb-1">エンドポイント</label>
-                    <p className="text-text-primary font-mono text-xs break-all">{storageConfig.endpoint}</p>
+                    <span className="font-medium text-text-secondary block mb-1">
+                      エンドポイント
+                    </span>
+                    <p className="text-text-primary font-mono text-xs break-all">
+                      {storageConfig.endpoint}
+                    </p>
                   </div>
                 )}
               </div>
@@ -498,11 +500,7 @@ export default function Settings() {
             </Button>
           </div>
           <DialogFooter>
-            <Button
-              onClick={() => setRecoveryKeyDisplayOpen(false)}
-              size="sm"
-              className="text-sm"
-            >
+            <Button onClick={() => setRecoveryKeyDisplayOpen(false)} size="sm" className="text-sm">
               保管しました
             </Button>
           </DialogFooter>

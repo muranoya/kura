@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
-import { getFromStorage, saveToStorage, removeFromStorage } from '../../shared/storage'
+import { useCallback, useEffect, useState } from 'react'
 import { STORAGE_KEYS } from '../../shared/constants'
+import { getFromStorage, removeFromStorage, saveToStorage } from '../../shared/storage'
 import type { OnboardingDraft } from '../../shared/types'
 
 const DEFAULT_DRAFT: OnboardingDraft = {

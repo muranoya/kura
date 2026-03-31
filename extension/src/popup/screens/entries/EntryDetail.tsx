@@ -1,16 +1,22 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { Copy, Eye, EyeOff, Pencil, Trash2 } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { useNavigate, useParams } from 'react-router-dom'
 import remarkGfm from 'remark-gfm'
+
+interface MdProps {
+  children?: ReactNode
+  href?: string
+  inline?: boolean
+}
 import * as commands from '../../commands'
-import { Entry, Label } from '../../shared/types'
+import { getTypeLabel } from '../../components/entries/EntryCard'
+import { PageHeader } from '../../components/layout/PageHeader'
+import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import { Badge } from '../../components/ui/badge'
-import { Copy, Eye, EyeOff, Trash2, Pencil } from 'lucide-react'
-import { PageHeader } from '../../components/layout/PageHeader'
-import { getEntryTypeLabel } from '../../../shared/constants'
-import { getTypeLabel } from '../../components/entries/EntryCard'
+import type { Entry, Label } from '../../shared/types'
 
 interface FieldDisplayProps {
   label: string
@@ -20,7 +26,13 @@ interface FieldDisplayProps {
   onToggleMask?: () => void
 }
 
-function FieldDisplay({ label, value, isPassword = false, isMasked = false, onToggleMask }: FieldDisplayProps) {
+function FieldDisplay({
+  label,
+  value,
+  isPassword = false,
+  isMasked = false,
+  onToggleMask,
+}: FieldDisplayProps) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = () => {
@@ -31,17 +43,26 @@ function FieldDisplay({ label, value, isPassword = false, isMasked = false, onTo
 
   return (
     <div className="space-y-0.5">
-      <label className="text-sm font-semibold text-text-muted uppercase">{label}</label>
+      <span className="text-sm font-semibold text-text-muted uppercase">{label}</span>
       <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-bg-elevated border border-border">
         <code className="font-mono text-sm text-text-primary flex-1 break-all">
           {isPassword && isMasked ? '••••••••' : value}
         </code>
         {isPassword && onToggleMask && (
-          <button onClick={onToggleMask} className="p-1 text-text-muted hover:text-text-primary transition-colors shrink-0">
+          <button
+            type="button"
+            onClick={onToggleMask}
+            className="p-1 text-text-muted hover:text-text-primary transition-colors shrink-0"
+          >
             {isMasked ? <EyeOff size={14} /> : <Eye size={14} />}
           </button>
         )}
-        <button onClick={handleCopy} className="p-1 text-text-muted hover:text-accent transition-colors shrink-0" title="コピー">
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="p-1 text-text-muted hover:text-accent transition-colors shrink-0"
+          title="コピー"
+        >
           {copied ? <span className="text-sm text-success">✓</span> : <Copy size={14} />}
         </button>
       </div>
@@ -50,30 +71,61 @@ function FieldDisplay({ label, value, isPassword = false, isMasked = false, onTo
 }
 
 const markdownComponents = {
-  h1: ({ children }: any) => <h1 className="text-lg font-bold text-text-primary mt-2 mb-1">{children}</h1>,
-  h2: ({ children }: any) => <h2 className="text-base font-bold text-text-primary mt-1.5 mb-1">{children}</h2>,
-  h3: ({ children }: any) => <h3 className="text-sm font-bold text-text-primary mt-1 mb-0.5">{children}</h3>,
-  p: ({ children }: any) => <p className="text-text-primary mb-1 text-sm leading-tight">{children}</p>,
-  ul: ({ children }: any) => <ul className="list-disc list-inside text-text-primary mb-1 space-y-0.5 text-sm">{children}</ul>,
-  ol: ({ children }: any) => <ol className="list-decimal list-inside text-text-primary mb-1 space-y-0.5 text-sm">{children}</ol>,
-  li: ({ children }: any) => <li className="text-text-primary text-sm">{children}</li>,
-  code: ({ inline, children }: any) =>
-    inline ? (
-      <code className="bg-bg-elevated px-1 py-0.5 rounded text-sm font-mono text-text-primary">{children}</code>
-    ) : (
-      <code className="block bg-bg-elevated p-2 rounded text-sm font-mono text-text-primary overflow-x-auto mb-1">{children}</code>
-    ),
-  pre: ({ children }: any) => <pre className="bg-bg-elevated p-2 rounded text-sm font-mono text-text-primary overflow-x-auto mb-1">{children}</pre>,
-  blockquote: ({ children }: any) => (
-    <blockquote className="border-l-4 border-accent pl-2 py-0.5 text-text-secondary italic mb-1 text-sm">{children}</blockquote>
+  h1: ({ children }: MdProps) => (
+    <h1 className="text-lg font-bold text-text-primary mt-2 mb-1">{children}</h1>
   ),
-  a: ({ href, children }: any) => (
-    <a href={href} className="text-accent hover:text-accent-hover underline break-all text-sm" target="_blank" rel="noopener noreferrer">
+  h2: ({ children }: MdProps) => (
+    <h2 className="text-base font-bold text-text-primary mt-1.5 mb-1">{children}</h2>
+  ),
+  h3: ({ children }: MdProps) => (
+    <h3 className="text-sm font-bold text-text-primary mt-1 mb-0.5">{children}</h3>
+  ),
+  p: ({ children }: MdProps) => (
+    <p className="text-text-primary mb-1 text-sm leading-tight">{children}</p>
+  ),
+  ul: ({ children }: MdProps) => (
+    <ul className="list-disc list-inside text-text-primary mb-1 space-y-0.5 text-sm">{children}</ul>
+  ),
+  ol: ({ children }: MdProps) => (
+    <ol className="list-decimal list-inside text-text-primary mb-1 space-y-0.5 text-sm">
+      {children}
+    </ol>
+  ),
+  li: ({ children }: MdProps) => <li className="text-text-primary text-sm">{children}</li>,
+  code: ({ inline, children }: MdProps) =>
+    inline ? (
+      <code className="bg-bg-elevated px-1 py-0.5 rounded text-sm font-mono text-text-primary">
+        {children}
+      </code>
+    ) : (
+      <code className="block bg-bg-elevated p-2 rounded text-sm font-mono text-text-primary overflow-x-auto mb-1">
+        {children}
+      </code>
+    ),
+  pre: ({ children }: MdProps) => (
+    <pre className="bg-bg-elevated p-2 rounded text-sm font-mono text-text-primary overflow-x-auto mb-1">
+      {children}
+    </pre>
+  ),
+  blockquote: ({ children }: MdProps) => (
+    <blockquote className="border-l-4 border-accent pl-2 py-0.5 text-text-secondary italic mb-1 text-sm">
+      {children}
+    </blockquote>
+  ),
+  a: ({ href, children }: MdProps) => (
+    <a
+      href={href}
+      className="text-accent hover:text-accent-hover underline break-all text-sm"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
       {children}
     </a>
   ),
-  strong: ({ children }: any) => <strong className="font-bold text-text-primary">{children}</strong>,
-  em: ({ children }: any) => <em className="italic text-text-primary">{children}</em>,
+  strong: ({ children }: MdProps) => (
+    <strong className="font-bold text-text-primary">{children}</strong>
+  ),
+  em: ({ children }: MdProps) => <em className="italic text-text-primary">{children}</em>,
 }
 
 export default function EntryDetail() {
@@ -115,9 +167,10 @@ export default function EntryDetail() {
   }
 
   if (loading) return <PageHeader title="読み込み中..." size="compact" showBackButton={true} />
-  if (!entry) return <PageHeader title="エントリが見つかりません" size="compact" showBackButton={true} />
+  if (!entry)
+    return <PageHeader title="エントリが見つかりません" size="compact" showBackButton={true} />
 
-  const v = entry.typedValue as Record<string, any>
+  const v = entry.typedValue as Record<string, string>
 
   return (
     <div className="h-full overflow-y-auto pb-20">
@@ -129,11 +182,21 @@ export default function EntryDetail() {
         onBack={() => navigate('/entries')}
         action={
           <div className="flex gap-1.5">
-            <Button size="sm" variant="secondary" onClick={() => navigate(`/entries/${id}/edit`)} className="gap-1.5 text-sm h-8">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => navigate(`/entries/${id}/edit`)}
+              className="gap-1.5 text-sm h-8"
+            >
               <Pencil size={14} />
               編集
             </Button>
-            <Button size="sm" variant="destructive" onClick={handleDelete} className="gap-1.5 text-sm h-8">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleDelete}
+              className="gap-1.5 text-sm h-8"
+            >
               <Trash2 size={14} />
               削除
             </Button>
@@ -142,7 +205,6 @@ export default function EntryDetail() {
       />
 
       <div className="p-3 space-y-2">
-
         {/* 基本情報 */}
         {entry.entryType === 'login' && (v.url || v.username || v.password || v.totp) && (
           <Card>
@@ -258,7 +320,11 @@ export default function EntryDetail() {
                   value={field.value}
                   isPassword={field.fieldType === 'password'}
                   isMasked={passwordMasked && field.fieldType === 'password'}
-                  onToggleMask={field.fieldType === 'password' ? () => setPasswordMasked(!passwordMasked) : undefined}
+                  onToggleMask={
+                    field.fieldType === 'password'
+                      ? () => setPasswordMasked(!passwordMasked)
+                      : undefined
+                  }
                 />
               ))}
             </CardContent>

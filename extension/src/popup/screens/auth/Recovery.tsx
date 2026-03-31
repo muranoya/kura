@@ -1,11 +1,11 @@
-import { useNavigate } from 'react-router-dom'
-import { useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import * as commands from '../../commands'
 import { Button } from '../../components/ui/button'
+import { Card, CardContent } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
-import { Card, CardContent } from '../../components/ui/card'
-import * as commands from '../../commands'
 
 export default function Recovery() {
   const navigate = useNavigate()
@@ -42,6 +42,7 @@ export default function Recovery() {
       <div className="w-full max-w-sm">
         {/* ヘッダー */}
         <button
+          type="button"
           onClick={() => navigate('/auth/lock')}
           className="flex items-center gap-1 text-accent hover:text-accent-hover mb-6 text-sm"
         >

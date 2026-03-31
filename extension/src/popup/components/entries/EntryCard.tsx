@@ -1,9 +1,18 @@
+import {
+  Building2,
+  CreditCard,
+  FileText,
+  KeyRound,
+  RotateCw,
+  Star,
+  Terminal,
+  Trash2,
+} from 'lucide-react'
 import * as React from 'react'
-import { EntryRow } from '../../shared/types'
+import type { EntryRow } from '../../shared/types'
+import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Card } from '../ui/card'
-import { Badge } from '../ui/badge'
-import { KeyRound, Building2, Terminal, FileText, CreditCard, Star, Trash2, RotateCw } from 'lucide-react'
 
 // アイコン取得
 const getEntryIcon = (type: string) => {
@@ -63,7 +72,9 @@ export default function EntryCard(props: EntryCardProps) {
     const paddingClass = isCompact ? 'px-3 py-2' : 'p-3'
     const iconSize = isCompact ? 16 : 20
     const iconContainerSize = isCompact ? 'w-7 h-7' : 'w-8 h-8'
-    const selectedClass = isSelected ? 'bg-accent-subtle border-l-2 border-accent' : 'hover:border-accent/50'
+    const selectedClass = isSelected
+      ? 'bg-accent-subtle border-l-2 border-accent'
+      : 'hover:border-accent/50'
 
     return (
       <Card
@@ -73,11 +84,17 @@ export default function EntryCard(props: EntryCardProps) {
         <div className="flex items-center justify-between gap-3">
           {/* 左側: アイコン + 名前 */}
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className={`flex-shrink-0 ${iconContainerSize} rounded-lg bg-accent/10 flex items-center justify-center text-accent`}>
-              {React.cloneElement(getEntryIcon(props.entry.entryType) as React.ReactElement, { size: iconSize })}
+            <div
+              className={`flex-shrink-0 ${iconContainerSize} rounded-lg bg-accent/10 flex items-center justify-center text-accent`}
+            >
+              {React.cloneElement(getEntryIcon(props.entry.entryType) as React.ReactElement, {
+                size: iconSize,
+              })}
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className={`${isCompact ? 'text-sm' : 'text-sm'} font-semibold text-text-primary truncate`}>
+              <h3
+                className={`${isCompact ? 'text-sm' : 'text-sm'} font-semibold text-text-primary truncate`}
+              >
                 {props.entry.name}
               </h3>
               {!isCompact && (
@@ -94,6 +111,7 @@ export default function EntryCard(props: EntryCardProps) {
           <div className="flex items-center gap-1 flex-shrink-0">
             {/* お気に入りボタン */}
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation()
                 props.onFavorite(props.entry.id, props.entry.isFavorite)
@@ -117,11 +135,12 @@ export default function EntryCard(props: EntryCardProps) {
     <Card className="p-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-text-primary truncate">
-            {props.entry.name}
-          </h3>
+          <h3 className="text-sm font-semibold text-text-primary truncate">{props.entry.name}</h3>
           <p className="text-sm text-text-muted mt-1">
-            削除日時: {props.entry.deletedAt ? new Date(props.entry.deletedAt * 1000).toLocaleString('ja-JP') : '-'}
+            削除日時:{' '}
+            {props.entry.deletedAt
+              ? new Date(props.entry.deletedAt * 1000).toLocaleString('ja-JP')
+              : '-'}
           </p>
         </div>
 

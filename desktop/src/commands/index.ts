@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
-import { EntryRow, Entry, Label, EntryFilter } from '../shared/types'
-import { getFromStorage, saveToStorage } from '../shared/storage'
 import { STORAGE_KEYS } from '../shared/constants'
+import { getFromStorage, saveToStorage } from '../shared/storage'
+import type { Entry, EntryFilter, EntryRow, Label } from '../shared/types'
 
 // ============================================================================
 // Session Management
@@ -50,15 +50,17 @@ export async function listEntries(filter?: EntryFilter): Promise<EntryRow[]> {
 }
 
 export async function getEntry(id: string): Promise<Entry> {
-  const entry = await invoke<any>('get_entry', { id })
+  const entry = await invoke<Record<string, unknown>>('get_entry', { id })
   return {
     ...entry,
-    customFields: (entry.customFields ?? []).map((f: any) => ({
-      id: f.id,
-      name: f.name,
-      fieldType: f.field_type,
-      value: f.value,
-    }))
+    customFields: ((entry.customFields as Array<Record<string, unknown>>) ?? []).map(
+      (f: Record<string, unknown>) => ({
+        id: f.id,
+        name: f.name,
+        fieldType: f.field_type,
+        value: f.value,
+      }),
+    ),
   }
 }
 
@@ -68,7 +70,7 @@ export async function createEntry(
   typedValueJson: string,
   notes?: string,
   labelIds?: string[],
-  customFields?: string
+  customFields?: string,
 ): Promise<string> {
   return invoke<string>('create_entry', {
     entryType,
@@ -86,7 +88,7 @@ export async function updateEntry(
   typedValueJson: string,
   notes?: string,
   labelIds?: string[],
-  customFields?: string
+  customFields?: string,
 ): Promise<void> {
   return invoke<void>('update_entry', {
     id,
@@ -144,7 +146,7 @@ export async function setEntryLabels(entryId: string, labelIds: string[]): Promi
 
 export async function changeMasterPassword(
   oldPassword: string,
-  newPassword: string
+  newPassword: string,
 ): Promise<void> {
   return invoke<void>('change_master_password', { oldPassword, newPassword })
 }
@@ -153,7 +155,7 @@ export async function upgradeArgon2Params(
   password: string,
   iterations: number,
   memory: number,
-  parallelism: number
+  parallelism: number,
 ): Promise<string> {
   return invoke<string>('upgrade_argon2_params', {
     password,
@@ -176,11 +178,11 @@ export async function regenerateRecoveryKey(password: string): Promise<string> {
 // ============================================================================
 
 export async function generatePassword(
-  length: number = 16,
-  includeUppercase: boolean = true,
-  includeLowercase: boolean = true,
-  includeNumbers: boolean = true,
-  includeSymbols: boolean = true
+  length = 16,
+  includeUppercase = true,
+  includeLowercase = true,
+  includeNumbers = true,
+  includeSymbols = true,
 ): Promise<string> {
   return invoke<string>('generate_password', {
     length,
@@ -191,7 +193,7 @@ export async function generatePassword(
   })
 }
 
-export async function generateTotp(secret: string, digits: number = 6, period: number = 30): Promise<string> {
+export async function generateTotp(secret: string, digits = 6, period = 30): Promise<string> {
   return invoke<string>('generate_totp', { secret, digits, period })
 }
 
@@ -225,7 +227,7 @@ export async function pushVaultAndTrack(storageConfig: string): Promise<void> {
 /// S3設定がある場合のみ syncVault を呼び出す（エラーはサイレント無視）
 /// 実際にデータが同期された場合は true を返す
 export async function syncVaultIfConfigured(): Promise<boolean> {
-  const config = await getFromStorage<any>(STORAGE_KEYS.S3_CONFIG)
+  const config = await getFromStorage<Record<string, unknown>>(STORAGE_KEYS.S3_CONFIG)
   if (!config) return false
   try {
     const result = await syncVault(JSON.stringify(config))

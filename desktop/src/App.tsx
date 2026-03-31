@@ -1,25 +1,25 @@
-import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom'
 import * as commands from './commands'
+import Sidebar from './components/Sidebar'
 import { SyncProvider, useNotifySynced } from './contexts/SyncContext'
-import Welcome from './screens/onboarding/Welcome'
-import StorageSetup from './screens/onboarding/StorageSetup'
-import MasterPassword from './screens/onboarding/MasterPassword'
-import RecoveryKey from './screens/onboarding/RecoveryKey'
-import UnlockExistingVault from './screens/onboarding/UnlockExistingVault'
 import Lock from './screens/auth/Lock'
 import Recovery from './screens/auth/Recovery'
-import EntryList from './screens/entries/EntryList'
+import EntryCreate from './screens/entries/EntryCreate'
 import EntryDetail from './screens/entries/EntryDetail'
 import EntryEdit from './screens/entries/EntryEdit'
-import EntryCreate from './screens/entries/EntryCreate'
-import Trash from './screens/entries/Trash'
-import PasswordGenerator from './screens/entries/PasswordGenerator'
-import ConflictResolver from './screens/sync/ConflictResolver'
-import LabelManager from './screens/labels/LabelManager'
+import EntryList from './screens/entries/EntryList'
 import LabelEntries from './screens/entries/LabelEntries'
+import PasswordGenerator from './screens/entries/PasswordGenerator'
+import Trash from './screens/entries/Trash'
+import LabelManager from './screens/labels/LabelManager'
+import MasterPassword from './screens/onboarding/MasterPassword'
+import RecoveryKey from './screens/onboarding/RecoveryKey'
+import StorageSetup from './screens/onboarding/StorageSetup'
+import UnlockExistingVault from './screens/onboarding/UnlockExistingVault'
+import Welcome from './screens/onboarding/Welcome'
 import Settings from './screens/settings/Settings'
-import Sidebar from './components/Sidebar'
+import ConflictResolver from './screens/sync/ConflictResolver'
 
 type AppState = 'loading' | 'onboarding' | 'locked' | 'unlocked'
 
@@ -114,27 +114,30 @@ function AppContent() {
 
         {/* Main App */}
         {appState === 'unlocked' && (
-          <Route path="*" element={
-            <div className="flex h-screen bg-bg-base">
-              <Sidebar />
-              <div className="flex-1 overflow-auto bg-bg-base">
-                <Routes>
-                  <Route path="/entries" element={<EntryList />} />
-                  <Route path="/favorites" element={<EntryList onlyFavorites={true} />} />
-                  <Route path="/entries/create" element={<EntryCreate />} />
-                  <Route path="/entries/:id" element={<EntryDetail />} />
-                  <Route path="/entries/:id/edit" element={<EntryEdit />} />
-                  <Route path="/password-generator" element={<PasswordGenerator />} />
-                  <Route path="/trash" element={<Trash />} />
-                  <Route path="/sync/conflict-resolver" element={<ConflictResolver />} />
-                  <Route path="/labels" element={<LabelManager />} />
-                  <Route path="/labels/:labelId/entries" element={<LabelEntries />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="*" element={<Navigate to="/entries" replace />} />
-                </Routes>
+          <Route
+            path="*"
+            element={
+              <div className="flex h-screen bg-bg-base">
+                <Sidebar />
+                <div className="flex-1 overflow-auto bg-bg-base">
+                  <Routes>
+                    <Route path="/entries" element={<EntryList />} />
+                    <Route path="/favorites" element={<EntryList onlyFavorites={true} />} />
+                    <Route path="/entries/create" element={<EntryCreate />} />
+                    <Route path="/entries/:id" element={<EntryDetail />} />
+                    <Route path="/entries/:id/edit" element={<EntryEdit />} />
+                    <Route path="/password-generator" element={<PasswordGenerator />} />
+                    <Route path="/trash" element={<Trash />} />
+                    <Route path="/sync/conflict-resolver" element={<ConflictResolver />} />
+                    <Route path="/labels" element={<LabelManager />} />
+                    <Route path="/labels/:labelId/entries" element={<LabelEntries />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="*" element={<Navigate to="/entries" replace />} />
+                  </Routes>
+                </div>
               </div>
-            </div>
-          } />
+            }
+          />
         )}
       </Routes>
     </MemoryRouter>

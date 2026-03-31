@@ -1,5 +1,5 @@
+import { Check, Lock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { Lock, Check } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
 
@@ -42,29 +42,21 @@ export default function Welcome() {
               <Check className="w-4 h-4 text-accent flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-text-primary">クラウドストレージ連携</p>
-                <p className="text-sm text-text-muted mt-0.5">
-                  S3互換サービスなら何でも対応
-                </p>
+                <p className="text-sm text-text-muted mt-0.5">S3互換サービスなら何でも対応</p>
               </div>
             </div>
             <div className="flex gap-3">
               <Check className="w-4 h-4 text-accent flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-text-primary">ベンダーロックインなし</p>
-                <p className="text-sm text-text-muted mt-0.5">
-                  いつでも他のサービスに切り替え可能
-                </p>
+                <p className="text-sm text-text-muted mt-0.5">いつでも他のサービスに切り替え可能</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* CTA */}
-        <Button
-          onClick={handleStart}
-          className="w-full text-sm"
-          size="sm"
-        >
+        <Button onClick={handleStart} className="w-full text-sm" size="sm">
           始める
         </Button>
       </div>

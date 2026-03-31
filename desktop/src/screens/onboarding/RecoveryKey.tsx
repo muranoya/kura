@@ -1,10 +1,10 @@
+import { AlertCircle, CheckCircle2, Copy } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
+import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import { PageHeader } from '../../components/layout/PageHeader'
-import { Copy, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 export default function RecoveryKey() {
   const navigate = useNavigate()

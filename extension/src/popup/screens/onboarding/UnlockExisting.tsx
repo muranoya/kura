@@ -1,11 +1,10 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import { Lock } from 'lucide-react'
+import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import { PageHeader } from '../../components/layout/PageHeader'
 import { getFromStorage } from '../../lib/storage'
 import { STORAGE_KEYS } from '../../shared/constants'
 
@@ -30,18 +29,17 @@ export default function UnlockExisting() {
       }
 
       const configStr = JSON.stringify(s3Config)
-      const response = await new Promise<any>((resolve, reject) => {
-        chrome.runtime.sendMessage(
-          { type: 'DOWNLOAD', storageConfig: configStr },
-          (resp) => {
+      const response = await new Promise<{ success?: boolean; error?: string; result?: unknown }>(
+        (resolve, reject) => {
+          chrome.runtime.sendMessage({ type: 'DOWNLOAD', storageConfig: configStr }, (resp) => {
             if (chrome.runtime.lastError) {
               reject(new Error(chrome.runtime.lastError.message))
             } else {
               resolve(resp)
             }
-          }
-        )
-      })
+          })
+        },
+      )
 
       if (!response?.success) {
         throw new Error(response?.error || 'ダウンロードに失敗しました')
@@ -66,19 +64,18 @@ export default function UnlockExisting() {
     setError(null)
     try {
       console.log('[UnlockExisting] Sending UNLOCK message')
-      const response = await new Promise<any>((resolve, reject) => {
-        chrome.runtime.sendMessage(
-          { type: 'UNLOCK', password: password },
-          (resp) => {
+      const response = await new Promise<{ success?: boolean; error?: string; result?: unknown }>(
+        (resolve, reject) => {
+          chrome.runtime.sendMessage({ type: 'UNLOCK', password: password }, (resp) => {
             console.log('[UnlockExisting] UNLOCK response:', resp)
             if (chrome.runtime.lastError) {
               reject(new Error(chrome.runtime.lastError.message))
             } else {
               resolve(resp)
             }
-          }
-        )
-      })
+          })
+        },
+      )
 
       if (!response?.success) {
         throw new Error(response?.error || 'アンロックに失敗しました')
@@ -95,18 +92,13 @@ export default function UnlockExisting() {
 
   return (
     <div className="h-full overflow-y-auto pb-20 flex flex-col">
-      <PageHeader
-        title="既存Vaultをロード"
-        showBackButton={true}
-      />
+      <PageHeader title="既存Vaultをロード" showBackButton={true} />
 
       <div className="p-4 space-y-4">
         {/* ダウンロード中 */}
         {downloading && (
           <div className="p-3 rounded-md bg-accent/10 border border-accent/20">
-            <p className="text-sm text-text-primary">
-              🔄 S3からVaultをダウンロード中...
-            </p>
+            <p className="text-sm text-text-primary">🔄 S3からVaultをダウンロード中...</p>
           </div>
         )}
 

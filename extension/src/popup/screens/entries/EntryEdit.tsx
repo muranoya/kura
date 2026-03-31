@@ -1,10 +1,10 @@
-import { useParams, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import * as commands from '../../commands'
-import { Entry, Label, CustomField } from '../../shared/types'
-import { Button } from '../../components/ui/button'
-import { PageHeader } from '../../components/layout/PageHeader'
 import EntryForm from '../../components/entries/EntryForm'
+import { PageHeader } from '../../components/layout/PageHeader'
+import { Button } from '../../components/ui/button'
+import type { CustomField, Entry, Label } from '../../shared/types'
 
 export default function EntryEdit() {
   const { id } = useParams<{ id: string }>()
@@ -15,7 +15,7 @@ export default function EntryEdit() {
   const [error, setError] = useState('')
   const [name, setName] = useState('')
   const [notes, setNotes] = useState<string | null>(null)
-  const [typedValue, setTypedValue] = useState<Record<string, any>>({})
+  const [typedValue, setTypedValue] = useState<Record<string, string>>({})
   const [customFields, setCustomFields] = useState<CustomField[]>([])
   const [allLabels, setAllLabels] = useState<Label[]>([])
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
@@ -53,10 +53,26 @@ export default function EntryEdit() {
     setError('')
     try {
       const typedValueJson = JSON.stringify(typedValue)
-      const customFieldsJson = customFields.length > 0
-        ? JSON.stringify(customFields.map((f) => ({ id: f.id, name: f.name, field_type: f.fieldType, value: f.value })))
-        : undefined
-      await commands.updateEntry(id!, name, typedValueJson, notes || undefined, selectedLabelIds, customFieldsJson)
+      const customFieldsJson =
+        customFields.length > 0
+          ? JSON.stringify(
+              customFields.map((f) => ({
+                id: f.id,
+                name: f.name,
+                field_type: f.fieldType,
+                value: f.value,
+              })),
+            )
+          : undefined
+      if (!id) return
+      await commands.updateEntry(
+        id,
+        name,
+        typedValueJson,
+        notes || undefined,
+        selectedLabelIds,
+        customFieldsJson,
+      )
       navigate(`/entries/${id}`)
     } catch (err) {
       setError(`保存失敗: ${err}`)
@@ -86,7 +102,9 @@ export default function EntryEdit() {
       />
 
       <div className="flex-1 overflow-y-auto p-3">
-        {error && <div className="mb-3 p-2 bg-danger/10 text-danger text-sm rounded-md">{error}</div>}
+        {error && (
+          <div className="mb-3 p-2 bg-danger/10 text-danger text-sm rounded-md">{error}</div>
+        )}
         <EntryForm
           mode="edit"
           entryType={entry.entryType}

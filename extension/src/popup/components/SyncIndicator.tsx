@@ -42,13 +42,9 @@ export default function SyncIndicator({ status, lastSyncTime }: SyncIndicatorPro
         fontSize: '0.75rem',
       }}
     >
-      <span style={{ color: getStatusColor(), fontWeight: 500 }}>
-        {getStatusText()}
-      </span>
+      <span style={{ color: getStatusColor(), fontWeight: 500 }}>{getStatusText()}</span>
       {lastSyncTime && (
-        <span style={{ color: '#666' }}>
-          {new Date(lastSyncTime).toLocaleTimeString()}
-        </span>
+        <span style={{ color: '#666' }}>{new Date(lastSyncTime).toLocaleTimeString()}</span>
       )}
     </div>
   )

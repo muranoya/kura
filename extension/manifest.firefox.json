@@ -4,11 +4,7 @@
   "version": "0.1.0",
   "description": "サーバ不要、自分一人のための、運用コストゼロのパスワードマネージャー",
 
-  "permissions": [
-    "storage",
-    "alarms",
-    "clipboardWrite"
-  ],
+  "permissions": ["storage", "alarms", "clipboardWrite"],
 
   "action": {
     "default_popup": "src/popup/index.html",

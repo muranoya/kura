@@ -1,14 +1,14 @@
-import { useState, useCallback } from 'react'
+import { Lock } from 'lucide-react'
+import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
-import { clearStorage } from '../../shared/storage'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Button } from '../../components/ui/button'
+import { Card, CardContent } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Separator } from '../../components/ui/separator'
-import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { Lock } from 'lucide-react'
+import { clearStorage } from '../../shared/storage'
 
 export default function LockScreen() {
   const navigate = useNavigate()
@@ -92,11 +92,7 @@ export default function LockScreen() {
             </div>
 
             {/* ロック解除ボタン */}
-            <Button
-              onClick={handleUnlock}
-              disabled={loading}
-              className="w-full mb-2"
-            >
+            <Button onClick={handleUnlock} disabled={loading} className="w-full mb-2">
               {loading ? 'ロック解除中...' : 'ロック解除'}
             </Button>
 
@@ -114,11 +110,7 @@ export default function LockScreen() {
         {/* ログアウトセクション */}
         <div className="mt-8">
           <Separator className="mb-6" />
-          <Button
-            variant="destructive"
-            onClick={handleLogout}
-            className="w-full"
-          >
+          <Button variant="destructive" onClick={handleLogout} className="w-full">
             ログアウト
           </Button>
         </div>

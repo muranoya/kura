@@ -1,8 +1,17 @@
-import { EntryRow } from '../../shared/types'
+import {
+  Building2,
+  CreditCard,
+  FileText,
+  KeyRound,
+  RotateCw,
+  Star,
+  Terminal,
+  Trash2,
+} from 'lucide-react'
+import type { EntryRow } from '../../shared/types'
+import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Card } from '../ui/card'
-import { Badge } from '../ui/badge'
-import { KeyRound, Building2, Terminal, FileText, CreditCard, Star, Trash2, RotateCw } from 'lucide-react'
 
 // アイコン取得
 const getEntryIcon = (type: string) => {
@@ -83,6 +92,7 @@ export default function EntryCard(props: EntryCardProps) {
           <div className="flex items-center gap-2 flex-shrink-0">
             {/* お気に入りボタン */}
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation()
                 props.onFavorite(props.entry.id, props.entry.isFavorite)
@@ -119,11 +129,12 @@ export default function EntryCard(props: EntryCardProps) {
     <Card className="p-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-text-primary truncate">
-            {props.entry.name}
-          </h3>
+          <h3 className="text-sm font-semibold text-text-primary truncate">{props.entry.name}</h3>
           <p className="text-xs text-text-muted mt-1">
-            削除日時: {props.entry.deletedAt ? new Date(props.entry.deletedAt * 1000).toLocaleString('ja-JP') : '-'}
+            削除日時:{' '}
+            {props.entry.deletedAt
+              ? new Date(props.entry.deletedAt * 1000).toLocaleString('ja-JP')
+              : '-'}
           </p>
         </div>
 

@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { Check, Copy, RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import * as commands from '../../commands'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label as UILabel } from '../../components/ui/label'
-import { Copy, Check, RefreshCw } from 'lucide-react'
 
 interface PasswordGeneratorPanelProps {
   onUse?: (password: string) => void
@@ -30,7 +30,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
         includeUppercase,
         includeLowercase,
         includeNumbers,
-        includeSymbols
+        includeSymbols,
       )
       setPassword(generated)
       setCopied(false)
@@ -54,9 +54,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
 
   const isInline = !!onUse
 
-  const containerClass = isInline
-    ? 'space-y-2'
-    : ''
+  const containerClass = isInline ? 'space-y-2' : ''
 
   const wrapperClass = isInline
     ? 'border border-accent/30 rounded-md p-3 space-y-3 bg-bg-surface'
@@ -71,9 +69,12 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
             <CardContent className="px-2 py-2">
               {password ? (
                 <div className="flex items-center gap-2 p-2 rounded-md bg-bg-elevated border border-border">
-                  <span className="font-mono text-xs text-text-primary flex-1 break-all">{password}</span>
+                  <span className="font-mono text-xs text-text-primary flex-1 break-all">
+                    {password}
+                  </span>
                   <div className="flex gap-1 shrink-0">
                     <button
+                      type="button"
                       onClick={handleCopy}
                       className="p-1 text-text-muted hover:text-text-primary transition-colors"
                       title="コピー"
@@ -81,6 +82,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                       {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
                     </button>
                     <button
+                      type="button"
                       onClick={handleGenerate}
                       disabled={loading}
                       className="p-1 text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
@@ -90,6 +92,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                     </button>
                     {onUse && (
                       <button
+                        type="button"
                         onClick={() => onUse(password)}
                         className="px-2 py-1 text-xs bg-accent text-white hover:bg-accent-hover rounded transition-colors whitespace-nowrap"
                         title="このパスワードを使用"
@@ -119,7 +122,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                 min="1"
                 max="128"
                 value={length}
-                onChange={(e) => setLength(parseInt(e.target.value))}
+                onChange={(e) => setLength(Number.parseInt(e.target.value))}
                 className="h-2 px-0 py-0 w-full"
               />
               <div className="flex gap-2 text-xs text-text-secondary">
@@ -138,7 +141,10 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                   onChange={(e) => setIncludeUppercase(e.target.checked)}
                   className="w-3 h-3 rounded border-border"
                 />
-                <label htmlFor={`uppercase-${isInline ? 'inline' : 'screen'}`} className="text-xs text-text-primary cursor-pointer">
+                <label
+                  htmlFor={`uppercase-${isInline ? 'inline' : 'screen'}`}
+                  className="text-xs text-text-primary cursor-pointer"
+                >
                   大文字 (A-Z)
                 </label>
               </div>
@@ -151,7 +157,10 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                   onChange={(e) => setIncludeLowercase(e.target.checked)}
                   className="w-3 h-3 rounded border-border"
                 />
-                <label htmlFor={`lowercase-${isInline ? 'inline' : 'screen'}`} className="text-xs text-text-primary cursor-pointer">
+                <label
+                  htmlFor={`lowercase-${isInline ? 'inline' : 'screen'}`}
+                  className="text-xs text-text-primary cursor-pointer"
+                >
                   小文字 (a-z)
                 </label>
               </div>
@@ -164,7 +173,10 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                   onChange={(e) => setIncludeNumbers(e.target.checked)}
                   className="w-3 h-3 rounded border-border"
                 />
-                <label htmlFor={`numbers-${isInline ? 'inline' : 'screen'}`} className="text-xs text-text-primary cursor-pointer">
+                <label
+                  htmlFor={`numbers-${isInline ? 'inline' : 'screen'}`}
+                  className="text-xs text-text-primary cursor-pointer"
+                >
                   数字 (0-9)
                 </label>
               </div>
@@ -177,7 +189,10 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                   onChange={(e) => setIncludeSymbols(e.target.checked)}
                   className="w-3 h-3 rounded border-border"
                 />
-                <label htmlFor={`symbols-${isInline ? 'inline' : 'screen'}`} className="text-xs text-text-primary cursor-pointer">
+                <label
+                  htmlFor={`symbols-${isInline ? 'inline' : 'screen'}`}
+                  className="text-xs text-text-primary cursor-pointer"
+                >
                   特殊文字 (!@#$%...)
                 </label>
               </div>
@@ -196,9 +211,12 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
             <CardContent className="px-3 pb-3 pt-2">
               {password ? (
                 <div className="flex items-center gap-2 p-3 rounded-md bg-bg-elevated border border-border">
-                  <span className="font-mono text-sm text-text-primary flex-1 break-all">{password}</span>
+                  <span className="font-mono text-sm text-text-primary flex-1 break-all">
+                    {password}
+                  </span>
                   <div className="flex gap-1 shrink-0">
                     <button
+                      type="button"
                       onClick={handleCopy}
                       className="p-1 text-text-muted hover:text-text-primary transition-colors"
                       title="コピー"
@@ -206,6 +224,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                       {copied ? <Check size={16} className="text-success" /> : <Copy size={16} />}
                     </button>
                     <button
+                      type="button"
                       onClick={handleGenerate}
                       disabled={loading}
                       className="p-1 text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
@@ -240,7 +259,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                     min="1"
                     max="128"
                     value={length}
-                    onChange={(e) => setLength(parseInt(e.target.value))}
+                    onChange={(e) => setLength(Number.parseInt(e.target.value))}
                     className="h-2 px-0 py-0 w-full"
                   />
                 </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 interface TotpDisplayProps {
   totp: string
@@ -40,6 +40,7 @@ export default function TotpDisplay({ totp, onCopy }: TotpDisplayProps) {
         <span>{totp}</span>
         {onCopy && (
           <button
+            type="button"
             onClick={onCopy}
             style={{
               background: 'none',

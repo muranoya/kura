@@ -1,15 +1,15 @@
-import { useState, useEffect, useMemo } from 'react'
+import { Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button } from '../../components/ui/button'
-import EntryCard, { getTypeLabel } from '../../components/entries/EntryCard'
-import { SyncActions } from '../../components/layout/SyncActions'
-import { EmptyState } from '../../components/layout/EmptyState'
-import EntryListPanel from '../../components/entries/EntryListPanel'
 import * as commands from '../../commands'
-import { EntryRow, EntryType, Entry } from '../../shared/types'
-import { Plus, Pencil, Trash2, Search, X } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import EntryCard, { getTypeLabel } from '../../components/entries/EntryCard'
+import EntryListPanel from '../../components/entries/EntryListPanel'
+import { EmptyState } from '../../components/layout/EmptyState'
+import { SyncActions } from '../../components/layout/SyncActions'
 import { Badge } from '../../components/ui/badge'
+import { Button } from '../../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import type { Entry, EntryRow, EntryType } from '../../shared/types'
 
 interface EntryListProps {
   isFavorites?: boolean
@@ -38,6 +38,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
     commands.listLabels().then(setAllLabels).catch(console.error)
   }, [])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: loadEntries is stable
   useEffect(() => {
     loadEntries()
   }, [isFavorites, selectedLabelId])
@@ -104,7 +105,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
     try {
       await commands.setFavorite(id, !currentFavorite)
       setEntries((prev) =>
-        prev.map((e) => (e.id === id ? { ...e, isFavorite: !currentFavorite } : e))
+        prev.map((e) => (e.id === id ? { ...e, isFavorite: !currentFavorite } : e)),
       )
       if (selectedEntry && selectedEntry.id === id) {
         setSelectedEntry((prev) => (prev ? { ...prev, isFavorite: !currentFavorite } : prev))
@@ -124,7 +125,10 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
 
         {/* 検索ボックス */}
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted" size={14} />
+          <Search
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted"
+            size={14}
+          />
           <input
             type="text"
             placeholder="検索..."
@@ -134,6 +138,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={() => setSearchQuery('')}
               className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
               title="検索をクリア"
@@ -164,7 +169,6 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
       <div className="flex-1 flex overflow-hidden">
         {/* 左ペイン: リスト */}
         <div className="w-60 border-r border-border bg-sidebar flex flex-col">
-
           {/* エラーメッセージ */}
           {error && (
             <div className="mx-2 mt-2 p-2 rounded-md bg-danger/10 border border-danger/20">
@@ -215,9 +219,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
             />
           ) : (
             <div className="h-full flex items-center justify-center">
-              <EmptyState
-                title="アイテムを選択してください"
-              />
+              <EmptyState title="アイテムを選択してください" />
             </div>
           )}
         </div>
@@ -254,7 +256,12 @@ function EntryDetailPane({
     )
   }
 
-  const FieldDisplay = ({ label, value, isPassword = false, isMasked = false }: {
+  const FieldDisplay = ({
+    label,
+    value,
+    isPassword = false,
+    isMasked = false,
+  }: {
     label: string
     value: string
     isPassword?: boolean
@@ -268,6 +275,7 @@ function EntryDetailPane({
         </code>
         {isPassword && (
           <button
+            type="button"
             onClick={onToggleMask}
             className="p-1.5 rounded hover:bg-bg-elevated transition-colors flex-shrink-0"
             title={isMasked ? '表示' : '非表示'}
@@ -276,6 +284,7 @@ function EntryDetailPane({
           </button>
         )}
         <button
+          type="button"
           onClick={() => navigator.clipboard.writeText(value)}
           className="p-1.5 rounded hover:bg-bg-elevated transition-colors flex-shrink-0 text-accent hover:text-accent-hover"
           title="コピー"
@@ -293,21 +302,11 @@ function EntryDetailPane({
         <div className="flex items-start justify-between gap-3 mb-2">
           <h2 className="text-lg font-bold text-text-primary truncate flex-1">{entry.name}</h2>
           <div className="flex gap-2 flex-shrink-0">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={onEdit}
-              className="gap-1.5 text-sm"
-            >
+            <Button size="sm" variant="secondary" onClick={onEdit} className="gap-1.5 text-sm">
               <Pencil size={14} />
               編集
             </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={onDelete}
-              className="gap-1.5 text-sm"
-            >
+            <Button size="sm" variant="destructive" onClick={onDelete} className="gap-1.5 text-sm">
               <Trash2 size={14} />
               削除
             </Button>
@@ -323,38 +322,53 @@ function EntryDetailPane({
         <CardContent className="pt-4">
           {entry.entryType === 'login' && (
             <>
-              {(entry.typedValue as any).url && (
-                <FieldDisplay label="URL" value={(entry.typedValue as any).url} />
+              {(entry.typedValue as Record<string, string>).url && (
+                <FieldDisplay
+                  label="URL"
+                  value={(entry.typedValue as Record<string, string>).url}
+                />
               )}
-              {(entry.typedValue as any).username && (
-                <FieldDisplay label="ユーザー名" value={(entry.typedValue as any).username} />
+              {(entry.typedValue as Record<string, string>).username && (
+                <FieldDisplay
+                  label="ユーザー名"
+                  value={(entry.typedValue as Record<string, string>).username}
+                />
               )}
-              {(entry.typedValue as any).password && (
+              {(entry.typedValue as Record<string, string>).password && (
                 <FieldDisplay
                   label="パスワード"
-                  value={(entry.typedValue as any).password}
+                  value={(entry.typedValue as Record<string, string>).password}
                   isPassword
                   isMasked={passwordMasked}
                 />
               )}
-              {(entry.typedValue as any).totp && (
-                <FieldDisplay label="TOTP" value={(entry.typedValue as any).totp} />
+              {(entry.typedValue as Record<string, string>).totp && (
+                <FieldDisplay
+                  label="TOTP"
+                  value={(entry.typedValue as Record<string, string>).totp}
+                />
               )}
             </>
           )}
 
           {entry.entryType === 'bank' && (
             <>
-              {(entry.typedValue as any).bank_name && (
-                <FieldDisplay label="銀行名" value={(entry.typedValue as any).bank_name} />
+              {(entry.typedValue as Record<string, string>).bank_name && (
+                <FieldDisplay
+                  label="銀行名"
+                  value={(entry.typedValue as Record<string, string>).bank_name}
+                />
               )}
-              {(entry.typedValue as any).account_number && (
-                <FieldDisplay label="口座番号" value={(entry.typedValue as any).account_number} />
+              {(entry.typedValue as Record<string, string>).account_number && (
+                <FieldDisplay
+                  label="口座番号"
+                  value={(entry.typedValue as Record<string, string>).account_number}
+                />
               )}
-              {(entry.typedValue as any).pin && (
+              {(entry.typedValue as Record<string, string>).pin && (
                 <FieldDisplay
                   label="PIN"
-                  value={(entry.typedValue as any).pin}
+                  value={(entry.typedValue as Record<string, string>).pin}
                   isPassword
                   isMasked={passwordMasked}
                 />
@@ -364,18 +378,18 @@ function EntryDetailPane({
 
           {entry.entryType === 'ssh_key' && (
             <>
-              {(entry.typedValue as any).private_key && (
+              {(entry.typedValue as Record<string, string>).private_key && (
                 <FieldDisplay
                   label="秘密鍵"
-                  value={(entry.typedValue as any).private_key}
+                  value={(entry.typedValue as Record<string, string>).private_key}
                   isPassword
                   isMasked={passwordMasked}
                 />
               )}
-              {(entry.typedValue as any).passphrase && (
+              {(entry.typedValue as Record<string, string>).passphrase && (
                 <FieldDisplay
                   label="パスフレーズ"
-                  value={(entry.typedValue as any).passphrase}
+                  value={(entry.typedValue as Record<string, string>).passphrase}
                   isPassword
                   isMasked={passwordMasked}
                 />
@@ -385,19 +399,28 @@ function EntryDetailPane({
 
           {entry.entryType === 'credit_card' && (
             <>
-              {(entry.typedValue as any).cardholder && (
-                <FieldDisplay label="カード名義人" value={(entry.typedValue as any).cardholder} />
+              {(entry.typedValue as Record<string, string>).cardholder && (
+                <FieldDisplay
+                  label="カード名義人"
+                  value={(entry.typedValue as Record<string, string>).cardholder}
+                />
               )}
-              {(entry.typedValue as any).number && (
-                <FieldDisplay label="カード番号" value={(entry.typedValue as any).number} />
+              {(entry.typedValue as Record<string, string>).number && (
+                <FieldDisplay
+                  label="カード番号"
+                  value={(entry.typedValue as Record<string, string>).number}
+                />
               )}
-              {(entry.typedValue as any).expiry && (
-                <FieldDisplay label="有効期限" value={(entry.typedValue as any).expiry} />
+              {(entry.typedValue as Record<string, string>).expiry && (
+                <FieldDisplay
+                  label="有効期限"
+                  value={(entry.typedValue as Record<string, string>).expiry}
+                />
               )}
-              {(entry.typedValue as any).cvv && (
+              {(entry.typedValue as Record<string, string>).cvv && (
                 <FieldDisplay
                   label="CVV"
-                  value={(entry.typedValue as any).cvv}
+                  value={(entry.typedValue as Record<string, string>).cvv}
                   isPassword
                   isMasked={passwordMasked}
                 />
@@ -409,7 +432,7 @@ function EntryDetailPane({
             <div className="py-3">
               <p className="text-sm font-semibold text-text-muted uppercase mb-2">コンテンツ</p>
               <p className="text-sm text-text-primary whitespace-pre-wrap">
-                {(entry.typedValue as any).content}
+                {(entry.typedValue as Record<string, string>).content}
               </p>
             </div>
           )}

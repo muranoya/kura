@@ -1,16 +1,15 @@
-import { useNavigate, useLocation } from 'react-router-dom'
+import { AlertTriangle, Check, Copy } from 'lucide-react'
 import { useState } from 'react'
-import { Copy, Check, AlertTriangle } from 'lucide-react'
-import { Button } from '../../components/ui/button'
-import { Input } from '../../components/ui/input'
-import { Label } from '../../components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { PageHeader } from '../../components/layout/PageHeader'
+import { Button } from '../../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { Input } from '../../components/ui/input'
 
 export default function RecoveryKey() {
   const navigate = useNavigate()
   const location = useLocation()
-  const passedRecoveryKey = (location.state as any)?.recoveryKey
+  const passedRecoveryKey = (location.state as { recoveryKey?: string })?.recoveryKey
   const [recoveryKey] = useState(passedRecoveryKey || 'XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX')
   const [confirmed, setConfirmed] = useState(false)
   const [recoveryKeyInput, setRecoveryKeyInput] = useState('')
@@ -48,19 +47,16 @@ export default function RecoveryKey() {
       // Vault が unlocked されていることを確認
       console.log('[RecoveryKey] Checking vault unlocked state')
       const isUnlocked = await new Promise<boolean>((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: 'IS_UNLOCKED' },
-          (response: any) => {
-            console.log('[RecoveryKey] IS_UNLOCKED response:', response)
-            resolve(response?.unlocked ?? false)
-          }
-        )
+        chrome.runtime.sendMessage({ type: 'IS_UNLOCKED' }, (response: { unlocked?: boolean }) => {
+          console.log('[RecoveryKey] IS_UNLOCKED response:', response)
+          resolve(response?.unlocked ?? false)
+        })
       })
 
       if (isUnlocked) {
         console.log('[RecoveryKey] Vault is unlocked, navigating to /entries')
         // ナビゲーション前に少し待機して、state の更新を確保
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
         navigate('/entries')
         console.log('[RecoveryKey] Navigation called')
       } else {
@@ -77,10 +73,7 @@ export default function RecoveryKey() {
 
   return (
     <div className="h-full overflow-y-auto pb-20 flex flex-col">
-      <PageHeader
-        title="リカバリーキー"
-        showBackButton={false}
-      />
+      <PageHeader title="リカバリーキー" showBackButton={false} />
 
       <div className="p-4 space-y-4">
         {/* 警告 */}
@@ -127,9 +120,7 @@ export default function RecoveryKey() {
             onChange={(e) => setConfirmed(e.target.checked)}
             className="w-4 h-4 mt-0.5 flex-shrink-0"
           />
-          <span className="text-sm text-text-primary">
-            リカバリーキーを紙に書き写しました
-          </span>
+          <span className="text-sm text-text-primary">リカバリーキーを紙に書き写しました</span>
         </label>
 
         {/* 確認入力 */}

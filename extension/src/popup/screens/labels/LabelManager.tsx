@@ -1,18 +1,18 @@
+import { Check, Edit2, Plus, Trash2, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, Edit2, Check, X } from 'lucide-react'
-import { Button } from '../../components/ui/button'
-import { Input } from '../../components/ui/input'
-import { Label } from '../../components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import * as commands from '../../commands'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { EmptyState } from '../../components/layout/EmptyState'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { SyncActions } from '../../components/layout/SyncActions'
-import { EmptyState } from '../../components/layout/EmptyState'
-import { ConfirmDialog } from '../../components/ConfirmDialog'
-import * as commands from '../../commands'
+import { Button } from '../../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { Input } from '../../components/ui/input'
+import { Label } from '../../components/ui/label'
 
 export default function LabelManager() {
-  const navigate = useNavigate()
+  const _navigate = useNavigate()
   const [labels, setLabels] = useState<{ id: string; name: string }[]>([])
   const [newLabelName, setNewLabelName] = useState('')
   const [loading, setLoading] = useState(true)
@@ -74,7 +74,7 @@ export default function LabelManager() {
     try {
       await commands.renameLabel(id, editingName)
       setLabels((prev) =>
-        prev.map((label) => (label.id === id ? { ...label, name: editingName } : label))
+        prev.map((label) => (label.id === id ? { ...label, name: editingName } : label)),
       )
       setEditingId(null)
       setEditingName('')
@@ -152,10 +152,7 @@ export default function LabelManager() {
         {loading ? (
           <div className="text-center py-8 text-text-muted text-sm">読み込み中...</div>
         ) : labels.length === 0 ? (
-          <EmptyState
-            title="ラベルがありません"
-            description="新しいラベルを作成してください"
-          />
+          <EmptyState title="ラベルがありません" description="新しいラベルを作成してください" />
         ) : (
           <Card>
             <CardHeader className="px-3 py-2">

@@ -1,9 +1,9 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { EmptyState } from '../../components/layout/EmptyState'
+import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import { PageHeader } from '../../components/layout/PageHeader'
-import { EmptyState } from '../../components/layout/EmptyState'
 
 interface Conflict {
   entryId: string
@@ -25,18 +25,19 @@ export default function ConflictResolver() {
   const loadConflicts = async () => {
     setLoading(true)
     try {
-      const response = await new Promise<any>((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: 'GET_SYNC_CONFLICTS' },
-          (response) => resolve(response)
-        )
+      const response = await new Promise<{
+        success?: boolean
+        error?: string
+        conflicts?: Conflict[]
+      }>((resolve) => {
+        chrome.runtime.sendMessage({ type: 'GET_SYNC_CONFLICTS' }, (response) => resolve(response))
       })
       if (response?.success) {
         setConflicts(response.conflicts || [])
         const initialResolutions: Record<string, 'local' | 'remote'> = {}
-        ;(response.conflicts || []).forEach((conflict: Conflict) => {
+        for (const conflict of response.conflicts || []) {
           initialResolutions[conflict.entryId] = 'local'
-        })
+        }
         setResolutions(initialResolutions)
       }
     } catch (err) {
@@ -60,10 +61,13 @@ export default function ConflictResolver() {
   const handleResolve = async () => {
     setResolving(true)
     try {
-      const response = await new Promise<any>((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: 'RESOLVE_SYNC_CONFLICTS', resolutions },
-          (response) => resolve(response)
+      const response = await new Promise<{
+        success?: boolean
+        error?: string
+        conflicts?: Conflict[]
+      }>((resolve) => {
+        chrome.runtime.sendMessage({ type: 'RESOLVE_SYNC_CONFLICTS', resolutions }, (response) =>
+          resolve(response),
         )
       })
 
@@ -167,12 +171,7 @@ export default function ConflictResolver() {
 
         {/* アクションボタン */}
         <div className="space-y-2">
-          <Button
-            onClick={handleResolve}
-            disabled={resolving}
-            className="w-full text-sm"
-            size="sm"
-          >
+          <Button onClick={handleResolve} disabled={resolving} className="w-full text-sm" size="sm">
             {resolving ? '解決中...' : '解決'}
           </Button>
           <Button

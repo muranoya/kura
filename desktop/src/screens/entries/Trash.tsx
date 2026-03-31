@@ -1,12 +1,12 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import * as commands from '../../commands'
-import { getFromStorage } from '../../shared/storage'
-import { useSyncVersion } from '../../contexts/SyncContext'
-import { EntryRow, EntryType } from '../../shared/types'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import EntryCard from '../../components/entries/EntryCard'
 import EntryListPanel from '../../components/entries/EntryListPanel'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
+import { useSyncVersion } from '../../contexts/SyncContext'
+import { getFromStorage } from '../../shared/storage'
+import type { EntryRow, EntryType } from '../../shared/types'
 
 export default function Trash() {
   const syncVersion = useSyncVersion()
@@ -18,37 +18,38 @@ export default function Trash() {
   const [selectedType, setSelectedType] = useState<EntryType | undefined>(undefined)
   const [searchQuery, setSearchQuery] = useState('')
 
-  useEffect(() => {
-    loadTrashEntries()
-  }, [syncVersion])
-
-  const loadTrashEntries = async () => {
+  const loadTrashEntries = useCallback(async () => {
+    void syncVersion // trigger reload on sync
     try {
       setLoading(true)
       const data = await commands.listEntries({ includeTrash: true })
-      setAllEntries(data.filter(e => e.deletedAt !== null))
+      setAllEntries(data.filter((e) => e.deletedAt !== null))
     } catch (err) {
       setError(`ゴミ箱読み込み失敗: ${err}`)
     } finally {
       setLoading(false)
     }
-  }
+  }, [syncVersion])
+
+  useEffect(() => {
+    loadTrashEntries()
+  }, [loadTrashEntries])
 
   const filterEntries = () => {
     let filtered = allEntries
 
     // 削除済みエントリのみ
-    filtered = filtered.filter(e => e.deletedAt !== null)
+    filtered = filtered.filter((e) => e.deletedAt !== null)
 
     // タイプフィルター
     if (selectedType) {
-      filtered = filtered.filter(e => e.entryType === selectedType)
+      filtered = filtered.filter((e) => e.entryType === selectedType)
     }
 
     // 検索フィルター（名前で検索）
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(e => e.name.toLowerCase().includes(query))
+      filtered = filtered.filter((e) => e.name.toLowerCase().includes(query))
     }
 
     return filtered
@@ -64,17 +65,20 @@ export default function Trash() {
     setSearchQuery('')
   }
 
-  const handleRestore = useCallback(async (id: string) => {
-    try {
-      await commands.restoreEntry(id)
-      const vaultBytes = await commands.getVaultBytes()
-      await commands.writeVaultFile(vaultBytes)
-      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
-      setAllEntries(allEntries.filter(e => e.id !== id))
-    } catch (err) {
-      setError(`復元失敗: ${err}`)
-    }
-  }, [allEntries])
+  const handleRestore = useCallback(
+    async (id: string) => {
+      try {
+        await commands.restoreEntry(id)
+        const vaultBytes = await commands.getVaultBytes()
+        await commands.writeVaultFile(vaultBytes)
+        commands.syncVaultIfConfigured().catch((e) => console.warn('Sync failed:', e))
+        setAllEntries(allEntries.filter((e) => e.id !== id))
+      } catch (err) {
+        setError(`復元失敗: ${err}`)
+      }
+    },
+    [allEntries],
+  )
 
   const handlePurgeConfirmed = useCallback(async () => {
     if (!purgeTargetId) return
@@ -82,11 +86,11 @@ export default function Trash() {
       await commands.purgeEntry(purgeTargetId)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      const s3Config = await getFromStorage<any>('s3Config')
+      const s3Config = await getFromStorage<Record<string, string>>('s3Config')
       if (s3Config) {
         await commands.pushVaultAndTrack(JSON.stringify(s3Config))
       }
-      setAllEntries(allEntries.filter(e => e.id !== purgeTargetId))
+      setAllEntries(allEntries.filter((e) => e.id !== purgeTargetId))
       setPurgeDialogOpen(false)
       setPurgeTargetId(null)
     } catch (err) {

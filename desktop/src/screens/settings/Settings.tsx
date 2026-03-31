@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react'
-import { ExternalLink, Copy, Check } from 'lucide-react'
-import { clearStorage, getFromStorage } from '../../shared/storage'
+import { Check, Copy, ExternalLink } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import * as commands from '../../commands'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { Input } from '../../components/ui/input'
-import { Label } from '../../components/ui/label'
 import {
   Dialog,
   DialogContent,
@@ -14,20 +13,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog'
+import { Input } from '../../components/ui/input'
+import { Label } from '../../components/ui/label'
 import { STORAGE_KEYS } from '../../shared/constants'
-import * as commands from '../../commands'
-import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
+import { clearStorage, getFromStorage } from '../../shared/storage'
 
 export default function Settings() {
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
-  const [storageConfig, setStorageConfig] = useState<any>(null)
+  const [storageConfig, setStorageConfig] = useState<Record<string, string> | null>(null)
   const [storageLoading, setStorageLoading] = useState(true)
 
   // Load storage config
   useEffect(() => {
     const loadStorageConfig = async () => {
       try {
-        const config = await getFromStorage<any>(STORAGE_KEYS.S3_CONFIG)
+        const config = await getFromStorage<Record<string, string>>(STORAGE_KEYS.S3_CONFIG)
         setStorageConfig(config ?? null)
       } catch (err) {
         console.error('Failed to load storage config:', err)
@@ -75,15 +75,11 @@ export default function Settings() {
   }
 
   const saveVaultAndPush = async () => {
-    try {
-      const vaultBytes = await commands.getVaultBytes()
-      await commands.writeVaultFile(vaultBytes)
-      const s3Config = await getFromStorage<any>('s3Config')
-      if (s3Config) {
-        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
-      }
-    } catch (err) {
-      throw err
+    const vaultBytes = await commands.getVaultBytes()
+    await commands.writeVaultFile(vaultBytes)
+    const s3Config = await getFromStorage<Record<string, string>>('s3Config')
+    if (s3Config) {
+      await commands.pushVaultAndTrack(JSON.stringify(s3Config))
     }
   }
 
@@ -110,8 +106,8 @@ export default function Settings() {
       setOldPassword('')
       setNewPassword('')
       setConfirmPassword('')
-    } catch (err: any) {
-      setChangePasswordError(err?.message || 'パスワード変更に失敗しました')
+    } catch (err: unknown) {
+      setChangePasswordError(err instanceof Error ? err.message : 'パスワード変更に失敗しました')
     } finally {
       setChangePasswordLoading(false)
     }
@@ -132,8 +128,8 @@ export default function Settings() {
       setRotateDekPassword('')
       setRecoveryKeyDisplayValue(newRecoveryKey)
       setRecoveryKeyDisplayOpen(true)
-    } catch (err: any) {
-      setRotateDekError(err?.message || 'DEK更新に失敗しました')
+    } catch (err: unknown) {
+      setRotateDekError(err instanceof Error ? err.message : 'DEK更新に失敗しました')
     } finally {
       setRotateDekLoading(false)
     }
@@ -154,8 +150,8 @@ export default function Settings() {
       setRegeneratePassword('')
       setRecoveryKeyDisplayValue(newRecoveryKey)
       setRecoveryKeyDisplayOpen(true)
-    } catch (err: any) {
-      setRegenerateError(err?.message || 'リカバリーキー再生成に失敗しました')
+    } catch (err: unknown) {
+      setRegenerateError(err instanceof Error ? err.message : 'リカバリーキー再生成に失敗しました')
     } finally {
       setRegenerateLoading(false)
     }
@@ -194,11 +190,7 @@ export default function Settings() {
             >
               マスターパスワード変更
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setRotateDekOpen(true)}
-              className="w-full"
-            >
+            <Button variant="secondary" onClick={() => setRotateDekOpen(true)} className="w-full">
               DEK更新
             </Button>
             <Button
@@ -229,21 +221,37 @@ export default function Settings() {
             ) : storageConfig ? (
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs font-medium text-text-secondary block mb-1">バケット</label>
-                  <p className="text-sm text-text-primary font-mono">{storageConfig.bucket || 'N/A'}</p>
+                  <span className="text-xs font-medium text-text-secondary block mb-1">
+                    バケット
+                  </span>
+                  <p className="text-sm text-text-primary font-mono">
+                    {storageConfig.bucket || 'N/A'}
+                  </p>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-text-secondary block mb-1">リージョン</label>
-                  <p className="text-sm text-text-primary font-mono">{storageConfig.region || 'N/A'}</p>
+                  <span className="text-xs font-medium text-text-secondary block mb-1">
+                    リージョン
+                  </span>
+                  <p className="text-sm text-text-primary font-mono">
+                    {storageConfig.region || 'N/A'}
+                  </p>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-text-secondary block mb-1">ファイルパス</label>
-                  <p className="text-sm text-text-primary font-mono">{storageConfig.key || 'vault.json'}</p>
+                  <span className="text-xs font-medium text-text-secondary block mb-1">
+                    ファイルパス
+                  </span>
+                  <p className="text-sm text-text-primary font-mono">
+                    {storageConfig.key || 'vault.json'}
+                  </p>
                 </div>
                 {storageConfig.endpoint && (
                   <div>
-                    <label className="text-xs font-medium text-text-secondary block mb-1">エンドポイント</label>
-                    <p className="text-sm text-text-primary font-mono break-all">{storageConfig.endpoint}</p>
+                    <span className="text-xs font-medium text-text-secondary block mb-1">
+                      エンドポイント
+                    </span>
+                    <p className="text-sm text-text-primary font-mono break-all">
+                      {storageConfig.endpoint}
+                    </p>
                   </div>
                 )}
               </div>
@@ -353,10 +361,7 @@ export default function Settings() {
             >
               キャンセル
             </Button>
-            <Button
-              onClick={handleChangePassword}
-              disabled={changePasswordLoading}
-            >
+            <Button onClick={handleChangePassword} disabled={changePasswordLoading}>
               {changePasswordLoading ? '変更中...' : '変更'}
             </Button>
           </DialogFooter>
@@ -401,10 +406,7 @@ export default function Settings() {
             >
               キャンセル
             </Button>
-            <Button
-              onClick={handleRotateDek}
-              disabled={rotateDekLoading}
-            >
+            <Button onClick={handleRotateDek} disabled={rotateDekLoading}>
               {rotateDekLoading ? '更新中...' : '更新'}
             </Button>
           </DialogFooter>
@@ -448,10 +450,7 @@ export default function Settings() {
             >
               キャンセル
             </Button>
-            <Button
-              onClick={handleRegenerateRecoveryKey}
-              disabled={regenerateLoading}
-            >
+            <Button onClick={handleRegenerateRecoveryKey} disabled={regenerateLoading}>
               {regenerateLoading ? '生成中...' : '生成'}
             </Button>
           </DialogFooter>
@@ -472,11 +471,7 @@ export default function Settings() {
             <div className="bg-bg-muted p-4 rounded font-mono text-sm break-all max-h-40 overflow-y-auto">
               {recoveryKeyDisplayValue}
             </div>
-            <Button
-              variant="secondary"
-              onClick={copyRecoveryKey}
-              className="w-full"
-            >
+            <Button variant="secondary" onClick={copyRecoveryKey} className="w-full">
               {recoveryKeyCopied ? (
                 <>
                   <Check size={16} className="mr-2" /> コピーしました
@@ -489,11 +484,7 @@ export default function Settings() {
             </Button>
           </div>
           <DialogFooter>
-            <Button
-              onClick={() => setRecoveryKeyDisplayOpen(false)}
-            >
-              保管しました
-            </Button>
+            <Button onClick={() => setRecoveryKeyDisplayOpen(false)}>保管しました</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

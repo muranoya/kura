@@ -1,16 +1,16 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
 import * as commands from '../../commands'
-import { Label, CustomField } from '../../shared/types'
-import { Button } from '../../components/ui/button'
-import { PageHeader } from '../../components/layout/PageHeader'
 import EntryForm from '../../components/entries/EntryForm'
+import { PageHeader } from '../../components/layout/PageHeader'
+import { Button } from '../../components/ui/button'
+import type { CustomField, Label } from '../../shared/types'
 
 export default function EntryCreate() {
   const navigate = useNavigate()
   const [entryType, setEntryType] = useState('login')
   const [name, setName] = useState('')
-  const [typedValue, setTypedValue] = useState<Record<string, any>>({})
+  const [typedValue, setTypedValue] = useState<Record<string, string>>({})
   const [notes, setNotes] = useState<string | null>(null)
   const [customFields, setCustomFields] = useState<CustomField[]>([])
   const [allLabels, setAllLabels] = useState<Label[]>([])
@@ -38,10 +38,25 @@ export default function EntryCreate() {
     setLoading(true)
     try {
       const typedValueJson = JSON.stringify(typedValue)
-      const customFieldsJson = customFields.length > 0
-        ? JSON.stringify(customFields.map((f) => ({ id: f.id, name: f.name, field_type: f.fieldType, value: f.value })))
-        : undefined
-      const id = await commands.createEntry(entryType, name, typedValueJson, notes || undefined, selectedLabelIds, customFieldsJson)
+      const customFieldsJson =
+        customFields.length > 0
+          ? JSON.stringify(
+              customFields.map((f) => ({
+                id: f.id,
+                name: f.name,
+                field_type: f.fieldType,
+                value: f.value,
+              })),
+            )
+          : undefined
+      const id = await commands.createEntry(
+        entryType,
+        name,
+        typedValueJson,
+        notes || undefined,
+        selectedLabelIds,
+        customFieldsJson,
+      )
       navigate(`/entries/${id}`)
     } catch (err) {
       alert(`アイテム作成失敗: ${err}`)
@@ -56,12 +71,7 @@ export default function EntryCreate() {
         title="新規アイテム"
         showBackButton={true}
         action={
-          <Button
-            size="sm"
-            onClick={handleCreate}
-            disabled={loading || !name}
-            className="text-sm"
-          >
+          <Button size="sm" onClick={handleCreate} disabled={loading || !name} className="text-sm">
             {loading ? '作成中...' : '作成'}
           </Button>
         }

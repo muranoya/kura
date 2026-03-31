@@ -1,13 +1,13 @@
+import { Lock } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Lock } from 'lucide-react'
+import { STORAGE_KEYS } from '../../../shared/constants'
+import { removeFromStorage } from '../../../shared/storage'
+import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
+import { Card, CardContent } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
-import { Card, CardContent } from '../../components/ui/card'
-import { PageHeader } from '../../components/layout/PageHeader'
-import { removeFromStorage } from '../../../shared/storage'
-import { STORAGE_KEYS } from '../../../shared/constants'
 
 export default function UnlockExistingVault() {
   const navigate = useNavigate()
@@ -32,19 +32,18 @@ export default function UnlockExistingVault() {
 
     try {
       console.log('[UnlockExistingVault] Sending UNLOCK message')
-      const response = await new Promise<any>((resolve, reject) => {
-        chrome.runtime.sendMessage(
-          { type: 'UNLOCK', password },
-          (resp) => {
+      const response = await new Promise<{ success?: boolean; error?: string }>(
+        (resolve, reject) => {
+          chrome.runtime.sendMessage({ type: 'UNLOCK', password }, (resp) => {
             console.log('[UnlockExistingVault] UNLOCK response:', resp)
             if (chrome.runtime.lastError) {
               reject(new Error(chrome.runtime.lastError.message))
             } else {
               resolve(resp)
             }
-          }
-        )
-      })
+          })
+        },
+      )
 
       if (!response?.success) {
         throw new Error(response?.error || 'アンロックに失敗しました')
@@ -122,12 +121,7 @@ export default function UnlockExistingVault() {
                 >
                   戻る
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={loading || !password}
-                  className="flex-1"
-                  size="sm"
-                >
+                <Button type="submit" disabled={loading || !password} className="flex-1" size="sm">
                   {loading ? 'アンロック中...' : 'このVaultを使う'}
                 </Button>
               </div>

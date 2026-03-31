@@ -1,14 +1,14 @@
-import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { STORAGE_KEYS } from '../../../shared/constants'
+import { saveToStorage } from '../../../shared/storage'
+import type { S3Config } from '../../../shared/types'
+import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import { PageHeader } from '../../components/layout/PageHeader'
 import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
-import { saveToStorage } from '../../../shared/storage'
-import { STORAGE_KEYS } from '../../../shared/constants'
-import type { S3Config } from '../../../shared/types'
 
 export default function StorageSetup() {
   const navigate = useNavigate()
@@ -39,17 +39,18 @@ export default function StorageSetup() {
       console.log('[StorageSetup] Config saved successfully')
 
       // DOWNLOAD_VAULT メッセージを送信してVault存在確認
-      const response = await new Promise<any>((resolve, reject) => {
-        chrome.runtime.sendMessage(
-          { type: 'DOWNLOAD_VAULT' },
-          (resp) => {
-            if (chrome.runtime.lastError) {
-              reject(new Error(chrome.runtime.lastError.message))
-            } else {
-              resolve(resp)
-            }
+      const response = await new Promise<{
+        success?: boolean
+        error?: string
+        vaultExists?: boolean
+      }>((resolve, reject) => {
+        chrome.runtime.sendMessage({ type: 'DOWNLOAD_VAULT' }, (resp) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message))
+          } else {
+            resolve(resp)
           }
-        )
+        })
       })
 
       if (!response?.success) {
@@ -86,10 +87,7 @@ export default function StorageSetup() {
 
   return (
     <div className="h-full overflow-y-auto pb-20 flex flex-col">
-      <PageHeader
-        title="ストレージ設定"
-        subtitle="S3互換のクラウドストレージを設定します"
-      />
+      <PageHeader title="ストレージ設定" subtitle="S3互換のクラウドストレージを設定します" />
 
       <div className="p-4 space-y-4">
         {/* エラー表示 */}

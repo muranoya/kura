@@ -1,7 +1,7 @@
-import { EntryRow, EntryType } from '../../shared/types'
-import { EmptyState } from '../layout/EmptyState'
-import { Select, SelectValue, SelectContent, SelectItem, SelectTrigger } from '../ui/select'
 import { Search, X } from 'lucide-react'
+import type { EntryRow, EntryType } from '../../shared/types'
+import { EmptyState } from '../layout/EmptyState'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 
 interface EntryListPanelProps {
   // フィルター
@@ -60,7 +60,9 @@ export default function EntryListPanel({
       <div className="flex gap-2">
         <Select
           value={selectedType ?? 'all'}
-          onValueChange={(value) => onTypeChange(value === 'all' ? undefined : (value as EntryType))}
+          onValueChange={(value) =>
+            onTypeChange(value === 'all' ? undefined : (value as EntryType))
+          }
         >
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="カテゴリ" />
@@ -76,7 +78,10 @@ export default function EntryListPanel({
 
         {/* 検索ボックス */}
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted" size={18} />
+          <Search
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted"
+            size={18}
+          />
           <input
             type="text"
             placeholder="名前、メモ、カスタムフィールド名で検索..."
@@ -86,6 +91,7 @@ export default function EntryListPanel({
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={onSearchClear}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
               title="検索をクリア"
@@ -108,11 +114,7 @@ export default function EntryListPanel({
 
       {/* コンテンツ */}
       {loading ? (
-        <EmptyState
-          icon="⏳"
-          title="読み込み中..."
-          description="エントリを読み込んでいます"
-        />
+        <EmptyState icon="⏳" title="読み込み中..." description="エントリを読み込んでいます" />
       ) : entries.length === 0 ? (
         <EmptyState
           icon="🔑"
@@ -123,9 +125,7 @@ export default function EntryListPanel({
       ) : (
         <div className="space-y-3">
           {entries.map((entry) => (
-            <div key={entry.id}>
-              {renderCard(entry)}
-            </div>
+            <div key={entry.id}>{renderCard(entry)}</div>
           ))}
         </div>
       )}

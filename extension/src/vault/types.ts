@@ -34,6 +34,6 @@ export interface SyncConflict {
   entryId: string
   entryName: string
   conflictType: 'local_modified_remote_deleted' | 'remote_modified_local_deleted' | 'both_modified'
-  localValue?: any
-  remoteValue?: any
+  localValue?: unknown
+  remoteValue?: unknown
 }

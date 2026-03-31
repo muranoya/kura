@@ -1,11 +1,11 @@
-import { useNavigate } from 'react-router-dom'
-import { useState } from 'react'
 import { Check, X } from 'lucide-react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import { PageHeader } from '../../components/layout/PageHeader'
 
 export default function MasterPassword() {
   const navigate = useNavigate()
@@ -26,13 +26,7 @@ export default function MasterPassword() {
 
   const strength = passwordStrength(password)
   const strengthLabels = ['', '弱', '中弱', '中', '強']
-  const strengthColors = [
-    'bg-gray-300',
-    'bg-danger',
-    'bg-warning',
-    'bg-warning',
-    'bg-success',
-  ]
+  const strengthColors = ['bg-gray-300', 'bg-danger', 'bg-warning', 'bg-warning', 'bg-success']
 
   const handleCreate = async () => {
     if (!confirmed) {
@@ -48,29 +42,33 @@ export default function MasterPassword() {
     setLoading(true)
     try {
       console.log('[MasterPassword] Sending CREATE_VAULT message')
-      const response = await new Promise<any>((resolve, reject) => {
+      const response = await new Promise<{
+        success?: boolean
+        recoveryKey?: string
+        error?: string
+      }>((resolve, _reject) => {
         chrome.runtime.sendMessage(
           { type: 'CREATE_VAULT', masterPassword: password },
           (response) => {
             console.log('[MasterPassword] CREATE_VAULT response:', response)
             resolve(response)
-          }
+          },
         )
       })
 
       if (response?.success) {
-        console.log('[MasterPassword] Vault created successfully, recovery key:', response.recoveryKey)
+        console.log(
+          '[MasterPassword] Vault created successfully, recovery key:',
+          response.recoveryKey,
+        )
 
         // Service Worker 再起動対策: 作成直後に UNLOCK を送ってメモリにロードさせる
         console.log('[MasterPassword] Sending UNLOCK to ensure vault is loaded in background')
         await new Promise<void>((resolve) => {
-          chrome.runtime.sendMessage(
-            { type: 'UNLOCK', password: password },
-            (unlockResponse) => {
-              console.log('[MasterPassword] UNLOCK response:', unlockResponse)
-              resolve()
-            }
-          )
+          chrome.runtime.sendMessage({ type: 'UNLOCK', password: password }, (unlockResponse) => {
+            console.log('[MasterPassword] UNLOCK response:', unlockResponse)
+            resolve()
+          })
         })
 
         navigate('/onb/recovery', { state: { recoveryKey: response.recoveryKey } })
@@ -91,16 +89,14 @@ export default function MasterPassword() {
 
   return (
     <div className="h-full overflow-y-auto pb-20 flex flex-col">
-      <PageHeader
-        title="マスターパスワード設定"
-        showBackButton={true}
-      />
+      <PageHeader title="マスターパスワード設定" showBackButton={true} />
 
       <div className="p-4 space-y-4">
         {/* パスワード説明 */}
         <div className="p-3 rounded-md bg-accent/10 border border-accent/20">
           <p className="text-sm text-text-primary">
-            📌 すべてのデータを保護するマスターパスワードです。安全で予測困難なパスワードを設定してください。
+            📌
+            すべてのデータを保護するマスターパスワードです。安全で予測困難なパスワードを設定してください。
           </p>
         </div>
 
@@ -136,9 +132,7 @@ export default function MasterPassword() {
                       />
                     ))}
                   </div>
-                  <p className="text-sm text-text-muted">
-                    強度: {strengthLabels[strength]}
-                  </p>
+                  <p className="text-sm text-text-muted">強度: {strengthLabels[strength]}</p>
                 </div>
               )}
             </div>

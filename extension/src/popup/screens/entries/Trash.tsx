@@ -1,17 +1,16 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { RotateCcw, Trash2 } from 'lucide-react'
-import { Button } from '../../components/ui/button'
-import EntryCard from '../../components/entries/EntryCard'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import * as commands from '../../commands'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { EmptyState } from '../../components/layout/EmptyState'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { SyncActions } from '../../components/layout/SyncActions'
-import { EmptyState } from '../../components/layout/EmptyState'
-import { ConfirmDialog } from '../../components/ConfirmDialog'
-import * as commands from '../../commands'
-import { EntryRow } from '../../shared/types'
+import { Button } from '../../components/ui/button'
+import type { EntryRow } from '../../shared/types'
 
 export default function Trash() {
-  const navigate = useNavigate()
+  const _navigate = useNavigate()
   const [entries, setEntries] = useState<EntryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -76,15 +75,15 @@ export default function Trash() {
         </div>
       ) : entries.length === 0 ? (
         <div className="flex-1 flex items-center justify-center p-4">
-          <EmptyState
-            title="ゴミ箱は空です"
-            description="削除したアイテムがここに表示されます"
-          />
+          <EmptyState title="ゴミ箱は空です" description="削除したアイテムがここに表示されます" />
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {entries.map((entry) => (
-            <div key={entry.id} className="flex items-center gap-2 p-3 bg-bg-elevated rounded-lg border border-border">
+            <div
+              key={entry.id}
+              className="flex items-center gap-2 p-3 bg-bg-elevated rounded-lg border border-border"
+            >
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-text-primary truncate">{entry.name}</p>
                 <p className="text-sm text-text-muted mt-0.5">{entry.entryType}</p>

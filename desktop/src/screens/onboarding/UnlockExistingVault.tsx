@@ -1,12 +1,12 @@
-import { useState, useCallback } from 'react'
+import { Lock } from 'lucide-react'
+import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
+import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
+import { Card, CardContent } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
-import { Card, CardContent } from '../../components/ui/card'
-import { PageHeader } from '../../components/layout/PageHeader'
-import { Lock } from 'lucide-react'
 
 export default function UnlockExistingVault() {
   const navigate = useNavigate()
@@ -27,7 +27,7 @@ export default function UnlockExistingVault() {
       await commands.writeVaultFile(vaultBytes)
       commands.syncVaultIfConfigured().catch(() => {}) // バックグラウンド
       window.location.reload()
-    } catch (err) {
+    } catch (_err) {
       setError('パスワードが違います')
       setLoading(false)
     }

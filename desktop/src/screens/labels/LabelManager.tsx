@@ -1,15 +1,15 @@
-import { useEffect, useState, useCallback } from 'react'
+import { Check, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import * as commands from '../../commands'
-import { useSyncVersion, useNotifySynced } from '../../contexts/SyncContext'
-import { Label } from '../../shared/types'
-import { Button } from '../../components/ui/button'
-import { Input } from '../../components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import { Badge } from '../../components/ui/badge'
-import { EmptyState } from '../../components/layout/EmptyState'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { Plus, Trash2, Pencil, X, Check } from 'lucide-react'
+import { EmptyState } from '../../components/layout/EmptyState'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
+import { Badge } from '../../components/ui/badge'
+import { Button } from '../../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { Input } from '../../components/ui/input'
+import { useNotifySynced, useSyncVersion } from '../../contexts/SyncContext'
+import type { Label } from '../../shared/types'
 
 export default function LabelManager() {
   const syncVersion = useSyncVersion()
@@ -24,11 +24,8 @@ export default function LabelManager() {
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
 
-  useEffect(() => {
-    loadLabels()
-  }, [syncVersion])
-
-  const loadLabels = async () => {
+  const loadLabels = useCallback(async () => {
+    void syncVersion // trigger reload on sync
     try {
       setLoading(true)
       const data = await commands.listLabels()
@@ -38,7 +35,11 @@ export default function LabelManager() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [syncVersion])
+
+  useEffect(() => {
+    loadLabels()
+  }, [loadLabels])
 
   const handleCreateLabel = useCallback(async () => {
     if (!newLabelName.trim()) {
@@ -51,7 +52,7 @@ export default function LabelManager() {
       const newLabel = await commands.createLabel(newLabelName)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
+      commands.syncVaultIfConfigured().catch((e) => console.warn('Sync failed:', e))
       setLabels([...labels, newLabel])
       setNewLabelName('')
       setError('')
@@ -69,8 +70,8 @@ export default function LabelManager() {
       await commands.deleteLabel(deleteTargetId)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
-      setLabels(labels.filter(l => l.id !== deleteTargetId))
+      commands.syncVaultIfConfigured().catch((e) => console.warn('Sync failed:', e))
+      setLabels(labels.filter((l) => l.id !== deleteTargetId))
       setDeleteDialogOpen(false)
       setDeleteTargetId(null)
       notifySynced()
@@ -104,8 +105,8 @@ export default function LabelManager() {
       await commands.renameLabel(editingLabelId, editingName)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
-      setLabels(labels.map(l => l.id === editingLabelId ? { ...l, name: editingName } : l))
+      commands.syncVaultIfConfigured().catch((e) => console.warn('Sync failed:', e))
+      setLabels(labels.map((l) => (l.id === editingLabelId ? { ...l, name: editingName } : l)))
       setEditingLabelId(null)
       setEditingName('')
       setError('')
@@ -165,7 +166,11 @@ export default function LabelManager() {
           {loading ? (
             <EmptyState icon="⏳" title="読み込み中..." description="ラベルを読み込んでいます" />
           ) : labels.length === 0 ? (
-            <EmptyState icon="🏷" title="ラベルがありません" description="最初のラベルを作成してください" />
+            <EmptyState
+              icon="🏷"
+              title="ラベルがありません"
+              description="最初のラベルを作成してください"
+            />
           ) : (
             <div className="space-y-2">
               {labels.map((label) => (

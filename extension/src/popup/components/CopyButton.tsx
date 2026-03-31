@@ -23,11 +23,7 @@ export default function CopyButton({ text, label = 'コピー', className, style
   }
 
   return (
-    <button
-      onClick={handleCopy}
-      className={className}
-      style={style}
-    >
+    <button type="button" onClick={handleCopy} className={className} style={style}>
       {copied ? '✓ コピーしました' : label}
     </button>
   )

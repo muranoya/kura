@@ -23,9 +23,5 @@ export default function EntryTypeIcon({ type, size = 24 }: EntryTypeIconProps) {
     }
   }
 
-  return (
-    <span style={{ fontSize: `${size}px`, lineHeight: 1 }}>
-      {getIcon()}
-    </span>
-  )
+  return <span style={{ fontSize: `${size}px`, lineHeight: 1 }}>{getIcon()}</span>
 }

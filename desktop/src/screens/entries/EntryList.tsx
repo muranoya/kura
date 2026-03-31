@@ -1,14 +1,13 @@
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
-import { getFromStorage } from '../../shared/storage'
-import { useSyncVersion } from '../../contexts/SyncContext'
-import { EntryRow, EntryType } from '../../shared/types'
-import { Button } from '../../components/ui/button'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import EntryCard from '../../components/entries/EntryCard'
 import EntryListPanel from '../../components/entries/EntryListPanel'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
+import { Button } from '../../components/ui/button'
+import { useSyncVersion } from '../../contexts/SyncContext'
+import type { EntryRow, EntryType } from '../../shared/types'
 
 interface EntryListProps {
   onlyFavorites?: boolean
@@ -28,28 +27,49 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
   const [selectedType, setSelectedType] = useState<EntryType | undefined>(undefined)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useEffect(() => {
-    loadEntries()
-  }, [onlyFavorites, searchQuery, selectedType, labelId, syncVersion])
-
-  const loadEntries = async () => {
+  const loadEntries = useCallback(async () => {
+    void syncVersion // trigger reload on sync
     try {
       setLoading(true)
-      console.log('DEBUG: loadEntries called with onlyFavorites=', onlyFavorites, 'searchQuery=', searchQuery, 'selectedType=', selectedType, 'labelId=', labelId)
+      console.log(
+        'DEBUG: loadEntries called with onlyFavorites=',
+        onlyFavorites,
+        'searchQuery=',
+        searchQuery,
+        'selectedType=',
+        selectedType,
+        'labelId=',
+        labelId,
+      )
       const data = await commands.listEntries({
         onlyFavorites,
         searchQuery: searchQuery || undefined,
         type: selectedType,
         labelId,
       })
-      console.log('DEBUG: received entries count=', data.length, 'filter onlyFavorites=', onlyFavorites, 'searchQuery=', searchQuery, 'type=', selectedType, 'labelId=', labelId)
+      console.log(
+        'DEBUG: received entries count=',
+        data.length,
+        'filter onlyFavorites=',
+        onlyFavorites,
+        'searchQuery=',
+        searchQuery,
+        'type=',
+        selectedType,
+        'labelId=',
+        labelId,
+      )
       setEntries(data)
     } catch (err) {
       setError(`アイテム読み込み失敗: ${err}`)
     } finally {
       setLoading(false)
     }
-  }
+  }, [onlyFavorites, searchQuery, selectedType, labelId, syncVersion])
+
+  useEffect(() => {
+    loadEntries()
+  }, [loadEntries])
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value)
@@ -75,11 +95,9 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
       // Save vault to file and sync to S3 (background)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
+      commands.syncVaultIfConfigured().catch((e) => console.warn('Sync failed:', e))
 
-      const updated = entries.map(e =>
-        e.id === id ? { ...e, isFavorite: !currentFavorite } : e
-      )
+      const updated = entries.map((e) => (e.id === id ? { ...e, isFavorite: !currentFavorite } : e))
       setEntries(updated)
     } catch (err) {
       setError(`お気に入り変更失敗: ${err}`)
@@ -94,10 +112,10 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
       // Save vault to file and sync to S3 (background)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
+      commands.syncVaultIfConfigured().catch((e) => console.warn('Sync failed:', e))
 
       // お気に入りビューで削除された場合、リストから削除する
-      setEntries(entries.filter(e => e.id !== deleteTargetId))
+      setEntries(entries.filter((e) => e.id !== deleteTargetId))
       setDeleteDialogOpen(false)
       setDeleteTargetId(null)
     } catch (err) {
@@ -114,7 +132,9 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
     <div className="flex flex-col h-screen bg-bg-base">
       {/* sticky ヘッダー */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
-        <h1 className="text-sm font-semibold text-text-primary flex-1">{labelName || (onlyFavorites ? 'お気に入り' : 'アイテム一覧')}</h1>
+        <h1 className="text-sm font-semibold text-text-primary flex-1">
+          {labelName || (onlyFavorites ? 'お気に入り' : 'アイテム一覧')}
+        </h1>
         <SyncHeaderActions />
       </div>
 
@@ -135,17 +155,12 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
         }
         emptyAction={
           !onlyFavorites && (
-            <Button onClick={() => navigate('/entries/create')}>
-              最初のアイテムを作成
-            </Button>
+            <Button onClick={() => navigate('/entries/create')}>最初のアイテムを作成</Button>
           )
         }
         actionButton={
           !onlyFavorites && (
-            <Button
-              onClick={() => navigate('/entries/create')}
-              size="sm"
-            >
+            <Button onClick={() => navigate('/entries/create')} size="sm">
               新規作成
             </Button>
           )

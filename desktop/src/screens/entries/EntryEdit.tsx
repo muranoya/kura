@@ -1,11 +1,10 @@
-import { useParams, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import * as commands from '../../commands'
-import { getFromStorage } from '../../shared/storage'
-import { Entry, Label, CustomField } from '../../shared/types'
-import { Button } from '../../components/ui/button'
 import EntryForm from '../../components/entries/EntryForm'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
+import { Button } from '../../components/ui/button'
+import type { CustomField, Entry, Label } from '../../shared/types'
 
 export default function EntryEdit() {
   const { id } = useParams<{ id: string }>()
@@ -16,7 +15,7 @@ export default function EntryEdit() {
   const [error, setError] = useState('')
   const [name, setName] = useState('')
   const [notes, setNotes] = useState<string | null>(null)
-  const [typedValue, setTypedValue] = useState<Record<string, any>>({})
+  const [typedValue, setTypedValue] = useState<Record<string, string | null>>({})
   const [customFields, setCustomFields] = useState<CustomField[]>([])
   const [allLabels, setAllLabels] = useState<Label[]>([])
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
@@ -53,14 +52,29 @@ export default function EntryEdit() {
     setSaving(true)
     try {
       const typedValueJson = JSON.stringify(typedValue)
-      const customFieldsJson = customFields.length > 0
-        ? JSON.stringify(customFields.map(f => ({ id: f.id, name: f.name, field_type: f.fieldType, value: f.value })))
-        : undefined
-      await commands.updateEntry(id!, name, typedValueJson, notes || undefined, selectedLabelIds, customFieldsJson)
+      const customFieldsJson =
+        customFields.length > 0
+          ? JSON.stringify(
+              customFields.map((f) => ({
+                id: f.id,
+                name: f.name,
+                field_type: f.fieldType,
+                value: f.value,
+              })),
+            )
+          : undefined
+      await commands.updateEntry(
+        id as string,
+        name,
+        typedValueJson,
+        notes || undefined,
+        selectedLabelIds,
+        customFieldsJson,
+      )
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
       // S3に同期（バックグラウンド）
-      commands.syncVaultIfConfigured().catch(e => console.warn('Sync failed:', e))
+      commands.syncVaultIfConfigured().catch((e) => console.warn('Sync failed:', e))
       navigate(`/entries/${id}`)
     } catch (err) {
       setError(`保存失敗: ${err}`)
@@ -69,10 +83,18 @@ export default function EntryEdit() {
     }
   }
 
-
-
-  if (loading) return <div className="flex items-center justify-center h-screen text-text-secondary">読み込み中...</div>
-  if (!entry) return <div className="flex items-center justify-center h-screen text-danger">アイテムが見つかりません</div>
+  if (loading)
+    return (
+      <div className="flex items-center justify-center h-screen text-text-secondary">
+        読み込み中...
+      </div>
+    )
+  if (!entry)
+    return (
+      <div className="flex items-center justify-center h-screen text-danger">
+        アイテムが見つかりません
+      </div>
+    )
 
   return (
     <div className="flex flex-col h-screen bg-bg-base">
@@ -90,7 +112,7 @@ export default function EntryEdit() {
           name={name}
           onNameChange={setName}
           typedValue={typedValue}
-          onTypedValueChange={(key, value) => setTypedValue(prev => ({ ...prev, [key]: value }))}
+          onTypedValueChange={(key, value) => setTypedValue((prev) => ({ ...prev, [key]: value }))}
           notes={notes}
           onNotesChange={setNotes}
           customFields={customFields}
@@ -104,18 +126,10 @@ export default function EntryEdit() {
 
       {/* sticky bottom ボタンバー */}
       <div className="shrink-0 sticky bottom-0 flex justify-end gap-2 px-3 py-2 border-t border-border bg-bg-surface">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => navigate(`/entries/${id}`)}
-        >
+        <Button variant="secondary" size="sm" onClick={() => navigate(`/entries/${id}`)}>
           キャンセル
         </Button>
-        <Button
-          size="sm"
-          onClick={handleSave}
-          disabled={saving}
-        >
+        <Button size="sm" onClick={handleSave} disabled={saving}>
           {saving ? '保存中...' : '保存'}
         </Button>
       </div>

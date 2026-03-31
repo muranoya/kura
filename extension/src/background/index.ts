@@ -1,9 +1,70 @@
 // Service Worker エントリーポイント
 // WASM の初期化とメッセージハンドラーのセットアップ
 
-import * as vault from '../../wasm/wasm_bridge'
-import { getFromStorage, saveToStorage } from '../shared/storage'
+import * as vaultModule from '../../wasm/wasm_bridge'
 import { STORAGE_KEYS } from '../shared/constants'
+import { getFromStorage, saveToStorage } from '../shared/storage'
+
+/** WASM API surface for Service Worker */
+interface WasmApi {
+  api_create_new_vault(masterPassword: string): string
+  api_load_vault(vaultBytes: Uint8Array, etag: string): void
+  api_unlock(masterPassword: string): boolean
+  api_unlock_with_recovery_key(recoveryKey: string): void
+  api_lock(): Uint8Array
+  api_get_vault_bytes(): Uint8Array
+  api_get_vault_etag?(): string | null
+  api_list_entries(
+    searchQuery: string | null,
+    type: string | null,
+    labelId: string | null,
+    includeTrash: boolean,
+    onlyFavorites: boolean,
+  ): string
+  api_get_entry(id: string): string
+  api_create_entry(
+    entryType: string,
+    name: string,
+    notes: string | null,
+    typedValueJson: string,
+    labelIds: string[],
+    customFieldsJson: string | null,
+  ): string
+  api_update_entry(
+    id: string,
+    name: string,
+    notes: string | null,
+    typedValueJson: string,
+    labelIds: string[],
+    customFieldsJson: string | null,
+  ): void
+  api_delete_entry(id: string): void
+  api_restore_entry(id: string): void
+  api_purge_entry(id: string): void
+  api_set_favorite(id: string, isFavorite: boolean): void
+  api_list_labels(): string
+  api_create_label(name: string): string
+  api_delete_label(id: string): void
+  api_rename_label(id: string, newName: string): void
+  api_set_entry_labels(entryId: string, labelIds: string[]): void
+  api_generate_password(
+    length: number,
+    includeUppercase: boolean,
+    includeLowercase: boolean,
+    includeNumbers: boolean,
+    includeSymbols: boolean,
+  ): string
+  api_generate_totp_default(secret: string): string
+  api_change_master_password(oldPassword: string, newPassword: string): void
+  api_rotate_dek(password: string): string
+  api_regenerate_recovery_key(password: string): string
+  api_sync?(configStr: string): Promise<{ last_synced_at?: number }>
+  api_push?(configStr: string): Promise<void>
+  api_download?(configStr: string): Promise<boolean>
+  [key: string]: unknown
+}
+
+const vault = vaultModule as unknown as WasmApi
 
 let wasmInitialized = false
 let unlocked = false
@@ -51,10 +112,12 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   console.log('[SW] activate event')
-  event.waitUntil(initWasm().then(() => {
-    console.log('[SW] Calling setupAlarms in activate')
-    setupAlarms()
-  }))
+  event.waitUntil(
+    initWasm().then(() => {
+      console.log('[SW] Calling setupAlarms in activate')
+      setupAlarms()
+    }),
+  )
 })
 
 // ========== ヘルパー関数 ==========
@@ -62,7 +125,7 @@ self.addEventListener('activate', (event) => {
 /**
  * camelCase への正規化（WASM からの snake_case → camelCase）
  */
-function normalizeEntry(raw: any): any {
+function normalizeEntry(raw: Record<string, unknown>): Record<string, unknown> {
   if (!raw) return raw
   return {
     id: raw.id,
@@ -74,19 +137,21 @@ function normalizeEntry(raw: any): any {
     notes: raw.notes ?? null,
     typedValue: raw.typed_value ?? {},
     labels: raw.label_ids ?? [],
-    customFields: (raw.custom_fields ?? []).map((f: any) => ({
-      id: f.id,
-      name: f.name,
-      fieldType: f.field_type,
-      value: f.value,
-    })),
+    customFields: ((raw.custom_fields as Record<string, unknown>[] | undefined) ?? []).map(
+      (f: Record<string, unknown>) => ({
+        id: f.id,
+        name: f.name,
+        fieldType: f.field_type,
+        value: f.value,
+      }),
+    ),
   }
 }
 
 /**
  * 配列エントリを正規化（normalizeEntry を各要素に適用）
  */
-function normalizeEntries(entries: any[]): any[] {
+function normalizeEntries(entries: Record<string, unknown>[]): Record<string, unknown>[] {
   return (entries ?? []).map(normalizeEntry)
 }
 
@@ -101,7 +166,7 @@ async function autoSync() {
     const s3Config = await getFromStorage(STORAGE_KEYS.S3_CONFIG)
     if (!s3Config) {
       console.log('[SW] autoSync: No S3 config, saving locally only')
-      const vaultBytes = (vault as any).api_get_vault_bytes()
+      const vaultBytes = vault.api_get_vault_bytes()
       await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
       return
     }
@@ -109,23 +174,23 @@ async function autoSync() {
     const configStr = JSON.stringify(s3Config)
 
     // api_sync を優先使用（マージ + アップロード）
-    if (typeof (vault as any).api_sync === 'function') {
+    if (typeof vault.api_sync === 'function') {
       console.log('[SW] autoSync: Calling api_sync')
-      await (vault as any).api_sync(configStr)
+      await vault.api_sync(configStr)
       console.log('[SW] autoSync: api_sync completed successfully')
-    } else if (typeof (vault as any).api_push === 'function') {
+    } else if (typeof vault.api_push === 'function') {
       // api_sync が利用不可の場合は api_push で代替
       console.log('[SW] autoSync: api_sync not available, using api_push')
-      await (vault as any).api_push(configStr)
+      await vault.api_push(configStr)
       console.log('[SW] autoSync: api_push completed successfully')
     } else {
       throw new Error('Neither api_sync nor api_push is available')
     }
 
     // 同期後に vault bytes / ETag / lastSyncTime を更新
-    const vaultBytes = (vault as any).api_get_vault_bytes()
+    const vaultBytes = vault.api_get_vault_bytes()
     await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
-    const newEtag = (vault as any).api_get_vault_etag?.() ?? null
+    const newEtag = vault.api_get_vault_etag?.() ?? null
     await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
     const syncTime = Math.floor(Date.now() / 1000)
     await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, syncTime)
@@ -137,20 +202,24 @@ async function autoSync() {
 
 async function loadSettings() {
   const settings = await getFromStorage(STORAGE_KEYS.APP_SETTINGS)
-  return settings || {
-    autolockMinutes: 5,
-    clipboardClearSeconds: 30,
-    clipboardAutoClean: true,
-    theme: 'light',
-  }
+  return (
+    settings || {
+      autolockMinutes: 5,
+      clipboardClearSeconds: 30,
+      clipboardAutoClean: true,
+      theme: 'light',
+    }
+  )
 }
 
 // ========== メッセージハンドリング ==========
 
 async function handleMessage(
-  message: any,
-  sender: chrome.runtime.MessageSender,
-  sendResponse: (response?: any) => void
+  // biome-ignore lint/suspicious/noExplicitAny: message shape varies by type, validated per case
+  message: Record<string, any>,
+  _sender: chrome.runtime.MessageSender,
+  // biome-ignore lint/suspicious/noExplicitAny: response shape varies by handler
+  sendResponse: (response?: any) => void,
 ) {
   try {
     await initWasm()
@@ -163,7 +232,7 @@ async function handleMessage(
         try {
           const etag = await getFromStorage(STORAGE_KEYS.VAULT_ETAG)
           console.log('[SW] Auto-loading vault from storage (Service Worker recovered)')
-          ;(vault as any).api_load_vault(new Uint8Array(vaultBytes), etag || '')
+          vault.api_load_vault(new Uint8Array(vaultBytes), etag || '')
           // Note: We load but don't unlock yet - the actual unlock state is restored on first UNLOCK/CREATE_VAULT
         } catch (e) {
           console.warn('[SW] Failed to auto-load vault:', e)
@@ -192,8 +261,8 @@ async function handleMessage(
             break
           }
           // vault をロードしてアンロック
-          ;(vault as any).api_load_vault(new Uint8Array(vaultBytes), etag || '')
-          ;(vault as any).api_unlock(message.password)
+          vault.api_load_vault(new Uint8Array(vaultBytes), etag || '')
+          vault.api_unlock(message.password)
           unlocked = true
           // オートロック alarm を設定
           const settings = await loadSettings()
@@ -202,7 +271,7 @@ async function handleMessage(
           chrome.alarms.create('autosync', { periodInMinutes: 1 })
           sendResponse({ success: true })
           // アンロック後に同期（バックグラウンド）
-          autoSync().catch(e => console.warn('[SW] Post-unlock sync failed:', e))
+          autoSync().catch((e) => console.warn('[SW] Post-unlock sync failed:', e))
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }
@@ -221,8 +290,8 @@ async function handleMessage(
             sendResponse({ success: false, error: 'Vault not found' })
             break
           }
-          ;(vault as any).api_load_vault(new Uint8Array(vaultBytes), etag || '')
-          ;(vault as any).api_unlock(message.password)
+          vault.api_load_vault(new Uint8Array(vaultBytes), etag || '')
+          vault.api_unlock(message.password)
           unlocked = true
           const settings = await loadSettings()
           chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
@@ -230,7 +299,7 @@ async function handleMessage(
           chrome.alarms.create('autosync', { periodInMinutes: 1 })
           sendResponse({ success: true })
           // アンロック後に同期（バックグラウンド）
-          autoSync().catch(e => console.warn('[SW] Post-unlock sync failed:', e))
+          autoSync().catch((e) => console.warn('[SW] Post-unlock sync failed:', e))
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }
@@ -239,7 +308,7 @@ async function handleMessage(
 
       case 'LOCK': {
         try {
-          const vaultBytes = (vault as any).api_lock()
+          const vaultBytes = vault.api_lock()
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
           unlocked = false
           chrome.alarms.clear('autolock')
@@ -259,12 +328,15 @@ async function handleMessage(
         try {
           console.log('[SW] CREATE_VAULT: Starting vault creation')
           console.log('[SW] CREATE_VAULT: vault object type:', typeof vault)
-          console.log('[SW] CREATE_VAULT: vault.api_create_new_vault:', typeof (vault as any).api_create_new_vault)
+          console.log(
+            '[SW] CREATE_VAULT: vault.api_create_new_vault:',
+            typeof vault.api_create_new_vault,
+          )
 
-          const recoveryKey = (vault as any).api_create_new_vault(message.masterPassword)
+          const recoveryKey = vault.api_create_new_vault(message.masterPassword)
           console.log('[SW] CREATE_VAULT: Vault created, recovery key:', recoveryKey)
 
-          const vaultBytes = (vault as any).api_get_vault_bytes()
+          const vaultBytes = vault.api_get_vault_bytes()
           console.log('[SW] CREATE_VAULT: Got vault bytes, size:', vaultBytes?.length)
 
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
@@ -295,9 +367,9 @@ async function handleMessage(
           break
         }
         try {
-          ;(vault as any).api_unlock_with_recovery_key(message.recoveryKey)
-          ;(vault as any).api_change_master_password(message.recoveryKey, message.newPassword)
-          const vaultBytes = (vault as any).api_get_vault_bytes()
+          vault.api_unlock_with_recovery_key(message.recoveryKey)
+          vault.api_change_master_password(message.recoveryKey, message.newPassword)
+          const vaultBytes = vault.api_get_vault_bytes()
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, null)
           await autoSync()
@@ -320,12 +392,12 @@ async function handleMessage(
         }
         try {
           const filter = message.filter || {}
-          const result = (vault as any).api_list_entries(
+          const result = vault.api_list_entries(
             filter.searchQuery || null,
             filter.type || null,
             filter.labelId || null,
             filter.includeTrash || false,
-            filter.onlyFavorites || false
+            filter.onlyFavorites || false,
           )
           const rawEntries = JSON.parse(result)
           const entries = normalizeEntries(rawEntries)
@@ -342,9 +414,9 @@ async function handleMessage(
           break
         }
         try {
-          const result = (vault as any).api_get_entry(message.id)
+          const result = vault.api_get_entry(message.id)
           const rawEntry = JSON.parse(result)
-          if (rawEntry && rawEntry.typed_value && typeof rawEntry.typed_value === 'string') {
+          if (rawEntry?.typed_value && typeof rawEntry.typed_value === 'string') {
             rawEntry.typed_value = JSON.parse(rawEntry.typed_value)
           }
           const entry = normalizeEntry(rawEntry)
@@ -361,13 +433,13 @@ async function handleMessage(
           break
         }
         try {
-          const entryId = (vault as any).api_create_entry(
+          const entryId = vault.api_create_entry(
             message.entryType,
             message.name,
             message.notes || null,
             JSON.stringify(message.typedValue || {}),
             message.labelIds || [],
-            message.customFields ? JSON.stringify(message.customFields) : null
+            message.customFields ? JSON.stringify(message.customFields) : null,
           )
           await autoSync()
           sendResponse({ success: true, entryId })
@@ -383,13 +455,13 @@ async function handleMessage(
           break
         }
         try {
-          ;(vault as any).api_update_entry(
+          vault.api_update_entry(
             message.id,
             message.name,
             message.notes || null,
             JSON.stringify(message.typedValue || {}),
             message.labelIds || [],
-            message.customFields ? JSON.stringify(message.customFields) : null
+            message.customFields ? JSON.stringify(message.customFields) : null,
           )
           await autoSync()
           sendResponse({ success: true })
@@ -405,7 +477,7 @@ async function handleMessage(
           break
         }
         try {
-          ;(vault as any).api_delete_entry(message.id)
+          vault.api_delete_entry(message.id)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -420,7 +492,7 @@ async function handleMessage(
           break
         }
         try {
-          ;(vault as any).api_restore_entry(message.id)
+          vault.api_restore_entry(message.id)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -435,7 +507,7 @@ async function handleMessage(
           break
         }
         try {
-          ;(vault as any).api_purge_entry(message.id)
+          vault.api_purge_entry(message.id)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -450,7 +522,7 @@ async function handleMessage(
           break
         }
         try {
-          ;(vault as any).api_set_favorite(message.id, message.isFavorite)
+          vault.api_set_favorite(message.id, message.isFavorite)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -467,7 +539,7 @@ async function handleMessage(
           break
         }
         try {
-          const result = (vault as any).api_list_entries(null, null, null, true, false)
+          const result = vault.api_list_entries(null, null, null, true, false)
           const rawEntries = JSON.parse(result)
           const entries = normalizeEntries(rawEntries)
           sendResponse({ success: true, entries })
@@ -485,7 +557,7 @@ async function handleMessage(
           break
         }
         try {
-          const result = (vault as any).api_list_labels()
+          const result = vault.api_list_labels()
           const labels = JSON.parse(result)
           sendResponse({ success: true, labels })
         } catch (err) {
@@ -500,7 +572,7 @@ async function handleMessage(
           break
         }
         try {
-          const labelId = (vault as any).api_create_label(message.name)
+          const labelId = vault.api_create_label(message.name)
           await autoSync()
           sendResponse({ success: true, labelId })
         } catch (err) {
@@ -515,7 +587,7 @@ async function handleMessage(
           break
         }
         try {
-          ;(vault as any).api_delete_label(message.id)
+          vault.api_delete_label(message.id)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -530,7 +602,7 @@ async function handleMessage(
           break
         }
         try {
-          ;(vault as any).api_rename_label(message.id, message.newName)
+          vault.api_rename_label(message.id, message.newName)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -545,7 +617,7 @@ async function handleMessage(
           break
         }
         try {
-          ;(vault as any).api_set_entry_labels(message.entryId, message.labelIds || [])
+          vault.api_set_entry_labels(message.entryId, message.labelIds || [])
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -558,12 +630,12 @@ async function handleMessage(
 
       case 'GENERATE_PASSWORD': {
         try {
-          const password = (vault as any).api_generate_password(
+          const password = vault.api_generate_password(
             message.length ?? 16,
             message.includeUppercase ?? true,
             message.includeLowercase ?? true,
             message.includeNumbers ?? true,
-            message.includeSymbols ?? true
+            message.includeSymbols ?? true,
           )
           sendResponse({ success: true, password })
         } catch (err) {
@@ -574,7 +646,7 @@ async function handleMessage(
 
       case 'GENERATE_TOTP': {
         try {
-          const totp = (vault as any).api_generate_totp_default(message.secret)
+          const totp = vault.api_generate_totp_default(message.secret)
           sendResponse({ success: true, totp })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -590,7 +662,7 @@ async function handleMessage(
           break
         }
         try {
-          ;(vault as any).api_change_master_password(message.oldPassword, message.newPassword)
+          vault.api_change_master_password(message.oldPassword, message.newPassword)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -605,7 +677,7 @@ async function handleMessage(
           break
         }
         try {
-          const recoveryKey = (vault as any).api_rotate_dek(message.password)
+          const recoveryKey = vault.api_rotate_dek(message.password)
           await autoSync()
           sendResponse({ success: true, recoveryKey })
         } catch (err) {
@@ -620,7 +692,7 @@ async function handleMessage(
           break
         }
         try {
-          const recoveryKey = (vault as any).api_regenerate_recovery_key(message.password)
+          const recoveryKey = vault.api_regenerate_recovery_key(message.password)
           await autoSync()
           sendResponse({ success: true, recoveryKey })
         } catch (err) {
@@ -640,7 +712,7 @@ async function handleMessage(
           }
 
           // api_download が実装されるまでは、エラーを返す
-          if (typeof (vault as any).api_download !== 'function') {
+          if (typeof vault.api_download !== 'function') {
             console.warn('[SW] DOWNLOAD_VAULT: api_download is not available in vault_core')
             sendResponse({
               success: false,
@@ -650,10 +722,10 @@ async function handleMessage(
           }
 
           console.log('[SW] DOWNLOAD_VAULT: Downloading vault from S3')
-          const vaultExists = await (vault as any).api_download(JSON.stringify(s3Config))
+          const vaultExists = await vault.api_download(JSON.stringify(s3Config))
 
           if (vaultExists) {
-            const vaultBytes = (vault as any).api_get_vault_bytes()
+            const vaultBytes = vault.api_get_vault_bytes()
             await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
             console.log('[SW] DOWNLOAD_VAULT: Vault downloaded and saved to storage')
           } else {
@@ -681,7 +753,7 @@ async function handleMessage(
           }
 
           // api_push が実装されるまでは、エラーを返す
-          if (typeof (vault as any).api_push !== 'function') {
+          if (typeof vault.api_push !== 'function') {
             console.warn('[SW] PUSH_VAULT: api_push is not available in vault_core')
             sendResponse({
               success: false,
@@ -691,8 +763,8 @@ async function handleMessage(
           }
 
           console.log('[SW] PUSH_VAULT: Pushing vault to S3')
-          await (vault as any).api_push(JSON.stringify(s3Config))
-          const newEtag = (vault as any).api_get_vault_etag?.() ?? null
+          await vault.api_push(JSON.stringify(s3Config))
+          const newEtag = vault.api_get_vault_etag?.() ?? null
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
           await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, new Date().toISOString())
           console.log('[SW] PUSH_VAULT: Push successful')
@@ -707,7 +779,9 @@ async function handleMessage(
       case 'DOWNLOAD': {
         try {
           console.log('[SW] DOWNLOAD: Starting download')
-          const s3Config = message.storageConfig ? JSON.parse(message.storageConfig) : await getFromStorage(STORAGE_KEYS.S3_CONFIG)
+          const s3Config = message.storageConfig
+            ? JSON.parse(message.storageConfig)
+            : await getFromStorage(STORAGE_KEYS.S3_CONFIG)
 
           if (!s3Config) {
             sendResponse({ success: false, error: 'S3 config not found' })
@@ -716,7 +790,7 @@ async function handleMessage(
 
           const configStr = JSON.stringify(s3Config)
           console.log('[SW] DOWNLOAD: Calling api_download')
-          const downloadResult = await (vault as any).api_download(configStr)
+          const downloadResult = await vault.api_download(configStr)
           console.log('[SW] DOWNLOAD: api_download completed, result:', downloadResult)
 
           sendResponse({ success: true, result: downloadResult })
@@ -743,24 +817,24 @@ async function handleMessage(
             break
           }
 
-          console.log('[SW] SYNC: api_sync available:', typeof (vault as any).api_sync === 'function')
-          console.log('[SW] SYNC: api_push available:', typeof (vault as any).api_push === 'function')
+          console.log('[SW] SYNC: api_sync available:', typeof vault.api_sync === 'function')
+          console.log('[SW] SYNC: api_push available:', typeof vault.api_push === 'function')
 
           const configStr = JSON.stringify(s3Config)
 
           let lastSyncedAt: number | null = null
           // api_sync が実装されている場合、それを使用
-          if (typeof (vault as any).api_sync === 'function') {
+          if (typeof vault.api_sync === 'function') {
             console.log('[SW] SYNC: Calling api_sync')
-            const syncResult = await (vault as any).api_sync(configStr)
+            const syncResult = await vault.api_sync(configStr)
             console.log('[SW] SYNC: api_sync completed successfully, syncResult:', syncResult)
             console.log('[SW] SYNC: syncResult type:', typeof syncResult)
             console.log('[SW] SYNC: syncResult.last_synced_at:', syncResult?.last_synced_at)
             lastSyncedAt = syncResult?.last_synced_at ?? null
-          } else if (typeof (vault as any).api_push === 'function') {
+          } else if (typeof vault.api_push === 'function') {
             // api_sync が利用できない場合は api_push で代替
             console.log('[SW] SYNC: api_sync not available, using api_push instead')
-            const pushResult = await (vault as any).api_push(configStr)
+            await vault.api_push(configStr)
             console.log('[SW] SYNC: api_push completed successfully')
             lastSyncedAt = null
           } else {
@@ -768,10 +842,10 @@ async function handleMessage(
           }
 
           // 同期後、vault bytes と ETag を更新
-          const vaultBytes = (vault as any).api_get_vault_bytes()
+          const vaultBytes = vault.api_get_vault_bytes()
           console.log('[SW] SYNC: Got vault bytes after sync, size:', vaultBytes?.length)
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
-          const newEtag = (vault as any).api_get_vault_etag?.() ?? null
+          const newEtag = vault.api_get_vault_etag?.() ?? null
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
 
           // lastSyncedAt がない場合はフォールバック
@@ -849,7 +923,7 @@ async function handleAutolockAlarm() {
   console.log('[SW] Autolock alarm triggered')
   if (!unlocked) return
   try {
-    const vaultBytes = (vault as any).api_lock()
+    const vaultBytes = vault.api_lock()
     await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
     unlocked = false
     console.log('[SW] Vault locked')
@@ -865,9 +939,9 @@ async function handleClipboardClearAlarm() {
       // Chrome: offscreen document 経由でクリップボードをクリア
       await chrome.offscreen.createDocument({
         url: chrome.runtime.getURL('src/background/offscreen.html'),
-        reasons: ['CLIPBOARD'],
+        reasons: ['CLIPBOARD' as chrome.offscreen.Reason],
         justification: 'Clear clipboard after copy timeout',
-      } as any)
+      })
       chrome.runtime.sendMessage({ type: 'CLEAR_CLIPBOARD' })
     } else {
       // Firefox: background page から直接クリップボードをクリア
@@ -884,7 +958,5 @@ async function handleAutosyncAlarm() {
     console.log('[SW] Vault is locked, skipping sync')
     return
   }
-  autoSync().catch(e => console.warn('[SW] Periodic sync failed:', e))
+  autoSync().catch((e) => console.warn('[SW] Periodic sync failed:', e))
 }
-
-export {}

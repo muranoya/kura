@@ -12,9 +12,11 @@ export default function SecretField({ value, label, onCopy, style }: SecretField
 
   return (
     <div style={style}>
-      <label style={{ display: 'block', fontSize: '0.75rem', color: '#666', marginBottom: '0.25rem' }}>
+      <span
+        style={{ display: 'block', fontSize: '0.75rem', color: '#666', marginBottom: '0.25rem' }}
+      >
         {label}
-      </label>
+      </span>
       <div
         style={{
           display: 'flex',
@@ -29,6 +31,7 @@ export default function SecretField({ value, label, onCopy, style }: SecretField
         <span>{visible ? value : '••••••••'}</span>
         <div style={{ display: 'flex', gap: '0.25rem' }}>
           <button
+            type="button"
             onClick={() => setVisible(!visible)}
             style={{
               background: 'none',
@@ -43,6 +46,7 @@ export default function SecretField({ value, label, onCopy, style }: SecretField
           </button>
           {onCopy && (
             <button
+              type="button"
               onClick={onCopy}
               style={{
                 background: 'none',

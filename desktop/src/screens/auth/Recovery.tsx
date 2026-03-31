@@ -1,11 +1,11 @@
+import { ArrowLeft } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import { Button } from '../../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import { ArrowLeft } from 'lucide-react'
 
 export default function Recovery() {
   const navigate = useNavigate()
@@ -42,6 +42,7 @@ export default function Recovery() {
       <div className="w-full max-w-md">
         {/* ヘッダー */}
         <button
+          type="button"
           onClick={() => navigate('/auth/lock')}
           className="flex items-center gap-2 text-accent hover:text-accent-hover mb-8 transition-colors"
         >
@@ -107,11 +108,7 @@ export default function Recovery() {
             </div>
 
             {/* 復旧ボタン */}
-            <Button
-              onClick={handleRecover}
-              disabled={loading}
-              className="w-full"
-            >
+            <Button onClick={handleRecover} disabled={loading} className="w-full">
               {loading ? '復旧中...' : '復旧'}
             </Button>
           </CardContent>

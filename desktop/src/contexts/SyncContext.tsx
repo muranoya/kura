@@ -12,11 +12,9 @@ const SyncContext = createContext<SyncContextValue>({
 
 export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [syncVersion, setSyncVersion] = useState(0)
-  const notifySynced = () => setSyncVersion(v => v + 1)
+  const notifySynced = () => setSyncVersion((v) => v + 1)
   return (
-    <SyncContext.Provider value={{ syncVersion, notifySynced }}>
-      {children}
-    </SyncContext.Provider>
+    <SyncContext.Provider value={{ syncVersion, notifySynced }}>{children}</SyncContext.Provider>
   )
 }
 

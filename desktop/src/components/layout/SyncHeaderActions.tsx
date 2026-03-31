@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
 import { Store } from '@tauri-apps/plugin-store'
-import { getFromStorage, saveToStorage } from '../../shared/storage'
-import { STORAGE_KEYS } from '../../shared/constants'
-import { useNotifySynced } from '../../contexts/SyncContext'
+import { Loader2, RefreshCw } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { syncVault } from '../../commands'
-import { RefreshCw, Loader2 } from 'lucide-react'
+import { useNotifySynced } from '../../contexts/SyncContext'
+import { STORAGE_KEYS } from '../../shared/constants'
+import { getFromStorage, saveToStorage } from '../../shared/storage'
+import type { S3Config } from '../../shared/types'
 
 function formatRelativeTime(unixSecs: number): string {
   const diffMin = Math.floor((Date.now() / 1000 - unixSecs) / 60)
@@ -18,16 +19,16 @@ function formatRelativeTime(unixSecs: number): string {
 export default function SyncHeaderActions() {
   const notifySynced = useNotifySynced()
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null)
-  const [storageConfig, setStorageConfig] = useState<any>(null)
+  const [storageConfig, setStorageConfig] = useState<S3Config | null>(null)
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error'>('idle')
-  const [tick, setTick] = useState(0)
+  const [_tick, setTick] = useState(0)
 
   // Load initial values
   useEffect(() => {
     const loadData = async () => {
       try {
         const [config, syncTime] = await Promise.all([
-          getFromStorage<any>(STORAGE_KEYS.S3_CONFIG),
+          getFromStorage<S3Config>(STORAGE_KEYS.S3_CONFIG),
           getFromStorage<number>(STORAGE_KEYS.LAST_SYNC_TIME),
         ])
         setStorageConfig(config)
@@ -58,7 +59,7 @@ export default function SyncHeaderActions() {
     }
 
     let unlisten: (() => void) | undefined
-    subscribe().then(fn => {
+    subscribe().then((fn) => {
       unlisten = fn
     })
 
@@ -70,7 +71,7 @@ export default function SyncHeaderActions() {
   // Auto-update relative time every minute
   useEffect(() => {
     if (!lastSyncTime) return
-    const timer = setInterval(() => setTick(t => t + 1), 60000)
+    const timer = setInterval(() => setTick((t) => t + 1), 60000)
     return () => clearInterval(timer)
   }, [lastSyncTime])
 
@@ -108,20 +109,20 @@ export default function SyncHeaderActions() {
   return (
     <div className="flex items-center gap-1.5 ml-auto">
       {lastSyncTime && (
-        <span className="text-xs text-text-muted">
-          {formatRelativeTime(lastSyncTime)}
-        </span>
+        <span className="text-xs text-text-muted">{formatRelativeTime(lastSyncTime)}</span>
       )}
       <button
+        type="button"
         onClick={handleSync}
         disabled={syncStatus === 'syncing'}
         className="p-1 text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
         title="今すぐ同期"
       >
-        {syncStatus === 'syncing'
-          ? <Loader2 className="w-4 h-4 animate-spin" />
-          : <RefreshCw className="w-4 h-4" />
-        }
+        {syncStatus === 'syncing' ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <RefreshCw className="w-4 h-4" />
+        )}
       </button>
     </div>
   )

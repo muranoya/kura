@@ -1,16 +1,23 @@
+import { Plus, Trash2 } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useCallback, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { CustomField, CustomFieldType, Label } from '../../../shared/types'
-import { Button } from '../ui/button'
-import { Input } from '../ui/input'
-import { Textarea } from '../ui/textarea'
-import { Label as UILabel } from '../ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Badge } from '../ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { Plus, Trash2 } from 'lucide-react'
 import { getEntryTypeLabel } from '../../../shared/constants'
+import type { CustomField, CustomFieldType, Label } from '../../../shared/types'
+
+interface MdProps {
+  children?: ReactNode
+  href?: string
+  inline?: boolean
+}
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { Input } from '../ui/input'
+import { Label as UILabel } from '../ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Textarea } from '../ui/textarea'
 import PasswordGeneratorPanel from './PasswordGeneratorPanel'
 
 export interface EntryFormProps {
@@ -19,8 +26,8 @@ export interface EntryFormProps {
   onEntryTypeChange?: (type: string) => void
   name: string
   onNameChange: (name: string) => void
-  typedValue: Record<string, any>
-  onTypedValueChange: (key: string, value: any) => void
+  typedValue: Record<string, string>
+  onTypedValueChange: (key: string, value: string) => void
   notes: string | null
   onNotesChange: (notes: string) => void
   customFields: CustomField[]
@@ -32,41 +39,72 @@ export interface EntryFormProps {
 }
 
 const markdownComponents = {
-  h1: ({ children }: any) => <h1 className="text-2xl font-bold text-text-primary mt-4 mb-2">{children}</h1>,
-  h2: ({ children }: any) => <h2 className="text-xl font-bold text-text-primary mt-3 mb-2">{children}</h2>,
-  h3: ({ children }: any) => <h3 className="text-lg font-bold text-text-primary mt-2 mb-2">{children}</h3>,
-  p: ({ children }: any) => <p className="text-text-primary mb-3 leading-relaxed">{children}</p>,
-  ul: ({ children }: any) => <ul className="list-disc list-inside text-text-primary mb-3 space-y-1">{children}</ul>,
-  ol: ({ children }: any) => <ol className="list-decimal list-inside text-text-primary mb-3 space-y-1">{children}</ol>,
-  li: ({ children }: any) => <li className="text-text-primary">{children}</li>,
-  code: ({ inline, children }: any) =>
-    inline ? (
-      <code className="bg-bg-elevated px-1.5 py-0.5 rounded text-sm font-mono text-text-primary">{children}</code>
-    ) : (
-      <code className="block bg-bg-elevated p-3 rounded text-sm font-mono text-text-primary overflow-x-auto mb-3">{children}</code>
-    ),
-  pre: ({ children }: any) => <pre className="bg-bg-elevated p-3 rounded text-sm font-mono text-text-primary overflow-x-auto mb-3">{children}</pre>,
-  blockquote: ({ children }: any) => (
-    <blockquote className="border-l-4 border-accent pl-3 py-1 text-text-secondary italic mb-3">{children}</blockquote>
+  h1: ({ children }: MdProps) => (
+    <h1 className="text-2xl font-bold text-text-primary mt-4 mb-2">{children}</h1>
   ),
-  a: ({ href, children }: any) => (
-    <a href={href} className="text-accent hover:text-accent-hover underline break-all" target="_blank" rel="noopener noreferrer">
+  h2: ({ children }: MdProps) => (
+    <h2 className="text-xl font-bold text-text-primary mt-3 mb-2">{children}</h2>
+  ),
+  h3: ({ children }: MdProps) => (
+    <h3 className="text-lg font-bold text-text-primary mt-2 mb-2">{children}</h3>
+  ),
+  p: ({ children }: MdProps) => (
+    <p className="text-text-primary mb-3 leading-relaxed">{children}</p>
+  ),
+  ul: ({ children }: MdProps) => (
+    <ul className="list-disc list-inside text-text-primary mb-3 space-y-1">{children}</ul>
+  ),
+  ol: ({ children }: MdProps) => (
+    <ol className="list-decimal list-inside text-text-primary mb-3 space-y-1">{children}</ol>
+  ),
+  li: ({ children }: MdProps) => <li className="text-text-primary">{children}</li>,
+  code: ({ inline, children }: MdProps) =>
+    inline ? (
+      <code className="bg-bg-elevated px-1.5 py-0.5 rounded text-sm font-mono text-text-primary">
+        {children}
+      </code>
+    ) : (
+      <code className="block bg-bg-elevated p-3 rounded text-sm font-mono text-text-primary overflow-x-auto mb-3">
+        {children}
+      </code>
+    ),
+  pre: ({ children }: MdProps) => (
+    <pre className="bg-bg-elevated p-3 rounded text-sm font-mono text-text-primary overflow-x-auto mb-3">
+      {children}
+    </pre>
+  ),
+  blockquote: ({ children }: MdProps) => (
+    <blockquote className="border-l-4 border-accent pl-3 py-1 text-text-secondary italic mb-3">
+      {children}
+    </blockquote>
+  ),
+  a: ({ href, children }: MdProps) => (
+    <a
+      href={href}
+      className="text-accent hover:text-accent-hover underline break-all"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
       {children}
     </a>
   ),
-  strong: ({ children }: any) => <strong className="font-bold text-text-primary">{children}</strong>,
-  em: ({ children }: any) => <em className="italic text-text-primary">{children}</em>,
-  hr: () => <hr className="border-border my-4" />,
-  table: ({ children }: any) => (
-    <table className="border-collapse border border-border w-full mb-3 text-sm">
-      {children}
-    </table>
+  strong: ({ children }: MdProps) => (
+    <strong className="font-bold text-text-primary">{children}</strong>
   ),
-  thead: ({ children }: any) => <thead className="bg-bg-elevated">{children}</thead>,
-  tbody: ({ children }: any) => <tbody>{children}</tbody>,
-  tr: ({ children }: any) => <tr className="border border-border">{children}</tr>,
-  th: ({ children }: any) => <th className="border border-border p-2 text-text-primary font-bold text-left">{children}</th>,
-  td: ({ children }: any) => <td className="border border-border p-2 text-text-primary">{children}</td>,
+  em: ({ children }: MdProps) => <em className="italic text-text-primary">{children}</em>,
+  hr: () => <hr className="border-border my-4" />,
+  table: ({ children }: MdProps) => (
+    <table className="border-collapse border border-border w-full mb-3 text-sm">{children}</table>
+  ),
+  thead: ({ children }: MdProps) => <thead className="bg-bg-elevated">{children}</thead>,
+  tbody: ({ children }: MdProps) => <tbody>{children}</tbody>,
+  tr: ({ children }: MdProps) => <tr className="border border-border">{children}</tr>,
+  th: ({ children }: MdProps) => (
+    <th className="border border-border p-2 text-text-primary font-bold text-left">{children}</th>
+  ),
+  td: ({ children }: MdProps) => (
+    <td className="border border-border p-2 text-text-primary">{children}</td>
+  ),
 }
 
 export default function EntryForm({
@@ -89,9 +127,12 @@ export default function EntryForm({
   const [secureNotePreviewMode, setSecureNotePreviewMode] = useState(false)
   const [activeGeneratorFieldId, setActiveGeneratorFieldId] = useState<string | null>(null)
 
-  const updateTypedValue = useCallback((key: string, value: any) => {
-    onTypedValueChange(key, value)
-  }, [onTypedValueChange])
+  const updateTypedValue = useCallback(
+    (key: string, value: string) => {
+      onTypedValueChange(key, value)
+    },
+    [onTypedValueChange],
+  )
 
   const addCustomField = useCallback(() => {
     const newField: CustomField = {
@@ -103,15 +144,19 @@ export default function EntryForm({
     onCustomFieldsChange([...customFields, newField])
   }, [customFields, onCustomFieldsChange])
 
-  const updateCustomField = useCallback((fieldId: string, field: Partial<CustomField>) => {
-    onCustomFieldsChange(
-      customFields.map(f => (f.id === fieldId ? { ...f, ...field } : f))
-    )
-  }, [customFields, onCustomFieldsChange])
+  const updateCustomField = useCallback(
+    (fieldId: string, field: Partial<CustomField>) => {
+      onCustomFieldsChange(customFields.map((f) => (f.id === fieldId ? { ...f, ...field } : f)))
+    },
+    [customFields, onCustomFieldsChange],
+  )
 
-  const deleteCustomField = useCallback((fieldId: string) => {
-    onCustomFieldsChange(customFields.filter(f => f.id !== fieldId))
-  }, [customFields, onCustomFieldsChange])
+  const deleteCustomField = useCallback(
+    (fieldId: string) => {
+      onCustomFieldsChange(customFields.filter((f) => f.id !== fieldId))
+    },
+    [customFields, onCustomFieldsChange],
+  )
 
   const renderForm = useCallback(() => {
     const v = typedValue
@@ -121,7 +166,9 @@ export default function EntryForm({
         return (
           <div className="space-y-3">
             <div className="space-y-1">
-              <UILabel htmlFor="url" className="text-sm">URL</UILabel>
+              <UILabel htmlFor="url" className="text-sm">
+                URL
+              </UILabel>
               <Input
                 id="url"
                 value={v.url || ''}
@@ -130,7 +177,9 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="username" className="text-sm">ユーザー名</UILabel>
+              <UILabel htmlFor="username" className="text-sm">
+                ユーザー名
+              </UILabel>
               <Input
                 id="username"
                 value={v.username || ''}
@@ -138,7 +187,9 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="password" className="text-sm">パスワード</UILabel>
+              <UILabel htmlFor="password" className="text-sm">
+                パスワード
+              </UILabel>
               <Input
                 id="password"
                 type="password"
@@ -159,7 +210,9 @@ export default function EntryForm({
               )}
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="totp" className="text-sm">TOTP（オプション）</UILabel>
+              <UILabel htmlFor="totp" className="text-sm">
+                TOTP（オプション）
+              </UILabel>
               <Input
                 id="totp"
                 value={v.totp || ''}
@@ -173,7 +226,9 @@ export default function EntryForm({
         return (
           <div className="space-y-3">
             <div className="space-y-1">
-              <UILabel htmlFor="bank_name" className="text-sm">銀行名</UILabel>
+              <UILabel htmlFor="bank_name" className="text-sm">
+                銀行名
+              </UILabel>
               <Input
                 id="bank_name"
                 value={v.bank_name || ''}
@@ -181,7 +236,9 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="account_number" className="text-sm">口座番号</UILabel>
+              <UILabel htmlFor="account_number" className="text-sm">
+                口座番号
+              </UILabel>
               <Input
                 id="account_number"
                 value={v.account_number || ''}
@@ -189,7 +246,9 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="pin" className="text-sm">PIN</UILabel>
+              <UILabel htmlFor="pin" className="text-sm">
+                PIN
+              </UILabel>
               <Input
                 id="pin"
                 type="password"
@@ -215,7 +274,9 @@ export default function EntryForm({
         return (
           <div className="space-y-3">
             <div className="space-y-1">
-              <UILabel htmlFor="private_key" className="text-sm">秘密鍵</UILabel>
+              <UILabel htmlFor="private_key" className="text-sm">
+                秘密鍵
+              </UILabel>
               <Textarea
                 id="private_key"
                 value={v.private_key || ''}
@@ -224,7 +285,9 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="passphrase" className="text-sm">パスフレーズ（オプション）</UILabel>
+              <UILabel htmlFor="passphrase" className="text-sm">
+                パスフレーズ（オプション）
+              </UILabel>
               <Input
                 id="passphrase"
                 type="password"
@@ -251,7 +314,9 @@ export default function EntryForm({
           <div className="space-y-3">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <UILabel htmlFor="content" className="text-sm">内容</UILabel>
+                <UILabel htmlFor="content" className="text-sm">
+                  内容
+                </UILabel>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -298,7 +363,9 @@ export default function EntryForm({
         return (
           <div className="space-y-3">
             <div className="space-y-1">
-              <UILabel htmlFor="cardholder" className="text-sm">カード名義</UILabel>
+              <UILabel htmlFor="cardholder" className="text-sm">
+                カード名義
+              </UILabel>
               <Input
                 id="cardholder"
                 value={v.cardholder || ''}
@@ -306,7 +373,9 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="number" className="text-sm">カード番号</UILabel>
+              <UILabel htmlFor="number" className="text-sm">
+                カード番号
+              </UILabel>
               <Input
                 id="number"
                 value={v.number || ''}
@@ -315,7 +384,9 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="expiry" className="text-sm">有効期限</UILabel>
+              <UILabel htmlFor="expiry" className="text-sm">
+                有効期限
+              </UILabel>
               <Input
                 id="expiry"
                 value={v.expiry || ''}
@@ -324,7 +395,9 @@ export default function EntryForm({
               />
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="cvv" className="text-sm">CVV</UILabel>
+              <UILabel htmlFor="cvv" className="text-sm">
+                CVV
+              </UILabel>
               <Input
                 id="cvv"
                 type="password"
@@ -360,8 +433,15 @@ export default function EntryForm({
           <Card key={field.id} className="p-2 space-y-1.5">
             <div className="flex items-end gap-2">
               <div className="flex-1 space-y-0.5">
-                <UILabel htmlFor={`field-type-${field.id}`} className="text-sm">種類</UILabel>
-                <Select value={field.fieldType} onValueChange={(value) => updateCustomField(field.id, { fieldType: value as CustomFieldType })}>
+                <UILabel htmlFor={`field-type-${field.id}`} className="text-sm">
+                  種類
+                </UILabel>
+                <Select
+                  value={field.fieldType}
+                  onValueChange={(value) =>
+                    updateCustomField(field.id, { fieldType: value as CustomFieldType })
+                  }
+                >
                   <SelectTrigger id={`field-type-${field.id}`} className="h-8 text-sm">
                     <SelectValue />
                   </SelectTrigger>
@@ -375,7 +455,9 @@ export default function EntryForm({
                 </Select>
               </div>
               <div className="flex-1 space-y-0.5">
-                <UILabel htmlFor={`field-name-${field.id}`} className="text-sm">フィールド名</UILabel>
+                <UILabel htmlFor={`field-name-${field.id}`} className="text-sm">
+                  フィールド名
+                </UILabel>
                 <Input
                   id={`field-name-${field.id}`}
                   value={field.name}
@@ -394,50 +476,56 @@ export default function EntryForm({
               </Button>
             </div>
             <div className="space-y-0.5">
-              <UILabel htmlFor={`field-value-${field.id}`} className="text-sm">値</UILabel>
+              <UILabel htmlFor={`field-value-${field.id}`} className="text-sm">
+                値
+              </UILabel>
               <Input
                 id={`field-value-${field.id}`}
                 type={field.fieldType === 'password' ? 'password' : 'text'}
                 value={field.value}
                 onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
                 className="h-8 text-sm"
-                onFocus={() => field.fieldType === 'password' && setActiveGeneratorFieldId(`custom-${field.id}`)}
+                onFocus={() =>
+                  field.fieldType === 'password' && setActiveGeneratorFieldId(`custom-${field.id}`)
+                }
                 onBlur={() => field.fieldType === 'password' && setActiveGeneratorFieldId(null)}
               />
-              {field.fieldType === 'password' && activeGeneratorFieldId === `custom-${field.id}` && (
-                <div onMouseDown={(e) => e.preventDefault()}>
-                  <PasswordGeneratorPanel
-                    onUse={(pw) => {
-                      updateCustomField(field.id, { value: pw })
-                      setActiveGeneratorFieldId(null)
-                    }}
-                  />
-                </div>
-              )}
+              {field.fieldType === 'password' &&
+                activeGeneratorFieldId === `custom-${field.id}` && (
+                  <div onMouseDown={(e) => e.preventDefault()}>
+                    <PasswordGeneratorPanel
+                      onUse={(pw) => {
+                        updateCustomField(field.id, { value: pw })
+                        setActiveGeneratorFieldId(null)
+                      }}
+                    />
+                  </div>
+                )}
             </div>
           </Card>
         ))}
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={addCustomField}
-          className="w-full gap-2"
-        >
+        <Button variant="secondary" size="sm" onClick={addCustomField} className="w-full gap-2">
           <Plus size={16} />
           フィールドを追加
         </Button>
       </div>
     )
-  }, [customFields, updateCustomField, deleteCustomField, activeGeneratorFieldId])
+  }, [customFields, updateCustomField, deleteCustomField, addCustomField, activeGeneratorFieldId])
 
   const getTypeLabel = () => {
     switch (entryType) {
-      case 'login': return 'ログイン情報'
-      case 'bank': return '銀行情報'
-      case 'ssh_key': return 'キー情報'
-      case 'secure_note': return 'ノート'
-      case 'credit_card': return 'カード情報'
-      default: return 'アイテム'
+      case 'login':
+        return 'ログイン情報'
+      case 'bank':
+        return '銀行情報'
+      case 'ssh_key':
+        return 'キー情報'
+      case 'secure_note':
+        return 'ノート'
+      case 'credit_card':
+        return 'カード情報'
+      default:
+        return 'アイテム'
     }
   }
 
@@ -491,15 +579,11 @@ export default function EntryForm({
         <CardHeader className="px-3 py-2">
           <CardTitle className="text-sm font-medium">{getTypeLabel()}</CardTitle>
         </CardHeader>
-        <CardContent className="px-3 pb-3 pt-2">
-          {renderForm()}
-        </CardContent>
+        <CardContent className="px-3 pb-3 pt-2">{renderForm()}</CardContent>
       </Card>
 
       {/* カスタムフィールド */}
-      <div className="mb-3">
-        {renderCustomFields()}
-      </div>
+      <div className="mb-3">{renderCustomFields()}</div>
 
       {/* ラベル */}
       <Card className="mb-3">
@@ -511,7 +595,7 @@ export default function EntryForm({
             <p className="text-sm text-text-muted">ラベルがありません</p>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {allLabels.map(label => (
+              {allLabels.map((label) => (
                 <label key={label.id} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -520,7 +604,7 @@ export default function EntryForm({
                       if (e.target.checked) {
                         onSelectedLabelIdsChange([...selectedLabelIds, label.id])
                       } else {
-                        onSelectedLabelIdsChange(selectedLabelIds.filter(lid => lid !== label.id))
+                        onSelectedLabelIdsChange(selectedLabelIds.filter((lid) => lid !== label.id))
                       }
                     }}
                     className="w-4 h-4 rounded border-border"

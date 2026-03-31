@@ -1,6 +1,6 @@
+import { Shield } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/button'
-import { Shield } from 'lucide-react'
 
 export default function Welcome() {
   const navigate = useNavigate()
@@ -17,12 +17,8 @@ export default function Welcome() {
         <h1 className="text-4xl font-bold text-text-primary mb-4">kura</h1>
 
         {/* キャッチコピー */}
-        <p className="text-lg text-text-secondary mb-2">
-          サーバ不要、自分一人のための
-        </p>
-        <p className="text-lg text-text-secondary mb-8">
-          運用コストゼロのパスワードマネージャー
-        </p>
+        <p className="text-lg text-text-secondary mb-2">サーバ不要、自分一人のための</p>
+        <p className="text-lg text-text-secondary mb-8">運用コストゼロのパスワードマネージャー</p>
 
         {/* 特徴 */}
         <div className="space-y-3 mb-8 text-left bg-bg-surface rounded-lg p-6 border border-border">
@@ -50,11 +46,7 @@ export default function Welcome() {
         </div>
 
         {/* CTA */}
-        <Button
-          onClick={() => navigate('/onb/storage')}
-          size="lg"
-          className="w-full"
-        >
+        <Button onClick={() => navigate('/onb/storage')} size="lg" className="w-full">
           始める
         </Button>
       </div>

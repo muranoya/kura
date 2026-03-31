@@ -1,6 +1,6 @@
 // chrome.storage ラッパー
 
-export async function getFromStorage<T = any>(key: string): Promise<T | undefined> {
+export async function getFromStorage<T = unknown>(key: string): Promise<T | undefined> {
   return new Promise((resolve) => {
     chrome.storage.local.get([key], (result) => {
       resolve(result[key] as T)
@@ -8,7 +8,7 @@ export async function getFromStorage<T = any>(key: string): Promise<T | undefine
   })
 }
 
-export async function saveToStorage(key: string, value: any): Promise<void> {
+export async function saveToStorage(key: string, value: unknown): Promise<void> {
   return new Promise((resolve) => {
     chrome.storage.local.set({ [key]: value }, () => {
       resolve()

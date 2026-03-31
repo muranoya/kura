@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { saveToStorage } from '../../shared/storage'
 import { downloadVault } from '../../commands'
+import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
+import { Card, CardContent } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card'
-import { PageHeader } from '../../components/layout/PageHeader'
+import { saveToStorage } from '../../shared/storage'
 
 export default function StorageSetup() {
   const navigate = useNavigate()
@@ -25,7 +25,7 @@ export default function StorageSetup() {
       return
     }
 
-    const config: any = {
+    const config: Record<string, string> = {
       region,
       bucket,
       key: key || 'vault.json',
@@ -50,7 +50,9 @@ export default function StorageSetup() {
         navigate('/onb/password')
       }
     } catch (err) {
-      setError(`ストレージへのアクセスに失敗しました: ${err instanceof Error ? err.message : String(err)}`)
+      setError(
+        `ストレージへのアクセスに失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+      )
       setIsLoading(false)
     }
   }
@@ -84,7 +86,9 @@ export default function StorageSetup() {
                     setError('')
                   }}
                 />
-                <p className="text-xs text-text-muted mt-1.5">AWS S3 のリージョンコードを入力してください</p>
+                <p className="text-xs text-text-muted mt-1.5">
+                  AWS S3 のリージョンコードを入力してください
+                </p>
               </div>
 
               {/* バケット */}

@@ -1,27 +1,26 @@
-import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { BottomNav } from './components/BottomNav'
-import Welcome from './screens/onboarding/Welcome'
-import StorageSetup from './screens/onboarding/StorageSetup'
-import MasterPassword from './screens/onboarding/MasterPassword'
-import RecoveryKey from './screens/onboarding/RecoveryKey'
-import UnlockExistingVault from './screens/onboarding/UnlockExistingVault'
 import Lock from './screens/auth/Lock'
 import Recovery from './screens/auth/Recovery'
-import EntryList from './screens/entries/EntryList'
+import EntryCreate from './screens/entries/EntryCreate'
 import EntryDetail from './screens/entries/EntryDetail'
 import EntryEdit from './screens/entries/EntryEdit'
-import EntryCreate from './screens/entries/EntryCreate'
+import EntryList from './screens/entries/EntryList'
 import PasswordGenerator from './screens/entries/PasswordGenerator'
 import Trash from './screens/entries/Trash'
-import ConflictResolver from './screens/sync/ConflictResolver'
 import LabelManager from './screens/labels/LabelManager'
+import MasterPassword from './screens/onboarding/MasterPassword'
+import RecoveryKey from './screens/onboarding/RecoveryKey'
+import StorageSetup from './screens/onboarding/StorageSetup'
+import UnlockExistingVault from './screens/onboarding/UnlockExistingVault'
+import Welcome from './screens/onboarding/Welcome'
 import Settings from './screens/settings/Settings'
+import ConflictResolver from './screens/sync/ConflictResolver'
 
 type AppState = 'loading' | 'onboarding' | 'locked' | 'unlocked'
 
 const TAB_ROUTES = ['/entries', '/favorites', '/labels', '/password-generator', '/settings']
-const DETAIL_ROUTES = ['/entries/create', '/entries/:id', '/entries/:id/edit', '/trash']
 
 // BottomNav を表示すべきかチェック
 function shouldShowBottomNav(pathname: string, appState: AppState): boolean {
@@ -37,7 +36,7 @@ function AppContent() {
   useEffect(() => {
     const checkVaultState = async () => {
       // StorageSetupがfromOnboardingフラグを付けてnavigateした場合、onboarding状態を維持
-      if ((location.state as any)?.fromOnboarding === true) {
+      if ((location.state as { fromOnboarding?: boolean })?.fromOnboarding === true) {
         console.log('[App] fromOnboarding flag detected, staying in onboarding state')
         setAppState('onboarding')
         return
@@ -64,10 +63,10 @@ function AppContent() {
         if (typeof chrome !== 'undefined' && chrome.runtime) {
           chrome.runtime.sendMessage(
             { type: 'IS_UNLOCKED' },
-            (response: any) => {
+            (response: { unlocked?: boolean }) => {
               console.log('[App] IS_UNLOCKED response:', response)
               resolve(response?.unlocked ?? false)
-            }
+            },
           )
         } else {
           resolve(false)
@@ -79,7 +78,7 @@ function AppContent() {
     }
 
     checkVaultState()
-  }, [location.pathname, location.state])
+  }, [location.state])
 
   if (appState === 'loading') {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>読み込み中...</div>
