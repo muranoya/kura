@@ -106,7 +106,6 @@ export default function EntryEdit() {
           <div className="mb-3 p-2 bg-danger/10 text-danger text-sm rounded-md">{error}</div>
         )}
         <EntryForm
-          mode="edit"
           entryType={entry.entryType}
           name={name}
           onNameChange={setName}

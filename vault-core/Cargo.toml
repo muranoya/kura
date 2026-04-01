@@ -21,7 +21,6 @@ sha2 = "0.10"
 hmac = "0.12"
 totp-rs = "5"
 getrandom = { version = "0.2", features = ["js"] }  # WASM-compatible random
-once_cell = "1"
 
 [features]
 default = []

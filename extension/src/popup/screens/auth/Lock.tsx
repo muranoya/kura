@@ -52,8 +52,8 @@ export default function LockScreen() {
         }
       })
 
-      // ページをリロード
-      window.location.href = '/'
+      // ポップアップを閉じる（再度開くとウェルカム画面が表示される）
+      window.close()
     } catch (err) {
       setError(`ログアウト失敗: ${err}`)
       setShowLogoutDialog(false)

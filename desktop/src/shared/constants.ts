@@ -6,6 +6,8 @@ export const ENTRY_TYPE_LABELS: Record<string, string> = {
   secure_note: 'セキュアノート',
   credit_card: 'クレジットカード',
   passkey: 'PassKey',
+  password: 'パスワード',
+  software_license: 'ソフトウェアライセンス',
 }
 
 export function getEntryTypeLabel(type: string): string {
@@ -18,6 +20,9 @@ export const DEFAULT_SETTINGS = {
   autolockMinutes: 5,
   autolockOnBackground: true,
 }
+
+// Default vault ID (single vault for now)
+export const DEFAULT_VAULT_ID = 'default'
 
 // Storage keys
 export const STORAGE_KEYS = {

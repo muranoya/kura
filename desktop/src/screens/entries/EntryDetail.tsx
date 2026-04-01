@@ -197,7 +197,7 @@ export default function EntryDetail() {
         </div>
 
         {/* 基本情報 */}
-        {entry.entryType === 'login' && (v.url || v.username || v.password || v.totp) && (
+        {entry.entryType === 'login' && (v.url || v.username || v.password) && (
           <Card>
             <CardHeader className="px-3 py-2">
               <CardTitle className="text-sm font-medium">ログイン情報</CardTitle>
@@ -214,18 +214,20 @@ export default function EntryDetail() {
                   onToggleMask={() => setPasswordMasked(!passwordMasked)}
                 />
               )}
-              {v.totp && <FieldDisplay label="TOTP" value={v.totp} />}
             </CardContent>
           </Card>
         )}
 
-        {entry.entryType === 'bank' && (v.bank_name || v.account_number || v.pin) && (
+        {entry.entryType === 'bank' && (v.bank_name || v.branch_code || v.account_type || v.account_holder || v.account_number || v.pin) && (
           <Card>
             <CardHeader className="px-3 py-2">
               <CardTitle className="text-sm font-medium">銀行口座</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2 space-y-2">
               {v.bank_name && <FieldDisplay label="銀行名" value={v.bank_name} />}
+              {v.branch_code && <FieldDisplay label="支店コード" value={v.branch_code} />}
+              {v.account_type && <FieldDisplay label="種類" value={v.account_type} />}
+              {v.account_holder && <FieldDisplay label="口座名義" value={v.account_holder} />}
               {v.account_number && <FieldDisplay label="口座番号" value={v.account_number} />}
               {v.pin && (
                 <FieldDisplay
@@ -240,22 +242,13 @@ export default function EntryDetail() {
           </Card>
         )}
 
-        {entry.entryType === 'ssh_key' && (v.private_key || v.passphrase) && (
+        {entry.entryType === 'ssh_key' && v.private_key && (
           <Card>
             <CardHeader className="px-3 py-2">
               <CardTitle className="text-sm font-medium">SSH キー</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2 space-y-2">
-              {v.private_key && <FieldDisplay label="秘密鍵" value={v.private_key} />}
-              {v.passphrase && (
-                <FieldDisplay
-                  label="パスフレーズ"
-                  value={v.passphrase}
-                  isPassword={true}
-                  isMasked={passwordMasked}
-                  onToggleMask={() => setPasswordMasked(!passwordMasked)}
-                />
-              )}
+              <FieldDisplay label="秘密鍵" value={v.private_key} />
             </CardContent>
           </Card>
         )}
@@ -275,7 +268,7 @@ export default function EntryDetail() {
           </Card>
         )}
 
-        {entry.entryType === 'credit_card' && (v.cardholder || v.number || v.expiry || v.cvv) && (
+        {entry.entryType === 'credit_card' && (v.cardholder || v.number || v.expiry || v.cvv || v.pin) && (
           <Card>
             <CardHeader className="px-3 py-2">
               <CardTitle className="text-sm font-medium">クレジットカード</CardTitle>
@@ -293,6 +286,46 @@ export default function EntryDetail() {
                   onToggleMask={() => setPasswordMasked(!passwordMasked)}
                 />
               )}
+              {v.pin && (
+                <FieldDisplay
+                  label="暗証番号"
+                  value={v.pin}
+                  isPassword={true}
+                  isMasked={passwordMasked}
+                  onToggleMask={() => setPasswordMasked(!passwordMasked)}
+                />
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {entry.entryType === 'password' && (v.username || v.password) && (
+          <Card>
+            <CardHeader className="px-3 py-2">
+              <CardTitle className="text-sm font-medium">パスワード情報</CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3 pt-2 space-y-2">
+              {v.username && <FieldDisplay label="ユーザー名" value={v.username} />}
+              {v.password && (
+                <FieldDisplay
+                  label="パスワード"
+                  value={v.password}
+                  isPassword={true}
+                  isMasked={passwordMasked}
+                  onToggleMask={() => setPasswordMasked(!passwordMasked)}
+                />
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {entry.entryType === 'software_license' && v.license_key && (
+          <Card>
+            <CardHeader className="px-3 py-2">
+              <CardTitle className="text-sm font-medium">ライセンス情報</CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3 pt-2 space-y-2">
+              <FieldDisplay label="ライセンスキー" value={v.license_key} />
             </CardContent>
           </Card>
         )}

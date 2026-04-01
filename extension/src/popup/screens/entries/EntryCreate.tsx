@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import EntryForm from '../../components/entries/EntryForm'
+import EntryTypeSelectDialog from '../../components/entries/EntryTypeSelectDialog'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import type { CustomField, Label } from '../../shared/types'
 
 export default function EntryCreate() {
   const navigate = useNavigate()
+  const [showTypeDialog, setShowTypeDialog] = useState(true)
   const [entryType, setEntryType] = useState('login')
   const [name, setName] = useState('')
   const [typedValue, setTypedValue] = useState<Record<string, string>>({})
@@ -67,6 +69,15 @@ export default function EntryCreate() {
 
   return (
     <div className="h-full overflow-y-auto flex flex-col">
+      <EntryTypeSelectDialog
+        open={showTypeDialog}
+        onSelect={(type) => {
+          setEntryType(type)
+          setShowTypeDialog(false)
+        }}
+        onCancel={() => navigate('/entries')}
+      />
+
       <PageHeader
         title="新規アイテム"
         showBackButton={true}
@@ -79,9 +90,7 @@ export default function EntryCreate() {
 
       <div className="flex-1 overflow-y-auto p-3">
         <EntryForm
-          mode="create"
           entryType={entryType}
-          onEntryTypeChange={setEntryType}
           name={name}
           onNameChange={setName}
           typedValue={typedValue}

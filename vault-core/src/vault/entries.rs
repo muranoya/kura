@@ -184,7 +184,6 @@ mod tests {
             "user".into(),
             "pass".into(),
             None,
-            None,
         )
     }
 
@@ -273,7 +272,6 @@ mod tests {
             Some("https://updated.com".into()),
             "newuser".into(),
             "newpass".into(),
-            None,
             Some("notes".into()),
         );
         vault.update_entry("e1", "Updated".into(), new_data).unwrap();

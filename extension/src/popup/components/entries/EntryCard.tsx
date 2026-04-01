@@ -3,7 +3,9 @@ import {
   CreditCard,
   FileText,
   KeyRound,
+  Lock,
   RotateCw,
+  ScrollText,
   Star,
   Terminal,
   Trash2,
@@ -27,6 +29,10 @@ const getEntryIcon = (type: string) => {
       return <FileText size={20} />
     case 'credit_card':
       return <CreditCard size={20} />
+    case 'password':
+      return <Lock size={20} />
+    case 'software_license':
+      return <ScrollText size={20} />
     default:
       return <KeyRound size={20} />
   }
@@ -41,6 +47,8 @@ const getTypeLabel = (type: string): string => {
     secure_note: 'セキュアノート',
     credit_card: 'クレジットカード',
     passkey: 'PassKey',
+    password: 'パスワード',
+    software_license: 'ソフトウェアライセンス',
   }
   return labels[type] || type
 }

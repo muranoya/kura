@@ -97,7 +97,7 @@ export default function EntryEdit() {
     )
 
   return (
-    <div className="flex flex-col h-screen bg-bg-base">
+    <div className="flex flex-col h-screen bg-bg-surface">
       {/* sticky ヘッダー */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
         <h1 className="text-sm font-semibold text-text-primary flex-1">アイテム編集</h1>
@@ -107,7 +107,6 @@ export default function EntryEdit() {
       {/* フォーム */}
       <div className="flex-1 overflow-y-auto p-3">
         <EntryForm
-          mode="edit"
           entryType={entry.entryType}
           name={name}
           onNameChange={setName}

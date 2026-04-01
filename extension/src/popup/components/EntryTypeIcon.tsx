@@ -18,6 +18,10 @@ export default function EntryTypeIcon({ type, size = 24 }: EntryTypeIconProps) {
         return '💳'
       case 'passkey':
         return '🛡️'
+      case 'password':
+        return '🔒'
+      case 'software_license':
+        return '📋'
       default:
         return '📦'
     }

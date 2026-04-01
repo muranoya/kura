@@ -1,23 +1,20 @@
-import { Plus, Trash2 } from 'lucide-react'
+import { Link, Lock, Mail, Phone, Plus, Trash2, Type } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useCallback, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { cn } from '../../lib/utils'
 import { getEntryTypeLabel } from '../../shared/constants'
 import type { CustomField, CustomFieldType, Label } from '../../shared/types'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
 import { Label as UILabel } from '../ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Textarea } from '../ui/textarea'
 import PasswordGeneratorPanel from './PasswordGeneratorPanel'
 
 export interface EntryFormProps {
-  mode: 'create' | 'edit'
   entryType: string
-  onEntryTypeChange?: (type: string) => void
   name: string
   onNameChange: (name: string) => void
   typedValue: Record<string, string | null>
@@ -107,10 +104,24 @@ const markdownComponents = {
   ),
 }
 
+const CUSTOM_FIELD_TYPES = [
+  { value: 'text' as const, label: 'テキスト', icon: Type },
+  { value: 'password' as const, label: 'パスワード', icon: Lock },
+  { value: 'email' as const, label: 'メール', icon: Mail },
+  { value: 'url' as const, label: 'URL', icon: Link },
+  { value: 'phone' as const, label: '電話番号', icon: Phone },
+]
+
+const FIELD_TYPE_LABELS: Record<string, string> = {
+  text: 'テキスト',
+  password: 'パスワード',
+  email: 'メール',
+  url: 'URL',
+  phone: '電話番号',
+}
+
 export default function EntryForm({
-  mode,
   entryType,
-  onEntryTypeChange,
   name,
   onNameChange,
   typedValue,
@@ -126,6 +137,7 @@ export default function EntryForm({
 }: EntryFormProps) {
   const [secureNotePreviewMode, setSecureNotePreviewMode] = useState(false)
   const [activeGeneratorFieldId, setActiveGeneratorFieldId] = useState<string | null>(null)
+  const [pendingFieldType, setPendingFieldType] = useState(false)
 
   const updateTypedValue = useCallback(
     (key: string, value: string | null) => {
@@ -134,15 +146,19 @@ export default function EntryForm({
     [onTypedValueChange],
   )
 
-  const addCustomField = useCallback(() => {
-    const newField: CustomField = {
-      id: Math.random().toString(36).substring(7),
-      name: '',
-      fieldType: 'text',
-      value: '',
-    }
-    onCustomFieldsChange([...customFields, newField])
-  }, [customFields, onCustomFieldsChange])
+  const addCustomFieldWithType = useCallback(
+    (fieldType: CustomFieldType) => {
+      const newField: CustomField = {
+        id: Math.random().toString(36).substring(7),
+        name: '',
+        fieldType,
+        value: '',
+      }
+      onCustomFieldsChange([...customFields, newField])
+      setPendingFieldType(false)
+    },
+    [customFields, onCustomFieldsChange],
+  )
 
   const updateCustomField = useCallback(
     (fieldId: string, field: Partial<CustomField>) => {
@@ -165,17 +181,6 @@ export default function EntryForm({
       case 'login':
         return (
           <div className="space-y-3">
-            <div className="space-y-1">
-              <UILabel htmlFor="url" className="text-xs">
-                URL
-              </UILabel>
-              <Input
-                id="url"
-                value={v.url || ''}
-                onChange={(e) => updateTypedValue('url', e.target.value)}
-                placeholder="https://example.com"
-              />
-            </div>
             <div className="space-y-1">
               <UILabel htmlFor="username" className="text-xs">
                 ユーザー名
@@ -210,14 +215,14 @@ export default function EntryForm({
               )}
             </div>
             <div className="space-y-1">
-              <UILabel htmlFor="totp" className="text-xs">
-                TOTP（オプション）
+              <UILabel htmlFor="url" className="text-xs">
+                URL
               </UILabel>
               <Input
-                id="totp"
-                value={v.totp || ''}
-                onChange={(e) => updateTypedValue('totp', e.target.value)}
-                placeholder="000000"
+                id="url"
+                value={v.url || ''}
+                onChange={(e) => updateTypedValue('url', e.target.value)}
+                placeholder="https://example.com"
               />
             </div>
           </div>
@@ -233,6 +238,37 @@ export default function EntryForm({
                 id="bank_name"
                 value={v.bank_name || ''}
                 onChange={(e) => updateTypedValue('bank_name', e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <UILabel htmlFor="branch_code" className="text-xs">
+                支店コード
+              </UILabel>
+              <Input
+                id="branch_code"
+                value={v.branch_code || ''}
+                onChange={(e) => updateTypedValue('branch_code', e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <UILabel htmlFor="account_type" className="text-xs">
+                種類
+              </UILabel>
+              <Input
+                id="account_type"
+                value={v.account_type || ''}
+                onChange={(e) => updateTypedValue('account_type', e.target.value)}
+                placeholder="普通 / 当座 / 貯蓄"
+              />
+            </div>
+            <div className="space-y-1">
+              <UILabel htmlFor="account_holder" className="text-xs">
+                口座名義
+              </UILabel>
+              <Input
+                id="account_holder"
+                value={v.account_holder || ''}
+                onChange={(e) => updateTypedValue('account_holder', e.target.value)}
               />
             </div>
             <div className="space-y-1">
@@ -283,29 +319,6 @@ export default function EntryForm({
                 onChange={(e) => updateTypedValue('private_key', e.target.value)}
                 className="font-mono text-sm"
               />
-            </div>
-            <div className="space-y-1">
-              <UILabel htmlFor="passphrase" className="text-xs">
-                パスフレーズ（オプション）
-              </UILabel>
-              <Input
-                id="passphrase"
-                type="password"
-                value={v.passphrase || ''}
-                onChange={(e) => updateTypedValue('passphrase', e.target.value)}
-                onFocus={() => setActiveGeneratorFieldId('passphrase')}
-                onBlur={() => setActiveGeneratorFieldId(null)}
-              />
-              {activeGeneratorFieldId === 'passphrase' && (
-                <div onMouseDown={(e) => e.preventDefault()}>
-                  <PasswordGeneratorPanel
-                    onUse={(pw) => {
-                      updateTypedValue('passphrase', pw)
-                      setActiveGeneratorFieldId(null)
-                    }}
-                  />
-                </div>
-              )}
             </div>
           </div>
         )
@@ -404,19 +417,83 @@ export default function EntryForm({
                 value={v.cvv || ''}
                 onChange={(e) => updateTypedValue('cvv', e.target.value)}
                 placeholder="123"
-                onFocus={() => setActiveGeneratorFieldId('cvv')}
+              />
+            </div>
+            <div className="space-y-1">
+              <UILabel htmlFor="cc_pin" className="text-xs">
+                暗証番号
+              </UILabel>
+              <Input
+                id="cc_pin"
+                type="password"
+                value={v.pin || ''}
+                onChange={(e) => updateTypedValue('pin', e.target.value)}
+                onFocus={() => setActiveGeneratorFieldId('cc_pin')}
                 onBlur={() => setActiveGeneratorFieldId(null)}
               />
-              {activeGeneratorFieldId === 'cvv' && (
+              {activeGeneratorFieldId === 'cc_pin' && (
                 <div onMouseDown={(e) => e.preventDefault()}>
                   <PasswordGeneratorPanel
                     onUse={(pw) => {
-                      updateTypedValue('cvv', pw)
+                      updateTypedValue('pin', pw)
                       setActiveGeneratorFieldId(null)
                     }}
                   />
                 </div>
               )}
+            </div>
+          </div>
+        )
+      case 'password':
+        return (
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <UILabel htmlFor="username" className="text-xs">
+                ユーザー名
+              </UILabel>
+              <Input
+                id="username"
+                value={v.username || ''}
+                onChange={(e) => updateTypedValue('username', e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <UILabel htmlFor="password" className="text-xs">
+                パスワード
+              </UILabel>
+              <Input
+                id="password"
+                type="password"
+                value={v.password || ''}
+                onChange={(e) => updateTypedValue('password', e.target.value)}
+                onFocus={() => setActiveGeneratorFieldId('password')}
+                onBlur={() => setActiveGeneratorFieldId(null)}
+              />
+              {activeGeneratorFieldId === 'password' && (
+                <div onMouseDown={(e) => e.preventDefault()}>
+                  <PasswordGeneratorPanel
+                    onUse={(pw) => {
+                      updateTypedValue('password', pw)
+                      setActiveGeneratorFieldId(null)
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      case 'software_license':
+        return (
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <UILabel htmlFor="license_key" className="text-xs">
+                ライセンスキー
+              </UILabel>
+              <Input
+                id="license_key"
+                value={v.license_key || ''}
+                onChange={(e) => updateTypedValue('license_key', e.target.value)}
+              />
             </div>
           </div>
         )
@@ -428,209 +505,170 @@ export default function EntryForm({
   const renderCustomFields = useCallback(() => {
     return (
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-text-primary">カスタムフィールド</h3>
+        <span className="text-xs text-text-muted">カスタムフィールド</span>
         {customFields.map((field) => (
-          <Card key={field.id} className="p-2 space-y-1.5">
-            <div className="flex items-end gap-2">
-              <div className="flex-1 space-y-0.5">
-                <UILabel htmlFor={`field-type-${field.id}`} className="text-xs">
-                  種類
-                </UILabel>
-                <Select
-                  value={field.fieldType}
-                  onValueChange={(value) =>
-                    updateCustomField(field.id, { fieldType: value as CustomFieldType })
-                  }
-                >
-                  <SelectTrigger id={`field-type-${field.id}`} className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="text">テキスト</SelectItem>
-                    <SelectItem value="password">パスワード</SelectItem>
-                    <SelectItem value="email">メール</SelectItem>
-                    <SelectItem value="url">URL</SelectItem>
-                    <SelectItem value="phone">電話番号</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex-1 space-y-0.5">
-                <UILabel htmlFor={`field-name-${field.id}`} className="text-xs">
-                  フィールド名
-                </UILabel>
-                <Input
-                  id={`field-name-${field.id}`}
-                  value={field.name}
-                  onChange={(e) => updateCustomField(field.id, { name: e.target.value })}
-                  placeholder="例: セキュリティ質問"
-                  className="h-8 text-xs"
-                />
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => deleteCustomField(field.id)}
-                className="p-1 shrink-0 h-8"
-              >
-                <Trash2 size={14} />
-              </Button>
-            </div>
-            <div className="space-y-0.5">
-              <UILabel htmlFor={`field-value-${field.id}`} className="text-xs">
-                値
-              </UILabel>
+          <div key={field.id} className="space-y-1.5">
+            <div className="group flex items-start gap-2">
+              <Badge variant="muted" className="shrink-0 mt-1.5 text-[10px]">
+                {FIELD_TYPE_LABELS[field.fieldType] || field.fieldType}
+              </Badge>
+              <Input
+                id={`field-name-${field.id}`}
+                value={field.name}
+                onChange={(e) => updateCustomField(field.id, { name: e.target.value })}
+                placeholder="フィールド名"
+                className="h-8 text-xs flex-1 min-w-0"
+              />
               <Input
                 id={`field-value-${field.id}`}
                 type={field.fieldType === 'password' ? 'password' : 'text'}
                 value={field.value}
                 onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
-                className="h-8 text-xs"
+                placeholder="値"
+                className="h-8 text-xs flex-1"
                 onFocus={() =>
                   field.fieldType === 'password' && setActiveGeneratorFieldId(`custom-${field.id}`)
                 }
                 onBlur={() => field.fieldType === 'password' && setActiveGeneratorFieldId(null)}
               />
-              {field.fieldType === 'password' &&
-                activeGeneratorFieldId === `custom-${field.id}` && (
-                  <div onMouseDown={(e) => e.preventDefault()}>
-                    <PasswordGeneratorPanel
-                      onUse={(pw) => {
-                        updateCustomField(field.id, { value: pw })
-                        setActiveGeneratorFieldId(null)
-                      }}
-                    />
-                  </div>
-                )}
+              <button
+                type="button"
+                onClick={() => deleteCustomField(field.id)}
+                className="p-1 shrink-0 mt-1 text-text-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
-          </Card>
+            {field.fieldType === 'password' &&
+              activeGeneratorFieldId === `custom-${field.id}` && (
+                <div onMouseDown={(e) => e.preventDefault()}>
+                  <PasswordGeneratorPanel
+                    onUse={(pw) => {
+                      updateCustomField(field.id, { value: pw })
+                      setActiveGeneratorFieldId(null)
+                    }}
+                  />
+                </div>
+              )}
+          </div>
         ))}
-        <Button variant="secondary" size="sm" onClick={addCustomField} className="w-full gap-2">
-          <Plus size={16} />
-          フィールドを追加
-        </Button>
+        {pendingFieldType ? (
+          <div className="space-y-2">
+            <span className="text-xs text-text-muted">フィールドの種類を選択</span>
+            <div className="flex flex-wrap gap-1.5">
+              {CUSTOM_FIELD_TYPES.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => addCustomFieldWithType(value)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border border-border bg-bg-surface text-text-secondary hover:border-accent hover:text-accent hover:bg-accent/5 transition-colors"
+                >
+                  <Icon size={12} />
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setPendingFieldType(false)}
+              className="text-xs text-text-muted hover:text-text-secondary transition-colors"
+            >
+              キャンセル
+            </button>
+          </div>
+        ) : (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setPendingFieldType(true)}
+            className="w-full gap-2"
+          >
+            <Plus size={16} />
+            フィールドを追加
+          </Button>
+        )}
       </div>
     )
-  }, [customFields, updateCustomField, deleteCustomField, addCustomField, activeGeneratorFieldId])
-
-  const getTypeLabel = () => {
-    switch (entryType) {
-      case 'login':
-        return 'ログイン情報'
-      case 'bank':
-        return '銀行情報'
-      case 'ssh_key':
-        return 'キー情報'
-      case 'secure_note':
-        return 'ノート'
-      case 'credit_card':
-        return 'カード情報'
-      default:
-        return 'アイテム'
-    }
-  }
+  }, [
+    customFields,
+    updateCustomField,
+    deleteCustomField,
+    addCustomFieldWithType,
+    activeGeneratorFieldId,
+    pendingFieldType,
+  ])
 
   return (
-    <>
+    <div className="space-y-6">
       {error && (
-        <div className="mb-3 p-3 rounded-md bg-danger/10 border border-danger/20">
+        <div className="p-3 rounded-md bg-danger/10 border border-danger/20">
           <p className="text-sm text-danger">{error}</p>
         </div>
       )}
 
-      {/* 基本情報 */}
-      <Card className="mb-3">
-        <CardHeader className="px-3 py-2">
-          <CardTitle className="text-sm font-medium">基本情報</CardTitle>
-        </CardHeader>
-        <CardContent className="px-3 pb-3 pt-2 space-y-3">
-          <div>
-            <UILabel htmlFor="entry-type">アイテム種別</UILabel>
-            {mode === 'create' ? (
-              <Select value={entryType} onValueChange={onEntryTypeChange}>
-                <SelectTrigger id="entry-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="login">ログイン</SelectItem>
-                  <SelectItem value="bank">銀行口座</SelectItem>
-                  <SelectItem value="ssh_key">SSHキー</SelectItem>
-                  <SelectItem value="secure_note">セキュアノート</SelectItem>
-                  <SelectItem value="credit_card">クレジットカード</SelectItem>
-                </SelectContent>
-              </Select>
-            ) : (
-              <Badge variant="secondary">{getEntryTypeLabel(entryType)}</Badge>
-            )}
-          </div>
-          <div>
-            <UILabel htmlFor="name">名前</UILabel>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => onNameChange(e.target.value)}
-              placeholder="例: Gmail アカウント"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      {/* アイテム種別 + 名前 */}
+      <div className="space-y-2">
+        <Badge variant="secondary">{getEntryTypeLabel(entryType)}</Badge>
+        <Input
+          id="name"
+          value={name}
+          onChange={(e) => onNameChange(e.target.value)}
+          placeholder="例: Gmail アカウント"
+          className="text-base font-medium h-11 border-0 border-b border-border rounded-none bg-transparent px-0 focus-visible:ring-0 focus-visible:border-accent"
+        />
+      </div>
 
-      {/* アイテム種別別フォーム */}
-      <Card className="mb-3">
-        <CardHeader className="px-3 py-2">
-          <CardTitle className="text-sm font-medium">{getTypeLabel()}</CardTitle>
-        </CardHeader>
-        <CardContent className="px-3 pb-3 pt-2">{renderForm()}</CardContent>
-      </Card>
+      {/* 種別固有フィールド */}
+      <div>{renderForm()}</div>
 
       {/* カスタムフィールド */}
-      <div className="mb-3">{renderCustomFields()}</div>
-
-      {/* ラベル */}
-      <Card className="mb-3">
-        <CardHeader className="px-3 py-2">
-          <CardTitle className="text-sm font-medium">ラベル</CardTitle>
-        </CardHeader>
-        <CardContent className="px-3 pb-3 pt-2">
-          {allLabels.length === 0 ? (
-            <p className="text-xs text-text-muted">ラベルがありません</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {allLabels.map((label) => (
-                <label key={label.id} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedLabelIds.includes(label.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        onSelectedLabelIdsChange([...selectedLabelIds, label.id])
-                      } else {
-                        onSelectedLabelIdsChange(selectedLabelIds.filter((lid) => lid !== label.id))
-                      }
-                    }}
-                    className="w-4 h-4 rounded border-border"
-                  />
-                  <span className="text-xs">{label.name}</span>
-                </label>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <div>{renderCustomFields()}</div>
 
       {/* メモ */}
-      <Card className="mb-3">
-        <CardHeader className="px-3 py-2">
-          <CardTitle className="text-sm font-medium">メモ</CardTitle>
-        </CardHeader>
-        <CardContent className="px-3 pb-3 pt-2">
-          <Textarea
-            value={notes || ''}
-            onChange={(e) => onNotesChange(e.target.value)}
-            placeholder="メモを入力（オプション）"
-            className="min-h-24"
-          />
-        </CardContent>
-      </Card>
-    </>
+      <div className="space-y-1">
+        <UILabel className="text-xs text-text-muted">メモ</UILabel>
+        <Textarea
+          value={notes || ''}
+          onChange={(e) => onNotesChange(e.target.value)}
+          placeholder="メモを追加..."
+          className="min-h-20 resize-none border-dashed border-border/60 focus:border-solid focus:border-accent"
+        />
+      </div>
+
+      {/* ラベル */}
+      <div className="space-y-2">
+        <span className="text-xs text-text-muted">ラベル</span>
+        {allLabels.length === 0 ? (
+          <p className="text-xs text-text-muted">ラベルがありません</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {allLabels.map((label) => {
+              const isSelected = selectedLabelIds.includes(label.id)
+              return (
+                <button
+                  key={label.id}
+                  type="button"
+                  onClick={() => {
+                    if (isSelected) {
+                      onSelectedLabelIdsChange(selectedLabelIds.filter((lid) => lid !== label.id))
+                    } else {
+                      onSelectedLabelIdsChange([...selectedLabelIds, label.id])
+                    }
+                  }}
+                  className={cn(
+                    'px-2.5 py-1 text-xs rounded-full border transition-colors',
+                    isSelected
+                      ? 'bg-accent text-white border-accent'
+                      : 'bg-transparent text-text-secondary border-border hover:border-accent/50 hover:text-text-primary',
+                  )}
+                >
+                  {label.name}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

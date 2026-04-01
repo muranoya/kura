@@ -16,6 +16,10 @@ pub enum EntryType {
     CreditCard,
     #[serde(rename = "passkey")]
     Passkey,
+    #[serde(rename = "password")]
+    Password,
+    #[serde(rename = "software_license")]
+    SoftwareLicense,
 }
 
 impl EntryType {
@@ -27,6 +31,8 @@ impl EntryType {
             EntryType::SecureNote => "secure_note",
             EntryType::CreditCard => "credit_card",
             EntryType::Passkey => "passkey",
+            EntryType::Password => "password",
+            EntryType::SoftwareLicense => "software_license",
         }
     }
 
@@ -38,6 +44,8 @@ impl EntryType {
             "secure_note" => Some(EntryType::SecureNote),
             "credit_card" => Some(EntryType::CreditCard),
             "passkey" => Some(EntryType::Passkey),
+            "password" => Some(EntryType::Password),
+            "software_license" => Some(EntryType::SoftwareLicense),
             _ => None,
         }
     }

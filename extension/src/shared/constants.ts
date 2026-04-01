@@ -1,3 +1,6 @@
+// Default vault ID for single-vault extension
+export const DEFAULT_VAULT_ID = 'default'
+
 // Entry type labels and icons
 export const ENTRY_TYPE_LABELS: Record<string, string> = {
   login: 'ログイン',
@@ -6,6 +9,8 @@ export const ENTRY_TYPE_LABELS: Record<string, string> = {
   secure_note: 'セキュアノート',
   credit_card: 'クレジットカード',
   passkey: 'PassKey',
+  password: 'パスワード',
+  software_license: 'ソフトウェアライセンス',
 }
 
 export function getEntryTypeLabel(type: string): string {

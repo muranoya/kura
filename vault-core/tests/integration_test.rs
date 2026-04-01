@@ -20,7 +20,6 @@ fn test_vault_create_unlock_lock_cycle() {
                 "user@example.com".to_string(),
                 "password123".to_string(),
                 None,
-                None,
             ),
             vec![],
         )
@@ -117,7 +116,6 @@ fn test_multiple_entries_and_labels() {
                 "user@gmail.com".to_string(),
                 "pass123".to_string(),
                 None,
-                None,
             ),
             vec![personal_label.id.clone()],
         )
@@ -131,7 +129,6 @@ fn test_multiple_entries_and_labels() {
                 Some("https://github.com".to_string()),
                 "user".to_string(),
                 "token123".to_string(),
-                None,
                 None,
             ),
             vec![work_label.id.clone()],
@@ -287,7 +284,6 @@ fn test_delete_label_removes_label_id_from_entry() {
                 "user".to_string(),
                 "password".to_string(),
                 None,
-                None,
             ),
             vec![label.id.clone()],
         )
@@ -341,7 +337,6 @@ fn test_delete_label_affects_all_entries_with_label() {
                 "user1".to_string(),
                 "pass1".to_string(),
                 None,
-                None,
             ),
             vec![label_to_delete.id.clone()],
         )
@@ -357,7 +352,6 @@ fn test_delete_label_affects_all_entries_with_label() {
                 "user2".to_string(),
                 "pass2".to_string(),
                 None,
-                None,
             ),
             vec![label_to_delete.id.clone(), other_label.id.clone()],
         )
@@ -372,7 +366,6 @@ fn test_delete_label_affects_all_entries_with_label() {
                 Some("https://example3.com".to_string()),
                 "user3".to_string(),
                 "pass3".to_string(),
-                None,
                 None,
             ),
             vec![other_label.id.clone()],

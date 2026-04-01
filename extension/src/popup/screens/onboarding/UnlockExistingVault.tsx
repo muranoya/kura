@@ -47,6 +47,7 @@ export default function UnlockExistingVault() {
         throw new Error(response?.error || 'アンロックに失敗しました')
       }
 
+      await removeFromStorage(STORAGE_KEYS.ONBOARDING_DRAFT)
       navigate('/entries')
     } catch (err) {
       setError(String(err) || '不正なパスワード')

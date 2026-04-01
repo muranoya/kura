@@ -13,7 +13,7 @@ import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
 
 export default function StorageSetup() {
   const navigate = useNavigate()
-  const { draft, setDraft, clearDraft, draftLoaded } = useOnboardingDraft()
+  const { draft, setDraft, draftLoaded } = useOnboardingDraft()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -44,9 +44,6 @@ export default function StorageSetup() {
         const errorMsg = 'error' in response ? response.error : 'Vault確認に失敗しました'
         throw new Error(errorMsg)
       }
-
-      // clearDraftは成功後のみ実行
-      await clearDraft()
 
       // vaultExists の結果に基づいて分岐
       if ('vaultExists' in response && response.vaultExists) {

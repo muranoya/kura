@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import EntryForm from '../../components/entries/EntryForm'
+import EntryTypeSelectDialog from '../../components/entries/EntryTypeSelectDialog'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 import { Button } from '../../components/ui/button'
 import type { CustomField, Label } from '../../shared/types'
 
 export default function EntryCreate() {
   const navigate = useNavigate()
+  const [showTypeDialog, setShowTypeDialog] = useState(true)
   const [entryType, setEntryType] = useState('login')
   const [name, setName] = useState('')
   const [typedValue, setTypedValue] = useState<Record<string, string | null>>({})
@@ -72,7 +74,16 @@ export default function EntryCreate() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-bg-base">
+    <div className="flex flex-col h-screen bg-bg-surface">
+      <EntryTypeSelectDialog
+        open={showTypeDialog}
+        onSelect={(type) => {
+          setEntryType(type)
+          setShowTypeDialog(false)
+        }}
+        onCancel={() => navigate('/entries')}
+      />
+
       {/* sticky ヘッダー */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
         <h1 className="text-sm font-semibold text-text-primary flex-1">新規アイテム</h1>
@@ -82,9 +93,7 @@ export default function EntryCreate() {
       {/* フォーム */}
       <div className="flex-1 overflow-y-auto p-3">
         <EntryForm
-          mode="create"
           entryType={entryType}
-          onEntryTypeChange={setEntryType}
           name={name}
           onNameChange={setName}
           typedValue={typedValue}

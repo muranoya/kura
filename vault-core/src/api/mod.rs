@@ -5,15 +5,10 @@ mod security;
 mod sync;
 mod utils;
 
-pub use session::*;
-pub use entries::*;
-pub use labels::*;
-pub use security::*;
-pub use sync::*;
+pub use sync::parse_s3_config;
 pub use utils::*;
 
 use crate::sync::engine::SessionState;
-use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
 /// エントリ行データ
@@ -58,11 +53,29 @@ pub struct SyncApiResult {
     pub last_synced_at: Option<i64>,
 }
 
-/// グローバルセッション管理
-static VAULT_SESSION: Lazy<Mutex<Option<SessionState>>> = Lazy::new(|| Mutex::new(None));
+/// Vault状態を保持するインスタンス
+///
+/// アプリ側で複数のVaultManagerを生成することで、
+/// 複数のvaultを同時にUnlock状態で保持できる。
+pub struct VaultManager {
+    pub(crate) session: Mutex<Option<SessionState>>,
+    pub(crate) last_sync_time: Mutex<Option<i64>>,
+}
 
-/// 最終同期時刻（UNIXタイムスタンプ、秒）
-static LAST_SYNC_TIME: Lazy<Mutex<Option<i64>>> = Lazy::new(|| Mutex::new(None));
+impl VaultManager {
+    pub fn new() -> Self {
+        Self {
+            session: Mutex::new(None),
+            last_sync_time: Mutex::new(None),
+        }
+    }
+}
+
+impl Default for VaultManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 fn unix_now() -> i64 {
     crate::get_timestamp()

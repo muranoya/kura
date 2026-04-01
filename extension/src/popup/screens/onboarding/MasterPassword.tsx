@@ -11,29 +11,9 @@ export default function MasterPassword() {
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [confirmed, setConfirmed] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const passwordStrength = (pwd: string) => {
-    if (!pwd) return 0
-    let strength = 0
-    if (pwd.length >= 8) strength++
-    if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) strength++
-    if (/[0-9]/.test(pwd)) strength++
-    if (/[!@#$%^&*]/.test(pwd)) strength++
-    return strength
-  }
-
-  const strength = passwordStrength(password)
-  const strengthLabels = ['', '弱', '中弱', '中', '強']
-  const strengthColors = ['bg-gray-300', 'bg-danger', 'bg-warning', 'bg-warning', 'bg-success']
-
   const handleCreate = async () => {
-    if (!confirmed) {
-      alert('パスワードを忘れないことを確認してください')
-      return
-    }
-
     if (password !== confirmPassword) {
       alert('パスワードが一致しません')
       return
@@ -62,7 +42,7 @@ export default function MasterPassword() {
           })
         })
 
-        navigate('/onb/recovery', { state: { recoveryKey: response.recoveryKey } })
+        navigate('/onb/recovery', { state: { recoveryKey: response.recoveryKey, fromOnboarding: true } })
       } else {
         const errorMsg = response?.error || 'Vault作成に失敗しました'
         alert(errorMsg)
@@ -77,18 +57,10 @@ export default function MasterPassword() {
   const passwordsMatch = confirmPassword && password === confirmPassword
 
   return (
-    <div className="h-full overflow-y-auto pb-20 flex flex-col">
+    <div className="h-full overflow-y-auto pb-4 flex flex-col">
       <PageHeader title="マスターパスワード設定" showBackButton={true} />
 
       <div className="p-4 space-y-4">
-        {/* パスワード説明 */}
-        <div className="p-3 rounded-md bg-accent/10 border border-accent/20">
-          <p className="text-sm text-text-primary">
-            📌
-            すべてのデータを保護するマスターパスワードです。安全で予測困難なパスワードを設定してください。
-          </p>
-        </div>
-
         <Card>
           <CardHeader className="px-3 py-2">
             <CardTitle className="text-sm font-medium">パスワード設定</CardTitle>
@@ -107,23 +79,6 @@ export default function MasterPassword() {
                 placeholder="強力なパスワードを設定してください"
                 className="text-sm"
               />
-
-              {/* 強度インジケータ */}
-              {password && (
-                <div className="space-y-1">
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div
-                        key={i}
-                        className={`h-1 flex-1 rounded-full ${
-                          i <= strength ? strengthColors[strength] : 'bg-border'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-sm text-text-muted">強度: {strengthLabels[strength]}</p>
-                </div>
-              )}
             </div>
 
             {/* パスワード確認入力 */}
@@ -160,18 +115,6 @@ export default function MasterPassword() {
               )}
             </div>
 
-            {/* 確認チェックボックス */}
-            <label className="flex items-start gap-2 p-2 rounded-md border border-border cursor-pointer hover:bg-bg-elevated">
-              <input
-                type="checkbox"
-                checked={confirmed}
-                onChange={(e) => setConfirmed(e.target.checked)}
-                className="w-4 h-4 mt-0.5 flex-shrink-0"
-              />
-              <span className="text-sm text-text-primary">
-                このパスワードを忘れないことを確認します
-              </span>
-            </label>
           </CardContent>
         </Card>
 
@@ -188,7 +131,7 @@ export default function MasterPassword() {
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={loading || password !== confirmPassword || !password || !confirmed}
+            disabled={loading || password !== confirmPassword || !password}
             className="flex-1 text-sm"
             size="sm"
           >

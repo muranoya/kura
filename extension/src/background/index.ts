@@ -2,27 +2,30 @@
 // WASM の初期化とメッセージハンドラーのセットアップ
 
 import * as vaultModule from '../../wasm/wasm_bridge'
-import { STORAGE_KEYS } from '../shared/constants'
+import { DEFAULT_VAULT_ID, STORAGE_KEYS } from '../shared/constants'
 import { getFromStorage, saveToStorage } from '../shared/storage'
 
 /** WASM API surface for Service Worker */
 interface WasmApi {
-  api_create_new_vault(masterPassword: string): string
-  api_load_vault(vaultBytes: Uint8Array, etag: string): void
-  api_unlock(masterPassword: string): boolean
-  api_unlock_with_recovery_key(recoveryKey: string): void
-  api_lock(): Uint8Array
-  api_get_vault_bytes(): Uint8Array
-  api_get_vault_etag?(): string | null
+  api_create_new_vault(vaultId: string, masterPassword: string): string
+  api_load_vault(vaultId: string, vaultBytes: Uint8Array, etag: string): void
+  api_unlock(vaultId: string, masterPassword: string): boolean
+  api_unlock_with_recovery_key(vaultId: string, recoveryKey: string): void
+  api_lock(vaultId: string): Uint8Array
+  api_get_vault_bytes(vaultId: string): Uint8Array
+  api_get_vault_etag?(vaultId: string): string | null
+  api_is_unlocked(vaultId: string): boolean
   api_list_entries(
+    vaultId: string,
     searchQuery: string | null,
     type: string | null,
     labelId: string | null,
     includeTrash: boolean,
     onlyFavorites: boolean,
   ): string
-  api_get_entry(id: string): string
+  api_get_entry(vaultId: string, id: string): string
   api_create_entry(
+    vaultId: string,
     entryType: string,
     name: string,
     notes: string | null,
@@ -31,6 +34,7 @@ interface WasmApi {
     customFieldsJson: string | null,
   ): string
   api_update_entry(
+    vaultId: string,
     id: string,
     name: string,
     notes: string | null,
@@ -38,15 +42,15 @@ interface WasmApi {
     labelIds: string[],
     customFieldsJson: string | null,
   ): void
-  api_delete_entry(id: string): void
-  api_restore_entry(id: string): void
-  api_purge_entry(id: string): void
-  api_set_favorite(id: string, isFavorite: boolean): void
-  api_list_labels(): string
-  api_create_label(name: string): string
-  api_delete_label(id: string): void
-  api_rename_label(id: string, newName: string): void
-  api_set_entry_labels(entryId: string, labelIds: string[]): void
+  api_delete_entry(vaultId: string, id: string): void
+  api_restore_entry(vaultId: string, id: string): void
+  api_purge_entry(vaultId: string, id: string): void
+  api_set_favorite(vaultId: string, id: string, isFavorite: boolean): void
+  api_list_labels(vaultId: string): string
+  api_create_label(vaultId: string, name: string): string
+  api_delete_label(vaultId: string, id: string): void
+  api_rename_label(vaultId: string, id: string, newName: string): void
+  api_set_entry_labels(vaultId: string, entryId: string, labelIds: string[]): void
   api_generate_password(
     length: number,
     includeUppercase: boolean,
@@ -55,11 +59,11 @@ interface WasmApi {
     includeSymbols: boolean,
   ): string
   api_generate_totp_default(secret: string): string
-  api_change_master_password(oldPassword: string, newPassword: string): void
-  api_rotate_dek(password: string): string
-  api_regenerate_recovery_key(password: string): string
-  api_sync(configStr: string): Promise<{ last_synced_at?: number }>
-  api_download(configStr: string): Promise<boolean>
+  api_change_master_password(vaultId: string, oldPassword: string, newPassword: string): void
+  api_rotate_dek(vaultId: string, password: string): string
+  api_regenerate_recovery_key(vaultId: string, password: string): string
+  api_sync(vaultId: string, configStr: string): Promise<{ last_synced_at?: number }>
+  api_download(vaultId: string, configStr: string): Promise<boolean>
   [key: string]: unknown
 }
 
@@ -155,18 +159,18 @@ async function autoSync() {
     // S3設定がない場合はローカル保存のみ
     const s3Config = await getFromStorage(STORAGE_KEYS.S3_CONFIG)
     if (!s3Config) {
-      const vaultBytes = vault.api_get_vault_bytes()
+      const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
       await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
       return
     }
 
     const configStr = JSON.stringify(s3Config)
-    await vault.api_sync(configStr)
+    await vault.api_sync(DEFAULT_VAULT_ID, configStr)
 
     // 同期後に vault bytes / ETag / lastSyncTime を更新
-    const vaultBytes = vault.api_get_vault_bytes()
+    const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
     await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
-    const newEtag = vault.api_get_vault_etag?.() ?? null
+    const newEtag = vault.api_get_vault_etag?.(DEFAULT_VAULT_ID) ?? null
     await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
     const syncTime = Math.floor(Date.now() / 1000)
     await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, syncTime)
@@ -206,7 +210,7 @@ async function handleMessage(
       if (vaultBytes) {
         try {
           const etag = await getFromStorage(STORAGE_KEYS.VAULT_ETAG)
-          vault.api_load_vault(new Uint8Array(vaultBytes), etag || '')
+          vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
         } catch (e) {
           console.error('[SW] Failed to auto-load vault:', e)
         }
@@ -234,8 +238,8 @@ async function handleMessage(
             break
           }
           // vault をロードしてアンロック
-          vault.api_load_vault(new Uint8Array(vaultBytes), etag || '')
-          vault.api_unlock(message.password)
+          vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
+          vault.api_unlock(DEFAULT_VAULT_ID, message.password)
           unlocked = true
           // オートロック alarm を設定
           const settings = await loadSettings()
@@ -263,8 +267,8 @@ async function handleMessage(
             sendResponse({ success: false, error: 'Vault not found' })
             break
           }
-          vault.api_load_vault(new Uint8Array(vaultBytes), etag || '')
-          vault.api_unlock(message.password)
+          vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
+          vault.api_unlock(DEFAULT_VAULT_ID, message.password)
           unlocked = true
           const settings = await loadSettings()
           chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
@@ -281,7 +285,7 @@ async function handleMessage(
 
       case 'LOCK': {
         try {
-          const vaultBytes = vault.api_lock()
+          const vaultBytes = vault.api_lock(DEFAULT_VAULT_ID)
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
           unlocked = false
           chrome.alarms.clear('autolock')
@@ -299,8 +303,8 @@ async function handleMessage(
           break
         }
         try {
-          const recoveryKey = vault.api_create_new_vault(message.masterPassword)
-          const vaultBytes = vault.api_get_vault_bytes()
+          const recoveryKey = vault.api_create_new_vault(DEFAULT_VAULT_ID, message.masterPassword)
+          const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
 
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, null)
@@ -325,9 +329,9 @@ async function handleMessage(
           break
         }
         try {
-          vault.api_unlock_with_recovery_key(message.recoveryKey)
-          vault.api_change_master_password(message.recoveryKey, message.newPassword)
-          const vaultBytes = vault.api_get_vault_bytes()
+          vault.api_unlock_with_recovery_key(DEFAULT_VAULT_ID, message.recoveryKey)
+          vault.api_change_master_password(DEFAULT_VAULT_ID, message.recoveryKey, message.newPassword)
+          const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, null)
           await autoSync()
@@ -351,6 +355,7 @@ async function handleMessage(
         try {
           const filter = message.filter || {}
           const result = vault.api_list_entries(
+            DEFAULT_VAULT_ID,
             filter.searchQuery || null,
             filter.type || null,
             filter.labelId || null,
@@ -372,7 +377,7 @@ async function handleMessage(
           break
         }
         try {
-          const result = vault.api_get_entry(message.id)
+          const result = vault.api_get_entry(DEFAULT_VAULT_ID, message.id)
           const rawEntry = JSON.parse(result)
           if (rawEntry?.typed_value && typeof rawEntry.typed_value === 'string') {
             rawEntry.typed_value = JSON.parse(rawEntry.typed_value)
@@ -392,6 +397,7 @@ async function handleMessage(
         }
         try {
           const entryId = vault.api_create_entry(
+            DEFAULT_VAULT_ID,
             message.entryType,
             message.name,
             message.notes || null,
@@ -414,6 +420,7 @@ async function handleMessage(
         }
         try {
           vault.api_update_entry(
+            DEFAULT_VAULT_ID,
             message.id,
             message.name,
             message.notes || null,
@@ -435,7 +442,7 @@ async function handleMessage(
           break
         }
         try {
-          vault.api_delete_entry(message.id)
+          vault.api_delete_entry(DEFAULT_VAULT_ID, message.id)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -450,7 +457,7 @@ async function handleMessage(
           break
         }
         try {
-          vault.api_restore_entry(message.id)
+          vault.api_restore_entry(DEFAULT_VAULT_ID, message.id)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -465,7 +472,7 @@ async function handleMessage(
           break
         }
         try {
-          vault.api_purge_entry(message.id)
+          vault.api_purge_entry(DEFAULT_VAULT_ID, message.id)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -480,7 +487,7 @@ async function handleMessage(
           break
         }
         try {
-          vault.api_set_favorite(message.id, message.isFavorite)
+          vault.api_set_favorite(DEFAULT_VAULT_ID, message.id, message.isFavorite)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -497,7 +504,7 @@ async function handleMessage(
           break
         }
         try {
-          const result = vault.api_list_entries(null, null, null, true, false)
+          const result = vault.api_list_entries(DEFAULT_VAULT_ID, null, null, null, true, false)
           const rawEntries = JSON.parse(result)
           const entries = normalizeEntries(rawEntries)
           sendResponse({ success: true, entries })
@@ -515,7 +522,7 @@ async function handleMessage(
           break
         }
         try {
-          const result = vault.api_list_labels()
+          const result = vault.api_list_labels(DEFAULT_VAULT_ID)
           const labels = JSON.parse(result)
           sendResponse({ success: true, labels })
         } catch (err) {
@@ -530,7 +537,7 @@ async function handleMessage(
           break
         }
         try {
-          const labelId = vault.api_create_label(message.name)
+          const labelId = vault.api_create_label(DEFAULT_VAULT_ID, message.name)
           await autoSync()
           sendResponse({ success: true, labelId })
         } catch (err) {
@@ -545,7 +552,7 @@ async function handleMessage(
           break
         }
         try {
-          vault.api_delete_label(message.id)
+          vault.api_delete_label(DEFAULT_VAULT_ID, message.id)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -560,7 +567,7 @@ async function handleMessage(
           break
         }
         try {
-          vault.api_rename_label(message.id, message.newName)
+          vault.api_rename_label(DEFAULT_VAULT_ID, message.id, message.newName)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -575,7 +582,7 @@ async function handleMessage(
           break
         }
         try {
-          vault.api_set_entry_labels(message.entryId, message.labelIds || [])
+          vault.api_set_entry_labels(DEFAULT_VAULT_ID, message.entryId, message.labelIds || [])
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -620,7 +627,7 @@ async function handleMessage(
           break
         }
         try {
-          vault.api_change_master_password(message.oldPassword, message.newPassword)
+          vault.api_change_master_password(DEFAULT_VAULT_ID, message.oldPassword, message.newPassword)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -635,7 +642,7 @@ async function handleMessage(
           break
         }
         try {
-          const recoveryKey = vault.api_rotate_dek(message.password)
+          const recoveryKey = vault.api_rotate_dek(DEFAULT_VAULT_ID, message.password)
           await autoSync()
           sendResponse({ success: true, recoveryKey })
         } catch (err) {
@@ -650,7 +657,7 @@ async function handleMessage(
           break
         }
         try {
-          const recoveryKey = vault.api_regenerate_recovery_key(message.password)
+          const recoveryKey = vault.api_regenerate_recovery_key(DEFAULT_VAULT_ID, message.password)
           await autoSync()
           sendResponse({ success: true, recoveryKey })
         } catch (err) {
@@ -678,10 +685,10 @@ async function handleMessage(
             break
           }
 
-          const vaultExists = await vault.api_download(JSON.stringify(s3Config))
+          const vaultExists = await vault.api_download(DEFAULT_VAULT_ID, JSON.stringify(s3Config))
 
           if (vaultExists) {
-            const vaultBytes = vault.api_get_vault_bytes()
+            const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
             await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
           }
 
@@ -705,7 +712,7 @@ async function handleMessage(
           }
 
           const configStr = JSON.stringify(s3Config)
-          const downloadResult = await vault.api_download(configStr)
+          const downloadResult = await vault.api_download(DEFAULT_VAULT_ID, configStr)
 
           sendResponse({ success: true, result: downloadResult })
         } catch (err) {
@@ -730,13 +737,13 @@ async function handleMessage(
 
           const configStr = JSON.stringify(s3Config)
 
-          const syncResult = await vault.api_sync(configStr)
+          const syncResult = await vault.api_sync(DEFAULT_VAULT_ID, configStr)
           const lastSyncedAt = syncResult?.last_synced_at ?? null
 
           // 同期後、vault bytes と ETag を更新
-          const vaultBytes = vault.api_get_vault_bytes()
+          const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
-          const newEtag = vault.api_get_vault_etag?.() ?? null
+          const newEtag = vault.api_get_vault_etag?.(DEFAULT_VAULT_ID) ?? null
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
 
           const syncTime = lastSyncedAt ?? Math.floor(Date.now() / 1000)
@@ -810,7 +817,7 @@ function setupAlarms() {
 async function handleAutolockAlarm() {
   if (!unlocked) return
   try {
-    const vaultBytes = vault.api_lock()
+    const vaultBytes = vault.api_lock(DEFAULT_VAULT_ID)
     await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
     unlocked = false
   } catch (err) {

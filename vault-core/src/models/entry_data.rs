@@ -49,26 +49,28 @@ impl Drop for EntryData {
 }
 
 impl EntryData {
-    pub fn new_login(url: Option<String>, username: String, password: String, totp: Option<String>, notes: Option<String>) -> Self {
+    pub fn new_login(url: Option<String>, username: String, password: String, notes: Option<String>) -> Self {
         EntryData {
             entry_type: EntryType::Login,
             notes,
             typed_value: json!({
                 "url": url,
                 "username": username,
-                "password": password,
-                "totp": totp
+                "password": password
             }),
             custom_fields: None,
         }
     }
 
-    pub fn new_bank(bank_name: String, account_number: String, pin: String, notes: Option<String>) -> Self {
+    pub fn new_bank(bank_name: String, account_holder: String, branch_code: String, account_type: String, account_number: String, pin: String, notes: Option<String>) -> Self {
         EntryData {
             entry_type: EntryType::Bank,
             notes,
             typed_value: json!({
                 "bank_name": bank_name,
+                "account_holder": account_holder,
+                "branch_code": branch_code,
+                "account_type": account_type,
                 "account_number": account_number,
                 "pin": pin
             }),
@@ -76,13 +78,12 @@ impl EntryData {
         }
     }
 
-    pub fn new_ssh_key(private_key: String, passphrase: Option<String>, notes: Option<String>) -> Self {
+    pub fn new_ssh_key(private_key: String, notes: Option<String>) -> Self {
         EntryData {
             entry_type: EntryType::SshKey,
             notes,
             typed_value: json!({
-                "private_key": private_key,
-                "passphrase": passphrase
+                "private_key": private_key
             }),
             custom_fields: None,
         }
@@ -99,7 +100,7 @@ impl EntryData {
         }
     }
 
-    pub fn new_credit_card(cardholder: String, number: String, expiry: String, cvv: String, notes: Option<String>) -> Self {
+    pub fn new_credit_card(cardholder: String, number: String, expiry: String, cvv: String, pin: String, notes: Option<String>) -> Self {
         EntryData {
             entry_type: EntryType::CreditCard,
             notes,
@@ -107,7 +108,31 @@ impl EntryData {
                 "cardholder": cardholder,
                 "number": number,
                 "expiry": expiry,
-                "cvv": cvv
+                "cvv": cvv,
+                "pin": pin
+            }),
+            custom_fields: None,
+        }
+    }
+
+    pub fn new_password(username: String, password: String, notes: Option<String>) -> Self {
+        EntryData {
+            entry_type: EntryType::Password,
+            notes,
+            typed_value: json!({
+                "username": username,
+                "password": password
+            }),
+            custom_fields: None,
+        }
+    }
+
+    pub fn new_software_license(license_key: String, notes: Option<String>) -> Self {
+        EntryData {
+            entry_type: EntryType::SoftwareLicense,
+            notes,
+            typed_value: json!({
+                "license_key": license_key
             }),
             custom_fields: None,
         }
@@ -141,7 +166,6 @@ mod tests {
             Some("https://example.com".to_string()),
             "user@example.com".to_string(),
             "password123".to_string(),
-            None,
             Some("my notes".to_string()),
         );
 

@@ -1,38 +1,40 @@
 import { invoke } from '@tauri-apps/api/core'
-import { STORAGE_KEYS } from '../shared/constants'
+import { DEFAULT_VAULT_ID, STORAGE_KEYS } from '../shared/constants'
 import { getFromStorage, saveToStorage } from '../shared/storage'
 import type { Entry, EntryFilter, EntryRow, Label } from '../shared/types'
+
+const vaultId = DEFAULT_VAULT_ID
 
 // ============================================================================
 // Session Management
 // ============================================================================
 
 export async function createVault(masterPassword: string): Promise<string> {
-  return invoke<string>('create_vault', { masterPassword })
+  return invoke<string>('create_vault', { vaultId, masterPassword })
 }
 
 export async function loadVault(vaultBytes: number[], etag: string): Promise<void> {
-  return invoke<void>('load_vault', { vaultBytes, etag })
+  return invoke<void>('load_vault', { vaultId, vaultBytes, etag })
 }
 
 export async function unlock(masterPassword: string): Promise<void> {
-  return invoke<void>('unlock', { masterPassword })
+  return invoke<void>('unlock', { vaultId, masterPassword })
 }
 
 export async function unlockWithRecoveryKey(recoveryKey: string): Promise<void> {
-  return invoke<void>('unlock_with_recovery_key', { recoveryKey })
+  return invoke<void>('unlock_with_recovery_key', { vaultId, recoveryKey })
 }
 
 export async function lock(): Promise<number[]> {
-  return invoke<number[]>('lock')
+  return invoke<number[]>('lock', { vaultId })
 }
 
 export async function getVaultBytes(): Promise<number[]> {
-  return invoke<number[]>('get_vault_bytes')
+  return invoke<number[]>('get_vault_bytes', { vaultId })
 }
 
 export async function isUnlocked(): Promise<boolean> {
-  return invoke<boolean>('is_unlocked')
+  return invoke<boolean>('is_unlocked', { vaultId })
 }
 
 // ============================================================================
@@ -41,6 +43,7 @@ export async function isUnlocked(): Promise<boolean> {
 
 export async function listEntries(filter?: EntryFilter): Promise<EntryRow[]> {
   return invoke<EntryRow[]>('list_entries', {
+    vaultId,
     searchQuery: filter?.searchQuery ?? null,
     entryType: filter?.type ?? null,
     labelId: filter?.labelId ?? null,
@@ -50,7 +53,7 @@ export async function listEntries(filter?: EntryFilter): Promise<EntryRow[]> {
 }
 
 export async function getEntry(id: string): Promise<Entry> {
-  const entry = await invoke<Record<string, unknown>>('get_entry', { id })
+  const entry = await invoke<Record<string, unknown>>('get_entry', { vaultId, id })
   return {
     ...entry,
     customFields: ((entry.customFields as Array<Record<string, unknown>>) ?? []).map(
@@ -73,6 +76,7 @@ export async function createEntry(
   customFields?: string,
 ): Promise<string> {
   return invoke<string>('create_entry', {
+    vaultId,
     entryType,
     name,
     notes: notes ?? null,
@@ -91,6 +95,7 @@ export async function updateEntry(
   customFields?: string,
 ): Promise<void> {
   return invoke<void>('update_entry', {
+    vaultId,
     id,
     name,
     notes: notes ?? null,
@@ -101,19 +106,19 @@ export async function updateEntry(
 }
 
 export async function deleteEntry(id: string): Promise<void> {
-  return invoke<void>('delete_entry', { id })
+  return invoke<void>('delete_entry', { vaultId, id })
 }
 
 export async function restoreEntry(id: string): Promise<void> {
-  return invoke<void>('restore_entry', { id })
+  return invoke<void>('restore_entry', { vaultId, id })
 }
 
 export async function purgeEntry(id: string): Promise<void> {
-  return invoke<void>('purge_entry', { id })
+  return invoke<void>('purge_entry', { vaultId, id })
 }
 
 export async function setFavorite(id: string, isFavorite: boolean): Promise<void> {
-  return invoke<void>('set_favorite', { id, isFavorite })
+  return invoke<void>('set_favorite', { vaultId, id, isFavorite })
 }
 
 // ============================================================================
@@ -121,23 +126,23 @@ export async function setFavorite(id: string, isFavorite: boolean): Promise<void
 // ============================================================================
 
 export async function listLabels(): Promise<Label[]> {
-  return invoke<Label[]>('list_labels')
+  return invoke<Label[]>('list_labels', { vaultId })
 }
 
 export async function createLabel(name: string): Promise<Label> {
-  return invoke<Label>('create_label', { name })
+  return invoke<Label>('create_label', { vaultId, name })
 }
 
 export async function deleteLabel(id: string): Promise<void> {
-  return invoke<void>('delete_label', { id })
+  return invoke<void>('delete_label', { vaultId, id })
 }
 
 export async function renameLabel(id: string, newName: string): Promise<void> {
-  return invoke<void>('rename_label', { id, newName })
+  return invoke<void>('rename_label', { vaultId, id, newName })
 }
 
 export async function setEntryLabels(entryId: string, labelIds: string[]): Promise<void> {
-  return invoke<void>('set_entry_labels', { entryId, labelIds })
+  return invoke<void>('set_entry_labels', { vaultId, entryId, labelIds })
 }
 
 // ============================================================================
@@ -148,7 +153,7 @@ export async function changeMasterPassword(
   oldPassword: string,
   newPassword: string,
 ): Promise<void> {
-  return invoke<void>('change_master_password', { oldPassword, newPassword })
+  return invoke<void>('change_master_password', { vaultId, oldPassword, newPassword })
 }
 
 export async function upgradeArgon2Params(
@@ -158,6 +163,7 @@ export async function upgradeArgon2Params(
   parallelism: number,
 ): Promise<string> {
   return invoke<string>('upgrade_argon2_params', {
+    vaultId,
     password,
     iterations,
     memory,
@@ -166,11 +172,11 @@ export async function upgradeArgon2Params(
 }
 
 export async function rotateDek(password: string): Promise<string> {
-  return invoke<string>('rotate_dek', { password })
+  return invoke<string>('rotate_dek', { vaultId, password })
 }
 
 export async function regenerateRecoveryKey(password: string): Promise<string> {
-  return invoke<string>('regenerate_recovery_key', { password })
+  return invoke<string>('regenerate_recovery_key', { vaultId, password })
 }
 
 // ============================================================================
@@ -210,12 +216,13 @@ export async function syncVault(storageConfig: string): Promise<{
   last_synced_at: number | null
 }> {
   return invoke<{ synced: boolean; last_synced_at: number | null }>('sync_vault', {
+    vaultId,
     storageConfig,
   })
 }
 
 export async function pushVault(storageConfig: string): Promise<number> {
-  return invoke<number>('push_vault', { storageConfig })
+  return invoke<number>('push_vault', { vaultId, storageConfig })
 }
 
 /// ヘルパー: pushVaultを実行して、タイムスタンプをストレージに保存
@@ -244,11 +251,11 @@ export async function syncVaultIfConfigured(): Promise<boolean> {
 }
 
 export async function getLastSyncTime(): Promise<number | null> {
-  return invoke<number | null>('get_last_sync_time')
+  return invoke<number | null>('get_last_sync_time', { vaultId })
 }
 
 export async function downloadVault(storageConfig: string): Promise<boolean> {
-  return invoke<boolean>('download_vault', { storageConfig })
+  return invoke<boolean>('download_vault', { vaultId, storageConfig })
 }
 
 // ============================================================================
