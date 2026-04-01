@@ -4,7 +4,6 @@ import { BottomNav } from './components/BottomNav'
 import Lock from './screens/auth/Lock'
 import Recovery from './screens/auth/Recovery'
 import EntryCreate from './screens/entries/EntryCreate'
-import EntryDetail from './screens/entries/EntryDetail'
 import EntryEdit from './screens/entries/EntryEdit'
 import EntryList from './screens/entries/EntryList'
 import PasswordGenerator from './screens/entries/PasswordGenerator'
@@ -43,7 +42,7 @@ function AppContent() {
       // chrome.storage.local から vaultBytes の存在確認
       const result = await new Promise<{ vaultBytes?: string }>((resolve) => {
         if (typeof chrome !== 'undefined' && chrome.storage) {
-          chrome.storage.local.get(['vaultBytes'], resolve)
+          chrome.storage.local.get(['vaultBytes'], (result) => resolve(result))
         } else {
           resolve({})
         }
@@ -116,7 +115,6 @@ function AppContent() {
 
             {/* Detail routes without BottomNav */}
             <Route path="/entries/create" element={<EntryCreate />} />
-            <Route path="/entries/:id" element={<EntryDetail />} />
             <Route path="/entries/:id/edit" element={<EntryEdit />} />
             <Route path="/trash" element={<Trash />} />
             <Route path="*" element={<Navigate to="/entries" replace />} />

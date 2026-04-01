@@ -11,7 +11,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import * as React from 'react'
-import type { EntryRow } from '../../shared/types'
+import type { EntryRow } from '../../../shared/types'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Card } from '../ui/card'
@@ -95,9 +95,10 @@ export default function EntryCard(props: EntryCardProps) {
             <div
               className={`flex-shrink-0 ${iconContainerSize} rounded-lg bg-accent/10 flex items-center justify-center text-accent`}
             >
-              {React.cloneElement(getEntryIcon(props.entry.entryType) as React.ReactElement, {
-                size: iconSize,
-              })}
+              {React.cloneElement(
+                getEntryIcon(props.entry.entryType) as React.ReactElement<{ size: number }>,
+                { size: iconSize },
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <h3

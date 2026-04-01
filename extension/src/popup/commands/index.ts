@@ -60,7 +60,9 @@ export async function listEntries(filter?: EntryFilter): Promise<EntryRow[]> {
 export async function getEntry(id: string): Promise<Entry> {
   const res = await sendMessage({ type: 'GET_ENTRY', id })
   if (!res.success) throw new Error(field<'error', string>(res, 'error'))
-  return field<'entry', Entry>(res, 'entry')
+  const entry = field<'entry', Entry>(res, 'entry')
+  if (!entry) throw new Error('Entry not found')
+  return entry
 }
 
 export async function createEntry(

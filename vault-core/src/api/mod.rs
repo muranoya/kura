@@ -29,6 +29,7 @@ pub struct EntryDetail {
     pub entry_type: String,
     pub name: String,
     pub is_favorite: bool,
+    pub created_at: i64,
     pub updated_at: i64,
     pub deleted_at: Option<i64>,
     pub notes: Option<String>,

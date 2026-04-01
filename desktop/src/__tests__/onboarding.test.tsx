@@ -161,7 +161,6 @@ describe('StorageSetup - S3 connection', () => {
 
 describe('MasterPassword - validation', () => {
   it('should show error when passwords are empty', async () => {
-    const user = userEvent.setup()
     // Button is disabled when fields are empty, so we need to fill them first
     // Actually, the button has: disabled={loading || !password || !confirmPassword}
     // So we can't click it when empty. The validation for empty is handled by disabled state.

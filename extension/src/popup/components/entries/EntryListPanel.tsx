@@ -1,4 +1,4 @@
-import type { EntryRow, EntryType } from '../../shared/types'
+import type { EntryRow, EntryType } from '../../../shared/types'
 import { EmptyState } from '../layout/EmptyState'
 import TypeFilterDropdown from '../ui/type-filter-dropdown'
 

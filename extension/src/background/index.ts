@@ -104,12 +104,12 @@ function setupMessageHandlers() {
 setupMessageHandlers()
 
 // Service Worker 起動時に初期化
-self.addEventListener('install', (event) => {
-  event.waitUntil(initWasm())
+self.addEventListener('install', (event: Event) => {
+  ;(event as unknown as { waitUntil(p: Promise<unknown>): void }).waitUntil(initWasm())
 })
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
+self.addEventListener('activate', (event: Event) => {
+  ;(event as unknown as { waitUntil(p: Promise<unknown>): void }).waitUntil(
     initWasm().then(() => {
       setupAlarms()
     }),
@@ -128,6 +128,7 @@ function normalizeEntry(raw: Record<string, unknown>): Record<string, unknown> {
     entryType: raw.entry_type,
     name: raw.name,
     isFavorite: raw.is_favorite ?? false,
+    createdAt: raw.created_at ?? 0,
     updatedAt: raw.updated_at ?? 0,
     deletedAt: raw.deleted_at ?? null,
     notes: raw.notes ?? null,
@@ -179,8 +180,15 @@ async function autoSync() {
   }
 }
 
-async function loadSettings() {
-  const settings = await getFromStorage(STORAGE_KEYS.APP_SETTINGS)
+interface AppSettings {
+  autolockMinutes: number
+  clipboardClearSeconds: number
+  clipboardAutoClean: boolean
+  theme: string
+}
+
+async function loadSettings(): Promise<AppSettings> {
+  const settings = await getFromStorage<AppSettings>(STORAGE_KEYS.APP_SETTINGS)
   return (
     settings || {
       autolockMinutes: 5,
@@ -206,10 +214,10 @@ async function handleMessage(
     // Service Worker 再起動時の vault 自動復元
     // vaultBytes が storage に存在し、unlocked が false の場合、vault をロードする
     if (!unlocked) {
-      const vaultBytes = await getFromStorage(STORAGE_KEYS.VAULT_BYTES)
+      const vaultBytes = await getFromStorage<number[]>(STORAGE_KEYS.VAULT_BYTES)
       if (vaultBytes) {
         try {
-          const etag = await getFromStorage(STORAGE_KEYS.VAULT_ETAG)
+          const etag = await getFromStorage<string>(STORAGE_KEYS.VAULT_ETAG)
           vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
         } catch (e) {
           console.error('[SW] Failed to auto-load vault:', e)
@@ -231,8 +239,8 @@ async function handleMessage(
           break
         }
         try {
-          const vaultBytes = await getFromStorage(STORAGE_KEYS.VAULT_BYTES)
-          const etag = await getFromStorage(STORAGE_KEYS.VAULT_ETAG)
+          const vaultBytes = await getFromStorage<number[]>(STORAGE_KEYS.VAULT_BYTES)
+          const etag = await getFromStorage<string>(STORAGE_KEYS.VAULT_ETAG)
           if (!vaultBytes) {
             sendResponse({ success: false, error: 'Vault not found' })
             break
@@ -261,8 +269,8 @@ async function handleMessage(
           break
         }
         try {
-          const vaultBytes = await getFromStorage(STORAGE_KEYS.VAULT_BYTES)
-          const etag = await getFromStorage(STORAGE_KEYS.VAULT_ETAG)
+          const vaultBytes = await getFromStorage<number[]>(STORAGE_KEYS.VAULT_BYTES)
+          const etag = await getFromStorage<string>(STORAGE_KEYS.VAULT_ETAG)
           if (!vaultBytes) {
             sendResponse({ success: false, error: 'Vault not found' })
             break

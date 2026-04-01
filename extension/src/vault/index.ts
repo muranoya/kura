@@ -8,8 +8,8 @@ interface WasmApi {
   api_load_vault(vaultId: string, vaultBytes: string | Uint8Array, etag?: string): string
   api_unlock(vaultId: string, masterPassword: string): boolean
   api_unlock_with_recovery_key(vaultId: string, recoveryKey: string): void
-  api_lock(vaultId: string): string | Uint8Array
-  api_get_vault_bytes(vaultId: string): string | Uint8Array
+  api_lock(vaultId: string): Uint8Array
+  api_get_vault_bytes(vaultId: string): Uint8Array
   api_list_entries(
     vaultId: string,
     searchQuery: string | null,
@@ -119,7 +119,7 @@ export async function unlockWithRecoveryKey(recoveryKey: string): Promise<void> 
   }
 }
 
-export async function lockVault(): Promise<string> {
+export async function lockVault(): Promise<Uint8Array> {
   await ensureWasmReady()
   try {
     return wasm.api_lock(DEFAULT_VAULT_ID)
@@ -129,7 +129,7 @@ export async function lockVault(): Promise<string> {
   }
 }
 
-export async function getVaultBytes(): Promise<string> {
+export async function getVaultBytes(): Promise<Uint8Array> {
   await ensureWasmReady()
   try {
     return wasm.api_get_vault_bytes(DEFAULT_VAULT_ID)

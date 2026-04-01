@@ -24,6 +24,7 @@ export interface EntryRow {
 
 // Entry with full details
 export interface Entry extends EntryRow {
+  createdAt: number
   notes: string | null
   typedValue: Record<string, unknown>
   labels: string[]

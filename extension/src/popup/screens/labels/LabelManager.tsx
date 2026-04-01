@@ -1,6 +1,5 @@
 import { Check, Edit2, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { EmptyState } from '../../components/layout/EmptyState'
@@ -11,7 +10,6 @@ import { Label } from '../../components/ui/label'
 import { Separator } from '../../components/ui/separator'
 
 export default function LabelManager() {
-  const _navigate = useNavigate()
   const [labels, setLabels] = useState<{ id: string; name: string }[]>([])
   const [newLabelName, setNewLabelName] = useState('')
   const [loading, setLoading] = useState(true)

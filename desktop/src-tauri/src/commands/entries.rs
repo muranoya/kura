@@ -49,6 +49,7 @@ pub async fn get_entry(vault_id: String, id: String) -> Result<serde_json::Value
             "entryType": entry.entry_type,
             "name": entry.name,
             "isFavorite": entry.is_favorite,
+            "createdAt": entry.created_at,
             "updatedAt": entry.updated_at,
             "deletedAt": entry.deleted_at,
             "notes": entry.notes,

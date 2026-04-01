@@ -5,7 +5,7 @@ import EntryForm from '../../components/entries/EntryForm'
 import EntryTypeSelectDialog from '../../components/entries/EntryTypeSelectDialog'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
-import type { CustomField, Label } from '../../shared/types'
+import type { CustomField, Label } from '../../../shared/types'
 
 export default function EntryCreate() {
   const navigate = useNavigate()
@@ -59,7 +59,7 @@ export default function EntryCreate() {
         selectedLabelIds,
         customFieldsJson,
       )
-      navigate(`/entries/${id}`)
+      navigate('/entries', { state: { selectedId: id } })
     } catch (err) {
       alert(`アイテム作成失敗: ${err}`)
     } finally {

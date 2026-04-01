@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { DEFAULT_VAULT_ID, STORAGE_KEYS } from '../shared/constants'
 import { getFromStorage, saveToStorage } from '../shared/storage'
-import type { Entry, EntryFilter, EntryRow, Label } from '../shared/types'
+import type { CustomFieldType, Entry, EntryFilter, EntryRow, Label } from '../shared/types'
 
 const vaultId = DEFAULT_VAULT_ID
 
@@ -53,17 +53,18 @@ export async function listEntries(filter?: EntryFilter): Promise<EntryRow[]> {
 }
 
 export async function getEntry(id: string): Promise<Entry> {
-  const entry = await invoke<Record<string, unknown>>('get_entry', { vaultId, id })
+  const entry = await invoke<Entry & { customFields?: Array<Record<string, unknown>> }>(
+    'get_entry',
+    { vaultId, id },
+  )
   return {
     ...entry,
-    customFields: ((entry.customFields as Array<Record<string, unknown>>) ?? []).map(
-      (f: Record<string, unknown>) => ({
-        id: f.id,
-        name: f.name,
-        fieldType: f.field_type,
-        value: f.value,
-      }),
-    ),
+    customFields: (entry.customFields ?? []).map((f: Record<string, unknown>) => ({
+      id: f.id as string,
+      name: f.name as string,
+      fieldType: f.field_type as CustomFieldType,
+      value: f.value as string,
+    })),
   }
 }
 

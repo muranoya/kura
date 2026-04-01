@@ -72,6 +72,7 @@ impl VaultManager {
             entry_type: entry.entry_type.as_str().to_string(),
             name: entry.name,
             is_favorite: entry.is_favorite,
+            created_at: entry.created_at,
             updated_at: entry.updated_at,
             deleted_at: entry.deleted_at,
             notes: entry.data.notes.clone(),

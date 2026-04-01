@@ -1,6 +1,7 @@
-import { Pencil, Plus, Search, Settings, Trash2, X } from 'lucide-react'
+import { Copy, Eye, EyeOff, Pencil, Plus, Search, Settings, Trash2, X } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import EntryCard, { getTypeLabel } from '../../components/entries/EntryCard'
 import EntryListPanel from '../../components/entries/EntryListPanel'
@@ -8,8 +9,7 @@ import { EmptyState } from '../../components/layout/EmptyState'
 import { SyncActions } from '../../components/layout/SyncActions'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import type { Entry, EntryRow, EntryType } from '../../shared/types'
+import type { Entry, EntryRow, EntryType } from '../../../shared/types'
 
 interface EntryListProps {
   isFavorites?: boolean
@@ -17,6 +17,7 @@ interface EntryListProps {
 
 export default function EntryList({ isFavorites = false }: EntryListProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const [entries, setEntries] = useState<EntryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -26,12 +27,20 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedLabelId, setSelectedLabelId] = useState<string | undefined>(undefined)
 
-  // 詳細ペイン
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // 詳細ペイン — location state から初期選択IDを取得
+  const initialSelectedId = (location.state as { selectedId?: string } | null)?.selectedId ?? null
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId)
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
   const [selectedLoading, setSelectedLoading] = useState(false)
   const [allLabels, setAllLabels] = useState<Array<{ id: string; name: string }>>([])
   const [passwordMasked, setPasswordMasked] = useState(true)
+
+  // location state の selectedId を消費後クリア
+  useEffect(() => {
+    if (initialSelectedId) {
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // マウント時にラベル一覧を取得（フィルターUI用）
   useEffect(() => {
@@ -108,7 +117,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
         prev.map((e) => (e.id === id ? { ...e, isFavorite: !currentFavorite } : e)),
       )
       if (selectedEntry && selectedEntry.id === id) {
-        setSelectedEntry((prev) => (prev ? { ...prev, isFavorite: !currentFavorite } : prev))
+        setSelectedEntry((prev: Entry | null) => (prev ? { ...prev, isFavorite: !currentFavorite } : prev))
       }
     } catch (err) {
       setError(String(err) || 'Failed to update favorite')
@@ -217,7 +226,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
         </div>
 
         {/* 右ペイン: 詳細 */}
-        <div className="flex-1 bg-base overflow-y-auto pb-20">
+        <div className="flex-1 bg-bg-surface overflow-y-auto pb-20">
           {selectedId && selectedEntry ? (
             <EntryDetailPane
               entry={selectedEntry}
@@ -250,6 +259,88 @@ interface EntryDetailPaneProps {
   onDelete: () => void
 }
 
+function PaneFieldDisplay({
+  label,
+  value,
+  isPassword = false,
+  isMasked = false,
+  onToggleMask,
+}: {
+  label: string
+  value: string | null | undefined
+  isPassword?: boolean
+  isMasked?: boolean
+  onToggleMask?: () => void
+}) {
+  const [copied, setCopied] = useState(false)
+  const isEmpty = !value
+
+  const handleCopy = () => {
+    if (isEmpty) return
+    navigator.clipboard.writeText(value)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div
+      className={`flex items-center gap-1.5 px-2 py-1.5 rounded transition-colors ${
+        isEmpty
+          ? 'opacity-50'
+          : 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80'
+      } ${copied ? 'bg-accent-subtle' : ''}`}
+      onClick={handleCopy}
+      role={isEmpty ? undefined : 'button'}
+      tabIndex={isEmpty ? undefined : 0}
+      onKeyDown={isEmpty ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') handleCopy() }}
+    >
+      <span className="text-xs text-text-secondary w-20 shrink-0">{label}</span>
+      <span className={`text-sm flex-1 break-all ${
+        isEmpty
+          ? 'text-text-secondary italic'
+          : isPassword && isMasked
+            ? 'font-mono text-text-primary tracking-wider'
+            : 'font-mono text-text-primary'
+      }`}>
+        {isEmpty
+          ? '未設定'
+          : isPassword && isMasked
+            ? '••••••••'
+            : value}
+      </span>
+      {!isEmpty && isPassword && onToggleMask && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onToggleMask() }}
+          className="p-0.5 text-text-muted hover:text-text-primary transition-colors shrink-0"
+        >
+          {isMasked ? <EyeOff size={12} /> : <Eye size={12} />}
+        </button>
+      )}
+      {!isEmpty && (
+        <span className="shrink-0 text-text-muted">
+          {copied ? <span className="text-xs text-success">コピーしました</span> : <Copy size={13} />}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function PaneSectionHeading({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-1.5 pt-2 pb-0.5 px-0.5">
+      <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">{children}</span>
+      <div className="flex-1 border-t border-border" />
+    </div>
+  )
+}
+
+function formatTimestamp(ts: number): string {
+  const d = new Date(ts * 1000)
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 function EntryDetailPane({
   entry,
   allLabels,
@@ -267,241 +358,198 @@ function EntryDetailPane({
     )
   }
 
-  const FieldDisplay = ({
-    label,
-    value,
-    isPassword = false,
-    isMasked = false,
-  }: {
-    label: string
-    value: string
-    isPassword?: boolean
-    isMasked?: boolean
-  }) => (
-    <div className="py-3 border-b border-border/50">
-      <p className="text-sm font-semibold text-text-muted uppercase mb-1.5">{label}</p>
-      <div className="flex items-center gap-2">
-        <code className="text-sm text-text-primary font-mono break-all flex-1">
-          {isPassword && isMasked ? '••••••••' : value}
-        </code>
-        {isPassword && (
-          <button
-            type="button"
-            onClick={onToggleMask}
-            className="p-1.5 rounded hover:bg-bg-elevated transition-colors flex-shrink-0"
-            title={isMasked ? '表示' : '非表示'}
-          >
-            {isMasked ? '👁️' : '🙈'}
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => navigator.clipboard.writeText(value)}
-          className="p-1.5 rounded hover:bg-bg-elevated transition-colors flex-shrink-0 text-accent hover:text-accent-hover"
-          title="コピー"
-        >
-          📋
-        </button>
-      </div>
-    </div>
-  )
+  const v = entry.typedValue as Record<string, string | null>
 
   return (
-    <div className="p-4">
+    <div className="p-3">
       {/* ヘッダー */}
-      <div className="mb-4">
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <h2 className="text-lg font-bold text-text-primary truncate flex-1">{entry.name}</h2>
-          <div className="flex gap-2 flex-shrink-0">
-            <Button size="sm" variant="secondary" onClick={onEdit} className="gap-1.5 text-sm">
-              <Pencil size={14} />
-              編集
-            </Button>
-            <Button size="sm" variant="destructive" onClick={onDelete} className="gap-1.5 text-sm">
-              <Trash2 size={14} />
-              削除
-            </Button>
-          </div>
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-bold text-text-primary truncate">{entry.name}</h2>
+          <Badge variant="muted" className="text-[11px] mt-0.5">
+            {getTypeLabel(entry.entryType)}
+          </Badge>
         </div>
-        <Badge variant="muted" className="text-sm">
-          {getTypeLabel(entry.entryType)}
-        </Badge>
+        <div className="flex gap-1 flex-shrink-0">
+          <Button size="sm" variant="secondary" onClick={onEdit} className="gap-1 text-xs h-7">
+            <Pencil size={12} />
+            編集
+          </Button>
+          <Button size="sm" variant="destructive" onClick={onDelete} className="gap-1 text-xs h-7">
+            <Trash2 size={12} />
+            削除
+          </Button>
+        </div>
       </div>
 
-      {/* タイプ別フィールド */}
-      <Card className="mb-4">
-        <CardContent className="pt-4">
-          {entry.entryType === 'login' && (
-            <>
-              {(entry.typedValue as Record<string, string>).url && (
-                <FieldDisplay
-                  label="URL"
-                  value={(entry.typedValue as Record<string, string>).url}
-                />
-              )}
-              {(entry.typedValue as Record<string, string>).username && (
-                <FieldDisplay
-                  label="ユーザー名"
-                  value={(entry.typedValue as Record<string, string>).username}
-                />
-              )}
-              {(entry.typedValue as Record<string, string>).password && (
-                <FieldDisplay
-                  label="パスワード"
-                  value={(entry.typedValue as Record<string, string>).password}
-                  isPassword
-                  isMasked={passwordMasked}
-                />
-              )}
-              {(entry.typedValue as Record<string, string>).totp && (
-                <FieldDisplay
-                  label="TOTP"
-                  value={(entry.typedValue as Record<string, string>).totp}
-                />
-              )}
-            </>
-          )}
+      {/* ラベル */}
+      {entry.labels && entry.labels.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {entry.labels.map((labelId: string) => {
+            const label = allLabels.find((l) => l.id === labelId)
+            return label ? (
+              <Badge key={labelId} variant="primary" className="text-xs">
+                {label.name}
+              </Badge>
+            ) : null
+          })}
+        </div>
+      )}
 
-          {entry.entryType === 'bank' && (
-            <>
-              {(entry.typedValue as Record<string, string>).bank_name && (
-                <FieldDisplay
-                  label="銀行名"
-                  value={(entry.typedValue as Record<string, string>).bank_name}
-                />
-              )}
-              {(entry.typedValue as Record<string, string>).account_number && (
-                <FieldDisplay
-                  label="口座番号"
-                  value={(entry.typedValue as Record<string, string>).account_number}
-                />
-              )}
-              {(entry.typedValue as Record<string, string>).pin && (
-                <FieldDisplay
-                  label="PIN"
-                  value={(entry.typedValue as Record<string, string>).pin}
-                  isPassword
-                  isMasked={passwordMasked}
-                />
-              )}
-            </>
-          )}
+      {/* ログイン情報 */}
+      {entry.entryType === 'login' && (
+        <>
+          <PaneSectionHeading>ログイン情報</PaneSectionHeading>
+          <div className="space-y-0">
+            <PaneFieldDisplay label="ユーザー名" value={v.username} />
+            <PaneFieldDisplay
+              label="パスワード"
+              value={v.password}
+              isPassword
+              isMasked={passwordMasked}
+              onToggleMask={onToggleMask}
+            />
+            <PaneFieldDisplay label="URL" value={v.url} />
+          </div>
+        </>
+      )}
 
-          {entry.entryType === 'ssh_key' && (
-            <>
-              {(entry.typedValue as Record<string, string>).private_key && (
-                <FieldDisplay
-                  label="秘密鍵"
-                  value={(entry.typedValue as Record<string, string>).private_key}
-                  isPassword
-                  isMasked={passwordMasked}
-                />
-              )}
-              {(entry.typedValue as Record<string, string>).passphrase && (
-                <FieldDisplay
-                  label="パスフレーズ"
-                  value={(entry.typedValue as Record<string, string>).passphrase}
-                  isPassword
-                  isMasked={passwordMasked}
-                />
-              )}
-            </>
-          )}
+      {/* 銀行口座 */}
+      {entry.entryType === 'bank' && (
+        <>
+          <PaneSectionHeading>銀行口座</PaneSectionHeading>
+          <div className="space-y-0">
+            <PaneFieldDisplay label="銀行名" value={v.bank_name} />
+            <PaneFieldDisplay label="支店コード" value={v.branch_code} />
+            <PaneFieldDisplay label="種類" value={v.account_type} />
+            <PaneFieldDisplay label="口座名義" value={v.account_holder} />
+            <PaneFieldDisplay label="口座番号" value={v.account_number} />
+            <PaneFieldDisplay
+              label="PIN"
+              value={v.pin}
+              isPassword
+              isMasked={passwordMasked}
+              onToggleMask={onToggleMask}
+            />
+          </div>
+        </>
+      )}
 
-          {entry.entryType === 'credit_card' && (
-            <>
-              {(entry.typedValue as Record<string, string>).cardholder && (
-                <FieldDisplay
-                  label="カード名義人"
-                  value={(entry.typedValue as Record<string, string>).cardholder}
-                />
-              )}
-              {(entry.typedValue as Record<string, string>).number && (
-                <FieldDisplay
-                  label="カード番号"
-                  value={(entry.typedValue as Record<string, string>).number}
-                />
-              )}
-              {(entry.typedValue as Record<string, string>).expiry && (
-                <FieldDisplay
-                  label="有効期限"
-                  value={(entry.typedValue as Record<string, string>).expiry}
-                />
-              )}
-              {(entry.typedValue as Record<string, string>).cvv && (
-                <FieldDisplay
-                  label="CVV"
-                  value={(entry.typedValue as Record<string, string>).cvv}
-                  isPassword
-                  isMasked={passwordMasked}
-                />
-              )}
-            </>
-          )}
+      {/* SSH キー */}
+      {entry.entryType === 'ssh_key' && (
+        <>
+          <PaneSectionHeading>SSH キー</PaneSectionHeading>
+          <div className="space-y-0">
+            <PaneFieldDisplay label="秘密鍵" value={v.private_key} />
+          </div>
+        </>
+      )}
 
-          {entry.entryType === 'secure_note' && (
-            <div className="py-3">
-              <p className="text-sm font-semibold text-text-muted uppercase mb-2">コンテンツ</p>
-              <p className="text-sm text-text-primary whitespace-pre-wrap">
-                {(entry.typedValue as Record<string, string>).content}
-              </p>
+      {/* セキュアノート */}
+      {entry.entryType === 'secure_note' && (
+        <>
+          <PaneSectionHeading>ノート</PaneSectionHeading>
+          {v.content ? (
+            <div className="p-2 rounded-md bg-bg-elevated border border-border text-text-primary text-xs whitespace-pre-wrap break-words mt-0.5">
+              {v.content}
             </div>
+          ) : (
+            <div className="px-2 py-1.5 text-sm text-text-secondary italic">未設定</div>
           )}
-        </CardContent>
-      </Card>
+        </>
+      )}
+
+      {/* クレジットカード */}
+      {entry.entryType === 'credit_card' && (
+        <>
+          <PaneSectionHeading>クレジットカード</PaneSectionHeading>
+          <div className="space-y-0">
+            <PaneFieldDisplay label="カード名義" value={v.cardholder} />
+            <PaneFieldDisplay label="カード番号" value={v.number} />
+            <PaneFieldDisplay label="有効期限" value={v.expiry} />
+            <PaneFieldDisplay
+              label="CVV"
+              value={v.cvv}
+              isPassword
+              isMasked={passwordMasked}
+              onToggleMask={onToggleMask}
+            />
+            <PaneFieldDisplay
+              label="暗証番号"
+              value={v.pin}
+              isPassword
+              isMasked={passwordMasked}
+              onToggleMask={onToggleMask}
+            />
+          </div>
+        </>
+      )}
+
+      {/* パスワード */}
+      {entry.entryType === 'password' && (
+        <>
+          <PaneSectionHeading>パスワード情報</PaneSectionHeading>
+          <div className="space-y-0">
+            <PaneFieldDisplay label="ユーザー名" value={v.username} />
+            <PaneFieldDisplay
+              label="パスワード"
+              value={v.password}
+              isPassword
+              isMasked={passwordMasked}
+              onToggleMask={onToggleMask}
+            />
+          </div>
+        </>
+      )}
+
+      {/* ソフトウェアライセンス */}
+      {entry.entryType === 'software_license' && (
+        <>
+          <PaneSectionHeading>ライセンス情報</PaneSectionHeading>
+          <div className="space-y-0">
+            <PaneFieldDisplay label="ライセンスキー" value={v.license_key} />
+          </div>
+        </>
+      )}
 
       {/* カスタムフィールド */}
       {entry.customFields && entry.customFields.length > 0 && (
-        <Card className="mb-4">
-          <CardHeader>
-            <CardTitle className="text-sm">カスタムフィールド</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {entry.customFields.map((field) => (
-              <FieldDisplay
+        <>
+          <PaneSectionHeading>カスタムフィールド</PaneSectionHeading>
+          <div className="space-y-0">
+            {entry.customFields.map((field: { id: string; name: string; value: string; fieldType: string }) => (
+              <PaneFieldDisplay
                 key={field.id}
                 label={field.name}
                 value={field.value}
                 isPassword={field.fieldType === 'password'}
-                isMasked={passwordMasked}
+                isMasked={passwordMasked && field.fieldType === 'password'}
+                onToggleMask={field.fieldType === 'password' ? onToggleMask : undefined}
               />
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </>
       )}
 
       {/* メモ */}
       {entry.notes && (
-        <Card className="mb-4">
-          <CardHeader>
-            <CardTitle className="text-sm">メモ</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-text-primary whitespace-pre-wrap">{entry.notes}</p>
-          </CardContent>
-        </Card>
+        <>
+          <PaneSectionHeading>メモ</PaneSectionHeading>
+          <div className="p-2 rounded-md bg-bg-elevated border border-border text-text-primary text-xs whitespace-pre-wrap break-words mt-0.5">
+            {entry.notes}
+          </div>
+        </>
       )}
 
-      {/* ラベル */}
-      {entry.labels && entry.labels.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">ラベル</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {entry.labels.map((labelId) => {
-                const label = allLabels.find((l) => l.id === labelId)
-                return label ? (
-                  <Badge key={labelId} variant="secondary">
-                    {label.name}
-                  </Badge>
-                ) : null
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* タイムスタンプ */}
+      <div className="mt-4 pt-2 border-t border-border space-y-0.5 text-xs text-text-secondary">
+        {entry.updatedAt > 0 && (
+          <div>更新: {formatTimestamp(entry.updatedAt)}</div>
+        )}
+        {entry.createdAt > 0 && (
+          <div>作成: {formatTimestamp(entry.createdAt)}</div>
+        )}
+      </div>
     </div>
   )
 }

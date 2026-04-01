@@ -4,7 +4,7 @@ import * as commands from '../../commands'
 import EntryForm from '../../components/entries/EntryForm'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
-import type { CustomField, Entry, Label } from '../../shared/types'
+import type { CustomField, Entry, Label } from '../../../shared/types'
 
 export default function EntryEdit() {
   const { id } = useParams<{ id: string }>()
@@ -29,7 +29,7 @@ export default function EntryEdit() {
           setEntry(data)
           setName(data.name)
           setNotes(data.notes)
-          setTypedValue(data.typedValue)
+          setTypedValue(data.typedValue as Record<string, string>)
           setCustomFields(data.customFields || [])
           setSelectedLabelIds(data.labels || [])
           setAllLabels(labels)
@@ -73,7 +73,7 @@ export default function EntryEdit() {
         selectedLabelIds,
         customFieldsJson,
       )
-      navigate(`/entries/${id}`)
+      navigate('/entries', { state: { selectedId: id } })
     } catch (err) {
       setError(`保存失敗: ${err}`)
     } finally {

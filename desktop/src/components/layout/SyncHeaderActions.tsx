@@ -31,7 +31,7 @@ export default function SyncHeaderActions() {
           getFromStorage<S3Config>(STORAGE_KEYS.S3_CONFIG),
           getFromStorage<number>(STORAGE_KEYS.LAST_SYNC_TIME),
         ])
-        setStorageConfig(config)
+        setStorageConfig(config ?? null)
         if (syncTime) {
           setLastSyncTime(syncTime)
         }

@@ -29,7 +29,7 @@ export default function EntryEdit() {
           setEntry(data)
           setName(data.name)
           setNotes(data.notes)
-          setTypedValue(data.typedValue)
+          setTypedValue(data.typedValue as Record<string, string | null>)
           setCustomFields(data.customFields || [])
           setSelectedLabelIds(data.labels || [])
           setAllLabels(labels)
