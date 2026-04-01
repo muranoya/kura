@@ -219,6 +219,8 @@ export async function pushVault(storageConfig: string): Promise<number> {
 }
 
 /// ヘルパー: pushVaultを実行して、タイムスタンプをストレージに保存
+/// 再暗号化操作（マスターパスワード変更・DEKローテーション・リカバリーキー再生成）後専用。
+/// 通常のデータ変更にはsyncVaultIfConfiguredを使用すること。
 export async function pushVaultAndTrack(storageConfig: string): Promise<void> {
   const ts = await pushVault(storageConfig)
   await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, ts)

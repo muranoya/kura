@@ -20,7 +20,12 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 vault_core = { path = "../../vault-core", features = ["desktop"] }
 aws-sdk-s3 = "1"
 aws-config = "1"
-async-trait = "0"
+async-trait = "0.1"
+
+[dev-dependencies]
+serial_test = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+uuid = { version = "1", features = ["v4"] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

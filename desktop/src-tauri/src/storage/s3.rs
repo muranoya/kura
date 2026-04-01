@@ -34,7 +34,12 @@ impl S3Storage {
         }
 
         let sdk_config = sdk_config_builder.load().await;
-        let client = aws_sdk_s3::Client::new(&sdk_config);
+
+        let mut s3_config_builder = aws_sdk_s3::config::Builder::from(&sdk_config);
+        if config.endpoint.is_some() {
+            s3_config_builder = s3_config_builder.force_path_style(true);
+        }
+        let client = aws_sdk_s3::Client::from_conf(s3_config_builder.build());
 
         Ok(S3Storage {
             client,

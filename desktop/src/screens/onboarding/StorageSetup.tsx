@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { downloadVault } from '../../commands'
 import { PageHeader } from '../../components/layout/PageHeader'
@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
-import { saveToStorage } from '../../shared/storage'
+import { getFromStorage, saveToStorage } from '../../shared/storage'
 
 export default function StorageSetup() {
   const navigate = useNavigate()
@@ -19,8 +19,21 @@ export default function StorageSetup() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
+  useEffect(() => {
+    getFromStorage<Record<string, string>>('s3Config').then((config) => {
+      if (config) {
+        setRegion(config.region ?? '')
+        setBucket(config.bucket ?? '')
+        setKey(config.key ?? 'vault.json')
+        setAccessKeyId(config.accessKeyId ?? '')
+        setSecretAccessKey(config.secretAccessKey ?? '')
+        setEndpoint(config.endpoint ?? '')
+      }
+    })
+  }, [])
+
   const handleNext = async () => {
-    if (!region || !bucket || !accessKeyId || !secretAccessKey) {
+    if (!region || !bucket || !key || !accessKeyId || !secretAccessKey) {
       setError('すべての必須フィールドを入力してください')
       return
     }
@@ -28,7 +41,7 @@ export default function StorageSetup() {
     const config: Record<string, string> = {
       region,
       bucket,
-      key: key || 'vault.json',
+      key,
       accessKeyId,
       secretAccessKey,
     }
@@ -110,16 +123,16 @@ export default function StorageSetup() {
 
               {/* ファイルパス */}
               <div>
-                <Label htmlFor="key">ファイルパス (オプション)</Label>
+                <Label htmlFor="key">
+                  ファイルパス <span className="text-danger">*</span>
+                </Label>
                 <Input
                   id="key"
                   placeholder="vault.json"
                   value={key}
                   onChange={(e) => setKey(e.target.value)}
                 />
-                <p className="text-xs text-text-muted mt-1.5">
-                  バケット内の保存パス。デフォルト: vault.json
-                </p>
+                <p className="text-xs text-text-muted mt-1.5">バケット内の保存パス</p>
               </div>
 
               {/* アクセスキーID */}

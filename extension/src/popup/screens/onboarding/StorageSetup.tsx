@@ -20,7 +20,7 @@ export default function StorageSetup() {
   const { region, bucket, key, accessKeyId, secretAccessKey, endpoint } = draft
 
   const isFormValid = () => {
-    return region && bucket && accessKeyId && secretAccessKey
+    return region && bucket && key && accessKeyId && secretAccessKey
   }
 
   const handleNext = async () => {
@@ -30,14 +30,12 @@ export default function StorageSetup() {
       const configToSave: S3Config = {
         region,
         bucket,
-        ...(key ? { key } : {}),
+        key,
         ...(endpoint ? { endpoint } : {}),
         accessKeyId,
         secretAccessKey,
       }
-      console.log('[StorageSetup] Saving config:', configToSave)
       await saveToStorage(STORAGE_KEYS.S3_CONFIG, configToSave)
-      console.log('[StorageSetup] Config saved successfully')
 
       // DOWNLOAD_VAULT メッセージを送信してVault存在確認
       const response = await sendMessage({ type: 'DOWNLOAD_VAULT' as const })
@@ -53,15 +51,12 @@ export default function StorageSetup() {
       // vaultExists の結果に基づいて分岐
       if ('vaultExists' in response && response.vaultExists) {
         // 既存Vault使用フロー
-        console.log('[StorageSetup] Vault exists, navigating to unlock-existing')
         navigate('/onb/unlock-existing', { state: { fromOnboarding: true } })
       } else {
         // 新規作成フロー
-        console.log('[StorageSetup] Vault not found, navigating to password')
         navigate('/onb/password')
       }
     } catch (err) {
-      console.error('[StorageSetup] Error:', err)
       setError(String(err))
       setLoading(false)
     }
@@ -128,7 +123,7 @@ export default function StorageSetup() {
             {/* ファイルパス */}
             <div className="space-y-1">
               <Label htmlFor="key" className="text-sm">
-                ファイルパス <span className="text-text-muted">(オプション)</span>
+                ファイルパス <span className="text-danger">*</span>
               </Label>
               <Input
                 id="key"
@@ -139,9 +134,7 @@ export default function StorageSetup() {
                 className="text-sm"
                 disabled={loading}
               />
-              <p className="text-sm text-text-muted mt-1">
-                バケット内の保存パス。デフォルト: vault.json
-              </p>
+              <p className="text-sm text-text-muted mt-1">バケット内の保存パス</p>
             </div>
 
             {/* アクセスキーID */}

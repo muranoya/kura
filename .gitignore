@@ -1,4 +1,39 @@
+# Editor
 *.swp
-/target/
+
+# OS
+.DS_Store
+
+# Rust
+**/target/
+
+# Node.js
 node_modules/
+
+# Claude
 /.claude/
+
+# Desktop (Tauri)
+desktop/dist/
+
+# Extension
+extension/dist/
+extension/wasm/
+extension/kura-extension-firefox.zip
+extension/kura-extension-chrome.zip
+
+# WASM build output
+extension/public/wasm/
+vault-core/pkg/
+
+# Android
+android/*.iml
+android/.gradle/
+android/local.properties
+android/.idea/
+android/build/
+android/captures/
+android/.externalNativeBuild/
+android/.cxx/
+android/**/*.so
+android/app/build/

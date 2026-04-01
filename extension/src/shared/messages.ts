@@ -65,7 +65,6 @@ export type Message =
 
   // Storage & Sync
   | { type: 'DOWNLOAD_VAULT' }
-  | { type: 'PUSH_VAULT' }
   | { type: 'SYNC' }
   | { type: 'GET_SYNC_STATUS' }
   | { type: 'GET_SYNC_CONFLICTS' }

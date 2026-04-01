@@ -49,7 +49,7 @@ export interface EntryFilter {
 export interface S3Config {
   region: string
   bucket: string
-  key?: string
+  key: string
   endpoint?: string
   accessKeyId: string
   secretAccessKey: string

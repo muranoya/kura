@@ -65,8 +65,5 @@ static VAULT_SESSION: Lazy<Mutex<Option<SessionState>>> = Lazy::new(|| Mutex::ne
 static LAST_SYNC_TIME: Lazy<Mutex<Option<i64>>> = Lazy::new(|| Mutex::new(None));
 
 fn unix_now() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64
+    crate::get_timestamp()
 }

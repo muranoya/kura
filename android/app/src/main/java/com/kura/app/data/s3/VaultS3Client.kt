@@ -43,7 +43,7 @@ class VaultS3Client(private val config: S3Config) {
         try {
             val request = GetObjectRequest {
                 bucket = config.bucket
-                key = config.key.ifBlank { "vault.json" }
+                key = config.key
             }
 
             return client.getObject(request) { response ->
@@ -80,7 +80,7 @@ class VaultS3Client(private val config: S3Config) {
         try {
             val request = PutObjectRequest {
                 bucket = config.bucket
-                key = config.key.ifBlank { "vault.json" }
+                key = config.key
                 body = ByteStream.fromBytes(data)
                 if (!etag.isNullOrBlank()) {
                     ifMatch = etag

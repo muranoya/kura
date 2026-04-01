@@ -5,7 +5,6 @@ import EntryCard from '../../components/entries/EntryCard'
 import EntryListPanel from '../../components/entries/EntryListPanel'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 import { useSyncVersion } from '../../contexts/SyncContext'
-import { getFromStorage } from '../../shared/storage'
 import type { EntryRow, EntryType } from '../../shared/types'
 
 export default function Trash() {
@@ -86,10 +85,7 @@ export default function Trash() {
       await commands.purgeEntry(purgeTargetId)
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      const s3Config = await getFromStorage<Record<string, string>>('s3Config')
-      if (s3Config) {
-        await commands.pushVaultAndTrack(JSON.stringify(s3Config))
-      }
+      commands.syncVaultIfConfigured().catch((e) => console.warn('Sync failed:', e))
       setAllEntries(allEntries.filter((e) => e.id !== purgeTargetId))
       setPurgeDialogOpen(false)
       setPurgeTargetId(null)

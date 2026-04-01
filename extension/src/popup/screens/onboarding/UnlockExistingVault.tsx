@@ -31,11 +31,9 @@ export default function UnlockExistingVault() {
     setError('')
 
     try {
-      console.log('[UnlockExistingVault] Sending UNLOCK message')
       const response = await new Promise<{ success?: boolean; error?: string }>(
         (resolve, reject) => {
           chrome.runtime.sendMessage({ type: 'UNLOCK', password }, (resp) => {
-            console.log('[UnlockExistingVault] UNLOCK response:', resp)
             if (chrome.runtime.lastError) {
               reject(new Error(chrome.runtime.lastError.message))
             } else {
@@ -49,10 +47,8 @@ export default function UnlockExistingVault() {
         throw new Error(response?.error || 'アンロックに失敗しました')
       }
 
-      console.log('[UnlockExistingVault] Vault unlocked, navigating to entries')
       navigate('/entries')
     } catch (err) {
-      console.error('[UnlockExistingVault] Unlock error:', err)
       setError(String(err) || '不正なパスワード')
       setLoading(false)
     }

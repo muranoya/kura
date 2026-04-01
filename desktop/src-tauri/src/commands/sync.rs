@@ -1,26 +1,7 @@
 use vault_core::api::*;
-use vault_core::config::S3Config;
 use serde_json::json;
 
 use crate::storage::S3Storage;
-
-fn parse_s3_config(storage_config: &str) -> Result<S3Config, String> {
-    let mut config_map: serde_json::Map<String, serde_json::Value> =
-        serde_json::from_str(storage_config)
-            .map_err(|e| format!("Failed to parse S3 config: {}", e))?;
-
-    if !config_map.contains_key("key") {
-        config_map.insert("key".to_string(), serde_json::Value::String("vault.json".to_string()));
-    }
-
-    let s3_config: S3Config = serde_json::from_value(serde_json::Value::Object(config_map))
-        .map_err(|e| format!("Failed to parse S3 config: {}", e))?;
-
-    s3_config.validate()
-        .map_err(|e| format!("Invalid S3 config: {}", e))?;
-
-    Ok(s3_config)
-}
 
 #[tauri::command]
 pub async fn sync_vault(storage_config: String) -> Result<serde_json::Value, String> {

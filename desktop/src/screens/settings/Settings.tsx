@@ -65,15 +65,20 @@ export default function Settings() {
 
   const handleLogoutConfirmed = async () => {
     try {
+      // バックエンドのvaultセッションをロック
+      await commands.lock()
       // ローカルストレージをクリア
       await clearStorage()
-      // ページをリロードしてアプリを初期化
-      window.location.reload()
+      // vaultファイルを削除
+      await commands.deleteVaultFile()
+      // ページをリロードしてオンボーディングに戻る
+      window.location.href = '/'
     } catch (err) {
       console.error('Failed to logout:', err)
     }
   }
 
+  // 再暗号化操作後の上書きアップロード（マージ不可のためpushを使用）
   const saveVaultAndPush = async () => {
     const vaultBytes = await commands.getVaultBytes()
     await commands.writeVaultFile(vaultBytes)
@@ -241,7 +246,7 @@ export default function Settings() {
                     ファイルパス
                   </span>
                   <p className="text-sm text-text-primary font-mono">
-                    {storageConfig.key || 'vault.json'}
+                    {storageConfig.key}
                   </p>
                 </div>
                 {storageConfig.endpoint && (
@@ -305,6 +310,7 @@ export default function Settings() {
             <DialogTitle>マスターパスワード変更</DialogTitle>
             <DialogDescription>
               新しいマスターパスワードを設定します。現在のパスワードで認証が必要です。
+              変更後、他のセットアップ済み端末では新しいマスターパスワードでの再ログインが必要になります。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

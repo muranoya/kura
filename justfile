@@ -224,10 +224,10 @@ default: help
 	cargo test --manifest-path {{VAULT_CORE_DIR}}/Cargo.toml
 	echo "✅ vault-core tests passed!"
 
-# extension のテスト
+# extension のテスト（wasm-bridge）
 @test-extension:
-	echo "🧪 Testing extension..."
-	cd {{EXTENSION_DIR}} && pnpm install && pnpm test
+	echo "🧪 Testing extension (wasm-bridge)..."
+	cargo test --manifest-path {{EXTENSION_DIR}}/wasm-bridge/Cargo.toml
 	echo "✅ extension tests passed!"
 
 # Android のテスト
@@ -236,10 +236,15 @@ default: help
 	cd {{ANDROID_DIR}} && ./gradlew test
 	echo "✅ Android tests passed!"
 
-# Desktop のテスト
+# Desktop のテスト（フロントエンド + Rust結合テスト）
 @test-desktop:
-	echo "🧪 Testing desktop..."
+	echo "🧪 Testing desktop (frontend)..."
 	cd {{DESKTOP_DIR}} && pnpm install && pnpm test
+	echo "🧪 Testing desktop (integration with MinIO)..."
+	docker compose -f docker-compose.test.yml up -d --wait minio
+	docker compose -f docker-compose.test.yml run --rm createbuckets
+	cargo test -p kura-desktop --test integration_test -- --test-threads=1 || { docker compose -f docker-compose.test.yml down -v; exit 1; }
+	docker compose -f docker-compose.test.yml down -v
 	echo "✅ desktop tests passed!"
 
 # 全テスト実行
@@ -254,11 +259,14 @@ default: help
 # クリーンアップ
 @clean:
 	echo "🧹 Cleaning build artifacts..."
+	echo "  - Cargo workspace (target/)..."
+	cargo clean
 	echo "  - Desktop..."
 	cd {{DESKTOP_DIR}} && rm -rf dist/ build/ node_modules/
-	cd {{DESKTOP_DIR}}/src-tauri && cargo clean
 	echo "  - Extension..."
-	cd {{EXTENSION_DIR}} && rm -rf dist/ build/ node_modules/ wasm/
+	cd {{EXTENSION_DIR}} && rm -rf dist/ build/ node_modules/ wasm/ kura-extension-chrome.zip kura-extension-firefox.zip
+	echo "  - Vault-core..."
+	rm -rf {{VAULT_CORE_DIR}}/pkg/
 	echo "  - Android..."
 	cd {{ANDROID_DIR}} && rm -rf app/build/ app/src/main/jniLibs/ .gradle/ build/
 	echo "✅ Cleanup completed!"
@@ -285,15 +293,9 @@ default: help
 	echo "    just test-vault-core      - Run vault-core tests"
 	echo "    just test-extension       - Run extension tests"
 	echo "    just test-android         - Run Android tests"
-	echo "    just test-desktop         - Run desktop tests"
+	echo "    just test-desktop         - Run desktop tests (frontend + integration)"
 	echo "    just test-all             - Run all tests"
 	echo ""
 	echo "  🔧 Utilities:"
 	echo "    just release-all          - Build all apps for release"
 	echo "    just clean                - Clean build artifacts"
-	echo ""
-	echo "Examples:"
-	echo "  just dev-desktop           # Development with hot reload"
-	echo "  just release-desktop       # Production build"
-	echo "  just release-all           # Build all for release"
-	echo ""

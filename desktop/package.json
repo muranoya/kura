@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "check": "biome check .",
-    "fix": "biome check --write ."
+    "fix": "biome check --write .",
+    "test": "vitest run"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1",
@@ -42,14 +43,21 @@
     "@biomejs/biome": "^1.9.4",
     "@tailwindcss/vite": "^4",
     "@tauri-apps/cli": "^2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@vitejs/plugin-react": "^4",
+    "jsdom": "^29.0.1",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vite": "^5"
+    "vite": "^5",
+    "vitest": "^2.1.9"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["@biomejs/biome"]
+    "onlyBuiltDependencies": [
+      "@biomejs/biome"
+    ]
   }
 }

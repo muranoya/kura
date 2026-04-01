@@ -41,7 +41,6 @@ export default function MasterPassword() {
 
     setLoading(true)
     try {
-      console.log('[MasterPassword] Sending CREATE_VAULT message')
       const response = await new Promise<{
         success?: boolean
         recoveryKey?: string
@@ -50,23 +49,15 @@ export default function MasterPassword() {
         chrome.runtime.sendMessage(
           { type: 'CREATE_VAULT', masterPassword: password },
           (response) => {
-            console.log('[MasterPassword] CREATE_VAULT response:', response)
             resolve(response)
           },
         )
       })
 
       if (response?.success) {
-        console.log(
-          '[MasterPassword] Vault created successfully, recovery key:',
-          response.recoveryKey,
-        )
-
         // Service Worker 再起動対策: 作成直後に UNLOCK を送ってメモリにロードさせる
-        console.log('[MasterPassword] Sending UNLOCK to ensure vault is loaded in background')
         await new Promise<void>((resolve) => {
-          chrome.runtime.sendMessage({ type: 'UNLOCK', password: password }, (unlockResponse) => {
-            console.log('[MasterPassword] UNLOCK response:', unlockResponse)
+          chrome.runtime.sendMessage({ type: 'UNLOCK', password: password }, () => {
             resolve()
           })
         })
@@ -74,11 +65,9 @@ export default function MasterPassword() {
         navigate('/onb/recovery', { state: { recoveryKey: response.recoveryKey } })
       } else {
         const errorMsg = response?.error || 'Vault作成に失敗しました'
-        console.error('[MasterPassword] Vault creation failed:', errorMsg)
         alert(errorMsg)
       }
     } catch (err) {
-      console.error('[MasterPassword] Exception:', err)
       alert(String(err))
     } finally {
       setLoading(false)

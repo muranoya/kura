@@ -217,11 +217,6 @@ export async function downloadVault(): Promise<boolean> {
   return field<'vaultExists', boolean>(res, 'vaultExists') ?? false
 }
 
-export async function pushVault(): Promise<void> {
-  const res = await sendMessage({ type: 'PUSH_VAULT' })
-  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
-}
-
 export async function sync(): Promise<void> {
   const res = await sendMessage({ type: 'SYNC' })
   if (!res.success) throw new Error(field<'error', string>(res, 'error'))

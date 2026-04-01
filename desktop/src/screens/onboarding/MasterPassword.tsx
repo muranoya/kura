@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2 } from 'lucide-react'
+import { CheckCircle2 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
@@ -52,17 +52,6 @@ export default function MasterPassword() {
       />
 
       <div className="max-w-2xl mx-auto p-6">
-        {/* セキュリティアラート */}
-        <div className="mb-6 p-4 bg-accent-subtle rounded-lg border border-accent/20 flex gap-3">
-          <AlertCircle className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
-          <div className="text-sm">
-            <p className="text-accent font-medium mb-1">重要なセキュリティ情報</p>
-            <p className="text-text-muted">
-              このパスワードを忘れると、すべてのデータにアクセスできなくなります。次の画面で表示されるリカバリーキーを必ず保管してください。
-            </p>
-          </div>
-        </div>
-
         {/* エラーメッセージ */}
         {error && (
           <div className="mb-6 p-4 rounded-md bg-danger/10 border border-danger/20">

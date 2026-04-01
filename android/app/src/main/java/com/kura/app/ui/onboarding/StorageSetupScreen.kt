@@ -83,10 +83,10 @@ fun StorageSetupScreen(
             )
             OutlinedTextField(
                 value = key, onValueChange = { key = it },
-                label = { Text("ファイルパス") },
+                label = { Text("ファイルパス *") },
                 placeholder = { Text("vault.json") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
-                supportingText = { Text("バケット内の保存パス。デフォルト: vault.json") }
+                supportingText = { Text("バケット内の保存パス") }
             )
             OutlinedTextField(
                 value = accessKeyId, onValueChange = { accessKeyId = it; error = "" },
@@ -117,7 +117,7 @@ fun StorageSetupScreen(
                 ) { Text("戻る") }
                 Button(
                     onClick = {
-                        if (region.isBlank() || bucket.isBlank() || accessKeyId.isBlank() || secretAccessKey.isBlank()) {
+                        if (region.isBlank() || bucket.isBlank() || key.isBlank() || accessKeyId.isBlank() || secretAccessKey.isBlank()) {
                             error = "すべての必須フィールドを入力してください"
                             return@Button
                         }
@@ -127,7 +127,7 @@ fun StorageSetupScreen(
                                 val config = buildJsonObject {
                                     put("region", region)
                                     put("bucket", bucket)
-                                    put("key", key.ifBlank { "vault.json" })
+                                    put("key", key)
                                     put("accessKeyId", accessKeyId)
                                     put("secretAccessKey", secretAccessKey)
                                     if (endpoint.isNotBlank()) put("endpoint", endpoint)

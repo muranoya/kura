@@ -208,16 +208,23 @@ export default function Settings() {
           </h2>
           <div className="space-y-1.5">
             <Button
+              variant="secondary"
               onClick={() => setChangePasswordOpen(true)}
               className="w-full text-sm"
               size="sm"
             >
               マスターパスワード変更
             </Button>
-            <Button onClick={() => setRotateDekOpen(true)} className="w-full text-sm" size="sm">
+            <Button
+              variant="secondary"
+              onClick={() => setRotateDekOpen(true)}
+              className="w-full text-sm"
+              size="sm"
+            >
               DEK更新
             </Button>
             <Button
+              variant="secondary"
               onClick={() => setRegenerateRecoveryOpen(true)}
               className="w-full text-sm"
               size="sm"
@@ -255,7 +262,7 @@ export default function Settings() {
               <div>
                 <span className="font-medium text-text-secondary block mb-1">ファイルパス</span>
                 <p className="text-text-primary font-mono break-all">
-                  {storageConfig.key || 'vault.json'}
+                  {storageConfig.key}
                 </p>
               </div>
               {storageConfig.endpoint && (

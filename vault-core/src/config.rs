@@ -46,6 +46,11 @@ impl S3Config {
                 "S3 secret access key is empty".to_string(),
             ));
         }
+        if self.key.is_empty() {
+            return Err(VaultError::InvalidConfiguration(
+                "S3 object key is empty".to_string(),
+            ));
+        }
         Ok(())
     }
 }

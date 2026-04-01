@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Copy } from 'lucide-react'
+import { CheckCircle2, Copy } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
@@ -44,18 +44,6 @@ export default function RecoveryKey() {
       <PageHeader title="リカバリーキー" subtitle="Vaultの復旧に必要です" />
 
       <div className="max-w-2xl mx-auto p-6">
-        {/* 重要な説明 */}
-        <div className="mb-6 p-4 bg-danger/10 rounded-lg border border-danger/20 flex gap-3">
-          <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
-          <div className="text-sm">
-            <p className="text-danger font-medium mb-1">必ず保管してください</p>
-            <p className="text-text-muted">
-              このリカバリーキーはマスターパスワードを忘れた場合の唯一の復旧手段です。
-              紙に印刷するか、パスワード管理ツールに保管してください。
-            </p>
-          </div>
-        </div>
-
         <Card>
           <CardHeader>
             <CardTitle>あなたのリカバリーキー</CardTitle>
@@ -87,16 +75,6 @@ export default function RecoveryKey() {
               )}
             </Button>
 
-            {/* 保管方法のヒント */}
-            <div className="mb-6 p-4 bg-accent-subtle rounded-lg border border-accent/20">
-              <h4 className="text-sm font-medium text-accent mb-2">💡 保管方法</h4>
-              <ul className="text-xs text-text-secondary space-y-1">
-                <li>✓ 紙に印刷して金庫に保管</li>
-                <li>✓ 別のパスワードマネージャーに保管</li>
-                <li>✓ 信頼できる人に複製を渡す</li>
-              </ul>
-            </div>
-
             {/* 完了ボタン */}
             <Button onClick={handleComplete} className="w-full">
               完了
@@ -104,13 +82,6 @@ export default function RecoveryKey() {
           </CardContent>
         </Card>
 
-        {/* 下部メモ */}
-        <div className="mt-6 p-4 bg-bg-surface rounded-lg border border-border">
-          <p className="text-xs text-text-muted">
-            次の画面からVaultにロックがかかり、マスターパスワードで保護されます。
-            リカバリーキーを必ず安全な場所に保管してください。
-          </p>
-        </div>
       </div>
     </div>
   )

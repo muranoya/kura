@@ -28,11 +28,7 @@ impl WasmS3Storage {
     }
 
     fn object_url(&self) -> String {
-        let key = if self.config.key.is_empty() {
-            "vault.json"
-        } else {
-            &self.config.key
-        };
+        let key = &self.config.key;
         match &self.config.endpoint {
             Some(ep) => {
                 let ep_trimmed = ep.trim_end_matches('/');
@@ -87,7 +83,7 @@ impl StorageBackend for WasmS3Storage {
             .map_err(|_| VaultError::StorageError("AbortController creation failed".into()))?;
         let signal = abort_controller.signal();
 
-        let mut init = web_sys::RequestInit::new();
+        let init = web_sys::RequestInit::new();
         init.set_method("GET");
         init.set_headers(&headers);
         init.set_mode(web_sys::RequestMode::Cors);
@@ -203,7 +199,7 @@ impl StorageBackend for WasmS3Storage {
             .map_err(|_| VaultError::StorageError("AbortController creation failed".into()))?;
         let signal = abort_controller.signal();
 
-        let mut init = web_sys::RequestInit::new();
+        let init = web_sys::RequestInit::new();
         init.set_method("PUT");
         init.set_headers(&headers);
         init.set_body(&body_val);

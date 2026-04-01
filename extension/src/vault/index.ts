@@ -58,7 +58,6 @@ export async function initWasm(): Promise<void> {
   try {
     // WASM モジュールは既に初期化されている（vite-plugin-wasm により自動インポート）
     wasmReady = true
-    console.log('[Vault] WASM initialized')
   } catch (error) {
     console.error('[Vault] WASM initialization failed:', error)
     throw error

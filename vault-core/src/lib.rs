@@ -11,7 +11,7 @@ pub mod password_gen;
 pub mod codec;
 pub mod totp;
 
-#[cfg(any(feature = "desktop", feature = "android"))]
+#[cfg(any(feature = "desktop", feature = "android", feature = "wasm"))]
 pub mod api;
 
 pub use config::{VaultConfig, S3Config};

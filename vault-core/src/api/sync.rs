@@ -1,7 +1,32 @@
+use crate::config::S3Config;
 use crate::storage::StorageBackend;
 use crate::sync::engine::SessionState;
 
 use super::{VAULT_SESSION, LAST_SYNC_TIME, unix_now, SyncApiResult};
+
+/// S3設定JSONをパースしてS3Configを生成
+///
+/// `key`が指定されていない場合はデフォルト値 "vault.json" を使用する。
+pub fn parse_s3_config(storage_config: &str) -> Result<S3Config, String> {
+    let mut map: serde_json::Map<String, serde_json::Value> =
+        serde_json::from_str(storage_config)
+            .map_err(|e| format!("Failed to parse S3 config: {}", e))?;
+
+    if !map.contains_key("key") {
+        map.insert(
+            "key".to_string(),
+            serde_json::Value::String("vault.json".to_string()),
+        );
+    }
+
+    let config: S3Config = serde_json::from_value(serde_json::Value::Object(map))
+        .map_err(|e| format!("Failed to parse S3 config: {}", e))?;
+
+    config.validate()
+        .map_err(|e| format!("Invalid S3 config: {}", e))?;
+
+    Ok(config)
+}
 
 /// リモートvaultをローカルとマージしてセッションを更新
 ///
@@ -96,6 +121,8 @@ pub fn api_get_vault_bytes() -> Result<Vec<u8>, String> {
 }
 
 /// ストレージから同期（ローカルとリモートをマージ）
+///
+/// 通常のデータ変更後に使用する標準の同期操作。
 pub async fn api_sync(storage: &dyn StorageBackend) -> Result<SyncApiResult, String> {
     const MAX_RETRIES: usize = 5;
 
@@ -111,7 +138,10 @@ pub async fn api_sync(storage: &dyn StorageBackend) -> Result<SyncApiResult, Str
     Ok(SyncApiResult { synced: true, last_synced_at: Some(ts) })
 }
 
-/// ストレージへプッシュ
+/// ストレージへプッシュ（マージなし・上書き）
+///
+/// 再暗号化操作（マスターパスワード変更・DEKローテーション・リカバリーキー再生成）後専用。
+/// 通常のデータ変更には`api_sync`を使用すること。
 pub async fn api_push(storage: &dyn StorageBackend) -> Result<i64, String> {
     crate::sync::engine::push_to_storage(storage, &VAULT_SESSION).await?;
 

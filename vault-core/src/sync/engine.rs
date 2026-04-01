@@ -18,6 +18,9 @@ pub struct SyncOutcome {
 
 /// ストレージからダウンロード → マージ → アップロード（リトライ付き）
 ///
+/// 通常のデータ変更（エントリ追加・編集・削除・purge等）後に使用する標準の同期操作。
+/// リモートの変更とローカルの変更をauto_mergeでマージし、GCを適用してからアップロードする。
+///
 /// `StorageBackend`の実装はアプリ側が提供する。
 /// タイムアウトは`StorageBackend`実装側の責務。
 pub async fn sync_with_storage(
@@ -152,6 +155,12 @@ pub async fn sync_with_storage(
 }
 
 /// 現在のvault状態をストレージにプッシュ（マージなし）
+///
+/// 再暗号化操作（マスターパスワード変更・DEKローテーション・リカバリーキー再生成）後の
+/// 上書きアップロード専用。暗号化エンベロープが変わるためリモートとのマージは不可能であり、
+/// ローカルの状態でリモートを上書きする必要がある。
+///
+/// 通常のデータ変更には`sync_with_storage`を使用すること。
 pub async fn push_to_storage(
     storage: &dyn StorageBackend,
     vault_session: &Mutex<Option<SessionState>>,
@@ -159,13 +168,6 @@ pub async fn push_to_storage(
     let (vault_bytes, etag) = {
         let session = vault_session.lock().map_err(|_| "Session lock poisoned".to_string())?;
         match session.as_ref() {
-            Some(SessionState::Locked(locked)) => {
-                let bytes = locked
-                    .to_vault_bytes()
-                    .map_err(|e| format!("Failed to serialize vault: {}", e))?;
-                let etag = locked.get_etag().cloned();
-                (bytes, etag)
-            }
             Some(SessionState::Unlocked(unlocked)) => {
                 let bytes = unlocked
                     .to_vault_bytes()
@@ -173,7 +175,7 @@ pub async fn push_to_storage(
                 let etag = unlocked.get_etag().cloned();
                 (bytes, etag)
             }
-            None => return Err("No vault loaded".to_string()),
+            _ => return Err("Vault not unlocked".to_string()),
         }
     };
 
@@ -184,14 +186,8 @@ pub async fn push_to_storage(
 
     {
         let mut session = vault_session.lock().map_err(|_| "Session lock poisoned".to_string())?;
-        match session.as_mut() {
-            Some(SessionState::Locked(ref mut locked)) => {
-                locked.set_etag(new_etag.clone());
-            }
-            Some(SessionState::Unlocked(ref mut unlocked)) => {
-                unlocked.set_etag(new_etag.clone());
-            }
-            None => {}
+        if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
+            unlocked.set_etag(new_etag.clone());
         }
     }
 

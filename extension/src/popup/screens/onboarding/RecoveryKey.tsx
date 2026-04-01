@@ -23,44 +23,34 @@ export default function RecoveryKey() {
   }
 
   const handleComplete = async () => {
-    console.log('[RecoveryKey] Complete button clicked')
-
     if (recoveryKey.replace(/-/g, '') !== recoveryKeyInput.replace(/-/g, '')) {
-      console.log('[RecoveryKey] Recovery keys do not match')
       alert('リカバリーキーが一致しません')
       return
     }
 
     setCompleting(true)
     try {
-      console.log('[RecoveryKey] Clearing onboarding draft')
       // Onboarding draft をクリア
       if (typeof chrome !== 'undefined' && chrome.storage) {
         await new Promise<void>((resolve) => {
           chrome.storage.local.remove('onboardingDraft', () => {
-            console.log('[RecoveryKey] Onboarding draft cleared')
             resolve()
           })
         })
       }
 
       // Vault が unlocked されていることを確認
-      console.log('[RecoveryKey] Checking vault unlocked state')
       const isUnlocked = await new Promise<boolean>((resolve) => {
         chrome.runtime.sendMessage({ type: 'IS_UNLOCKED' }, (response: { unlocked?: boolean }) => {
-          console.log('[RecoveryKey] IS_UNLOCKED response:', response)
           resolve(response?.unlocked ?? false)
         })
       })
 
       if (isUnlocked) {
-        console.log('[RecoveryKey] Vault is unlocked, navigating to /entries')
         // ナビゲーション前に少し待機して、state の更新を確保
         await new Promise((resolve) => setTimeout(resolve, 100))
         navigate('/entries')
-        console.log('[RecoveryKey] Navigation called')
       } else {
-        console.warn('[RecoveryKey] Vault is not unlocked yet')
         alert('Vault の準備ができていません。もう一度お試しください。')
       }
     } catch (err) {

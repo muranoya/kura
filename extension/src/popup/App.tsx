@@ -36,7 +36,6 @@ function AppContent() {
     const checkVaultState = async () => {
       // StorageSetupがfromOnboardingフラグを付けてnavigateした場合、onboarding状態を維持
       if ((location.state as { fromOnboarding?: boolean })?.fromOnboarding === true) {
-        console.log('[App] fromOnboarding flag detected, staying in onboarding state')
         setAppState('onboarding')
         return
       }
@@ -51,19 +50,16 @@ function AppContent() {
       })
 
       if (!result.vaultBytes) {
-        console.log('[App] No vault found in storage, setting state to onboarding')
         setAppState('onboarding')
         return
       }
 
       // Service Worker に IS_UNLOCKED メッセージを送信
-      console.log('[App] Vault found in storage, checking unlocked state')
       const isUnlocked = await new Promise<boolean>((resolve) => {
         if (typeof chrome !== 'undefined' && chrome.runtime) {
           chrome.runtime.sendMessage(
             { type: 'IS_UNLOCKED' },
             (response: { unlocked?: boolean }) => {
-              console.log('[App] IS_UNLOCKED response:', response)
               resolve(response?.unlocked ?? false)
             },
           )
@@ -72,7 +68,6 @@ function AppContent() {
         }
       })
 
-      console.log('[App] Setting appState to:', isUnlocked ? 'unlocked' : 'locked')
       setAppState(isUnlocked ? 'unlocked' : 'locked')
     }
 

@@ -49,14 +49,48 @@ pub fn generate_password(options: &PasswordOptions) -> Result<String> {
         ));
     }
 
-    let mut password = String::new();
+    use rand::Rng;
     let mut rng = rand::thread_rng();
-    for _ in 0..options.length {
-        use rand::Rng;
-        let idx = rng.gen_range(0..charset.len());
-        password.push(charset[idx] as char);
+
+    // Ensure at least one character from each enabled category
+    let mut required: Vec<u8> = Vec::new();
+    if options.include_uppercase {
+        required.push(UPPERCASE[rng.gen_range(0..UPPERCASE.len())]);
+    }
+    if options.include_lowercase {
+        required.push(LOWERCASE[rng.gen_range(0..LOWERCASE.len())]);
+    }
+    if options.include_numbers {
+        required.push(NUMBERS[rng.gen_range(0..NUMBERS.len())]);
+    }
+    if options.include_symbols {
+        required.push(SYMBOLS[rng.gen_range(0..SYMBOLS.len())]);
     }
 
+    if options.length < required.len() {
+        return Err(crate::error::VaultError::InvalidConfiguration(
+            format!(
+                "Password length {} is too short to include all required character types (need at least {})",
+                options.length,
+                required.len()
+            ),
+        ));
+    }
+
+    let remaining = options.length - required.len();
+    let mut password_bytes: Vec<u8> = required;
+    for _ in 0..remaining {
+        let idx = rng.gen_range(0..charset.len());
+        password_bytes.push(charset[idx]);
+    }
+
+    // Shuffle to avoid required characters always being at the start
+    for i in (1..password_bytes.len()).rev() {
+        let j = rng.gen_range(0..=i);
+        password_bytes.swap(i, j);
+    }
+
+    let password: String = password_bytes.into_iter().map(|b| b as char).collect();
     Ok(password)
 }
 

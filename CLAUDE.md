@@ -70,7 +70,6 @@
     - Windows
     - MacOS
 - スマートフォン
-    - iOS
     - Android
 - ウェブブラウザ拡張機能
     - Chrome
@@ -103,15 +102,15 @@ S3 / Cloudflare R2 / MinIO（ユーザーが選ぶ）
 
 `vault_core` はRustで実装されたコアライブラリで、全クライアントから使用される。
 
+ネットワーク通信は環境依存であるため、クラウドストレージへのダウンロード・アップロード操作はvault_coreには含めない。
+
 - vault.jsonの読み書き管理
 - 暗号化・復号
-- クラウドストレージ操作
 - 同期ロジック
 
 ```
 vault_core（Rust）
     ├── JNI（Java Native Interface）   → Android
-    ├── Objective-C FFI                → iOS
     ├── ネイティブFFI                  → デスクトップ (Tauri backend)
     └── WASM（wasm-pack）              → ブラウザ拡張
 ```
@@ -120,9 +119,9 @@ vault_core（Rust）
 
 **モバイルアプリ**
 
-- ネイティブアプリ（iOS/Android個別実装）
+- ネイティブアプリ（Android個別実装）
 - Rust JNIでvault_coreをネイティブ呼び出し
-- Access KeyはOSのKeychain（iOS） / Keystore（Android）に保存
+- Access KeyはOSのKeystore（Android）に保存
 
 **デスクトップアプリ**
 

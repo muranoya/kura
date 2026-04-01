@@ -51,7 +51,7 @@ data class SyncResult(
 data class S3Config(
     val region: String,
     val bucket: String,
-    val key: String = "vault.json",
+    val key: String,
     val accessKeyId: String,
     val secretAccessKey: String,
     val endpoint: String? = null
