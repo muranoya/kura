@@ -75,6 +75,7 @@ const vault = vaultModule as unknown as WasmApi
 
 let wasmInitialized = false
 let unlocked = false
+let popupConnected = false
 
 // WASM 初期化関数
 async function initWasm() {
@@ -106,6 +107,22 @@ function setupMessageHandlers() {
 
 // メッセージハンドラーを最初に登録（スクリプト読み込み時）
 setupMessageHandlers()
+
+// ポップアップの接続/切断を検知してオートロックを管理
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'popup') return
+  popupConnected = true
+  chrome.alarms.clear('autolock')
+
+  port.onDisconnect.addListener(async () => {
+    popupConnected = false
+    if (!unlocked) return
+    const settings = await loadSettings()
+    if (settings.autolockMinutes > 0) {
+      chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
+    }
+  })
+})
 
 // Service Worker 起動時に初期化
 self.addEventListener('install', (event: Event) => {
@@ -310,9 +327,13 @@ async function handleMessage(
           vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
           vault.api_unlock(DEFAULT_VAULT_ID, message.password)
           unlocked = true
-          // オートロック alarm を設定
-          const settings = await loadSettings()
-          chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
+          // ポップアップが閉じている場合のみオートロック alarm を設定
+          if (!popupConnected) {
+            const settings = await loadSettings()
+            if (settings.autolockMinutes > 0) {
+              chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
+            }
+          }
           // 定期同期アラームを設定
           chrome.alarms.create('autosync', { periodInMinutes: 1 })
           sendResponse({ success: true })
@@ -339,8 +360,13 @@ async function handleMessage(
           vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
           vault.api_unlock(DEFAULT_VAULT_ID, message.password)
           unlocked = true
-          const settings = await loadSettings()
-          chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
+          // ポップアップが閉じている場合のみオートロック alarm を設定
+          if (!popupConnected) {
+            const settings = await loadSettings()
+            if (settings.autolockMinutes > 0) {
+              chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
+            }
+          }
           // 定期同期アラームを設定
           chrome.alarms.create('autosync', { periodInMinutes: 1 })
           sendResponse({ success: true })
@@ -382,8 +408,12 @@ async function handleMessage(
             await saveToStorage(STORAGE_KEYS.S3_CONFIG, message.s3Config)
           }
           unlocked = true
-          const settings = await loadSettings()
-          chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
+          if (!popupConnected) {
+            const settings = await loadSettings()
+            if (settings.autolockMinutes > 0) {
+              chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
+            }
+          }
           sendResponse({ success: true, recoveryKey })
         } catch (err) {
           console.error('[SW] CREATE_VAULT: Error:', err)
@@ -405,8 +435,12 @@ async function handleMessage(
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, null)
           await autoSync()
           unlocked = true
-          const settings = await loadSettings()
-          chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
+          if (!popupConnected) {
+            const settings = await loadSettings()
+            if (settings.autolockMinutes > 0) {
+              chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
+            }
+          }
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -857,7 +891,11 @@ async function handleMessage(
         try {
           await saveToStorage(STORAGE_KEYS.APP_SETTINGS, message.settings)
           if (unlocked) {
-            chrome.alarms.create('autolock', { delayInMinutes: message.settings.autolockMinutes })
+            if (message.settings.autolockMinutes > 0 && !popupConnected) {
+              chrome.alarms.create('autolock', { delayInMinutes: message.settings.autolockMinutes })
+            } else {
+              chrome.alarms.clear('autolock')
+            }
           }
           sendResponse({ success: true })
         } catch (err) {

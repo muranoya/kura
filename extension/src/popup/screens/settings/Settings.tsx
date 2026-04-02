@@ -1,7 +1,7 @@
 import { Check, Copy, ExternalLink, Tags, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { STORAGE_KEYS } from '../../../shared/constants'
+import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../../../shared/constants'
 import { getFromStorage } from '../../../shared/storage'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -18,13 +18,28 @@ import {
 import { Label } from '../../components/ui/label'
 import { PasswordInput } from '../../components/ui/password-input'
 import { Separator } from '../../components/ui/separator'
+import TypeFilterDropdown from '../../components/ui/type-filter-dropdown'
 import { usePushError } from '../../contexts/ErrorContext'
+
+const AUTOLOCK_OPTIONS = [
+  { value: '0', label: '無効' },
+  { value: '1', label: '1分' },
+  { value: '3', label: '3分' },
+  { value: '5', label: '5分' },
+  { value: '10', label: '10分' },
+  { value: '15', label: '15分' },
+  { value: '30', label: '30分' },
+  { value: '60', label: '60分' },
+]
 
 export default function Settings() {
   const navigate = useNavigate()
   const pushError = usePushError()
   const [storageConfig, setStorageConfig] = useState<Record<string, string> | null>(null)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
+
+  // Auto-lock settings
+  const [autolockMinutes, setAutolockMinutes] = useState<number>(DEFAULT_SETTINGS.autolockMinutes)
 
   // Change Master Password Dialog
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
@@ -53,6 +68,7 @@ export default function Settings() {
 
   useEffect(() => {
     loadStorageConfig()
+    loadSettings()
   }, [])
 
   const loadStorageConfig = async () => {
@@ -63,6 +79,26 @@ export default function Settings() {
       }
     } catch (err) {
       console.error('Failed to load storage config:', err)
+    }
+  }
+
+  const loadSettings = async () => {
+    try {
+      const settings = await commands.getSettings()
+      setAutolockMinutes(settings.autolockMinutes ?? DEFAULT_SETTINGS.autolockMinutes)
+    } catch (err) {
+      console.error('Failed to load settings:', err)
+    }
+  }
+
+  const handleAutolockChange = async (value: string) => {
+    const minutes = Number(value)
+    setAutolockMinutes(minutes)
+    try {
+      const currentSettings = await commands.getSettings()
+      await commands.saveSettings({ ...currentSettings, autolockMinutes: minutes })
+    } catch (err) {
+      pushError(`設定の保存に失敗しました: ${err}`)
     }
   }
 
@@ -174,6 +210,25 @@ export default function Settings() {
       <PageHeader title="設定" showBackButton={true} />
 
       <div className="p-3">
+        {/* 一般 */}
+        <section>
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+            一般
+          </h2>
+          <div className="flex items-center justify-between px-1 gap-2">
+            <span className="text-sm text-text-primary shrink-0">自動ロック</span>
+            <div className="w-24">
+              <TypeFilterDropdown
+                value={String(autolockMinutes)}
+                onChange={handleAutolockChange}
+                options={AUTOLOCK_OPTIONS}
+              />
+            </div>
+          </div>
+        </section>
+
+        <Separator className="my-3" />
+
         {/* 管理 */}
         <section>
           <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">

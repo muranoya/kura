@@ -60,5 +60,4 @@ export interface S3Config {
 export interface AppSettings {
   clipboardClearSeconds: number
   autolockMinutes: number
-  autolockOnBackground: boolean
 }

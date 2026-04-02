@@ -33,6 +33,12 @@ function AppContent() {
   const location = useLocation()
   const [appState, setAppState] = useState<AppState>('loading')
 
+  // ポップアップの接続を維持し、オートロックタイマーを管理
+  useEffect(() => {
+    const port = chrome.runtime.connect({ name: 'popup' })
+    return () => port.disconnect()
+  }, [])
+
   useEffect(() => {
     const checkVaultState = async () => {
       // StorageSetupがfromOnboardingフラグを付けてnavigateした場合、onboarding状態を維持

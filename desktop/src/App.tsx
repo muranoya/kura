@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom'
 import * as commands from './commands'
 import ErrorBar from './components/layout/ErrorBar'
 import Sidebar from './components/Sidebar'
+import { DEFAULT_SETTINGS, STORAGE_KEYS } from './shared/constants'
+import { getFromStorage } from './shared/storage'
+import type { AppSettings } from './shared/types'
 import { ErrorProvider, usePushError } from './contexts/ErrorContext'
 import { SyncProvider, useNotifySynced } from './contexts/SyncContext'
 import Lock from './screens/auth/Lock'
@@ -29,6 +32,82 @@ function AppContent() {
   const notifySynced = useNotifySynced()
   const pushError = usePushError()
   const [appState, setAppState] = useState<AppState>('loading')
+  const [autolockMinutes, setAutolockMinutes] = useState<number>(DEFAULT_SETTINGS.autolockMinutes)
+  const autolockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const loadAutolockSettings = useCallback(async () => {
+    try {
+      const settings = await getFromStorage<AppSettings>(STORAGE_KEYS.APP_SETTINGS)
+      setAutolockMinutes(settings?.autolockMinutes ?? DEFAULT_SETTINGS.autolockMinutes)
+    } catch {
+      // デフォルト値を使用
+    }
+  }, [])
+
+  // 設定変更イベントをリッスン
+  useEffect(() => {
+    const handler = () => loadAutolockSettings()
+    window.addEventListener('settings-changed', handler)
+    return () => window.removeEventListener('settings-changed', handler)
+  }, [loadAutolockSettings])
+
+  // アンロック時に設定を読み込み
+  useEffect(() => {
+    if (appState === 'unlocked') {
+      loadAutolockSettings()
+    }
+  }, [appState, loadAutolockSettings])
+
+  // 自動ロックタイマー
+  useEffect(() => {
+    if (appState !== 'unlocked') return
+    if (autolockMinutes === 0) return
+
+    const clearTimer = () => {
+      if (autolockTimerRef.current) {
+        clearTimeout(autolockTimerRef.current)
+        autolockTimerRef.current = null
+      }
+    }
+
+    const performLock = async () => {
+      try {
+        const vaultBytes = await commands.lock()
+        await commands.writeVaultFile(vaultBytes)
+        setAppState('locked')
+      } catch (err) {
+        console.error('Auto-lock failed:', err)
+      }
+    }
+
+    const handleBlur = () => {
+      clearTimer()
+      autolockTimerRef.current = setTimeout(performLock, autolockMinutes * 60 * 1000)
+    }
+
+    const handleFocus = () => {
+      clearTimer()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        handleBlur()
+      } else {
+        handleFocus()
+      }
+    }
+
+    window.addEventListener('blur', handleBlur)
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      clearTimer()
+      window.removeEventListener('blur', handleBlur)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [appState, autolockMinutes])
 
   useEffect(() => {
     const initApp = async () => {

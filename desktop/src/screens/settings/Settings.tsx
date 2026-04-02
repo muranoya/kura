@@ -15,9 +15,28 @@ import {
 } from '../../components/ui/dialog'
 import { Label } from '../../components/ui/label'
 import { PasswordInput } from '../../components/ui/password-input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/select'
 import { usePushError } from '../../contexts/ErrorContext'
-import { STORAGE_KEYS } from '../../shared/constants'
-import { clearStorage, getFromStorage } from '../../shared/storage'
+import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../../shared/constants'
+import { clearStorage, getFromStorage, saveToStorage } from '../../shared/storage'
+import type { AppSettings } from '../../shared/types'
+
+const AUTOLOCK_OPTIONS = [
+  { value: '0', label: '無効' },
+  { value: '1', label: '1分' },
+  { value: '3', label: '3分' },
+  { value: '5', label: '5分' },
+  { value: '10', label: '10分' },
+  { value: '15', label: '15分' },
+  { value: '30', label: '30分' },
+  { value: '60', label: '60分' },
+]
 
 export default function Settings() {
   const pushError = usePushError()
@@ -25,7 +44,10 @@ export default function Settings() {
   const [storageConfig, setStorageConfig] = useState<Record<string, string> | null>(null)
   const [storageLoading, setStorageLoading] = useState(true)
 
-  // Load storage config
+  // Auto-lock settings
+  const [autolockMinutes, setAutolockMinutes] = useState<number>(DEFAULT_SETTINGS.autolockMinutes)
+
+  // Load storage config and settings
   useEffect(() => {
     const loadStorageConfig = async () => {
       try {
@@ -37,8 +59,36 @@ export default function Settings() {
         setStorageLoading(false)
       }
     }
+    const loadSettings = async () => {
+      try {
+        const settings = await getFromStorage<AppSettings>(STORAGE_KEYS.APP_SETTINGS)
+        if (settings) {
+          setAutolockMinutes(settings.autolockMinutes ?? DEFAULT_SETTINGS.autolockMinutes)
+        }
+      } catch (err) {
+        console.error('Failed to load settings:', err)
+      }
+    }
     loadStorageConfig()
+    loadSettings()
   }, [])
+
+  const saveSettings = async (updates: Partial<AppSettings>) => {
+    try {
+      const current = await getFromStorage<AppSettings>(STORAGE_KEYS.APP_SETTINGS)
+      const merged = { ...DEFAULT_SETTINGS, ...current, ...updates }
+      await saveToStorage(STORAGE_KEYS.APP_SETTINGS, merged)
+      window.dispatchEvent(new CustomEvent('settings-changed'))
+    } catch (err) {
+      pushError(`設定の保存に失敗しました: ${err}`)
+    }
+  }
+
+  const handleAutolockChange = (value: string) => {
+    const minutes = Number(value)
+    setAutolockMinutes(minutes)
+    saveSettings({ autolockMinutes: minutes })
+  }
 
   // Change Master Password Dialog
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
@@ -184,6 +234,33 @@ export default function Settings() {
 
       {/* コンテンツ */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        {/* 一般 */}
+        <Card>
+          <CardHeader className="px-3 py-2">
+            <CardTitle className="text-sm font-medium">一般</CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3 pt-2 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-text-primary">自動ロック</p>
+                <p className="text-xs text-text-muted">ウィンドウのフォーカスが外れてからの時間</p>
+              </div>
+              <Select value={String(autolockMinutes)} onValueChange={handleAutolockChange}>
+                <SelectTrigger className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {AUTOLOCK_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* セキュリティ */}
         <Card>
           <CardHeader className="px-3 py-2">
