@@ -208,6 +208,14 @@ export async function generateTotpDefault(secret: string): Promise<string> {
   return invoke<string>('generate_totp_default', { secret })
 }
 
+export async function generateTotpFromValue(value: string): Promise<string> {
+  return invoke<string>('generate_totp_from_value', { value })
+}
+
+export async function parseTotpPeriod(value: string): Promise<number> {
+  return invoke<number>('parse_totp_period', { value })
+}
+
 // ============================================================================
 // Sync
 // ============================================================================

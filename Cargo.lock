@@ -5907,17 +5907,11 @@ dependencies = [
 name = "wasm-bridge"
 version = "0.1.0"
 dependencies = [
- "async-trait",
- "chrono",
  "console_error_panic_hook",
- "hmac",
  "js-sys",
  "serde_json",
- "sha2",
  "vault_core",
  "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]

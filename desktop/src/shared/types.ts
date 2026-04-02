@@ -2,7 +2,7 @@
 export type EntryType = 'login' | 'bank' | 'ssh_key' | 'secure_note' | 'credit_card' | 'passkey' | 'password' | 'software_license'
 
 // Custom field types
-export type CustomFieldType = 'text' | 'password' | 'email' | 'url' | 'phone'
+export type CustomFieldType = 'text' | 'password' | 'email' | 'url' | 'phone' | 'totp'
 
 // Custom field
 export interface CustomField {

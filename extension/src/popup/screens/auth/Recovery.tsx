@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { PasswordInput } from '../../components/ui/password-input'
 
 export default function Recovery() {
   const navigate = useNavigate()
@@ -94,9 +95,8 @@ export default function Recovery() {
               <Label htmlFor="new-password" className="text-sm">
                 新しいマスターパスワード
               </Label>
-              <Input
+              <PasswordInput
                 id="new-password"
-                type="password"
                 placeholder="新しいパスワード"
                 value={newPassword}
                 onChange={(e) => {
@@ -113,9 +113,8 @@ export default function Recovery() {
               <Label htmlFor="confirm-password" className="text-sm">
                 パスワード確認
               </Label>
-              <Input
+              <PasswordInput
                 id="confirm-password"
-                type="password"
                 placeholder="パスワードを再入力"
                 value={confirmPassword}
                 onChange={(e) => {

@@ -12,6 +12,7 @@ pub enum CustomFieldType {
     Email,
     Url,
     Phone,
+    Totp,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

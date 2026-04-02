@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom'
 import * as commands from './commands'
+import ErrorBar from './components/layout/ErrorBar'
 import Sidebar from './components/Sidebar'
+import { ErrorProvider, usePushError } from './contexts/ErrorContext'
 import { SyncProvider, useNotifySynced } from './contexts/SyncContext'
 import Lock from './screens/auth/Lock'
 import Recovery from './screens/auth/Recovery'
@@ -25,6 +27,7 @@ type AppState = 'loading' | 'onboarding' | 'locked' | 'unlocked'
 
 function AppContent() {
   const notifySynced = useNotifySynced()
+  const pushError = usePushError()
   const [appState, setAppState] = useState<AppState>('loading')
 
   useEffect(() => {
@@ -71,12 +74,12 @@ function AppContent() {
           notifySynced()
         }
       } catch (e) {
-        console.warn('Periodic sync failed:', e)
+        pushError('同期に失敗しました', 'periodic-sync')
       }
     }, 60_000) // 1 minute
 
     return () => clearInterval(timer)
-  }, [appState, notifySynced])
+  }, [appState, notifySynced, pushError])
 
   if (appState === 'loading') {
     return (
@@ -119,7 +122,9 @@ function AppContent() {
             element={
               <div className="flex h-screen bg-bg-base">
                 <Sidebar />
-                <div className="flex-1 overflow-auto bg-bg-base">
+                <div className="flex-1 flex flex-col overflow-hidden bg-bg-base">
+                  <ErrorBar />
+                  <div className="flex-1 overflow-auto">
                   <Routes>
                     <Route path="/entries" element={<EntryList />} />
                     <Route path="/favorites" element={<EntryList onlyFavorites={true} />} />
@@ -134,6 +139,7 @@ function AppContent() {
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<Navigate to="/entries" replace />} />
                   </Routes>
+                  </div>
                 </div>
               </div>
             }
@@ -146,8 +152,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <SyncProvider>
-      <AppContent />
-    </SyncProvider>
+    <ErrorProvider>
+      <SyncProvider>
+        <AppContent />
+      </SyncProvider>
+    </ErrorProvider>
   )
 }

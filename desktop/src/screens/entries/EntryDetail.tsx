@@ -1,11 +1,14 @@
-import { ArrowLeft, Copy, Eye, EyeOff, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, Copy, Eye, EyeOff, Maximize2, Pencil, Trash2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useNavigate, useParams } from 'react-router-dom'
 import remarkGfm from 'remark-gfm'
 import * as commands from '../../commands'
+import TotpCustomFieldDisplay from '../../components/entries/TotpCustomFieldDisplay'
+import { LargeTextDialog } from '../../components/ui/large-text-dialog'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
+import { usePushError } from '../../contexts/ErrorContext'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { getEntryTypeLabel } from '../../shared/constants'
@@ -27,6 +30,7 @@ function FieldDisplay({
   onToggleMask,
 }: FieldDisplayProps) {
   const [copied, setCopied] = useState(false)
+  const [largeTextOpen, setLargeTextOpen] = useState(false)
   const isEmpty = !value
 
   const handleCopy = () => {
@@ -72,9 +76,26 @@ function FieldDisplay({
         </button>
       )}
       {!isEmpty && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setLargeTextOpen(true) }}
+          className="p-1 text-text-muted hover:text-text-primary transition-colors shrink-0"
+        >
+          <Maximize2 size={14} />
+        </button>
+      )}
+      {!isEmpty && (
         <span className="shrink-0 text-text-muted">
           {copied ? <span className="text-xs text-success">コピーしました</span> : <Copy size={14} />}
         </span>
+      )}
+      {!isEmpty && (
+        <LargeTextDialog
+          open={largeTextOpen}
+          onOpenChange={setLargeTextOpen}
+          label={label}
+          value={value}
+        />
       )}
     </div>
   )
@@ -173,6 +194,7 @@ const markdownComponents = {
 export default function EntryDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const pushError = usePushError()
   const [entry, setEntry] = useState<Entry | null>(null)
   const [loading, setLoading] = useState(true)
   const [allLabels, setAllLabels] = useState<Label[]>([])
@@ -226,7 +248,7 @@ export default function EntryDetail() {
             variant="destructive"
             onClick={() => {
               if (confirm('このエントリを削除しますか？')) {
-                commands.deleteEntry(id!).then(() => navigate('/entries')).catch((err) => alert(String(err)))
+                commands.deleteEntry(id!).then(() => navigate('/entries')).catch((err) => pushError(`アイテム削除に失敗しました: ${err}`))
               }
             }}
             className="gap-1 h-7 text-xs"
@@ -375,22 +397,29 @@ export default function EntryDetail() {
         {/* カスタムフィールド */}
         {entry.customFields && entry.customFields.length > 0 && (
           <>
-            <SectionHeading>カスタムフィールド</SectionHeading>
             <div className="space-y-0.5">
-              {entry.customFields.map((field) => (
-                <FieldDisplay
-                  key={field.id}
-                  label={field.name}
-                  value={field.value}
-                  isPassword={field.fieldType === 'password'}
-                  isMasked={passwordMasked && field.fieldType === 'password'}
-                  onToggleMask={
-                    field.fieldType === 'password'
-                      ? () => setPasswordMasked(!passwordMasked)
-                      : undefined
-                  }
-                />
-              ))}
+              {entry.customFields.map((field) =>
+                field.fieldType === 'totp' ? (
+                  <TotpCustomFieldDisplay
+                    key={field.id}
+                    label={field.name}
+                    value={field.value}
+                  />
+                ) : (
+                  <FieldDisplay
+                    key={field.id}
+                    label={field.name}
+                    value={field.value}
+                    isPassword={field.fieldType === 'password'}
+                    isMasked={passwordMasked && field.fieldType === 'password'}
+                    onToggleMask={
+                      field.fieldType === 'password'
+                        ? () => setPasswordMasked(!passwordMasked)
+                        : undefined
+                    }
+                  />
+                )
+              )}
             </div>
           </>
         )}

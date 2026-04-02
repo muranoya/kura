@@ -1,4 +1,4 @@
-import { Link, Lock, Mail, Phone, Plus, Trash2, Type } from 'lucide-react'
+import { Link, Lock, Mail, Phone, Plus, Timer, Trash2, Type } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useCallback, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -110,6 +110,7 @@ const CUSTOM_FIELD_TYPES = [
   { value: 'email' as const, label: 'メール', icon: Mail },
   { value: 'url' as const, label: 'URL', icon: Link },
   { value: 'phone' as const, label: '電話番号', icon: Phone },
+  { value: 'totp' as const, label: 'TOTP', icon: Timer },
 ]
 
 const FIELD_TYPE_LABELS: Record<string, string> = {
@@ -118,6 +119,7 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
   email: 'メール',
   url: 'URL',
   phone: '電話番号',
+  totp: 'TOTP',
 }
 
 export default function EntryForm({
@@ -505,7 +507,6 @@ export default function EntryForm({
   const renderCustomFields = useCallback(() => {
     return (
       <div className="space-y-2">
-        <span className="text-xs text-text-muted">カスタムフィールド</span>
         {customFields.map((field) => (
           <div key={field.id} className="space-y-1.5">
             <div className="group flex items-start gap-2">
@@ -517,15 +518,15 @@ export default function EntryForm({
                 value={field.name}
                 onChange={(e) => updateCustomField(field.id, { name: e.target.value })}
                 placeholder="フィールド名"
-                className="h-8 text-sm flex-1 min-w-0"
+                className="h-8 text-sm flex-[2] min-w-0"
               />
               <Input
                 id={`field-value-${field.id}`}
-                type={field.fieldType === 'password' ? 'password' : 'text'}
+                type={field.fieldType === 'password' || field.fieldType === 'totp' ? 'password' : 'text'}
                 value={field.value}
                 onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
-                placeholder="値"
-                className="h-8 text-sm flex-1"
+                placeholder={field.fieldType === 'totp' ? 'otpauth:// URI または Base32 シークレット' : '値'}
+                className="h-8 text-sm flex-[3]"
                 onFocus={() =>
                   field.fieldType === 'password' && setActiveGeneratorFieldId(`custom-${field.id}`)
                 }

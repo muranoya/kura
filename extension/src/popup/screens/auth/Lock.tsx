@@ -5,8 +5,8 @@ import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
-import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { PasswordInput } from '../../components/ui/password-input'
 
 export default function LockScreen() {
   const navigate = useNavigate()
@@ -86,9 +86,8 @@ export default function LockScreen() {
               <Label htmlFor="password" className="text-sm">
                 マスターパスワード
               </Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 placeholder="パスワードを入力"
                 value={password}
                 onChange={(e) => {

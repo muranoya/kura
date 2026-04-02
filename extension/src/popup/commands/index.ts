@@ -191,6 +191,17 @@ export async function generateTotp(secret: string): Promise<string> {
   return field<'totp', string>(res, 'totp') ?? ''
 }
 
+export async function generateTotpFromValue(
+  value: string,
+): Promise<{ totp: string; period: number }> {
+  const res = await sendMessage({ type: 'GENERATE_TOTP_FROM_VALUE', value })
+  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
+  return {
+    totp: field<'totp', string>(res, 'totp') ?? '',
+    period: field<'period', number>(res, 'period') ?? 30,
+  }
+}
+
 // Security
 export async function changeMasterPassword(
   oldPassword: string,

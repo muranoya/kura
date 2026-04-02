@@ -1,4 +1,4 @@
-use crate::totp::{generate_totp, generate_totp_default};
+use crate::totp::{generate_totp, generate_totp_default, generate_totp_from_value, parse_totp_period};
 use crate::password_gen::{PasswordOptions, generate_password};
 
 /// パスワード生成
@@ -33,4 +33,15 @@ pub fn api_generate_totp(secret: String, digits: u32, period: u32) -> Result<Str
 pub fn api_generate_totp_default(secret: String) -> Result<String, String> {
     generate_totp_default(&secret)
         .map_err(|e| format!("Failed to generate TOTP: {}", e))
+}
+
+/// TOTP生成（otpauth URI または生シークレットから）
+pub fn api_generate_totp_from_value(value: String) -> Result<String, String> {
+    generate_totp_from_value(&value)
+        .map_err(|e| format!("Failed to generate TOTP: {}", e))
+}
+
+/// TOTP周期の取得（otpauth URI から抽出、デフォルト30秒）
+pub fn api_parse_totp_period(value: String) -> u64 {
+    parse_totp_period(&value)
 }

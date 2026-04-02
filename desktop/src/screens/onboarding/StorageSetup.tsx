@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { PasswordInput } from '../../components/ui/password-input'
 import { getFromStorage, saveToStorage } from '../../shared/storage'
 
 export default function StorageSetup() {
@@ -156,9 +157,8 @@ export default function StorageSetup() {
                 <Label htmlFor="secret-key">
                   シークレットアクセスキー <span className="text-danger">*</span>
                 </Label>
-                <Input
+                <PasswordInput
                   id="secret-key"
-                  type="password"
                   placeholder="••••••••••••••••"
                   value={secretAccessKey}
                   onChange={(e) => {

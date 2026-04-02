@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { STORAGE_KEYS } from '../../../shared/constants'
 import { getFromStorage } from '../../../shared/storage'
 import * as commands from '../../commands'
+import { usePushError } from '../../contexts/ErrorContext'
 import { Button } from '../ui/button'
 
 function formatRelativeTime(unixSecs: number): string {
@@ -14,7 +15,12 @@ function formatRelativeTime(unixSecs: number): string {
   return `${Math.floor(h / 24)}日前`
 }
 
-export function SyncActions() {
+interface SyncActionsProps {
+  onSyncComplete?: () => void
+}
+
+export function SyncActions({ onSyncComplete }: SyncActionsProps) {
+  const pushError = usePushError()
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [storageConfigExists, setStorageConfigExists] = useState(true)
@@ -63,8 +69,9 @@ export function SyncActions() {
           setLastSyncTime(stored)
         }
       }
+      onSyncComplete?.()
     } catch (err) {
-      console.error('Sync failed:', err)
+      pushError(`同期に失敗しました: ${err}`, 'manual-sync')
     } finally {
       setSyncing(false)
     }

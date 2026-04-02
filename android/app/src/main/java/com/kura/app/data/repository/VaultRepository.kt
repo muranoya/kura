@@ -198,6 +198,14 @@ class VaultRepository(private val context: Context) {
         VaultBridge.generateTotpDefault(secret)
     }
 
+    suspend fun generateTotpFromValue(value: String): String = withContext(Dispatchers.IO) {
+        VaultBridge.generateTotpFromValue(value)
+    }
+
+    suspend fun parseTotpPeriod(value: String): Long = withContext(Dispatchers.IO) {
+        VaultBridge.parseTotpPeriod(value)
+    }
+
     // ========================================================================
     // Sync
     // ========================================================================

@@ -15,12 +15,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog'
-import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { PasswordInput } from '../../components/ui/password-input'
 import { Separator } from '../../components/ui/separator'
+import { usePushError } from '../../contexts/ErrorContext'
 
 export default function Settings() {
   const navigate = useNavigate()
+  const pushError = usePushError()
   const [storageConfig, setStorageConfig] = useState<Record<string, string> | null>(null)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
@@ -81,7 +83,7 @@ export default function Settings() {
       })
       window.close()
     } catch (err) {
-      console.error('Failed to logout:', err)
+      pushError(`ログアウトに失敗しました: ${err}`)
     }
   }
 
@@ -332,9 +334,8 @@ export default function Settings() {
               <Label htmlFor="old-password" className="text-sm">
                 現在のパスワード
               </Label>
-              <Input
+              <PasswordInput
                 id="old-password"
-                type="password"
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
                 disabled={changePasswordLoading}
@@ -346,9 +347,8 @@ export default function Settings() {
               <Label htmlFor="new-password" className="text-sm">
                 新しいパスワード
               </Label>
-              <Input
+              <PasswordInput
                 id="new-password"
-                type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 disabled={changePasswordLoading}
@@ -360,9 +360,8 @@ export default function Settings() {
               <Label htmlFor="confirm-password" className="text-sm">
                 新しいパスワード（確認）
               </Label>
-              <Input
+              <PasswordInput
                 id="confirm-password"
-                type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 disabled={changePasswordLoading}
@@ -413,9 +412,8 @@ export default function Settings() {
               <Label htmlFor="rotate-dek-password" className="text-sm">
                 マスターパスワード
               </Label>
-              <Input
+              <PasswordInput
                 id="rotate-dek-password"
-                type="password"
                 value={rotateDekPassword}
                 onChange={(e) => setRotateDekPassword(e.target.value)}
                 disabled={rotateDekLoading}
@@ -465,9 +463,8 @@ export default function Settings() {
               <Label htmlFor="regenerate-password" className="text-sm">
                 マスターパスワード
               </Label>
-              <Input
+              <PasswordInput
                 id="regenerate-password"
-                type="password"
                 value={regeneratePassword}
                 onChange={(e) => setRegeneratePassword(e.target.value)}
                 disabled={regenerateLoading}

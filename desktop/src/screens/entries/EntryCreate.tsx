@@ -5,10 +5,12 @@ import EntryForm from '../../components/entries/EntryForm'
 import EntryTypeSelectDialog from '../../components/entries/EntryTypeSelectDialog'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 import { Button } from '../../components/ui/button'
+import { usePushError } from '../../contexts/ErrorContext'
 import type { CustomField, Label } from '../../shared/types'
 
 export default function EntryCreate() {
   const navigate = useNavigate()
+  const pushError = usePushError()
   const [showTypeDialog, setShowTypeDialog] = useState(true)
   const [entryType, setEntryType] = useState('login')
   const [name, setName] = useState('')
@@ -67,7 +69,7 @@ export default function EntryCreate() {
 
       navigate(`/entries/${id}`)
     } catch (err) {
-      alert(`アイテム作成失敗: ${err}`)
+      pushError(`アイテム作成失敗: ${err}`)
     } finally {
       setLoading(false)
     }

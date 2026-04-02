@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { BottomNav } from './components/BottomNav'
+import ErrorBar from './components/layout/ErrorBar'
+import { ErrorProvider } from './contexts/ErrorContext'
 import Lock from './screens/auth/Lock'
 import Recovery from './screens/auth/Recovery'
 import EntryCreate from './screens/entries/EntryCreate'
@@ -80,7 +82,9 @@ function AppContent() {
   const showBottomNav = shouldShowBottomNav(location.pathname, appState)
 
   return (
-    <div className="relative w-full" style={{ height: '504px' }}>
+    <div className="relative w-full flex flex-col" style={{ height: '504px' }}>
+      <ErrorBar />
+      <div className="flex-1 overflow-hidden relative">
       <Routes>
         {/* Onboarding */}
         {appState === 'onboarding' && (
@@ -124,14 +128,17 @@ function AppContent() {
 
       {/* BottomNav */}
       {showBottomNav && <BottomNav />}
+      </div>
     </div>
   )
 }
 
 export default function App() {
   return (
-    <HashRouter>
-      <AppContent />
-    </HashRouter>
+    <ErrorProvider>
+      <HashRouter>
+        <AppContent />
+      </HashRouter>
+    </ErrorProvider>
   )
 }

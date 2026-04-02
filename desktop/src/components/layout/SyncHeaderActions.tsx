@@ -2,6 +2,7 @@ import { Store } from '@tauri-apps/plugin-store'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { syncVault } from '../../commands'
+import { usePushError } from '../../contexts/ErrorContext'
 import { useNotifySynced } from '../../contexts/SyncContext'
 import { STORAGE_KEYS } from '../../shared/constants'
 import { getFromStorage, saveToStorage } from '../../shared/storage'
@@ -18,6 +19,7 @@ function formatRelativeTime(unixSecs: number): string {
 
 export default function SyncHeaderActions() {
   const notifySynced = useNotifySynced()
+  const pushError = usePushError()
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null)
   const [storageConfig, setStorageConfig] = useState<S3Config | null>(null)
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error'>('idle')
@@ -95,7 +97,7 @@ export default function SyncHeaderActions() {
 
       setSyncStatus('idle')
     } catch (err) {
-      console.error('Sync failed:', err)
+      pushError(`同期に失敗しました: ${err}`, 'manual-sync')
       setSyncStatus('error')
       setTimeout(() => {
         setSyncStatus('idle')

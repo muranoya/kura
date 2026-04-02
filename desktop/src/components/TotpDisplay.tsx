@@ -27,30 +27,17 @@ export default function TotpDisplay({ totp, period = 30 }: TotpDisplayProps) {
   const strokeDashoffset = circumference * (1 - progress)
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        gap: '0.375rem',
-      }}
-    >
-      <span
-        style={{
-          fontFamily: 'monospace',
-          fontSize: '0.875rem',
-          letterSpacing: '0.15em',
-        }}
-      >
+    <div className="flex items-center justify-end gap-1.5">
+      <span className="font-mono text-sm tracking-widest text-text-primary">
         {totp}
       </span>
-      <svg width="28" height="28" viewBox="0 0 28 28" style={{ flexShrink: 0 }}>
+      <svg width="28" height="28" viewBox="0 0 28 28" className="shrink-0">
         <circle
           cx="14"
           cy="14"
           r={radius}
           fill="none"
-          stroke="#e5e7eb"
+          className="stroke-border"
           strokeWidth="2.5"
         />
         <circle
@@ -58,7 +45,7 @@ export default function TotpDisplay({ totp, period = 30 }: TotpDisplayProps) {
           cy="14"
           r={radius}
           fill="none"
-          stroke="#2563eb"
+          className="stroke-accent"
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeDasharray={circumference}
@@ -71,7 +58,8 @@ export default function TotpDisplay({ totp, period = 30 }: TotpDisplayProps) {
           y="14"
           textAnchor="middle"
           dominantBaseline="central"
-          style={{ fontSize: '8px', fill: '#666', fontFamily: 'sans-serif' }}
+          className="fill-text-secondary"
+          style={{ fontSize: '8px', fontFamily: 'sans-serif' }}
         >
           {remainingSeconds}
         </text>

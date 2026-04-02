@@ -529,6 +529,29 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_generateTotpDefault(
     }
 }
 
+#[no_mangle]
+pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_generateTotpFromValue(
+    mut env: JNIEnv,
+    _class: JClass,
+    value: JString,
+) -> jstring {
+    let v = get_string(&mut env, &value);
+    match api_generate_totp_from_value(v) {
+        Ok(code) => env.new_string(code).unwrap().into_raw(),
+        Err(e) => throw_err(&mut env, &e),
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_parseTotpPeriod(
+    mut env: JNIEnv,
+    _class: JClass,
+    value: JString,
+) -> jlong {
+    let v = get_string(&mut env, &value);
+    api_parse_totp_period(v) as jlong
+}
+
 // ============================================================================
 // Sync Operations
 // ============================================================================

@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { PasswordInput } from '../../components/ui/password-input'
 
 export default function MasterPassword() {
   const navigate = useNavigate()
@@ -71,9 +71,8 @@ export default function MasterPassword() {
               <Label htmlFor="password" className="text-sm">
                 マスターパスワード
               </Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="強力なパスワードを設定してください"
@@ -86,9 +85,8 @@ export default function MasterPassword() {
               <Label htmlFor="confirm-password" className="text-sm">
                 パスワード確認
               </Label>
-              <Input
+              <PasswordInput
                 id="confirm-password"
-                type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="パスワードを再入力してください"

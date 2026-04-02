@@ -8,13 +8,9 @@
 //! 同時に管理できる。vault_idに対応するVaultManagerが存在しない場合は
 //! 自動的に新規作成される。
 
-mod storage;
-
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
-#[cfg(target_arch = "wasm32")]
-use storage::WasmS3Storage;
 use vault_core::api::VaultManager;
 use wasm_bindgen::prelude::*;
 
@@ -98,6 +94,25 @@ pub fn api_get_vault_etag(vault_id: String) -> Option<String> {
 #[wasm_bindgen]
 pub fn api_is_unlocked(vault_id: String) -> bool {
     with_manager(&vault_id, |m| m.api_is_unlocked())
+}
+
+// ============================================================================
+// 同期API（JS側でS3操作、Rust側はマージのみ）
+// ============================================================================
+
+/// リモートvaultをローカルとマージしてセッションを更新
+///
+/// JS側がS3からダウンロードしたバイト列とETagを受け取り、
+/// DEKで復号 → auto_merge → GC → セッション更新を行う。
+#[wasm_bindgen]
+pub fn api_merge_remote_vault(vault_id: String, remote_bytes: &[u8], remote_etag: String) -> Result<(), JsValue> {
+    with_manager(&vault_id, |m| m.api_merge_remote_vault(remote_bytes.to_vec(), remote_etag)).map_err(to_js_err)
+}
+
+/// アップロード成功後にETagを更新
+#[wasm_bindgen]
+pub fn api_update_etag(vault_id: String, etag: String) -> Result<(), JsValue> {
+    with_manager(&vault_id, |m| m.api_update_etag(etag)).map_err(to_js_err)
 }
 
 // ============================================================================
@@ -265,54 +280,12 @@ pub fn api_generate_totp_default(secret: String) -> Result<String, JsValue> {
     vault_core::api::api_generate_totp_default(secret).map_err(to_js_err)
 }
 
-// ============================================================================
-// S3 Sync API
-// ============================================================================
-
-#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
-pub fn api_sync(vault_id: String, storage_config: String) -> js_sys::Promise {
-    let manager = get_manager(&vault_id);
-    wasm_bindgen_futures::future_to_promise(async move {
-        let s3_config = vault_core::api::parse_s3_config(&storage_config)
-            .map_err(to_js_err)?;
-        let storage = WasmS3Storage::new(s3_config)
-            .map_err(|e| to_js_err(format!("{}", e)))?;
-
-        manager.api_sync(&storage).await
-            .map(|_| JsValue::TRUE)
-            .map_err(to_js_err)
-    })
+pub fn api_generate_totp_from_value(value: String) -> Result<String, JsValue> {
+    vault_core::api::api_generate_totp_from_value(value).map_err(to_js_err)
 }
 
-#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
-pub fn api_push(vault_id: String, storage_config: String) -> js_sys::Promise {
-    let manager = get_manager(&vault_id);
-    wasm_bindgen_futures::future_to_promise(async move {
-        let s3_config = vault_core::api::parse_s3_config(&storage_config)
-            .map_err(to_js_err)?;
-        let storage = WasmS3Storage::new(s3_config)
-            .map_err(|e| to_js_err(format!("{}", e)))?;
-
-        manager.api_push(&storage).await
-            .map(|_| JsValue::TRUE)
-            .map_err(to_js_err)
-    })
-}
-
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen]
-pub fn api_download(vault_id: String, storage_config: String) -> js_sys::Promise {
-    let manager = get_manager(&vault_id);
-    wasm_bindgen_futures::future_to_promise(async move {
-        let s3_config = vault_core::api::parse_s3_config(&storage_config)
-            .map_err(to_js_err)?;
-        let storage = WasmS3Storage::new(s3_config)
-            .map_err(|e| to_js_err(format!("{}", e)))?;
-
-        manager.api_download(&storage).await
-            .map(|exists| JsValue::from_bool(exists))
-            .map_err(to_js_err)
-    })
+pub fn api_parse_totp_period(value: String) -> u32 {
+    vault_core::api::api_parse_totp_period(value) as u32
 }

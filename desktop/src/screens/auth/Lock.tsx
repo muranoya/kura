@@ -5,8 +5,8 @@ import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
-import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { PasswordInput } from '../../components/ui/password-input'
 import { Separator } from '../../components/ui/separator'
 import { clearStorage } from '../../shared/storage'
 
@@ -78,9 +78,8 @@ export default function LockScreen() {
             {/* マスターパスワード入力 */}
             <div className="space-y-2 mb-6">
               <Label htmlFor="password">マスターパスワード</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 placeholder="パスワードを入力"
                 value={password}
                 onChange={(e) => {

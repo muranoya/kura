@@ -1,7 +1,8 @@
-import { Copy, Eye, EyeOff, Pencil, Plus, Search, Settings, Trash2, X } from 'lucide-react'
+import { Copy, Eye, EyeOff, Maximize2, Pencil, Plus, Search, Settings, Trash2, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { STORAGE_KEYS } from '../../../shared/constants'
 import * as commands from '../../commands'
 import EntryCard, { getTypeLabel } from '../../components/entries/EntryCard'
 import EntryListPanel from '../../components/entries/EntryListPanel'
@@ -9,6 +10,8 @@ import { EmptyState } from '../../components/layout/EmptyState'
 import { SyncActions } from '../../components/layout/SyncActions'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
+import TotpCustomFieldDisplay from '../../components/entries/TotpCustomFieldDisplay'
+import { LargeTextDialog } from '../../components/ui/large-text-dialog'
 import type { Entry, EntryRow, EntryType } from '../../../shared/types'
 
 interface EntryListProps {
@@ -51,6 +54,17 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
   useEffect(() => {
     loadEntries()
   }, [isFavorites, selectedLabelId])
+
+  // バックグラウンド自動同期の完了を検知してデータを再読み込み
+  useEffect(() => {
+    const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+      if (changes[STORAGE_KEYS.LAST_SYNC_TIME]) {
+        loadEntries()
+      }
+    }
+    chrome.storage.onChanged.addListener(listener)
+    return () => chrome.storage.onChanged.removeListener(listener)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 詳細ペインを読み込み
   useEffect(() => {
@@ -171,7 +185,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
         )}
 
         {/* 同期ボタン */}
-        <SyncActions />
+        <SyncActions onSyncComplete={loadEntries} />
 
         {/* 設定ボタン */}
         <Button
@@ -273,6 +287,7 @@ function PaneFieldDisplay({
   onToggleMask?: () => void
 }) {
   const [copied, setCopied] = useState(false)
+  const [largeTextOpen, setLargeTextOpen] = useState(false)
   const isEmpty = !value
 
   const handleCopy = () => {
@@ -318,9 +333,26 @@ function PaneFieldDisplay({
         </button>
       )}
       {!isEmpty && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setLargeTextOpen(true) }}
+          className="p-0.5 text-text-muted hover:text-text-primary transition-colors shrink-0"
+        >
+          <Maximize2 size={12} />
+        </button>
+      )}
+      {!isEmpty && (
         <span className="shrink-0 text-text-muted">
           {copied ? <span className="text-xs text-success">コピーしました</span> : <Copy size={13} />}
         </span>
+      )}
+      {!isEmpty && (
+        <LargeTextDialog
+          open={largeTextOpen}
+          onOpenChange={setLargeTextOpen}
+          label={label}
+          value={value}
+        />
       )}
     </div>
   )
@@ -515,18 +547,25 @@ function EntryDetailPane({
       {/* カスタムフィールド */}
       {entry.customFields && entry.customFields.length > 0 && (
         <>
-          <PaneSectionHeading>カスタムフィールド</PaneSectionHeading>
           <div className="space-y-0">
-            {entry.customFields.map((field: { id: string; name: string; value: string; fieldType: string }) => (
-              <PaneFieldDisplay
-                key={field.id}
-                label={field.name}
-                value={field.value}
-                isPassword={field.fieldType === 'password'}
-                isMasked={passwordMasked && field.fieldType === 'password'}
-                onToggleMask={field.fieldType === 'password' ? onToggleMask : undefined}
-              />
-            ))}
+            {entry.customFields.map((field: { id: string; name: string; value: string; fieldType: string }) =>
+              field.fieldType === 'totp' ? (
+                <TotpCustomFieldDisplay
+                  key={field.id}
+                  label={field.name}
+                  value={field.value}
+                />
+              ) : (
+                <PaneFieldDisplay
+                  key={field.id}
+                  label={field.name}
+                  value={field.value}
+                  isPassword={field.fieldType === 'password'}
+                  isMasked={passwordMasked && field.fieldType === 'password'}
+                  onToggleMask={field.fieldType === 'password' ? onToggleMask : undefined}
+                />
+              )
+            )}
           </div>
         </>
       )}

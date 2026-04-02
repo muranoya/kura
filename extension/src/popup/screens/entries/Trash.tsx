@@ -1,5 +1,6 @@
 import { RotateCcw, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { STORAGE_KEYS } from '../../../shared/constants'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { EmptyState } from '../../components/layout/EmptyState'
@@ -17,6 +18,17 @@ export default function Trash() {
   useEffect(() => {
     loadTrash()
   }, [])
+
+  // バックグラウンド自動同期の完了を検知してデータを再読み込み
+  useEffect(() => {
+    const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+      if (changes[STORAGE_KEYS.LAST_SYNC_TIME]) {
+        loadTrash()
+      }
+    }
+    chrome.storage.onChanged.addListener(listener)
+    return () => chrome.storage.onChanged.removeListener(listener)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadTrash = async () => {
     setLoading(true)

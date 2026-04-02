@@ -6,8 +6,8 @@ import { removeFromStorage } from '../../../shared/storage'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
-import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { PasswordInput } from '../../components/ui/password-input'
 
 export default function UnlockExistingVault() {
   const navigate = useNavigate()
@@ -94,9 +94,8 @@ export default function UnlockExistingVault() {
                 <Label htmlFor="password" className="text-sm">
                   マスターパスワード
                 </Label>
-                <Input
+                <PasswordInput
                   id="password"
-                  type="password"
                   placeholder="マスターパスワードを入力"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

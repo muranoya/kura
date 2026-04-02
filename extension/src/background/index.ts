@@ -4,6 +4,8 @@
 import * as vaultModule from '../../wasm/wasm_bridge'
 import { DEFAULT_VAULT_ID, STORAGE_KEYS } from '../shared/constants'
 import { getFromStorage, saveToStorage } from '../shared/storage'
+import { VaultS3Client, ConflictError } from '../shared/s3-client'
+import type { S3Config } from '../shared/types'
 
 /** WASM API surface for Service Worker */
 interface WasmApi {
@@ -13,8 +15,10 @@ interface WasmApi {
   api_unlock_with_recovery_key(vaultId: string, recoveryKey: string): void
   api_lock(vaultId: string): Uint8Array
   api_get_vault_bytes(vaultId: string): Uint8Array
-  api_get_vault_etag?(vaultId: string): string | null
+  api_get_vault_etag(vaultId: string): string | null
   api_is_unlocked(vaultId: string): boolean
+  api_merge_remote_vault(vaultId: string, remoteBytes: Uint8Array, remoteEtag: string): void
+  api_update_etag(vaultId: string, etag: string): void
   api_list_entries(
     vaultId: string,
     searchQuery: string | null,
@@ -59,11 +63,11 @@ interface WasmApi {
     includeSymbols: boolean,
   ): string
   api_generate_totp_default(secret: string): string
+  api_generate_totp_from_value(value: string): string
+  api_parse_totp_period(value: string): number
   api_change_master_password(vaultId: string, oldPassword: string, newPassword: string): void
   api_rotate_dek(vaultId: string, password: string): string
   api_regenerate_recovery_key(vaultId: string, password: string): string
-  api_sync(vaultId: string, configStr: string): Promise<{ last_synced_at?: number }>
-  api_download(vaultId: string, configStr: string): Promise<boolean>
   [key: string]: unknown
 }
 
@@ -152,31 +156,88 @@ function normalizeEntries(entries: Record<string, unknown>[]): Record<string, un
   return (entries ?? []).map(normalizeEntry)
 }
 
+/** 同期中フラグ（並行実行を防止） */
+let syncing = false
+
+const MAX_SYNC_RETRIES = 5
+
+/**
+ * S3との同期（ダウンロード→マージ→アップロード、リトライ付き）
+ */
+async function syncWithS3(s3Config: S3Config): Promise<void> {
+  const client = new VaultS3Client(s3Config)
+  try {
+    for (let attempt = 0; attempt < MAX_SYNC_RETRIES; attempt++) {
+      const remote = await client.download()
+
+      if (!remote) {
+        // リモートに存在しない → ローカルをアップロード
+        const bytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
+        const etag = vault.api_get_vault_etag(DEFAULT_VAULT_ID)
+        const newEtag = await client.upload(bytes, etag)
+        vault.api_update_etag(DEFAULT_VAULT_ID, newEtag)
+        return
+      }
+
+      // リモート存在 → Rust側でマージ（復号→auto_merge→GC→セッション更新）
+      vault.api_merge_remote_vault(DEFAULT_VAULT_ID, remote.bytes, remote.etag)
+
+      // マージ済みvaultをアップロード
+      const mergedBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
+      const currentEtag = vault.api_get_vault_etag(DEFAULT_VAULT_ID)
+
+      try {
+        const newEtag = await client.upload(mergedBytes, currentEtag)
+        vault.api_update_etag(DEFAULT_VAULT_ID, newEtag)
+        return
+      } catch (err) {
+        if (err instanceof ConflictError) {
+          if (attempt + 1 === MAX_SYNC_RETRIES) {
+            throw new Error('Sync failed after maximum retries')
+          }
+          continue
+        }
+        throw err
+      }
+    }
+  } finally {
+    client.destroy()
+  }
+}
+
 /**
  * 自動同期（リモートとマージしてアップロード）
  */
 async function autoSync() {
+  if (syncing) return
+  syncing = true
   try {
     // S3設定がない場合はローカル保存のみ
-    const s3Config = await getFromStorage(STORAGE_KEYS.S3_CONFIG)
+    const s3Config = await getFromStorage<S3Config>(STORAGE_KEYS.S3_CONFIG)
     if (!s3Config) {
       const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
       await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
       return
     }
 
-    const configStr = JSON.stringify(s3Config)
-    await vault.api_sync(DEFAULT_VAULT_ID, configStr)
+    await syncWithS3(s3Config)
 
     // 同期後に vault bytes / ETag / lastSyncTime を更新
     const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
     await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
-    const newEtag = vault.api_get_vault_etag?.(DEFAULT_VAULT_ID) ?? null
+    const newEtag = vault.api_get_vault_etag(DEFAULT_VAULT_ID) ?? null
     await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
     const syncTime = Math.floor(Date.now() / 1000)
     await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, syncTime)
   } catch (err) {
     console.error('[SW] autoSync failed:', err)
+    await saveToStorage(STORAGE_KEYS.LAST_ERROR, {
+      key: 'auto-sync',
+      message: `同期に失敗しました: ${err}`,
+      timestamp: Date.now(),
+    })
+  } finally {
+    syncing = false
   }
 }
 
@@ -389,6 +450,9 @@ async function handleMessage(
           const rawEntry = JSON.parse(result)
           if (rawEntry?.typed_value && typeof rawEntry.typed_value === 'string') {
             rawEntry.typed_value = JSON.parse(rawEntry.typed_value)
+          }
+          if (rawEntry?.custom_fields && typeof rawEntry.custom_fields === 'string') {
+            rawEntry.custom_fields = JSON.parse(rawEntry.custom_fields)
           }
           const entry = normalizeEntry(rawEntry)
           sendResponse({ success: true, entry })
@@ -627,6 +691,17 @@ async function handleMessage(
         break
       }
 
+      case 'GENERATE_TOTP_FROM_VALUE': {
+        try {
+          const totp = vault.api_generate_totp_from_value(message.value)
+          const period = vault.api_parse_totp_period(message.value)
+          sendResponse({ success: true, totp, period })
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
       // ========== Security ==========
 
       case 'CHANGE_MASTER_PASSWORD': {
@@ -678,29 +753,25 @@ async function handleMessage(
 
       case 'DOWNLOAD_VAULT': {
         try {
-          const s3Config = await getFromStorage(STORAGE_KEYS.S3_CONFIG)
+          const s3Config = await getFromStorage<S3Config>(STORAGE_KEYS.S3_CONFIG)
           if (!s3Config) {
             sendResponse({ success: false, error: 'S3 config not found' })
             break
           }
 
-          // api_download が実装されるまでは、エラーを返す
-          if (typeof vault.api_download !== 'function') {
-            sendResponse({
-              success: false,
-              error: 'S3 download feature is not yet implemented in vault_core',
-            })
-            break
+          const client = new VaultS3Client(s3Config)
+          try {
+            const remote = await client.download()
+            if (remote) {
+              vault.api_load_vault(DEFAULT_VAULT_ID, remote.bytes, remote.etag)
+              const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
+              await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
+              await saveToStorage(STORAGE_KEYS.VAULT_ETAG, remote.etag)
+            }
+            sendResponse({ success: true, vaultExists: !!remote })
+          } finally {
+            client.destroy()
           }
-
-          const vaultExists = await vault.api_download(DEFAULT_VAULT_ID, JSON.stringify(s3Config))
-
-          if (vaultExists) {
-            const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
-            await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
-          }
-
-          sendResponse({ success: true, vaultExists })
         } catch (err) {
           console.error('[SW] DOWNLOAD_VAULT: Error:', err)
           sendResponse({ success: false, error: String(err) })
@@ -710,19 +781,25 @@ async function handleMessage(
 
       case 'DOWNLOAD': {
         try {
-          const s3Config = message.storageConfig
+          const s3Config: S3Config | null = message.storageConfig
             ? JSON.parse(message.storageConfig)
-            : await getFromStorage(STORAGE_KEYS.S3_CONFIG)
+            : await getFromStorage<S3Config>(STORAGE_KEYS.S3_CONFIG)
 
           if (!s3Config) {
             sendResponse({ success: false, error: 'S3 config not found' })
             break
           }
 
-          const configStr = JSON.stringify(s3Config)
-          const downloadResult = await vault.api_download(DEFAULT_VAULT_ID, configStr)
-
-          sendResponse({ success: true, result: downloadResult })
+          const client = new VaultS3Client(s3Config)
+          try {
+            const remote = await client.download()
+            if (remote) {
+              vault.api_load_vault(DEFAULT_VAULT_ID, remote.bytes, remote.etag)
+            }
+            sendResponse({ success: true, result: !!remote })
+          } finally {
+            client.destroy()
+          }
         } catch (err) {
           console.error('[SW] DOWNLOAD: Error:', err)
           sendResponse({ success: false, error: String(err) })
@@ -735,31 +812,35 @@ async function handleMessage(
           sendResponse({ success: false, error: 'Vault not unlocked' })
           break
         }
+        if (syncing) {
+          sendResponse({ success: false, error: 'Sync already in progress' })
+          break
+        }
+        syncing = true
         try {
-          const s3Config = await getFromStorage(STORAGE_KEYS.S3_CONFIG)
+          const s3Config = await getFromStorage<S3Config>(STORAGE_KEYS.S3_CONFIG)
 
           if (!s3Config) {
             sendResponse({ success: true, status: 'idle', message: 'S3 config not set' })
             break
           }
 
-          const configStr = JSON.stringify(s3Config)
-
-          const syncResult = await vault.api_sync(DEFAULT_VAULT_ID, configStr)
-          const lastSyncedAt = syncResult?.last_synced_at ?? null
+          await syncWithS3(s3Config)
 
           // 同期後、vault bytes と ETag を更新
           const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
-          const newEtag = vault.api_get_vault_etag?.(DEFAULT_VAULT_ID) ?? null
+          const newEtag = vault.api_get_vault_etag(DEFAULT_VAULT_ID) ?? null
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
 
-          const syncTime = lastSyncedAt ?? Math.floor(Date.now() / 1000)
+          const syncTime = Math.floor(Date.now() / 1000)
           await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, syncTime)
           sendResponse({ success: true, status: 'synced', last_synced_at: syncTime })
         } catch (err) {
           console.error('[SW] SYNC: Error:', err)
           sendResponse({ success: false, error: String(err) })
+        } finally {
+          syncing = false
         }
         break
       }
@@ -854,5 +935,12 @@ async function handleClipboardClearAlarm() {
 
 async function handleAutosyncAlarm() {
   if (!unlocked) return
-  autoSync().catch((e) => console.error('[SW] Periodic sync failed:', e))
+  autoSync().catch((e) => {
+    console.error('[SW] Periodic sync failed:', e)
+    saveToStorage(STORAGE_KEYS.LAST_ERROR, {
+      key: 'periodic-sync',
+      message: `同期に失敗しました: ${e}`,
+      timestamp: Date.now(),
+    })
+  })
 }

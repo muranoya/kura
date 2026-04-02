@@ -5,8 +5,8 @@ import * as commands from '../../commands'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
-import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { PasswordInput } from '../../components/ui/password-input'
 
 export default function MasterPassword() {
   const navigate = useNavigate()
@@ -67,9 +67,8 @@ export default function MasterPassword() {
                 <Label htmlFor="password">
                   パスワード <span className="text-danger">*</span>
                 </Label>
-                <Input
+                <PasswordInput
                   id="password"
-                  type="password"
                   placeholder="強力なパスワードを入力"
                   value={password}
                   onChange={(e) => {
@@ -87,9 +86,8 @@ export default function MasterPassword() {
                 <Label htmlFor="confirm-password">
                   パスワード確認 <span className="text-danger">*</span>
                 </Label>
-                <Input
+                <PasswordInput
                   id="confirm-password"
-                  type="password"
                   placeholder="パスワードを再入力"
                   value={confirmPassword}
                   onChange={(e) => {
