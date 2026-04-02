@@ -5,17 +5,21 @@ object VaultBridge {
         System.loadLibrary("vault_jni")
     }
 
+    // Instance management
+    external fun destroyVault(vaultId: String)
+
     // Session management
-    external fun createVault(masterPassword: String): String
-    external fun loadVault(vaultBytes: ByteArray, etag: String)
-    external fun unlock(masterPassword: String)
-    external fun unlockWithRecoveryKey(recoveryKey: String)
-    external fun lock(): ByteArray
-    external fun getVaultBytes(): ByteArray
-    external fun isUnlocked(): Boolean
+    external fun createVault(vaultId: String, masterPassword: String): String
+    external fun loadVault(vaultId: String, vaultBytes: ByteArray, etag: String)
+    external fun unlock(vaultId: String, masterPassword: String)
+    external fun unlockWithRecoveryKey(vaultId: String, recoveryKey: String)
+    external fun lock(vaultId: String): ByteArray
+    external fun getVaultBytes(vaultId: String): ByteArray
+    external fun isUnlocked(vaultId: String): Boolean
 
     // Entry operations
     external fun listEntries(
+        vaultId: String,
         searchQuery: String?,
         entryType: String?,
         labelId: String?,
@@ -23,8 +27,9 @@ object VaultBridge {
         onlyFavorites: Boolean
     ): String
 
-    external fun getEntry(id: String): String
+    external fun getEntry(vaultId: String, id: String): String
     external fun createEntry(
+        vaultId: String,
         entryType: String,
         name: String,
         notes: String?,
@@ -34,6 +39,7 @@ object VaultBridge {
     ): String
 
     external fun updateEntry(
+        vaultId: String,
         id: String,
         name: String,
         typedValueJson: String?,
@@ -42,24 +48,24 @@ object VaultBridge {
         customFieldsJson: String?
     )
 
-    external fun deleteEntry(id: String)
-    external fun restoreEntry(id: String)
-    external fun purgeEntry(id: String)
-    external fun setFavorite(id: String, isFavorite: Boolean)
+    external fun deleteEntry(vaultId: String, id: String)
+    external fun restoreEntry(vaultId: String, id: String)
+    external fun purgeEntry(vaultId: String, id: String)
+    external fun setFavorite(vaultId: String, id: String, isFavorite: Boolean)
 
     // Label operations
-    external fun listLabels(): String
-    external fun createLabel(name: String): String
-    external fun deleteLabel(id: String)
-    external fun renameLabel(id: String, newName: String)
-    external fun setEntryLabels(entryId: String, labelIdsJson: String)
+    external fun listLabels(vaultId: String): String
+    external fun createLabel(vaultId: String, name: String): String
+    external fun deleteLabel(vaultId: String, id: String)
+    external fun renameLabel(vaultId: String, id: String, newName: String)
+    external fun setEntryLabels(vaultId: String, entryId: String, labelIdsJson: String)
 
     // Security
-    external fun changeMasterPassword(oldPassword: String, newPassword: String)
-    external fun rotateDek(password: String): String
-    external fun regenerateRecoveryKey(password: String): String
+    external fun changeMasterPassword(vaultId: String, oldPassword: String, newPassword: String)
+    external fun rotateDek(vaultId: String, password: String): String
+    external fun regenerateRecoveryKey(vaultId: String, password: String): String
 
-    // Utilities
+    // Utilities (no vaultId needed)
     external fun generatePassword(
         length: Int,
         uppercase: Boolean,
@@ -74,9 +80,9 @@ object VaultBridge {
     external fun parseTotpPeriod(value: String): Long
 
     // Sync
-    external fun mergeRemoteVault(remoteBytes: ByteArray, remoteEtag: String)
-    external fun updateEtag(etag: String)
-    external fun getEtag(): String?
-    external fun getLastSyncTime(): Long
-    external fun restoreLastSyncTime(ts: Long)
+    external fun mergeRemoteVault(vaultId: String, remoteBytes: ByteArray, remoteEtag: String)
+    external fun updateEtag(vaultId: String, etag: String)
+    external fun getEtag(vaultId: String): String?
+    external fun getLastSyncTime(vaultId: String): Long
+    external fun restoreLastSyncTime(vaultId: String, ts: Long)
 }

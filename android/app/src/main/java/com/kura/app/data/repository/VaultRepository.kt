@@ -14,6 +14,10 @@ import java.io.File
 
 class VaultRepository(private val context: Context) {
 
+    companion object {
+        private const val DEFAULT_VAULT_ID = "default"
+    }
+
     private val json = Json { ignoreUnknownKeys = true }
 
     private fun vaultFile(): File = File(context.filesDir, "vault.bin")
@@ -45,31 +49,31 @@ class VaultRepository(private val context: Context) {
     // ========================================================================
 
     suspend fun createVault(masterPassword: String): String = withContext(Dispatchers.IO) {
-        VaultBridge.createVault(masterPassword)
+        VaultBridge.createVault(DEFAULT_VAULT_ID, masterPassword)
     }
 
     suspend fun loadVault(vaultBytes: ByteArray, etag: String = "") = withContext(Dispatchers.IO) {
-        VaultBridge.loadVault(vaultBytes, etag)
+        VaultBridge.loadVault(DEFAULT_VAULT_ID, vaultBytes, etag)
     }
 
     suspend fun unlock(masterPassword: String) = withContext(Dispatchers.IO) {
-        VaultBridge.unlock(masterPassword)
+        VaultBridge.unlock(DEFAULT_VAULT_ID, masterPassword)
     }
 
     suspend fun unlockWithRecoveryKey(recoveryKey: String) = withContext(Dispatchers.IO) {
-        VaultBridge.unlockWithRecoveryKey(recoveryKey)
+        VaultBridge.unlockWithRecoveryKey(DEFAULT_VAULT_ID, recoveryKey)
     }
 
     suspend fun lock(): ByteArray = withContext(Dispatchers.IO) {
-        VaultBridge.lock()
+        VaultBridge.lock(DEFAULT_VAULT_ID)
     }
 
     suspend fun getVaultBytes(): ByteArray = withContext(Dispatchers.IO) {
-        VaultBridge.getVaultBytes()
+        VaultBridge.getVaultBytes(DEFAULT_VAULT_ID)
     }
 
     suspend fun isUnlocked(): Boolean = withContext(Dispatchers.IO) {
-        VaultBridge.isUnlocked()
+        VaultBridge.isUnlocked(DEFAULT_VAULT_ID)
     }
 
     // ========================================================================
@@ -83,12 +87,12 @@ class VaultRepository(private val context: Context) {
         includeTrash: Boolean = false,
         onlyFavorites: Boolean = false
     ): List<EntryRow> = withContext(Dispatchers.IO) {
-        val jsonStr = VaultBridge.listEntries(searchQuery, entryType, labelId, includeTrash, onlyFavorites)
+        val jsonStr = VaultBridge.listEntries(DEFAULT_VAULT_ID, searchQuery, entryType, labelId, includeTrash, onlyFavorites)
         json.decodeFromString<List<EntryRow>>(jsonStr)
     }
 
     suspend fun getEntry(id: String): Entry = withContext(Dispatchers.IO) {
-        val jsonStr = VaultBridge.getEntry(id)
+        val jsonStr = VaultBridge.getEntry(DEFAULT_VAULT_ID, id)
         json.decodeFromString<Entry>(jsonStr)
     }
 
@@ -101,7 +105,7 @@ class VaultRepository(private val context: Context) {
         customFieldsJson: String?
     ): String = withContext(Dispatchers.IO) {
         val labelIdsJson = json.encodeToString(ListSerializer(String.serializer()), labelIds)
-        VaultBridge.createEntry(entryType, name, notes, typedValueJson, labelIdsJson, customFieldsJson)
+        VaultBridge.createEntry(DEFAULT_VAULT_ID, entryType, name, notes, typedValueJson, labelIdsJson, customFieldsJson)
     }
 
     suspend fun updateEntry(
@@ -115,23 +119,23 @@ class VaultRepository(private val context: Context) {
         val labelIdsJson = labelIds?.let {
             json.encodeToString(ListSerializer(String.serializer()), it)
         }
-        VaultBridge.updateEntry(id, name, typedValueJson, notes, labelIdsJson, customFieldsJson)
+        VaultBridge.updateEntry(DEFAULT_VAULT_ID, id, name, typedValueJson, notes, labelIdsJson, customFieldsJson)
     }
 
     suspend fun deleteEntry(id: String) = withContext(Dispatchers.IO) {
-        VaultBridge.deleteEntry(id)
+        VaultBridge.deleteEntry(DEFAULT_VAULT_ID, id)
     }
 
     suspend fun restoreEntry(id: String) = withContext(Dispatchers.IO) {
-        VaultBridge.restoreEntry(id)
+        VaultBridge.restoreEntry(DEFAULT_VAULT_ID, id)
     }
 
     suspend fun purgeEntry(id: String) = withContext(Dispatchers.IO) {
-        VaultBridge.purgeEntry(id)
+        VaultBridge.purgeEntry(DEFAULT_VAULT_ID, id)
     }
 
     suspend fun setFavorite(id: String, isFavorite: Boolean) = withContext(Dispatchers.IO) {
-        VaultBridge.setFavorite(id, isFavorite)
+        VaultBridge.setFavorite(DEFAULT_VAULT_ID, id, isFavorite)
     }
 
     // ========================================================================
@@ -139,25 +143,25 @@ class VaultRepository(private val context: Context) {
     // ========================================================================
 
     suspend fun listLabels(): List<Label> = withContext(Dispatchers.IO) {
-        val jsonStr = VaultBridge.listLabels()
+        val jsonStr = VaultBridge.listLabels(DEFAULT_VAULT_ID)
         json.decodeFromString<List<Label>>(jsonStr)
     }
 
     suspend fun createLabel(name: String): String = withContext(Dispatchers.IO) {
-        VaultBridge.createLabel(name)
+        VaultBridge.createLabel(DEFAULT_VAULT_ID, name)
     }
 
     suspend fun deleteLabel(id: String) = withContext(Dispatchers.IO) {
-        VaultBridge.deleteLabel(id)
+        VaultBridge.deleteLabel(DEFAULT_VAULT_ID, id)
     }
 
     suspend fun renameLabel(id: String, newName: String) = withContext(Dispatchers.IO) {
-        VaultBridge.renameLabel(id, newName)
+        VaultBridge.renameLabel(DEFAULT_VAULT_ID, id, newName)
     }
 
     suspend fun setEntryLabels(entryId: String, labelIds: List<String>) = withContext(Dispatchers.IO) {
         val labelIdsJson = json.encodeToString(ListSerializer(String.serializer()), labelIds)
-        VaultBridge.setEntryLabels(entryId, labelIdsJson)
+        VaultBridge.setEntryLabels(DEFAULT_VAULT_ID, entryId, labelIdsJson)
     }
 
     // ========================================================================
@@ -165,15 +169,15 @@ class VaultRepository(private val context: Context) {
     // ========================================================================
 
     suspend fun changeMasterPassword(oldPassword: String, newPassword: String) = withContext(Dispatchers.IO) {
-        VaultBridge.changeMasterPassword(oldPassword, newPassword)
+        VaultBridge.changeMasterPassword(DEFAULT_VAULT_ID, oldPassword, newPassword)
     }
 
     suspend fun rotateDek(password: String): String = withContext(Dispatchers.IO) {
-        VaultBridge.rotateDek(password)
+        VaultBridge.rotateDek(DEFAULT_VAULT_ID, password)
     }
 
     suspend fun regenerateRecoveryKey(password: String): String = withContext(Dispatchers.IO) {
-        VaultBridge.regenerateRecoveryKey(password)
+        VaultBridge.regenerateRecoveryKey(DEFAULT_VAULT_ID, password)
     }
 
     // ========================================================================
@@ -214,15 +218,15 @@ class VaultRepository(private val context: Context) {
         json.decodeFromString<S3Config>(configJson)
 
     private suspend fun mergeRemoteVault(remoteBytes: ByteArray, remoteEtag: String) = withContext(Dispatchers.IO) {
-        VaultBridge.mergeRemoteVault(remoteBytes, remoteEtag)
+        VaultBridge.mergeRemoteVault(DEFAULT_VAULT_ID, remoteBytes, remoteEtag)
     }
 
     private suspend fun updateEtag(etag: String) = withContext(Dispatchers.IO) {
-        VaultBridge.updateEtag(etag)
+        VaultBridge.updateEtag(DEFAULT_VAULT_ID, etag)
     }
 
     private suspend fun getEtag(): String? = withContext(Dispatchers.IO) {
-        VaultBridge.getEtag()
+        VaultBridge.getEtag(DEFAULT_VAULT_ID)
     }
 
     suspend fun syncVault(configJson: String): SyncResult = withContext(Dispatchers.IO) {
@@ -289,11 +293,11 @@ class VaultRepository(private val context: Context) {
     }
 
     suspend fun getLastSyncTime(): Long = withContext(Dispatchers.IO) {
-        VaultBridge.getLastSyncTime()
+        VaultBridge.getLastSyncTime(DEFAULT_VAULT_ID)
     }
 
     suspend fun restoreLastSyncTime(ts: Long) = withContext(Dispatchers.IO) {
-        VaultBridge.restoreLastSyncTime(ts)
+        VaultBridge.restoreLastSyncTime(DEFAULT_VAULT_ID, ts)
     }
 
     // ========================================================================
