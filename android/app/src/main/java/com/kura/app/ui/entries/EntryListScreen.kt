@@ -2,8 +2,10 @@ package com.kura.app.ui.entries
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,19 +29,20 @@ fun EntryListScreen(
     onCreateClick: () -> Unit,
     onlyFavorites: Boolean = false,
     labelId: String? = null,
-    onSettings: (() -> Unit)? = null,
+    initialType: String? = null,
+    onBack: (() -> Unit)? = null,
 ) {
     var entries by remember { mutableStateOf<List<EntryRow>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var searchQuery by remember { mutableStateOf("") }
-    var selectedType by remember { mutableStateOf<String?>(null) }
+    var selectedType by remember { mutableStateOf(initialType) }
     var deleteTargetId by remember { mutableStateOf<String?>(null) }
-    var filterExpanded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val title = when {
         onlyFavorites -> "お気に入り"
         labelId != null -> "ラベル"
+        selectedType != null -> EntryType.fromValue(selectedType!!)?.displayName ?: "アイテム"
         else -> "全てのアイテム"
     }
 
@@ -67,24 +70,10 @@ fun EntryListScreen(
         topBar = {
             TopAppBar(
                 title = { Text(title) },
-                actions = {
-                    Box {
-                        IconButton(onClick = { filterExpanded = true }) {
-                            Icon(Icons.Default.FilterList, contentDescription = "フィルター")
-                        }
-                        DropdownMenu(expanded = filterExpanded, onDismissRequest = { filterExpanded = false }) {
-                            DropdownMenuItem(text = { Text("全て") }, onClick = { selectedType = null; filterExpanded = false })
-                            EntryType.entries.forEach { type ->
-                                DropdownMenuItem(
-                                    text = { Text(type.displayName) },
-                                    onClick = { selectedType = type.value; filterExpanded = false }
-                                )
-                            }
-                        }
-                    }
-                    if (onSettings != null) {
-                        IconButton(onClick = onSettings) {
-                            Icon(Icons.Default.Settings, contentDescription = "設定")
+                navigationIcon = {
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
                         }
                     }
                 }
@@ -115,6 +104,31 @@ fun EntryListScreen(
                     }
                 }
             )
+
+            // Filter chips
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                item {
+                    FilterChip(
+                        selected = selectedType == null,
+                        onClick = { selectedType = null },
+                        label = { Text("全て") }
+                    )
+                }
+                items(EntryType.entries.filter { it != EntryType.PASSKEY }) { type ->
+                    FilterChip(
+                        selected = selectedType == type.value,
+                        onClick = {
+                            selectedType = if (selectedType == type.value) null else type.value
+                        },
+                        label = { Text(type.displayName) }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             if (loading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

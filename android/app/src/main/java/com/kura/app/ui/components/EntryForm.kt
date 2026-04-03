@@ -2,6 +2,7 @@ package com.kura.app.ui.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -10,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -47,190 +49,270 @@ fun EntryForm(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Name field
-        OutlinedTextField(
+        // Name field - prominent, borderless
+        TextField(
             value = name,
             onValueChange = onNameChange,
-            label = { Text("名前") },
+            placeholder = { Text("アイテム名を入力...", style = MaterialTheme.typography.headlineSmall) },
+            textStyle = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            colors = TextFieldDefaults.colors(
+                unfocusedContainerColor = Color.Transparent,
+                focusedContainerColor = Color.Transparent,
+                unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
+                focusedIndicatorColor = MaterialTheme.colorScheme.primary
+            )
         )
 
-        // Type-specific fields
-        when (entryType) {
-            "login" -> {
-                OutlinedTextField(
-                    value = typedValues["url"] ?: "",
-                    onValueChange = { onTypedValueChange("url", it) },
-                    label = { Text("URL") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
-                )
-                OutlinedTextField(
-                    value = typedValues["username"] ?: "",
-                    onValueChange = { onTypedValueChange("username", it) },
-                    label = { Text("ユーザー名") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                PasswordField(
-                    value = typedValues["password"] ?: "",
-                    onValueChange = { onTypedValueChange("password", it) },
-                    label = "パスワード",
-                    onGeneratePassword = onGeneratePassword,
-                    onCopy = onCopyToClipboard
-                )
-                OutlinedTextField(
-                    value = typedValues["totp"] ?: "",
-                    onValueChange = { onTypedValueChange("totp", it) },
-                    label = { Text("TOTP シークレット") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-            }
-            "bank" -> {
-                OutlinedTextField(
-                    value = typedValues["bank_name"] ?: "",
-                    onValueChange = { onTypedValueChange("bank_name", it) },
-                    label = { Text("銀行名") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = typedValues["account_number"] ?: "",
-                    onValueChange = { onTypedValueChange("account_number", it) },
-                    label = { Text("口座番号") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                PasswordField(
-                    value = typedValues["pin"] ?: "",
-                    onValueChange = { onTypedValueChange("pin", it) },
-                    label = "PIN",
-                    onCopy = onCopyToClipboard
-                )
-            }
-            "ssh_key" -> {
-                OutlinedTextField(
-                    value = typedValues["private_key"] ?: "",
-                    onValueChange = { onTypedValueChange("private_key", it) },
-                    label = { Text("秘密鍵") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                    maxLines = 8
-                )
-                PasswordField(
-                    value = typedValues["passphrase"] ?: "",
-                    onValueChange = { onTypedValueChange("passphrase", it) },
-                    label = "パスフレーズ",
-                    onCopy = onCopyToClipboard
-                )
-            }
-            "secure_note" -> {
-                OutlinedTextField(
-                    value = typedValues["content"] ?: "",
-                    onValueChange = { onTypedValueChange("content", it) },
-                    label = { Text("内容") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 5,
-                    maxLines = 20
-                )
-            }
-            "credit_card" -> {
-                OutlinedTextField(
-                    value = typedValues["cardholder"] ?: "",
-                    onValueChange = { onTypedValueChange("cardholder", it) },
-                    label = { Text("カード名義") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = typedValues["number"] ?: "",
-                    onValueChange = { onTypedValueChange("number", it) },
-                    label = { Text("カード番号") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-                OutlinedTextField(
-                    value = typedValues["expiry"] ?: "",
-                    onValueChange = { onTypedValueChange("expiry", it) },
-                    label = { Text("有効期限") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                PasswordField(
-                    value = typedValues["cvv"] ?: "",
-                    onValueChange = { onTypedValueChange("cvv", it) },
-                    label = "CVV",
-                    onCopy = onCopyToClipboard
-                )
-            }
-        }
-
-        // Notes
-        if (entryType != "secure_note") {
-            OutlinedTextField(
-                value = notes,
-                onValueChange = onNotesChange,
-                label = { Text("メモ") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-                maxLines = 6
-            )
-        }
-
-        // Labels
-        if (labels.isNotEmpty()) {
-            Text("ラベル", style = MaterialTheme.typography.titleSmall)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                labels.forEach { label ->
-                    FilterChip(
-                        selected = label.id in selectedLabelIds,
-                        onClick = { onLabelToggle(label.id) },
-                        label = { Text(label.name) }
+        // Type-specific fields section
+        FormSection(title = sectionTitle(entryType)) {
+            when (entryType) {
+                "login" -> {
+                    FlatTextField(
+                        value = typedValues["url"] ?: "",
+                        onValueChange = { onTypedValueChange("url", it) },
+                        label = "URL",
+                        keyboardType = KeyboardType.Uri
+                    )
+                    SectionDivider()
+                    FlatTextField(
+                        value = typedValues["username"] ?: "",
+                        onValueChange = { onTypedValueChange("username", it) },
+                        label = "ユーザー名"
+                    )
+                    SectionDivider()
+                    PasswordField(
+                        value = typedValues["password"] ?: "",
+                        onValueChange = { onTypedValueChange("password", it) },
+                        label = "パスワード",
+                        onGeneratePassword = onGeneratePassword,
+                        onCopy = onCopyToClipboard
+                    )
+                    SectionDivider()
+                    FlatTextField(
+                        value = typedValues["totp"] ?: "",
+                        onValueChange = { onTypedValueChange("totp", it) },
+                        label = "TOTP シークレット"
+                    )
+                }
+                "bank" -> {
+                    FlatTextField(
+                        value = typedValues["bank_name"] ?: "",
+                        onValueChange = { onTypedValueChange("bank_name", it) },
+                        label = "銀行名"
+                    )
+                    SectionDivider()
+                    FlatTextField(
+                        value = typedValues["account_number"] ?: "",
+                        onValueChange = { onTypedValueChange("account_number", it) },
+                        label = "口座番号"
+                    )
+                    SectionDivider()
+                    PasswordField(
+                        value = typedValues["pin"] ?: "",
+                        onValueChange = { onTypedValueChange("pin", it) },
+                        label = "PIN",
+                        onCopy = onCopyToClipboard
+                    )
+                }
+                "ssh_key" -> {
+                    FlatTextField(
+                        value = typedValues["private_key"] ?: "",
+                        onValueChange = { onTypedValueChange("private_key", it) },
+                        label = "秘密鍵",
+                        minLines = 3,
+                        maxLines = 8,
+                        singleLine = false
+                    )
+                    SectionDivider()
+                    PasswordField(
+                        value = typedValues["passphrase"] ?: "",
+                        onValueChange = { onTypedValueChange("passphrase", it) },
+                        label = "パスフレーズ",
+                        onCopy = onCopyToClipboard
+                    )
+                }
+                "secure_note" -> {
+                    FlatTextField(
+                        value = typedValues["content"] ?: "",
+                        onValueChange = { onTypedValueChange("content", it) },
+                        label = "内容",
+                        minLines = 5,
+                        maxLines = 20,
+                        singleLine = false
+                    )
+                }
+                "credit_card" -> {
+                    FlatTextField(
+                        value = typedValues["cardholder"] ?: "",
+                        onValueChange = { onTypedValueChange("cardholder", it) },
+                        label = "カード名義"
+                    )
+                    SectionDivider()
+                    FlatTextField(
+                        value = typedValues["number"] ?: "",
+                        onValueChange = { onTypedValueChange("number", it) },
+                        label = "カード番号",
+                        keyboardType = KeyboardType.Number
+                    )
+                    SectionDivider()
+                    FlatTextField(
+                        value = typedValues["expiry"] ?: "",
+                        onValueChange = { onTypedValueChange("expiry", it) },
+                        label = "有効期限"
+                    )
+                    SectionDivider()
+                    PasswordField(
+                        value = typedValues["cvv"] ?: "",
+                        onValueChange = { onTypedValueChange("cvv", it) },
+                        label = "CVV",
+                        onCopy = onCopyToClipboard
                     )
                 }
             }
         }
 
-        // Custom fields
-        Text("カスタムフィールド", style = MaterialTheme.typography.titleSmall)
-        customFields.forEachIndexed { index, field ->
-            CustomFieldEditor(
-                field = field,
-                onFieldChange = { updated ->
-                    val newList = customFields.toMutableList()
-                    newList[index] = updated
-                    onCustomFieldsChange(newList)
-                },
-                onRemove = {
-                    val newList = customFields.toMutableList()
-                    newList.removeAt(index)
-                    onCustomFieldsChange(newList)
-                }
-            )
-        }
-        TextButton(
-            onClick = {
-                val newField = CustomField(
-                    id = UUID.randomUUID().toString(),
-                    name = "",
-                    fieldType = "text",
-                    value = ""
+        // Notes section
+        if (entryType != "secure_note") {
+            FormSection(title = "メモ") {
+                FlatTextField(
+                    value = notes,
+                    onValueChange = onNotesChange,
+                    label = "メモ",
+                    minLines = 2,
+                    maxLines = 6,
+                    singleLine = false
                 )
-                onCustomFieldsChange(customFields + newField)
             }
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null)
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("フィールドを追加")
+        }
+
+        // Labels section
+        if (labels.isNotEmpty()) {
+            FormSection(title = "ラベル") {
+                FlowRow(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    labels.forEach { label ->
+                        FilterChip(
+                            selected = label.id in selectedLabelIds,
+                            onClick = { onLabelToggle(label.id) },
+                            label = { Text(label.name) },
+                            leadingIcon = if (label.id in selectedLabelIds) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null
+                        )
+                    }
+                }
+            }
+        }
+
+        // Custom fields section
+        FormSection(title = "カスタムフィールド") {
+            customFields.forEachIndexed { index, field ->
+                if (index > 0) SectionDivider()
+                CustomFieldEditor(
+                    field = field,
+                    onFieldChange = { updated ->
+                        val newList = customFields.toMutableList()
+                        newList[index] = updated
+                        onCustomFieldsChange(newList)
+                    },
+                    onRemove = {
+                        val newList = customFields.toMutableList()
+                        newList.removeAt(index)
+                        onCustomFieldsChange(newList)
+                    }
+                )
+            }
+            if (customFields.isNotEmpty()) SectionDivider()
+            TextButton(
+                onClick = {
+                    val newField = CustomField(
+                        id = UUID.randomUUID().toString(),
+                        name = "",
+                        fieldType = "text",
+                        value = ""
+                    )
+                    onCustomFieldsChange(customFields + newField)
+                },
+                modifier = Modifier.padding(horizontal = 8.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("フィールドを追加")
+            }
         }
     }
+}
+
+@Composable
+private fun FormSection(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Surface(
+        tonalElevation = 1.dp,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column {
+            Text(
+                title,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 4.dp)
+            )
+            content()
+        }
+    }
+}
+
+@Composable
+private fun SectionDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    )
+}
+
+@Composable
+private fun FlatTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    singleLine: Boolean = true,
+    minLines: Int = 1,
+    maxLines: Int = 1
+) {
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = singleLine,
+        minLines = minLines,
+        maxLines = maxLines,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        colors = TextFieldDefaults.colors(
+            unfocusedContainerColor = Color.Transparent,
+            focusedContainerColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            focusedIndicatorColor = Color.Transparent
+        )
+    )
+}
+
+private fun sectionTitle(entryType: String): String = when (entryType) {
+    "login" -> "ログイン情報"
+    "bank" -> "銀行口座情報"
+    "ssh_key" -> "SSHキー情報"
+    "secure_note" -> "ノート"
+    "credit_card" -> "クレジットカード情報"
+    else -> "基本情報"
 }
 
 @Composable
@@ -244,7 +326,7 @@ fun PasswordField(
     var visible by remember { mutableStateOf(false) }
     var showGenerator by remember { mutableStateOf(false) }
 
-    OutlinedTextField(
+    TextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
@@ -270,14 +352,20 @@ fun PasswordField(
                     }
                 }
             }
-        }
+        },
+        colors = TextFieldDefaults.colors(
+            unfocusedContainerColor = Color.Transparent,
+            focusedContainerColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            focusedIndicatorColor = Color.Transparent
+        )
     )
 
     if (showGenerator && onGeneratePassword != null) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 4.dp)
+                .padding(horizontal = 16.dp, vertical = 4.dp)
         ) {
             PasswordGeneratorPanel(
                 onGenerate = onGeneratePassword,
@@ -300,38 +388,34 @@ fun CustomFieldEditor(
 ) {
     val fieldTypes = CustomFieldType.entries
     var expanded by remember { mutableStateOf(false) }
+    val isPassword = field.fieldType == "password"
+    var visible by remember { mutableStateOf(!isPassword) }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = field.name,
-                    onValueChange = { onFieldChange(field.copy(name = it)) },
-                    label = { Text("フィールド名") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        // Row 1: Field name + type chip + delete
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextField(
+                value = field.name,
+                onValueChange = { onFieldChange(field.copy(name = it)) },
+                placeholder = { Text("フィールド名") },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyMedium,
+                colors = TextFieldDefaults.colors(
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                IconButton(onClick = onRemove) {
-                    Icon(Icons.Default.Close, contentDescription = "削除", tint = MaterialTheme.colorScheme.error)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Type selector
-            ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-                OutlinedTextField(
-                    value = CustomFieldType.fromValue(field.fieldType)?.displayName ?: field.fieldType,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("タイプ") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor()
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            // Type chip
+            Box {
+                AssistChip(
+                    onClick = { expanded = true },
+                    label = { Text(CustomFieldType.fromValue(field.fieldType)?.displayName ?: field.fieldType, style = MaterialTheme.typography.labelSmall) }
                 )
-                ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     fieldTypes.forEach { type ->
                         DropdownMenuItem(
                             text = { Text(type.displayName) },
@@ -343,31 +427,41 @@ fun CustomFieldEditor(
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Value
-            val isPassword = field.fieldType == "password"
-            var visible by remember { mutableStateOf(!isPassword) }
-
-            OutlinedTextField(
-                value = field.value,
-                onValueChange = { onFieldChange(field.copy(value = it)) },
-                label = { Text("値") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                visualTransformation = if (!visible) PasswordVisualTransformation() else VisualTransformation.None,
-                trailingIcon = if (isPassword) {
-                    {
-                        IconButton(onClick = { visible = !visible }) {
-                            Icon(
-                                if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = null
-                            )
-                        }
-                    }
-                } else null
-            )
+            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    Icons.Default.RemoveCircleOutline,
+                    contentDescription = "削除",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
+
+        // Row 2: Value
+        TextField(
+            value = field.value,
+            onValueChange = { onFieldChange(field.copy(value = it)) },
+            placeholder = { Text("値") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            visualTransformation = if (!visible && isPassword) PasswordVisualTransformation() else VisualTransformation.None,
+            trailingIcon = if (isPassword) {
+                {
+                    IconButton(onClick = { visible = !visible }) {
+                        Icon(
+                            if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            } else null,
+            colors = TextFieldDefaults.colors(
+                unfocusedContainerColor = Color.Transparent,
+                focusedContainerColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                focusedIndicatorColor = Color.Transparent
+            )
+        )
     }
 }
