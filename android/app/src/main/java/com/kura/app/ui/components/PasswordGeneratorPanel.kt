@@ -74,11 +74,23 @@ fun PasswordGeneratorPanel(
         Spacer(modifier = Modifier.height(8.dp))
 
         // Toggle options
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            FilterChip(selected = uppercase, onClick = { uppercase = !uppercase }, label = { Text("A-Z") })
-            FilterChip(selected = lowercase, onClick = { lowercase = !lowercase }, label = { Text("a-z") })
-            FilterChip(selected = numbers, onClick = { numbers = !numbers }, label = { Text("0-9") })
-            FilterChip(selected = symbols, onClick = { symbols = !symbols }, label = { Text("!@#") })
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = uppercase, onCheckedChange = { uppercase = it })
+                Text("大文字 (A-Z)", style = MaterialTheme.typography.bodyMedium)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = lowercase, onCheckedChange = { lowercase = it })
+                Text("小文字 (a-z)", style = MaterialTheme.typography.bodyMedium)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = numbers, onCheckedChange = { numbers = it })
+                Text("数字 (0-9)", style = MaterialTheme.typography.bodyMedium)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = symbols, onCheckedChange = { symbols = it })
+                Text("記号 (!@#)", style = MaterialTheme.typography.bodyMedium)
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))

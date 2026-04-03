@@ -6,8 +6,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
@@ -16,10 +16,13 @@ import com.kura.app.viewmodel.AppViewModel
 import com.kura.app.ui.onboarding.*
 import com.kura.app.ui.auth.*
 import com.kura.app.ui.entries.*
+import com.kura.app.ui.home.*
 import com.kura.app.ui.labels.*
 import com.kura.app.ui.tools.*
-import com.kura.app.ui.sync.*
+import com.kura.app.ui.sync.formatRelativeTime
 import com.kura.app.ui.settings.*
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 object Routes {
     // Onboarding
@@ -34,8 +37,8 @@ object Routes {
     const val RECOVERY = "recovery"
 
     // Main
+    const val HOME = "home"
     const val ENTRY_LIST = "entries"
-    const val FAVORITES = "favorites"
     const val ENTRY_DETAIL = "entries/{entryId}"
     const val ENTRY_CREATE = "entries/create"
     const val ENTRY_EDIT = "entries/{entryId}/edit"
@@ -43,7 +46,6 @@ object Routes {
     const val LABEL_MANAGER = "labels"
     const val LABEL_ENTRIES = "labels/{labelId}/entries"
     const val PASSWORD_GENERATOR = "password_generator"
-    const val SYNC = "sync"
     const val SETTINGS = "settings"
 
     fun recoveryKey(key: String) = "recovery_key/$key"
@@ -51,20 +53,6 @@ object Routes {
     fun entryEdit(id: String) = "entries/$id/edit"
     fun labelEntries(labelId: String) = "labels/$labelId/entries"
 }
-
-sealed class BottomNavItem(val route: String, val label: String, val icon: @Composable () -> Unit) {
-    data object Items : BottomNavItem(Routes.ENTRY_LIST, "アイテム", { Icon(Icons.Default.Key, contentDescription = null) })
-    data object Favorites : BottomNavItem(Routes.FAVORITES, "お気に入り", { Icon(Icons.Default.Star, contentDescription = null) })
-    data object Generator : BottomNavItem(Routes.PASSWORD_GENERATOR, "生成", { Icon(Icons.Default.AutoAwesome, contentDescription = null) })
-    data object Sync : BottomNavItem(Routes.SYNC, "同期", { Icon(Icons.Default.Sync, contentDescription = null) })
-    data object Settings : BottomNavItem(Routes.SETTINGS, "設定", { Icon(Icons.Default.Settings, contentDescription = null) })
-}
-
-val bottomNavItems = listOf(
-    BottomNavItem.Items,
-    BottomNavItem.Favorites,
-    BottomNavItem.Generator,
-)
 
 @Composable
 fun KuraApp(appViewModel: AppViewModel = viewModel()) {
@@ -160,58 +148,183 @@ fun AuthNavHost(appViewModel: AppViewModel) {
 @Composable
 fun MainNavHost(appViewModel: AppViewModel) {
     val navController = rememberNavController()
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val showBottomBar = currentRoute in bottomNavItems.map { it.route }
+    // Sync state for drawer
+    var isSyncing by remember { mutableStateOf(false) }
+    var lastSyncTime by remember { mutableStateOf<Long?>(null) }
 
-    Scaffold(
-        bottomBar = {
-            if (showBottomBar) {
-                NavigationBar {
-                    bottomNavItems.forEach { item ->
-                        NavigationBarItem(
-                            icon = item.icon,
-                            label = { Text(item.label) },
-                            selected = currentRoute == item.route,
-                            onClick = {
-                                if (currentRoute != item.route) {
-                                    navController.navigate(item.route) {
-                                        popUpTo(navController.graph.startDestinationId) {
-                                            saveState = true
-                                        }
-                                        launchSingleTop = true
-                                        restoreState = true
+    LaunchedEffect(Unit) {
+        val ts = appViewModel.repository.getLastSyncTime()
+        if (ts > 0) lastSyncTime = ts
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        gesturesEnabled = currentRoute == Routes.HOME,
+        drawerContent = {
+            ModalDrawerSheet(modifier = Modifier.width(300.dp)) {
+                // Header
+                Column(modifier = Modifier.padding(24.dp)) {
+                    Icon(
+                        Icons.Default.Key,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("kura", style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        "パスワードマネージャー",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                @Suppress("DEPRECATION")
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.List, contentDescription = null) },
+                    label = { Text("アイテム一覧") },
+                    selected = currentRoute == Routes.HOME,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(Routes.HOME) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+
+                NavigationDrawerItem(
+                    icon = {
+                        if (isSyncing) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Sync, contentDescription = null)
+                        }
+                    },
+                    label = { Text("同期") },
+                    badge = {
+                        Text(
+                            if (lastSyncTime != null) formatRelativeTime(lastSyncTime!!) else "未同期",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    selected = false,
+                    onClick = {
+                        if (isSyncing) return@NavigationDrawerItem
+                        scope.launch {
+                            drawerState.close()
+                            isSyncing = true
+                            try {
+                                val config = appViewModel.preferences.s3ConfigFlow.first()
+                                if (config != null) {
+                                    val result = appViewModel.repository.syncVault(config)
+                                    if (result.synced) {
+                                        val vaultBytes = appViewModel.repository.getVaultBytes()
+                                        appViewModel.repository.writeVaultFile(vaultBytes)
+                                    }
+                                    val ts = appViewModel.repository.getLastSyncTime()
+                                    if (ts > 0) {
+                                        appViewModel.preferences.saveLastSyncTime(ts)
+                                        lastSyncTime = ts
                                     }
                                 }
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Routes.ENTRY_LIST,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(Routes.ENTRY_LIST) {
-                EntryListScreen(
-                    appViewModel = appViewModel,
-                    onEntryClick = { id -> navController.navigate(Routes.entryDetail(id)) },
-                    onCreateClick = { navController.navigate(Routes.ENTRY_CREATE) },
-                    onlyFavorites = false,
-                    onSettings = { navController.navigate(Routes.SETTINGS) }
+                            } catch (_: Exception) { }
+                            isSyncing = false
+                        }
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
+                    label = { Text("パスワード生成") },
+                    selected = currentRoute == Routes.PASSWORD_GENERATOR,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Routes.PASSWORD_GENERATOR) { launchSingleTop = true }
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Label, contentDescription = null) },
+                    label = { Text("ラベル管理") },
+                    selected = currentRoute == Routes.LABEL_MANAGER,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Routes.LABEL_MANAGER) { launchSingleTop = true }
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                    label = { Text("ゴミ箱") },
+                    selected = currentRoute == Routes.TRASH,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Routes.TRASH) { launchSingleTop = true }
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                    label = { Text("設定") },
+                    selected = currentRoute == Routes.SETTINGS,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Routes.SETTINGS) { launchSingleTop = true }
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp)
                 )
             }
-            composable(Routes.FAVORITES) {
+        }
+    ) {
+        NavHost(
+            navController = navController,
+            startDestination = Routes.HOME
+        ) {
+            composable(Routes.HOME) {
+                HomeScreen(
+                    appViewModel = appViewModel,
+                    onOpenDrawer = { scope.launch { drawerState.open() } },
+                    onEntryClick = { id -> navController.navigate(Routes.entryDetail(id)) },
+                    onCreateClick = { navController.navigate(Routes.ENTRY_CREATE) }
+                )
+            }
+            composable(
+                Routes.ENTRY_LIST + "?type={type}&favorites={favorites}",
+                arguments = listOf(
+                    navArgument("type") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("favorites") { type = NavType.BoolType; defaultValue = false }
+                )
+            ) { backStackEntry ->
+                val type = backStackEntry.arguments?.getString("type")?.ifEmpty { null }
+                val favorites = backStackEntry.arguments?.getBoolean("favorites") ?: false
                 EntryListScreen(
                     appViewModel = appViewModel,
                     onEntryClick = { id -> navController.navigate(Routes.entryDetail(id)) },
                     onCreateClick = { navController.navigate(Routes.ENTRY_CREATE) },
-                    onlyFavorites = true,
-                    onSettings = { navController.navigate(Routes.SETTINGS) }
+                    onlyFavorites = favorites,
+                    initialType = type,
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable(
@@ -223,7 +336,8 @@ fun MainNavHost(appViewModel: AppViewModel) {
                     entryId = entryId,
                     appViewModel = appViewModel,
                     onBack = { navController.popBackStack() },
-                    onEdit = { navController.navigate(Routes.entryEdit(entryId)) }
+                    onEdit = { navController.navigate(Routes.entryEdit(entryId)) },
+                    onDeleted = { navController.popBackStack() }
                 )
             }
             composable(Routes.ENTRY_CREATE) {
@@ -251,7 +365,7 @@ fun MainNavHost(appViewModel: AppViewModel) {
             composable(Routes.TRASH) {
                 TrashScreen(
                     appViewModel = appViewModel,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.navigateUp() }
                 )
             }
             composable(Routes.LABEL_MANAGER) {
@@ -272,17 +386,12 @@ fun MainNavHost(appViewModel: AppViewModel) {
                     appViewModel = appViewModel,
                     onEntryClick = { id -> navController.navigate(Routes.entryDetail(id)) },
                     onCreateClick = { navController.navigate(Routes.ENTRY_CREATE) },
-                    labelId = labelId
+                    labelId = labelId,
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable(Routes.PASSWORD_GENERATOR) {
                 PasswordGeneratorScreen(
-                    appViewModel = appViewModel,
-                    onSettings = { navController.navigate(Routes.SETTINGS) }
-                )
-            }
-            composable(Routes.SYNC) {
-                SyncScreen(
                     appViewModel = appViewModel,
                     onBack = { navController.popBackStack() }
                 )
@@ -290,9 +399,6 @@ fun MainNavHost(appViewModel: AppViewModel) {
             composable(Routes.SETTINGS) {
                 SettingsScreen(
                     appViewModel = appViewModel,
-                    onTrash = { navController.navigate(Routes.TRASH) },
-                    onLabels = { navController.navigate(Routes.LABEL_MANAGER) },
-                    onSync = { navController.navigate(Routes.SYNC) },
                     onBack = { navController.popBackStack() },
                     onLogout = {
                         appViewModel.setAppState(AppState.ONBOARDING)

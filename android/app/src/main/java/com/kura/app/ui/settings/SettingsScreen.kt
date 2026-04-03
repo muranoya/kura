@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,9 +26,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     appViewModel: AppViewModel,
-    onTrash: () -> Unit,
-    onLabels: () -> Unit,
-    onSync: () -> Unit = {},
     onBack: () -> Unit = {},
     onLogout: () -> Unit
 ) {
@@ -46,7 +44,7 @@ fun SettingsScreen(
                 title = { Text("設定") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "戻る")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
                     }
                 }
             )
@@ -58,77 +56,82 @@ fun SettingsScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 管理
-            Card(onClick = onLabels, modifier = Modifier.fillMaxWidth()) {
+            // セキュリティセクション
+            Text("セキュリティ", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Card(onClick = { showChangePasswordDialog = true }, modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = { Text("ラベル管理") },
-                    leadingContent = { Icon(Icons.Default.Label, contentDescription = null) }
+                    headlineContent = { Text("マスターパスワード変更") },
+                    supportingContent = { Text("マスターパスワードを新しいものに変更") },
+                    leadingContent = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 )
             }
 
-            Card(onClick = onTrash, modifier = Modifier.fillMaxWidth()) {
+            Card(onClick = { showRotateDekDialog = true }, modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = { Text("ゴミ箱") },
-                    leadingContent = { Icon(Icons.Default.Delete, contentDescription = null) }
+                    headlineContent = { Text("DEK更新") },
+                    supportingContent = { Text("データ暗号化キーを更新し、リカバリーキーも再生成") },
+                    leadingContent = { Icon(Icons.Default.VpnKey, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 )
             }
 
-            Card(onClick = onSync, modifier = Modifier.fillMaxWidth()) {
+            Card(onClick = { showRegenRecoveryDialog = true }, modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = { Text("同期") },
-                    leadingContent = { Icon(Icons.Default.Sync, contentDescription = null) }
+                    headlineContent = { Text("リカバリーキー再生成") },
+                    supportingContent = { Text("新しいリカバリーキーを生成して表示") },
+                    leadingContent = { Icon(Icons.Default.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 )
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
             HorizontalDivider()
-
-            // Security section
-            Text("セキュリティ", style = MaterialTheme.typography.titleSmall)
-
-            Button(onClick = { showChangePasswordDialog = true }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.Lock, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("マスターパスワード変更")
-            }
-
-            OutlinedButton(onClick = { showRotateDekDialog = true }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.VpnKey, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("DEK更新")
-            }
-
-            OutlinedButton(onClick = { showRegenRecoveryDialog = true }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.Key, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("リカバリーキー再生成")
-            }
-
-            HorizontalDivider()
+            Spacer(modifier = Modifier.height(8.dp))
 
             // About section
-            Text("このアプリについて", style = MaterialTheme.typography.titleSmall)
+            Text("このアプリについて", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(4.dp))
+
             Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("バージョン", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("v0.1.0", style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
+                ListItem(
+                    headlineContent = { Text("バージョン") },
+                    trailingContent = { Text("v0.1.0", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                )
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
             HorizontalDivider()
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Logout
-            Button(
+            Card(
                 onClick = { showLogoutDialog = true },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
             ) {
-                Icon(Icons.Default.Logout, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("ログアウト")
+                ListItem(
+                    headlineContent = {
+                        Text("ログアウト", color = MaterialTheme.colorScheme.onErrorContainer)
+                    },
+                    supportingContent = {
+                        Text(
+                            "ローカルキャッシュとS3設定をクリア",
+                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.Logout,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                )
             }
         }
     }

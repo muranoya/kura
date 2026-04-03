@@ -11,17 +11,17 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF8B9CF7),
-    onPrimary = Color(0xFF1A1A2E),
-    primaryContainer = Color(0xFF3D4A8C),
-    onPrimaryContainer = Color(0xFFDDE1FF),
+    primary = Color(0xFFA78BFA),
+    onPrimary = Color(0xFF1E1B4B),
+    primaryContainer = Color(0xFF5B21B6),
+    onPrimaryContainer = Color(0xFFEDE9FE),
     secondary = Color(0xFFBEC6DC),
     onSecondary = Color(0xFF283041),
     secondaryContainer = Color(0xFF3E4758),
     onSecondaryContainer = Color(0xFFDAE2F9),
     tertiary = Color(0xFFDEBCDF),
     onTertiary = Color(0xFF3F2844),
-    surface = Color(0xFF121218),
+    surface = Color(0xFF1E1B2E),
     onSurface = Color(0xFFE4E1E9),
     surfaceVariant = Color(0xFF46464F),
     onSurfaceVariant = Color(0xFFC7C5D0),
@@ -33,25 +33,25 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF4A5BC7),
+    primary = Color(0xFF7C3AED),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFDDE1FF),
-    onPrimaryContainer = Color(0xFF001258),
+    primaryContainer = Color(0xFFF5F3FF),
+    onPrimaryContainer = Color(0xFF1E1B4B),
     secondary = Color(0xFF575E71),
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFDAE2F9),
     onSecondaryContainer = Color(0xFF141B2C),
     tertiary = Color(0xFF725572),
     onTertiary = Color.White,
-    surface = Color(0xFFFCF8FF),
-    onSurface = Color(0xFF1B1B21),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF1E1B4B),
     surfaceVariant = Color(0xFFE4E1EC),
-    onSurfaceVariant = Color(0xFF46464F),
+    onSurfaceVariant = Color(0xFF94A3B8),
     outline = Color(0xFF777680),
     error = Color(0xFFBA1A1A),
     onError = Color.White,
-    background = Color(0xFFFCF8FF),
-    onBackground = Color(0xFF1B1B21),
+    background = Color(0xFFF2F2F8),
+    onBackground = Color(0xFF1E1B4B),
 )
 
 @Composable
