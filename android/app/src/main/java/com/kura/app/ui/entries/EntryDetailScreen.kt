@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -17,13 +18,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.outlined.StarOutline
 import com.kura.app.data.model.CustomField
 import com.kura.app.data.model.Entry
 import com.kura.app.data.model.Label
+import com.kura.app.ui.components.ConfirmDialog
 import com.kura.app.ui.components.EntryTypeIcon
 import com.kura.app.ui.components.entryTypeDisplayName
 import com.kura.app.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 
@@ -33,12 +37,14 @@ fun EntryDetailScreen(
     entryId: String,
     appViewModel: AppViewModel,
     onBack: () -> Unit,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
+    onDeleted: () -> Unit = onBack
 ) {
     var entry by remember { mutableStateOf<Entry?>(null) }
     var labels by remember { mutableStateOf<List<Label>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
+    var showDeleteDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -59,6 +65,13 @@ fun EntryDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                    }
+                },
+                actions = {
+                    if (entry != null) {
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "ゴミ箱に移動")
+                        }
                     }
                 }
             )
@@ -116,11 +129,20 @@ fun EntryDetailScreen(
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                                 )
                             }
-                            if (e.isFavorite) {
+                            IconButton(
+                                onClick = {
+                                    scope.launch {
+                                        try {
+                                            appViewModel.repository.setFavorite(entryId, !e.isFavorite)
+                                            entry = appViewModel.repository.getEntry(entryId)
+                                        } catch (_: Exception) { }
+                                    }
+                                }
+                            ) {
                                 Icon(
-                                    Icons.Default.Star,
+                                    if (e.isFavorite) Icons.Default.Star else Icons.Outlined.StarOutline,
                                     contentDescription = "お気に入り",
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    tint = if (e.isFavorite) Color(0xFFD97706) else MaterialTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.size(28.dp)
                                 )
                             }
@@ -224,6 +246,26 @@ fun EntryDetailScreen(
                 }
             }
         }
+    }
+
+    if (showDeleteDialog) {
+        ConfirmDialog(
+            title = "アイテムを削除",
+            description = "このアイテムをゴミ箱に移動しますか？",
+            confirmText = "ゴミ箱に移動",
+            isDangerous = true,
+            onConfirm = {
+                scope.launch {
+                    try {
+                        appViewModel.repository.deleteEntry(entryId)
+                        appViewModel.repository.saveAndPush(appViewModel.preferences.s3ConfigFlow.first())
+                    } catch (_: Exception) { }
+                    showDeleteDialog = false
+                    onDeleted()
+                }
+            },
+            onCancel = { showDeleteDialog = false }
+        )
     }
 }
 

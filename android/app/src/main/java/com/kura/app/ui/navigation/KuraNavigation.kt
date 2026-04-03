@@ -19,8 +19,9 @@ import com.kura.app.ui.entries.*
 import com.kura.app.ui.home.*
 import com.kura.app.ui.labels.*
 import com.kura.app.ui.tools.*
-import com.kura.app.ui.sync.*
+import com.kura.app.ui.sync.formatRelativeTime
 import com.kura.app.ui.settings.*
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 object Routes {
@@ -45,7 +46,6 @@ object Routes {
     const val LABEL_MANAGER = "labels"
     const val LABEL_ENTRIES = "labels/{labelId}/entries"
     const val PASSWORD_GENERATOR = "password_generator"
-    const val SYNC = "sync"
     const val SETTINGS = "settings"
 
     fun recoveryKey(key: String) = "recovery_key/$key"
@@ -153,6 +153,15 @@ fun MainNavHost(appViewModel: AppViewModel) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
+    // Sync state for drawer
+    var isSyncing by remember { mutableStateOf(false) }
+    var lastSyncTime by remember { mutableStateOf<Long?>(null) }
+
+    LaunchedEffect(Unit) {
+        val ts = appViewModel.repository.getLastSyncTime()
+        if (ts > 0) lastSyncTime = ts
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = currentRoute == Routes.HOME,
@@ -178,13 +187,62 @@ fun MainNavHost(appViewModel: AppViewModel) {
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 Spacer(modifier = Modifier.height(8.dp))
 
+                @Suppress("DEPRECATION")
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Sync, contentDescription = null) },
-                    label = { Text("同期") },
-                    selected = currentRoute == Routes.SYNC,
+                    icon = { Icon(Icons.Default.List, contentDescription = null) },
+                    label = { Text("アイテム一覧") },
+                    selected = currentRoute == Routes.HOME,
                     onClick = {
                         scope.launch { drawerState.close() }
-                        navController.navigate(Routes.SYNC) { launchSingleTop = true }
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(Routes.HOME) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+
+                NavigationDrawerItem(
+                    icon = {
+                        if (isSyncing) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Sync, contentDescription = null)
+                        }
+                    },
+                    label = { Text("同期") },
+                    badge = {
+                        Text(
+                            if (lastSyncTime != null) formatRelativeTime(lastSyncTime!!) else "未同期",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    selected = false,
+                    onClick = {
+                        if (isSyncing) return@NavigationDrawerItem
+                        scope.launch {
+                            drawerState.close()
+                            isSyncing = true
+                            try {
+                                val config = appViewModel.preferences.s3ConfigFlow.first()
+                                if (config != null) {
+                                    val result = appViewModel.repository.syncVault(config)
+                                    if (result.synced) {
+                                        val vaultBytes = appViewModel.repository.getVaultBytes()
+                                        appViewModel.repository.writeVaultFile(vaultBytes)
+                                    }
+                                    val ts = appViewModel.repository.getLastSyncTime()
+                                    if (ts > 0) {
+                                        appViewModel.preferences.saveLastSyncTime(ts)
+                                        lastSyncTime = ts
+                                    }
+                                }
+                            } catch (_: Exception) { }
+                            isSyncing = false
+                        }
                     },
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
@@ -278,7 +336,8 @@ fun MainNavHost(appViewModel: AppViewModel) {
                     entryId = entryId,
                     appViewModel = appViewModel,
                     onBack = { navController.popBackStack() },
-                    onEdit = { navController.navigate(Routes.entryEdit(entryId)) }
+                    onEdit = { navController.navigate(Routes.entryEdit(entryId)) },
+                    onDeleted = { navController.popBackStack() }
                 )
             }
             composable(Routes.ENTRY_CREATE) {
@@ -306,7 +365,7 @@ fun MainNavHost(appViewModel: AppViewModel) {
             composable(Routes.TRASH) {
                 TrashScreen(
                     appViewModel = appViewModel,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.navigateUp() }
                 )
             }
             composable(Routes.LABEL_MANAGER) {
@@ -337,18 +396,9 @@ fun MainNavHost(appViewModel: AppViewModel) {
                     onBack = { navController.popBackStack() }
                 )
             }
-            composable(Routes.SYNC) {
-                SyncScreen(
-                    appViewModel = appViewModel,
-                    onBack = { navController.popBackStack() }
-                )
-            }
             composable(Routes.SETTINGS) {
                 SettingsScreen(
                     appViewModel = appViewModel,
-                    onTrash = { navController.navigate(Routes.TRASH) },
-                    onLabels = { navController.navigate(Routes.LABEL_MANAGER) },
-                    onSync = { navController.navigate(Routes.SYNC) },
                     onBack = { navController.popBackStack() },
                     onLogout = {
                         appViewModel.setAppState(AppState.ONBOARDING)

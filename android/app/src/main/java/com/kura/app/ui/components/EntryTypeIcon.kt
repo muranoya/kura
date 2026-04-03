@@ -7,6 +7,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 
+fun entryTypeColor(entryType: String): Color = when (entryType) {
+    "login" -> Color(0xFF7C3AED)
+    "bank" -> Color(0xFF2563EB)
+    "ssh_key" -> Color(0xFF059669)
+    "secure_note" -> Color(0xFFD97706)
+    "credit_card" -> Color(0xFFE11D48)
+    "passkey" -> Color(0xFF0891B2)
+    else -> Color(0xFF64748B)
+}
+
 @Composable
 fun EntryTypeIcon(entryType: String, modifier: Modifier = Modifier, tint: Color = Color.Unspecified) {
     val icon = when (entryType) {

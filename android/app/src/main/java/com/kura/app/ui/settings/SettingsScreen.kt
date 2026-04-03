@@ -26,9 +26,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     appViewModel: AppViewModel,
-    onTrash: () -> Unit,
-    onLabels: () -> Unit,
-    onSync: () -> Unit = {},
     onBack: () -> Unit = {},
     onLogout: () -> Unit
 ) {
@@ -61,41 +58,6 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 管理セクション
-            Text("管理", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Card(onClick = onLabels, modifier = Modifier.fillMaxWidth()) {
-                ListItem(
-                    headlineContent = { Text("ラベル管理") },
-                    supportingContent = { Text("ラベルの追加・編集・削除") },
-                    leadingContent = { Icon(Icons.Default.Label, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                )
-            }
-
-            Card(onClick = onTrash, modifier = Modifier.fillMaxWidth()) {
-                ListItem(
-                    headlineContent = { Text("ゴミ箱") },
-                    supportingContent = { Text("削除したアイテムの復元・完全削除") },
-                    leadingContent = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                )
-            }
-
-            Card(onClick = onSync, modifier = Modifier.fillMaxWidth()) {
-                ListItem(
-                    headlineContent = { Text("同期") },
-                    supportingContent = { Text("クラウドストレージとの同期") },
-                    leadingContent = { Icon(Icons.Default.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider()
-            Spacer(modifier = Modifier.height(8.dp))
-
             // セキュリティセクション
             Text("セキュリティ", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(4.dp))
