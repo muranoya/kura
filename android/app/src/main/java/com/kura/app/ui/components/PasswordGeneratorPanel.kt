@@ -1,6 +1,8 @@
 package com.kura.app.ui.components
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Refresh
@@ -52,7 +54,10 @@ fun PasswordGeneratorPanel(
                 Text(
                     text = password.ifEmpty { "..." },
                     style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
-                    modifier = Modifier.weight(1f)
+                    maxLines = 1,
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(rememberScrollState())
                 )
                 IconButton(onClick = { if (password.isNotEmpty()) onCopy(password) }) {
                     Icon(Icons.Default.ContentCopy, contentDescription = "コピー")
@@ -67,8 +72,7 @@ fun PasswordGeneratorPanel(
         Slider(
             value = length,
             onValueChange = { length = it },
-            valueRange = 4f..128f,
-            steps = 123
+            valueRange = 4f..128f
         )
 
         Spacer(modifier = Modifier.height(8.dp))

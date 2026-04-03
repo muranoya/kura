@@ -86,7 +86,7 @@ fun RecoveryKeyScreen(
                         try {
                             val s3Config = appViewModel.preferences.s3ConfigFlow.first()
                             if (s3Config != null) {
-                                appViewModel.repository.saveAndPush(s3Config)
+                                appViewModel.repository.saveAndSync(s3Config)
                             }
                         } catch (_: Exception) { }
                         onComplete()

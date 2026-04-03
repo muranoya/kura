@@ -95,7 +95,7 @@ fun EntryEditScreen(
                                             labelIds = selectedLabelIds.toList(),
                                             customFieldsJson = cfJson
                                         )
-                                        appViewModel.repository.saveAndPush(appViewModel.preferences.s3ConfigFlow.first())
+                                        appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
                                         onSaved()
                                     } catch (e: Exception) {
                                         error = "更新に失敗しました: ${e.message}"

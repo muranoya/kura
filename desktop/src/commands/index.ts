@@ -180,6 +180,14 @@ export async function regenerateRecoveryKey(password: string): Promise<string> {
   return invoke<string>('regenerate_recovery_key', { vaultId, password })
 }
 
+export async function encryptConfig(password: string, plaintext: string): Promise<string> {
+  return invoke<string>('encrypt_config', { vaultId, password, plaintext })
+}
+
+export async function decryptConfig(password: string, encryptedB64: string): Promise<string> {
+  return invoke<string>('decrypt_config', { vaultId, password, encryptedB64 })
+}
+
 // ============================================================================
 // Utils
 // ============================================================================
@@ -237,18 +245,20 @@ export async function pushVault(storageConfig: string): Promise<number> {
 /// ヘルパー: pushVaultを実行して、タイムスタンプをストレージに保存
 /// 再暗号化操作（マスターパスワード変更・DEKローテーション・リカバリーキー再生成）後専用。
 /// 通常のデータ変更にはsyncVaultIfConfiguredを使用すること。
-export async function pushVaultAndTrack(storageConfig: string): Promise<void> {
-  const ts = await pushVault(storageConfig)
+export async function pushVaultAndTrack(): Promise<void> {
+  const configJson = sessionStorage.getItem('decryptedS3Config')
+  if (!configJson) throw new Error('S3 config not available (vault locked?)')
+  const ts = await pushVault(configJson)
   await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, ts)
 }
 
 /// S3設定がある場合のみ syncVault を呼び出す（エラーはサイレント無視）
 /// 実際にデータが同期された場合は true を返す
 export async function syncVaultIfConfigured(): Promise<boolean> {
-  const config = await getFromStorage<Record<string, unknown>>(STORAGE_KEYS.S3_CONFIG)
-  if (!config) return false
+  const configJson = sessionStorage.getItem('decryptedS3Config')
+  if (!configJson) return false
   try {
-    const result = await syncVault(JSON.stringify(config))
+    const result = await syncVault(configJson)
     if (result.last_synced_at) {
       await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, result.last_synced_at)
     }

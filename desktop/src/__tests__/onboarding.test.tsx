@@ -20,6 +20,8 @@ vi.mock('../commands', () => ({
   isUnlocked: vi.fn(),
   readVaultFile: vi.fn(),
   loadVault: vi.fn(),
+  encryptConfig: vi.fn(),
+  decryptConfig: vi.fn(),
 }))
 
 // Mock storage module

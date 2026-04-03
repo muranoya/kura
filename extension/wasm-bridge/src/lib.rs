@@ -253,6 +253,16 @@ pub fn api_regenerate_recovery_key(vault_id: String, password: String) -> Result
     with_manager(&vault_id, |m| m.api_regenerate_recovery_key(password)).map_err(to_js_err)
 }
 
+#[wasm_bindgen]
+pub fn api_encrypt_config(vault_id: String, password: String, plaintext: String) -> Result<String, JsValue> {
+    with_manager(&vault_id, |m| m.api_encrypt_config(password, plaintext)).map_err(to_js_err)
+}
+
+#[wasm_bindgen]
+pub fn api_decrypt_config(vault_id: String, password: String, encrypted_b64: String) -> Result<String, JsValue> {
+    with_manager(&vault_id, |m| m.api_decrypt_config(password, encrypted_b64)).map_err(to_js_err)
+}
+
 // ============================================================================
 // ユーティリティAPI
 // ============================================================================

@@ -45,3 +45,27 @@ pub async fn regenerate_recovery_key(vault_id: String, password: String) -> Resu
         .await
         .map_err(|e| format!("Task error: {}", e))?
 }
+
+#[tauri::command]
+pub async fn encrypt_config(
+    vault_id: String,
+    password: String,
+    plaintext: String,
+) -> Result<String, String> {
+    let manager = get_manager(&vault_id);
+    tokio::task::spawn_blocking(move || manager.api_encrypt_config(password, plaintext))
+        .await
+        .map_err(|e| format!("Task error: {}", e))?
+}
+
+#[tauri::command]
+pub async fn decrypt_config(
+    vault_id: String,
+    password: String,
+    encrypted_b64: String,
+) -> Result<String, String> {
+    let manager = get_manager(&vault_id);
+    tokio::task::spawn_blocking(move || manager.api_decrypt_config(password, encrypted_b64))
+        .await
+        .map_err(|e| format!("Task error: {}", e))?
+}

@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.*
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kura.app.data.model.EntryRow
 import com.kura.app.data.model.EntryType
+import com.kura.app.data.model.Label
 import com.kura.app.ui.components.EntryCard
 import com.kura.app.ui.components.EntryTypeIcon
 import com.kura.app.ui.components.entryTypeColor
@@ -49,12 +51,15 @@ fun HomeScreen(
     var isRefreshing by remember { mutableStateOf(false) }
     var showFavoritesOnly by remember { mutableStateOf(false) }
     var selectedType by remember { mutableStateOf<String?>(null) }
+    var labels by remember { mutableStateOf<List<Label>>(emptyList()) }
+    var selectedLabelId by remember { mutableStateOf<String?>(null) }
 
     // Search state
     var searchQuery by remember { mutableStateOf("") }
     var searchActive by remember { mutableStateOf(false) }
     var searchResults by remember { mutableStateOf<List<EntryRow>>(emptyList()) }
     var searchSelectedType by remember { mutableStateOf<String?>(null) }
+    var searchSelectedLabelId by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
 
@@ -62,8 +67,13 @@ fun HomeScreen(
         scope.launch {
             loading = true
             try {
-                allEntries = appViewModel.repository.listEntries()
+                allEntries = appViewModel.repository.listEntries(
+                    entryType = selectedType,
+                    labelId = selectedLabelId,
+                    onlyFavorites = showFavoritesOnly
+                )
                 favoriteEntries = appViewModel.repository.listEntries(onlyFavorites = true)
+                labels = appViewModel.repository.listLabels()
                 val ts = appViewModel.repository.getLastSyncTime()
                 if (ts > 0) lastSyncTime = ts
             } catch (_: Exception) { }
@@ -93,16 +103,44 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(Unit) { loadData() }
+    LaunchedEffect(Unit) {
+        loadData()
+        // バックグラウンドでS3同期
+        launch {
+            try {
+                val config = appViewModel.preferences.s3ConfigFlow.first()
+                if (config != null) {
+                    isSyncing = true
+                    val result = appViewModel.repository.syncVault(config)
+                    if (result.synced) {
+                        val vaultBytes = appViewModel.repository.getVaultBytes()
+                        appViewModel.repository.writeVaultFile(vaultBytes)
+                        result.lastSyncedAt?.let { ts ->
+                            appViewModel.preferences.saveLastSyncTime(ts)
+                            lastSyncTime = ts
+                        }
+                        loadData()
+                    }
+                    isSyncing = false
+                }
+            } catch (_: Exception) { isSyncing = false }
+        }
+    }
+
+    // Reload when filters change
+    LaunchedEffect(selectedType, selectedLabelId, showFavoritesOnly) {
+        if (!loading) loadData()
+    }
 
     // Search debounce
-    LaunchedEffect(searchQuery, searchSelectedType) {
+    LaunchedEffect(searchQuery, searchSelectedType, searchSelectedLabelId) {
         delay(300)
-        if (searchQuery.isNotBlank() || searchSelectedType != null) {
+        if (searchQuery.isNotBlank() || searchSelectedType != null || searchSelectedLabelId != null) {
             try {
                 searchResults = appViewModel.repository.listEntries(
                     searchQuery = searchQuery.ifBlank { null },
-                    entryType = searchSelectedType
+                    entryType = searchSelectedType,
+                    labelId = searchSelectedLabelId
                 )
             } catch (_: Exception) { }
         } else {
@@ -110,15 +148,7 @@ fun HomeScreen(
         }
     }
 
-    // Filtered entries for main list
-    val displayEntries = remember(allEntries, favoriteEntries, selectedType, showFavoritesOnly) {
-        val source = if (showFavoritesOnly) favoriteEntries else allEntries
-        if (selectedType != null) {
-            source.filter { it.entryType == selectedType }
-        } else {
-            source
-        }
-    }
+    val displayEntries = allEntries
 
     Scaffold(
         topBar = {
@@ -172,34 +202,43 @@ fun HomeScreen(
                         )
                     }
 
-                    // Favorites toggle
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        shadowElevation = 2.dp,
-                        modifier = Modifier.size(38.dp),
-                        onClick = { showFavoritesOnly = !showFavoritesOnly }
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(
-                                if (showFavoritesOnly) Icons.Default.Star else Icons.Outlined.StarOutline,
-                                contentDescription = "お気に入りフィルター",
-                                tint = if (showFavoritesOnly) Color(0xFFD97706) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Add button
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            shadowElevation = 2.dp,
+                            modifier = Modifier.size(38.dp),
+                            onClick = onCreateClick
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "新規作成",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        // Favorites toggle
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            shadowElevation = 2.dp,
+                            modifier = Modifier.size(38.dp),
+                            onClick = { showFavoritesOnly = !showFavoritesOnly }
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(
+                                    if (showFavoritesOnly) Icons.Default.Star else Icons.Outlined.StarOutline,
+                                    contentDescription = "お気に入りフィルター",
+                                    tint = if (showFavoritesOnly) Color(0xFFD97706) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
-                }
-            }
-        },
-        floatingActionButton = {
-            if (!searchActive) {
-                FloatingActionButton(
-                    onClick = onCreateClick,
-                    shape = RoundedCornerShape(18.dp),
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "新規作成")
                 }
             }
         },
@@ -216,7 +255,7 @@ fun HomeScreen(
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { searchQuery = ""; searchSelectedType = null }) {
+                                IconButton(onClick = { searchQuery = ""; searchSelectedType = null; searchSelectedLabelId = null }) {
                                     Icon(Icons.Default.Close, contentDescription = "クリア")
                                 }
                             }
@@ -227,7 +266,7 @@ fun HomeScreen(
                 onExpandedChange = { searchActive = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (!searchActive) Modifier.padding(horizontal = 16.dp, vertical = 8.dp) else Modifier),
+                    .then(if (!searchActive) Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp).navigationBarsPadding() else Modifier),
             ) {
                 // Search expanded content
                 Column {
@@ -252,8 +291,39 @@ fun HomeScreen(
                         }
                     }
 
+                    // Label filter chips in search
+                    if (labels.isNotEmpty()) {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            item {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Label,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            items(labels, key = { it.id }) { label ->
+                                FilterChip(
+                                    selected = searchSelectedLabelId == label.id,
+                                    onClick = {
+                                        searchSelectedLabelId = if (searchSelectedLabelId == label.id) null else label.id
+                                    },
+                                    label = { Text(label.name) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                )
+                            }
+                        }
+                    }
+
                     // Search results
-                    val results = if (searchQuery.isNotBlank() || searchSelectedType != null) searchResults else allEntries
+                    val results = if (searchQuery.isNotBlank() || searchSelectedType != null || searchSelectedLabelId != null) searchResults else allEntries
                     LazyColumn(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -397,6 +467,48 @@ fun HomeScreen(
                         }
                     }
 
+                    // Label filter chips
+                    if (labels.isNotEmpty()) {
+                        item {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 20.dp),
+                                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                modifier = Modifier.padding(top = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                item {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Label,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                items(labels, key = { it.id }) { label ->
+                                    FilterChip(
+                                        selected = selectedLabelId == label.id,
+                                        onClick = {
+                                            selectedLabelId = if (selectedLabelId == label.id) null else label.id
+                                        },
+                                        label = {
+                                            Text(
+                                                label.name,
+                                                style = MaterialTheme.typography.labelMedium.copy(
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            )
+                                        },
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // Entry list
                     if (displayEntries.isEmpty()) {
                         item {
@@ -420,7 +532,7 @@ fun HomeScreen(
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                    if (!showFavoritesOnly && selectedType == null) {
+                                    if (!showFavoritesOnly && selectedType == null && selectedLabelId == null) {
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text(
                                             "右下の + ボタンで新しいアイテムを作成できます",

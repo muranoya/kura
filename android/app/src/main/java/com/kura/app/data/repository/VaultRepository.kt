@@ -243,7 +243,9 @@ class VaultRepository(private val context: Context) {
                 val etag = getEtag()
                 val newEtag = client.upload(bytes, etag)
                 updateEtag(newEtag)
-                return@withContext SyncResult(synced = true, lastSyncedAt = System.currentTimeMillis() / 1000)
+                val ts = System.currentTimeMillis() / 1000
+                restoreLastSyncTime(ts)
+                return@withContext SyncResult(synced = true, lastSyncedAt = ts)
             }
 
             val (remoteBytes, remoteEtag) = remote
@@ -258,7 +260,9 @@ class VaultRepository(private val context: Context) {
             try {
                 val newEtag = client.upload(mergedBytes, currentEtag)
                 updateEtag(newEtag)
-                return@withContext SyncResult(synced = true, lastSyncedAt = System.currentTimeMillis() / 1000)
+                val ts = System.currentTimeMillis() / 1000
+                restoreLastSyncTime(ts)
+                return@withContext SyncResult(synced = true, lastSyncedAt = ts)
             } catch (_: ConflictException) {
                 if (attempt + 1 == maxRetries) {
                     throw RuntimeException("Sync failed after maximum retries")
@@ -304,11 +308,21 @@ class VaultRepository(private val context: Context) {
     // Combined helpers
     // ========================================================================
 
+    suspend fun saveAndSync(s3ConfigJson: String?) {
+        val vaultBytes = getVaultBytes()
+        writeVaultFile(vaultBytes)
+        if (s3ConfigJson == null) return
+        val result = syncVault(s3ConfigJson)
+        if (result.synced) {
+            // マージでリモートの変更が取り込まれた可能性があるため再保存
+            val mergedBytes = getVaultBytes()
+            writeVaultFile(mergedBytes)
+        }
+    }
+
     suspend fun saveAndPush(s3ConfigJson: String?) {
         val vaultBytes = getVaultBytes()
         writeVaultFile(vaultBytes)
-        s3ConfigJson?.let {
-            try { pushVault(it) } catch (_: Exception) { }
-        }
+        s3ConfigJson?.let { pushVault(it) }
     }
 }

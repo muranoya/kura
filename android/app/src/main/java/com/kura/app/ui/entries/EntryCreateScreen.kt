@@ -74,7 +74,7 @@ fun EntryCreateScreen(
                                             labelIds = selectedLabelIds.toList(),
                                             customFieldsJson = cfJson
                                         )
-                                        appViewModel.repository.saveAndPush(appViewModel.preferences.s3ConfigFlow.first())
+                                        appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
                                         onCreated(id)
                                     } catch (e: Exception) {
                                         error = "作成に失敗しました: ${e.message}"

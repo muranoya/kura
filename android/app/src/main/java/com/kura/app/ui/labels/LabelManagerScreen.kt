@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,7 +20,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun LabelManagerScreen(
     appViewModel: AppViewModel,
-    onBack: () -> Unit,
+    onOpenDrawer: () -> Unit,
     onLabelClick: (String) -> Unit
 ) {
     var labels by remember { mutableStateOf<List<Label>>(emptyList()) }
@@ -48,8 +47,8 @@ fun LabelManagerScreen(
             TopAppBar(
                 title = { Text("ラベル管理") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                    IconButton(onClick = onOpenDrawer) {
+                        Icon(Icons.Default.Menu, contentDescription = "メニュー")
                     }
                 }
             )
@@ -120,7 +119,7 @@ fun LabelManagerScreen(
                         scope.launch {
                             try {
                                 appViewModel.repository.createLabel(newLabelName)
-                                appViewModel.repository.saveAndPush(appViewModel.preferences.s3ConfigFlow.first())
+                                appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
                                 newLabelName = ""
                                 showCreateDialog = false
                                 loadLabels()
@@ -152,7 +151,7 @@ fun LabelManagerScreen(
                         scope.launch {
                             try {
                                 appViewModel.repository.renameLabel(label.id, editName)
-                                appViewModel.repository.saveAndPush(appViewModel.preferences.s3ConfigFlow.first())
+                                appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
                                 editingLabel = null
                                 loadLabels()
                             } catch (_: Exception) { }
@@ -175,7 +174,7 @@ fun LabelManagerScreen(
                 scope.launch {
                     try {
                         appViewModel.repository.deleteLabel(targetId)
-                        appViewModel.repository.saveAndPush(appViewModel.preferences.s3ConfigFlow.first())
+                        appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
                         loadLabels()
                     } catch (_: Exception) { }
                     deleteTargetId = null

@@ -110,7 +110,7 @@ const CUSTOM_FIELD_TYPES = [
   { value: 'email' as const, label: 'メール', icon: Mail },
   { value: 'url' as const, label: 'URL', icon: Link },
   { value: 'phone' as const, label: '電話番号', icon: Phone },
-  { value: 'totp' as const, label: 'TOTP', icon: Timer },
+  { value: 'totp' as const, label: 'ワンタイムパスワード', icon: Timer },
 ]
 
 const FIELD_TYPE_LABELS: Record<string, string> = {
@@ -119,7 +119,7 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
   email: 'メール',
   url: 'URL',
   phone: '電話番号',
-  totp: 'TOTP',
+  totp: 'ワンタイムパスワード',
 }
 
 export default function EntryForm({

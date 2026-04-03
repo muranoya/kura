@@ -2,6 +2,8 @@ import { CheckCircle2 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
+import { STORAGE_KEYS } from '../../shared/constants'
+import { saveToStorage } from '../../shared/storage'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
@@ -34,6 +36,15 @@ export default function MasterPassword() {
     setLoading(true)
     try {
       const recoveryKey = await commands.createVault(password)
+      // S3設定をマスターパスワードで暗号化して永続保存
+      const pendingConfig = sessionStorage.getItem('pendingS3Config')
+      if (pendingConfig) {
+        const encrypted = await commands.encryptConfig(password, pendingConfig)
+        await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
+        sessionStorage.removeItem('pendingS3Config')
+        // 復号済みS3設定をセッションに保持（同期で使用）
+        sessionStorage.setItem('decryptedS3Config', pendingConfig)
+      }
       // Store recovery key in session/context for display on next screen
       sessionStorage.setItem('recoveryKey', recoveryKey)
       navigate('/onb/recovery')

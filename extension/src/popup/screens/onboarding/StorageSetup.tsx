@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { STORAGE_KEYS } from '../../../shared/constants'
 import { sendMessage } from '../../../shared/messages'
-import { saveToStorage } from '../../../shared/storage'
 import type { S3Config } from '../../../shared/types'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
@@ -28,7 +26,7 @@ export default function StorageSetup() {
     setLoading(true)
     setError('')
     try {
-      const configToSave: S3Config = {
+      const s3Config: S3Config = {
         region,
         bucket,
         key,
@@ -36,10 +34,9 @@ export default function StorageSetup() {
         accessKeyId,
         secretAccessKey,
       }
-      await saveToStorage(STORAGE_KEYS.S3_CONFIG, configToSave)
-
-      // DOWNLOAD_VAULT メッセージを送信してVault存在確認
-      const response = await sendMessage({ type: 'DOWNLOAD_VAULT' as const })
+      // S3設定はマスターパスワードで暗号化して保存するため、ここでは永続保存しない
+      // DOWNLOAD_VAULTにS3設定を渡してVault存在確認
+      const response = await sendMessage({ type: 'DOWNLOAD_VAULT' as const, s3Config })
 
       if (!response.success) {
         const errorMsg = 'error' in response ? response.error : 'Vault確認に失敗しました'

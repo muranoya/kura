@@ -163,6 +163,29 @@ default: help
 	echo "✅ Android release build completed!"
 	echo "  - APK: {{ANDROID_DIR}}/app/build/outputs/apk/release/app-release-unsigned.apk"
 
+# Android app - Build & install on USB-connected device
+@run-android-device: build-android-debug
+	echo ""
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "📱 Installing app on USB-connected device..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	DEVICE_COUNT=$({{ADB}} devices | grep -w "device" | grep -v "List" | wc -l); \
+	if [ "$DEVICE_COUNT" -eq 0 ]; then \
+		echo "❌ No device found. Check USB connection and USB debugging is enabled."; \
+		exit 1; \
+	fi; \
+	echo "🔍 Connected device(s):"; \
+	{{ADB}} devices -l | grep -w "device" | grep -v "List"
+	echo ""
+	echo "📦 Installing APK..."
+	{{ADB}} -d install -r {{ANDROID_DIR}}/app/build/outputs/apk/debug/app-debug.apk
+	echo ""
+	echo "🚀 Starting app..."
+	{{ADB}} -d shell am start -n com.kura.app/.MainActivity
+	echo ""
+	echo "✅ App is running on device! Use '{{ADB}} -d logcat | grep kura' for logs"
+
 # Android app - Build, launch emulator, install and start (all ABIs)
 @run-android: build-android-debug
 	just _run-android-emulator
@@ -279,6 +302,7 @@ default: help
 	echo "    just release-android           - Build Android release APK"
 	echo "    just build-android-jni         - Build Rust native libraries only"
 	echo "    just run-android               - Build & run on emulator"
+	echo "    just run-android-device        - Build & install on USB device"
 	echo ""
 	echo "  🖥️  Desktop:"
 	echo "    just dev-desktop          - Start desktop app in dev mode (hot reload)"

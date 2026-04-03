@@ -70,13 +70,6 @@ fun EntryForm(
             when (entryType) {
                 "login" -> {
                     FlatTextField(
-                        value = typedValues["url"] ?: "",
-                        onValueChange = { onTypedValueChange("url", it) },
-                        label = "URL",
-                        keyboardType = KeyboardType.Uri
-                    )
-                    SectionDivider()
-                    FlatTextField(
                         value = typedValues["username"] ?: "",
                         onValueChange = { onTypedValueChange("username", it) },
                         label = "ユーザー名"
@@ -91,9 +84,10 @@ fun EntryForm(
                     )
                     SectionDivider()
                     FlatTextField(
-                        value = typedValues["totp"] ?: "",
-                        onValueChange = { onTypedValueChange("totp", it) },
-                        label = "TOTP シークレット"
+                        value = typedValues["url"] ?: "",
+                        onValueChange = { onTypedValueChange("url", it) },
+                        label = "URL",
+                        keyboardType = KeyboardType.Uri
                     )
                 }
                 "bank" -> {
@@ -101,6 +95,24 @@ fun EntryForm(
                         value = typedValues["bank_name"] ?: "",
                         onValueChange = { onTypedValueChange("bank_name", it) },
                         label = "銀行名"
+                    )
+                    SectionDivider()
+                    FlatTextField(
+                        value = typedValues["branch_code"] ?: "",
+                        onValueChange = { onTypedValueChange("branch_code", it) },
+                        label = "支店コード"
+                    )
+                    SectionDivider()
+                    FlatTextField(
+                        value = typedValues["account_type"] ?: "",
+                        onValueChange = { onTypedValueChange("account_type", it) },
+                        label = "口座種別"
+                    )
+                    SectionDivider()
+                    FlatTextField(
+                        value = typedValues["account_holder"] ?: "",
+                        onValueChange = { onTypedValueChange("account_holder", it) },
+                        label = "口座名義"
                     )
                     SectionDivider()
                     FlatTextField(
@@ -169,9 +181,47 @@ fun EntryForm(
                         label = "CVV",
                         onCopy = onCopyToClipboard
                     )
+                    SectionDivider()
+                    PasswordField(
+                        value = typedValues["pin"] ?: "",
+                        onValueChange = { onTypedValueChange("pin", it) },
+                        label = "PIN",
+                        onCopy = onCopyToClipboard
+                    )
+                }
+                "password" -> {
+                    FlatTextField(
+                        value = typedValues["username"] ?: "",
+                        onValueChange = { onTypedValueChange("username", it) },
+                        label = "ユーザー名"
+                    )
+                    SectionDivider()
+                    PasswordField(
+                        value = typedValues["password"] ?: "",
+                        onValueChange = { onTypedValueChange("password", it) },
+                        label = "パスワード",
+                        onGeneratePassword = onGeneratePassword,
+                        onCopy = onCopyToClipboard
+                    )
+                }
+                "software_license" -> {
+                    FlatTextField(
+                        value = typedValues["license_key"] ?: "",
+                        onValueChange = { onTypedValueChange("license_key", it) },
+                        label = "ライセンスキー",
+                        minLines = 2,
+                        maxLines = 6,
+                        singleLine = false
+                    )
                 }
             }
         }
+
+        // Custom fields section
+        CustomFieldsSection(
+            customFields = customFields,
+            onCustomFieldsChange = onCustomFieldsChange
+        )
 
         // Notes section
         if (entryType != "secure_note") {
@@ -208,36 +258,91 @@ fun EntryForm(
                 }
             }
         }
+    }
+}
 
-        // Custom fields section
-        FormSection(title = "カスタムフィールド") {
-            customFields.forEachIndexed { index, field ->
-                if (index > 0) SectionDivider()
-                CustomFieldEditor(
-                    field = field,
-                    onFieldChange = { updated ->
-                        val newList = customFields.toMutableList()
-                        newList[index] = updated
-                        onCustomFieldsChange(newList)
-                    },
-                    onRemove = {
-                        val newList = customFields.toMutableList()
-                        newList.removeAt(index)
-                        onCustomFieldsChange(newList)
-                    }
-                )
-            }
-            if (customFields.isNotEmpty()) SectionDivider()
-            TextButton(
-                onClick = {
-                    val newField = CustomField(
-                        id = UUID.randomUUID().toString(),
-                        name = "",
-                        fieldType = "text",
-                        value = ""
-                    )
-                    onCustomFieldsChange(customFields + newField)
+@Composable
+private fun CustomFieldsSection(
+    customFields: List<CustomField>,
+    onCustomFieldsChange: (List<CustomField>) -> Unit
+) {
+    var showTypeSelector by remember { mutableStateOf(false) }
+
+    Surface(
+        tonalElevation = 1.dp,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+      Column {
+        customFields.forEachIndexed { index, field ->
+            if (index > 0) SectionDivider()
+            CustomFieldEditor(
+                field = field,
+                onFieldChange = { updated ->
+                    val newList = customFields.toMutableList()
+                    newList[index] = updated
+                    onCustomFieldsChange(newList)
                 },
+                onRemove = {
+                    val newList = customFields.toMutableList()
+                    newList.removeAt(index)
+                    onCustomFieldsChange(newList)
+                }
+            )
+        }
+        if (customFields.isNotEmpty()) SectionDivider()
+
+        if (showTypeSelector) {
+            // Type selection chips
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Text(
+                    "フィールドの種類を選択",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                @OptIn(ExperimentalLayoutApi::class)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CustomFieldType.entries.forEach { type ->
+                        val icon = when (type) {
+                            CustomFieldType.TEXT -> Icons.Default.TextFields
+                            CustomFieldType.PASSWORD -> Icons.Default.Lock
+                            CustomFieldType.EMAIL -> Icons.Default.Email
+                            CustomFieldType.URL -> Icons.Default.Link
+                            CustomFieldType.PHONE -> Icons.Default.Phone
+                            CustomFieldType.TOTP -> Icons.Default.Timer
+                        }
+                        AssistChip(
+                            onClick = {
+                                val newField = CustomField(
+                                    id = UUID.randomUUID().toString(),
+                                    name = "",
+                                    fieldType = type.value,
+                                    value = ""
+                                )
+                                onCustomFieldsChange(customFields + newField)
+                                showTypeSelector = false
+                            },
+                            label = { Text(type.displayName) },
+                            leadingIcon = {
+                                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                        )
+                    }
+                }
+                TextButton(
+                    onClick = { showTypeSelector = false },
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    Text("キャンセル")
+                }
+            }
+        } else {
+            TextButton(
+                onClick = { showTypeSelector = true },
                 modifier = Modifier.padding(horizontal = 8.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -245,6 +350,7 @@ fun EntryForm(
                 Text("フィールドを追加")
             }
         }
+      }
     }
 }
 
@@ -312,6 +418,8 @@ private fun sectionTitle(entryType: String): String = when (entryType) {
     "ssh_key" -> "SSHキー情報"
     "secure_note" -> "ノート"
     "credit_card" -> "クレジットカード情報"
+    "password" -> "パスワード情報"
+    "software_license" -> "ライセンス情報"
     else -> "基本情報"
 }
 
@@ -386,13 +494,11 @@ fun CustomFieldEditor(
     onFieldChange: (CustomField) -> Unit,
     onRemove: () -> Unit
 ) {
-    val fieldTypes = CustomFieldType.entries
-    var expanded by remember { mutableStateOf(false) }
-    val isPassword = field.fieldType == "password"
-    var visible by remember { mutableStateOf(!isPassword) }
+    val isSecret = field.fieldType == "password" || field.fieldType == "totp"
+    var visible by remember { mutableStateOf(!isSecret) }
 
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        // Row 1: Field name + type chip + delete
+        // Row 1: Field name + type badge (read-only) + delete
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextField(
                 value = field.name,
@@ -409,23 +515,17 @@ fun CustomFieldEditor(
                 )
             )
             Spacer(modifier = Modifier.width(4.dp))
-            // Type chip
-            Box {
-                AssistChip(
-                    onClick = { expanded = true },
-                    label = { Text(CustomFieldType.fromValue(field.fieldType)?.displayName ?: field.fieldType, style = MaterialTheme.typography.labelSmall) }
+            // Read-only type badge
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+            ) {
+                Text(
+                    text = CustomFieldType.fromValue(field.fieldType)?.displayName ?: field.fieldType,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                 )
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    fieldTypes.forEach { type ->
-                        DropdownMenuItem(
-                            text = { Text(type.displayName) },
-                            onClick = {
-                                onFieldChange(field.copy(fieldType = type.value))
-                                expanded = false
-                            }
-                        )
-                    }
-                }
             }
             IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
                 Icon(
@@ -441,11 +541,11 @@ fun CustomFieldEditor(
         TextField(
             value = field.value,
             onValueChange = { onFieldChange(field.copy(value = it)) },
-            placeholder = { Text("値") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            visualTransformation = if (!visible && isPassword) PasswordVisualTransformation() else VisualTransformation.None,
-            trailingIcon = if (isPassword) {
+            placeholder = { Text(if (field.fieldType == "totp") "otpauth:// URI または Base32 シークレット" else "値") },
+            visualTransformation = if (!visible && isSecret) PasswordVisualTransformation() else VisualTransformation.None,
+            trailingIcon = if (isSecret) {
                 {
                     IconButton(onClick = { visible = !visible }) {
                         Icon(

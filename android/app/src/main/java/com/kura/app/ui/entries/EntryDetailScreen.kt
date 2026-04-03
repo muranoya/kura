@@ -3,8 +3,17 @@ package com.kura.app.ui.entries
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -12,12 +21,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.outlined.StarOutline
 import com.kura.app.data.model.CustomField
 import com.kura.app.data.model.Entry
@@ -30,6 +45,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -173,21 +191,18 @@ fun EntryDetailScreen(
                             }
                         }
 
-                        // Typed fields section
-                        val fieldEntries = typedValue.entries.filter { (key, value) ->
-                            val strValue = when (value) {
-                                is JsonPrimitive -> value.contentOrNull ?: ""
-                                else -> value.toString()
-                            }
-                            strValue.isNotEmpty() && key != "totp"
-                        }
-                        if (fieldEntries.isNotEmpty()) {
+                        // Typed fields section - ordered per entry type, show all fields
+                        val orderedFields = typedFieldsForType(e.entryType)
+                        if (orderedFields.isNotEmpty()) {
                             DetailSection(title = "基本情報") {
-                                fieldEntries.forEachIndexed { index, (key, value) ->
-                                    val strValue = when (value) {
-                                        is JsonPrimitive -> value.contentOrNull ?: ""
-                                        else -> value.toString()
+                                orderedFields.forEachIndexed { index, key ->
+                                    val rawValue = typedValue[key]
+                                    val strValue = when (rawValue) {
+                                        is JsonPrimitive -> rawValue.contentOrNull ?: ""
+                                        null -> ""
+                                        else -> rawValue.toString()
                                     }
+                                    val isEmpty = strValue.isEmpty()
                                     if (index > 0) {
                                         HorizontalDivider(
                                             modifier = Modifier.padding(horizontal = 16.dp),
@@ -199,6 +214,7 @@ fun EntryDetailScreen(
                                         label = fieldDisplayName(key),
                                         value = strValue,
                                         isSecret = isSecret,
+                                        isEmpty = isEmpty,
                                         context = context,
                                         isMultiLine = key == "private_key" || key == "content"
                                     )
@@ -206,36 +222,90 @@ fun EntryDetailScreen(
                             }
                         }
 
-                        // TOTP
-                        val totpSecret = typedValue["totp"]?.jsonPrimitive?.contentOrNull
-                        if (!totpSecret.isNullOrEmpty()) {
-                            DetailSection(title = "ワンタイムパスワード") {
-                                TotpField(secret = totpSecret, appViewModel = appViewModel, context = context)
-                            }
-                        }
-
                         // Notes
-                        if (!e.notes.isNullOrEmpty()) {
-                            DetailSection(title = "メモ") {
-                                DetailField(label = "メモ", value = e.notes, context = context, isMultiLine = true)
-                            }
+                        DetailSection(title = "メモ") {
+                            val hasNotes = !e.notes.isNullOrEmpty()
+                            DetailField(
+                                label = "メモ",
+                                value = e.notes ?: "",
+                                isEmpty = !hasNotes,
+                                context = context,
+                                isMultiLine = true
+                            )
                         }
 
                         // Custom fields
                         if (customFields.isNotEmpty()) {
-                            DetailSection(title = "カスタムフィールド") {
-                                customFields.forEachIndexed { index, field ->
-                                    if (index > 0) {
-                                        HorizontalDivider(
-                                            modifier = Modifier.padding(horizontal = 16.dp),
-                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                                        )
+                            Surface(
+                                tonalElevation = 1.dp,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column {
+                                    customFields.forEachIndexed { index, field ->
+                                        if (index > 0) {
+                                            HorizontalDivider(
+                                                modifier = Modifier.padding(horizontal = 16.dp),
+                                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                            )
+                                        }
+                                        if (field.fieldType == "totp" && field.value.isNotEmpty()) {
+                                            TotpField(
+                                                label = field.name,
+                                                value = field.value,
+                                                appViewModel = appViewModel,
+                                                context = context
+                                            )
+                                        } else {
+                                            DetailField(
+                                                label = field.name,
+                                                value = field.value,
+                                                isSecret = field.fieldType == "password",
+                                                isEmpty = field.value.isEmpty(),
+                                                context = context
+                                            )
+                                        }
                                     }
-                                    DetailField(
-                                        label = field.name,
-                                        value = field.value,
-                                        isSecret = field.fieldType == "password",
-                                        context = context
+                                }
+                            }
+                        }
+
+                        // Timestamps
+                        Surface(
+                            tonalElevation = 1.dp,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        "更新",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        formatTimestamp(e.updatedAt),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        "作成",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        formatTimestamp(e.createdAt),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -258,7 +328,7 @@ fun EntryDetailScreen(
                 scope.launch {
                     try {
                         appViewModel.repository.deleteEntry(entryId)
-                        appViewModel.repository.saveAndPush(appViewModel.preferences.s3ConfigFlow.first())
+                        appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
                     } catch (_: Exception) { }
                     showDeleteDialog = false
                     onDeleted()
@@ -296,6 +366,7 @@ fun DetailField(
     label: String,
     value: String,
     isSecret: Boolean = false,
+    isEmpty: Boolean = false,
     context: Context,
     isMultiLine: Boolean = false
 ) {
@@ -303,39 +374,77 @@ fun DetailField(
     var copied by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.Top) {
-            Text(
-                text = if (visible) value else "••••••••",
-                style = if (isMultiLine) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
-                fontFamily = if (isSecret || isMultiLine) FontFamily.Monospace else FontFamily.Default,
-                modifier = Modifier.weight(1f)
+    val backgroundColor by animateColorAsState(
+        targetValue = if (copied) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 300),
+        label = "copyFeedback"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (!isEmpty) {
+                    Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple()
+                    ) {
+                        val copyValue = if (isSecret && !visible) value else value
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText(label, copyValue))
+                        copied = true
+                        scope.launch { delay(1500); copied = false }
+                    }
+                } else {
+                    Modifier
+                }
             )
-            if (isSecret) {
-                IconButton(onClick = { visible = !visible }, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (copied) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "コピーしました",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                if (isEmpty) {
+                    Text(
+                        "未設定",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontStyle = FontStyle.Italic,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                } else {
+                    Text(
+                        text = if (visible) value else "••••••••",
+                        style = if (isMultiLine) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+                        fontFamily = if (isSecret || isMultiLine) FontFamily.Monospace else FontFamily.Default,
                     )
                 }
             }
-            IconButton(
-                onClick = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
-                    copied = true
-                    scope.launch { delay(2000); copied = false }
-                },
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
-                    contentDescription = "コピー",
-                    modifier = Modifier.size(18.dp)
-                )
+            if (isSecret && !isEmpty) {
+                IconButton(onClick = { visible = !visible }, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = if (visible) "隠す" else "表示",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }
@@ -343,53 +452,149 @@ fun DetailField(
 
 @Composable
 fun TotpField(
-    secret: String,
+    value: String,
     appViewModel: AppViewModel,
-    context: Context
+    context: Context,
+    label: String = "TOTP"
 ) {
     var totpCode by remember { mutableStateOf("") }
     var copied by remember { mutableStateOf(false) }
+    var period by remember { mutableStateOf(30L) }
+    var remainingSeconds by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(secret) {
+    LaunchedEffect(value) {
+        period = try { appViewModel.repository.parseTotpPeriod(value) } catch (_: Exception) { 30L }
         while (true) {
-            try { totpCode = appViewModel.repository.generateTotpDefault(secret) } catch (_: Exception) { }
+            val now = System.currentTimeMillis() / 1000
+            val remaining = (period - (now % period)).toInt()
+            remainingSeconds = remaining
+            if (totpCode.isEmpty() || remaining == period.toInt()) {
+                try { totpCode = appViewModel.repository.generateTotpFromValue(value) } catch (_: Exception) { }
+            }
             delay(1000)
         }
     }
 
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Text("TOTP", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.height(4.dp))
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple()
+            ) {
+                val clipboard =
+                    context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("totp", totpCode))
+                copied = true
+                scope.launch { delay(1500); copied = false }
+            }
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (copied) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "コピーしました",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
             Text(
                 text = totpCode,
                 style = MaterialTheme.typography.headlineSmall.copy(
                     fontFamily = FontFamily.Monospace,
-                    letterSpacing = androidx.compose.ui.unit.TextUnit(4f, androidx.compose.ui.unit.TextUnitType.Sp)
-                ),
-                modifier = Modifier.weight(1f)
+                    letterSpacing = 4.sp
+                )
             )
-            IconButton(
-                onClick = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("totp", totpCode))
-                    copied = true
-                    scope.launch { delay(2000); copied = false }
-                }
-            ) {
-                Icon(if (copied) Icons.Default.Check else Icons.Default.ContentCopy, contentDescription = "コピー")
-            }
+            TotpCountdownCircle(
+                remainingSeconds = remainingSeconds,
+                period = period.toInt()
+            )
         }
     }
+}
+
+@Composable
+private fun TotpCountdownCircle(
+    remainingSeconds: Int,
+    period: Int
+) {
+    val trackColor = MaterialTheme.colorScheme.outlineVariant
+    val arcColor = MaterialTheme.colorScheme.primary
+    val textColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val textMeasurer = rememberTextMeasurer()
+    val text = remainingSeconds.toString()
+    val textStyle = TextStyle(fontSize = 8.sp, color = textColor)
+    val textLayoutResult = remember(text) { textMeasurer.measure(text, textStyle) }
+
+    Canvas(modifier = Modifier.size(28.dp)) {
+        val strokeWidth = 2.5.dp.toPx()
+        val radius = (size.minDimension - strokeWidth) / 2f
+        val topLeft = Offset(
+            (size.width - radius * 2) / 2f,
+            (size.height - radius * 2) / 2f
+        )
+        val arcSize = Size(radius * 2, radius * 2)
+
+        drawCircle(
+            color = trackColor,
+            radius = radius,
+            style = Stroke(width = strokeWidth)
+        )
+
+        val sweepAngle = if (period > 0) 360f * remainingSeconds / period else 0f
+        drawArc(
+            color = arcColor,
+            startAngle = -90f,
+            sweepAngle = sweepAngle,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+        )
+
+        drawText(
+            textLayoutResult = textLayoutResult,
+            topLeft = Offset(
+                (size.width - textLayoutResult.size.width) / 2f,
+                (size.height - textLayoutResult.size.height) / 2f
+            )
+        )
+    }
+}
+
+fun typedFieldsForType(entryType: String): List<String> = when (entryType) {
+    "login" -> listOf("username", "password", "url")
+    "bank" -> listOf("bank_name", "branch_code", "account_type", "account_holder", "account_number", "pin")
+    "ssh_key" -> listOf("private_key")
+    "secure_note" -> listOf("content")
+    "credit_card" -> listOf("cardholder", "number", "expiry", "cvv", "pin")
+    "password" -> listOf("username", "password")
+    "software_license" -> listOf("license_key")
+    else -> emptyList()
 }
 
 fun fieldDisplayName(key: String): String = when (key) {
     "url" -> "URL"
     "username" -> "ユーザー名"
     "password" -> "パスワード"
-    "totp" -> "TOTP シークレット"
     "bank_name" -> "銀行名"
+    "branch_code" -> "支店コード"
+    "account_type" -> "口座種別"
+    "account_holder" -> "口座名義"
     "account_number" -> "口座番号"
     "pin" -> "PIN"
     "private_key" -> "秘密鍵"
@@ -399,5 +604,14 @@ fun fieldDisplayName(key: String): String = when (key) {
     "number" -> "カード番号"
     "expiry" -> "有効期限"
     "cvv" -> "CVV"
+    "license_key" -> "ライセンスキー"
     else -> key
+}
+
+private fun formatTimestamp(epochSeconds: Long): String {
+    if (epochSeconds == 0L) return "-"
+    val instant = Instant.ofEpochSecond(epochSeconds)
+    val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm")
+        .withZone(ZoneId.systemDefault())
+    return formatter.format(instant)
 }

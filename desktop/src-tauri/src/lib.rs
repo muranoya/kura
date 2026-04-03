@@ -41,6 +41,8 @@ pub fn run() {
             commands::security::upgrade_argon2_params,
             commands::security::rotate_dek,
             commands::security::regenerate_recovery_key,
+            commands::security::encrypt_config,
+            commands::security::decrypt_config,
             // Utils
             commands::utils::generate_password,
             commands::utils::generate_totp,

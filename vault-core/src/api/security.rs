@@ -1,8 +1,48 @@
+use crate::crypto;
 use crate::sync::engine::SessionState;
 
 use super::VaultManager;
 
 impl VaultManager {
+    /// S3設定などの任意データをマスターパスワードで暗号化
+    /// Locked/Unlocked両状態で動作（Argon2Paramsのみ必要）
+    pub fn api_encrypt_config(&self, password: String, plaintext: String) -> Result<String, String> {
+        let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
+
+        let argon2_params = match session.as_ref() {
+            Some(SessionState::Locked(locked)) => &locked.vault_file.meta.argon2_params,
+            Some(SessionState::Unlocked(unlocked)) => &unlocked.meta.argon2_params,
+            None => return Err("Vault not loaded".to_string()),
+        };
+
+        let kek = crypto::kdf::derive_kek(&password, argon2_params)
+            .map_err(|e| format!("Failed to derive KEK: {}", e))?;
+
+        crypto::config::encrypt_with_kek(plaintext.as_bytes(), &kek)
+            .map_err(|e| format!("Failed to encrypt config: {}", e))
+    }
+
+    /// マスターパスワードで暗号化されたデータを復号
+    /// Locked/Unlocked両状態で動作
+    pub fn api_decrypt_config(&self, password: String, encrypted_b64: String) -> Result<String, String> {
+        let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
+
+        let argon2_params = match session.as_ref() {
+            Some(SessionState::Locked(locked)) => &locked.vault_file.meta.argon2_params,
+            Some(SessionState::Unlocked(unlocked)) => &unlocked.meta.argon2_params,
+            None => return Err("Vault not loaded".to_string()),
+        };
+
+        let kek = crypto::kdf::derive_kek(&password, argon2_params)
+            .map_err(|e| format!("Failed to derive KEK: {}", e))?;
+
+        let decrypted_bytes = crypto::config::decrypt_with_kek(&encrypted_b64, &kek)
+            .map_err(|e| format!("Failed to decrypt config: {}", e))?;
+
+        String::from_utf8(decrypted_bytes)
+            .map_err(|e| format!("Decrypted config is not valid UTF-8: {}", e))
+    }
+
     /// マスターパスワード変更
     pub fn api_change_master_password(&self, old_password: String, new_password: String) -> Result<(), String> {
         let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());

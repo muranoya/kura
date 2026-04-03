@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun TrashScreen(
     appViewModel: AppViewModel,
-    onBack: () -> Unit
+    onOpenDrawer: () -> Unit
 ) {
     var entries by remember { mutableStateOf<List<EntryRow>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -46,8 +46,8 @@ fun TrashScreen(
             TopAppBar(
                 title = { Text("ゴミ箱") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                    IconButton(onClick = onOpenDrawer) {
+                        Icon(Icons.Default.Menu, contentDescription = "メニュー")
                     }
                 }
             )
@@ -75,7 +75,7 @@ fun TrashScreen(
                             scope.launch {
                                 try {
                                     appViewModel.repository.restoreEntry(entry.id)
-                                    appViewModel.repository.saveAndPush(appViewModel.preferences.s3ConfigFlow.first())
+                                    appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
                                     loadEntries()
                                 } catch (_: Exception) { }
                             }
@@ -97,7 +97,7 @@ fun TrashScreen(
                 scope.launch {
                     try {
                         appViewModel.repository.purgeEntry(targetId)
-                        appViewModel.repository.saveAndPush(appViewModel.preferences.s3ConfigFlow.first())
+                        appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
                         loadEntries()
                     } catch (_: Exception) { }
                     purgeTargetId = null

@@ -10,13 +10,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Menu
 import com.kura.app.ui.components.PasswordGeneratorPanel
 import com.kura.app.viewmodel.AppViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PasswordGeneratorScreen(appViewModel: AppViewModel, onBack: () -> Unit = {}) {
+fun PasswordGeneratorScreen(appViewModel: AppViewModel, onOpenDrawer: () -> Unit = {}) {
     val context = LocalContext.current
 
     Scaffold(
@@ -24,8 +24,8 @@ fun PasswordGeneratorScreen(appViewModel: AppViewModel, onBack: () -> Unit = {})
             TopAppBar(
                 title = { Text("パスワード生成") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                    IconButton(onClick = onOpenDrawer) {
+                        Icon(Icons.Default.Menu, contentDescription = "メニュー")
                     }
                 }
             )

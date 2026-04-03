@@ -8,7 +8,8 @@ import { Card, CardContent } from '../../components/ui/card'
 import { Label } from '../../components/ui/label'
 import { PasswordInput } from '../../components/ui/password-input'
 import { Separator } from '../../components/ui/separator'
-import { clearStorage } from '../../shared/storage'
+import { STORAGE_KEYS } from '../../shared/constants'
+import { clearStorage, getFromStorage } from '../../shared/storage'
 
 export default function LockScreen() {
   const navigate = useNavigate()
@@ -26,6 +27,12 @@ export default function LockScreen() {
     setLoading(true)
     try {
       await commands.unlock(password)
+      // 暗号化されたS3設定を復号してセッションに保持
+      const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
+      if (encryptedConfig) {
+        const configJson = await commands.decryptConfig(password, encryptedConfig)
+        sessionStorage.setItem('decryptedS3Config', configJson)
+      }
       commands.syncVaultIfConfigured().catch(() => {}) // バックグラウンド
       window.location.reload()
     } catch (err) {

@@ -7,7 +7,6 @@ import { Card, CardContent } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { PasswordInput } from '../../components/ui/password-input'
-import { getFromStorage, saveToStorage } from '../../shared/storage'
 
 export default function StorageSetup() {
   const navigate = useNavigate()
@@ -21,16 +20,16 @@ export default function StorageSetup() {
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    getFromStorage<Record<string, string>>('s3Config').then((config) => {
-      if (config) {
-        setRegion(config.region ?? '')
-        setBucket(config.bucket ?? '')
-        setKey(config.key ?? 'vault.json')
-        setAccessKeyId(config.accessKeyId ?? '')
-        setSecretAccessKey(config.secretAccessKey ?? '')
-        setEndpoint(config.endpoint ?? '')
-      }
-    })
+    const pendingJson = sessionStorage.getItem('pendingS3Config')
+    if (pendingJson) {
+      const config = JSON.parse(pendingJson)
+      setRegion(config.region ?? '')
+      setBucket(config.bucket ?? '')
+      setKey(config.key ?? 'vault.json')
+      setAccessKeyId(config.accessKeyId ?? '')
+      setSecretAccessKey(config.secretAccessKey ?? '')
+      setEndpoint(config.endpoint ?? '')
+    }
   }, [])
 
   const handleNext = async () => {
@@ -52,7 +51,8 @@ export default function StorageSetup() {
       config.endpoint = endpoint
     }
 
-    await saveToStorage('s3Config', config)
+    // S3設定はマスターパスワードで暗号化して保存するため、ここでは一時保存のみ
+    sessionStorage.setItem('pendingS3Config', JSON.stringify(config))
 
     // Check if vault file exists on S3
     setIsLoading(true)

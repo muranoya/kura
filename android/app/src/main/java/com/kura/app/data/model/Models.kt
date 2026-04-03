@@ -19,6 +19,7 @@ data class Entry(
     @SerialName("entry_type") val entryType: String,
     val name: String,
     @SerialName("is_favorite") val isFavorite: Boolean,
+    @SerialName("created_at") val createdAt: Long = 0,
     @SerialName("updated_at") val updatedAt: Long,
     @SerialName("deleted_at") val deletedAt: Long? = null,
     val notes: String? = null,
@@ -63,7 +64,9 @@ enum class EntryType(val value: String, val displayName: String) {
     SSH_KEY("ssh_key", "SSHキー"),
     SECURE_NOTE("secure_note", "セキュアノート"),
     CREDIT_CARD("credit_card", "クレジットカード"),
-    PASSKEY("passkey", "Passkey");
+    PASSKEY("passkey", "Passkey"),
+    PASSWORD("password", "パスワード"),
+    SOFTWARE_LICENSE("software_license", "ソフトウェアライセンス");
 
     companion object {
         fun fromValue(value: String): EntryType? = entries.find { it.value == value }
@@ -75,7 +78,8 @@ enum class CustomFieldType(val value: String, val displayName: String) {
     PASSWORD("password", "パスワード"),
     EMAIL("email", "メール"),
     URL("url", "URL"),
-    PHONE("phone", "電話番号");
+    PHONE("phone", "電話番号"),
+    TOTP("totp", "ワンタイムパスワード");
 
     companion object {
         fun fromValue(value: String): CustomFieldType? = entries.find { it.value == value }

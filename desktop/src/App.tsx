@@ -74,6 +74,7 @@ function AppContent() {
       try {
         const vaultBytes = await commands.lock()
         await commands.writeVaultFile(vaultBytes)
+        sessionStorage.removeItem('decryptedS3Config')
         setAppState('locked')
       } catch (err) {
         console.error('Auto-lock failed:', err)

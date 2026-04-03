@@ -1,6 +1,8 @@
 import { Check, X } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import type { S3Config } from '../../../shared/types'
+import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
@@ -9,6 +11,7 @@ import { PasswordInput } from '../../components/ui/password-input'
 
 export default function MasterPassword() {
   const navigate = useNavigate()
+  const { draft } = useOnboardingDraft()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -21,13 +24,23 @@ export default function MasterPassword() {
 
     setLoading(true)
     try {
+      // オンボーディングドラフトからS3設定を構築
+      const s3Config: S3Config = {
+        region: draft.region,
+        bucket: draft.bucket,
+        key: draft.key,
+        accessKeyId: draft.accessKeyId,
+        secretAccessKey: draft.secretAccessKey,
+        ...(draft.endpoint ? { endpoint: draft.endpoint } : {}),
+      }
+
       const response = await new Promise<{
         success?: boolean
         recoveryKey?: string
         error?: string
       }>((resolve, _reject) => {
         chrome.runtime.sendMessage(
-          { type: 'CREATE_VAULT', masterPassword: password },
+          { type: 'CREATE_VAULT', masterPassword: password, s3Config },
           (response) => {
             resolve(response)
           },

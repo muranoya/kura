@@ -173,7 +173,7 @@ fun EntryListScreen(
                 scope.launch {
                     try {
                         appViewModel.repository.deleteEntry(targetId)
-                        appViewModel.repository.saveAndPush(appViewModel.preferences.s3ConfigFlow.first())
+                        appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
                         loadEntries()
                     } catch (_: Exception) { }
                     deleteTargetId = null

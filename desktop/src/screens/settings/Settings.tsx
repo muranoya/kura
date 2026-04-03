@@ -49,10 +49,10 @@ export default function Settings() {
 
   // Load storage config and settings
   useEffect(() => {
-    const loadStorageConfig = async () => {
+    const loadStorageConfig = () => {
       try {
-        const config = await getFromStorage<Record<string, string>>(STORAGE_KEYS.S3_CONFIG)
-        setStorageConfig(config ?? null)
+        const configJson = sessionStorage.getItem('decryptedS3Config')
+        setStorageConfig(configJson ? JSON.parse(configJson) : null)
       } catch (err) {
         console.error('Failed to load storage config:', err)
       } finally {
@@ -134,9 +134,9 @@ export default function Settings() {
   const saveVaultAndPush = async () => {
     const vaultBytes = await commands.getVaultBytes()
     await commands.writeVaultFile(vaultBytes)
-    const s3Config = await getFromStorage<Record<string, string>>('s3Config')
-    if (s3Config) {
-      await commands.pushVaultAndTrack(JSON.stringify(s3Config))
+    const configJson = sessionStorage.getItem('decryptedS3Config')
+    if (configJson) {
+      await commands.pushVaultAndTrack()
     }
   }
 
@@ -158,6 +158,12 @@ export default function Settings() {
     setChangePasswordLoading(true)
     try {
       await commands.changeMasterPassword(oldPassword, newPassword)
+      // S3設定を新しいパスワードで再暗号化
+      const configJson = sessionStorage.getItem('decryptedS3Config')
+      if (configJson) {
+        const encrypted = await commands.encryptConfig(newPassword, configJson)
+        await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
+      }
       await saveVaultAndPush()
       setChangePasswordOpen(false)
       setOldPassword('')

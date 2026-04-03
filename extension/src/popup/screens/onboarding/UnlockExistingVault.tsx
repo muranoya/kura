@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { STORAGE_KEYS } from '../../../shared/constants'
 import { removeFromStorage } from '../../../shared/storage'
+import type { S3Config } from '../../../shared/types'
+import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
@@ -11,6 +13,7 @@ import { PasswordInput } from '../../components/ui/password-input'
 
 export default function UnlockExistingVault() {
   const navigate = useNavigate()
+  const { draft } = useOnboardingDraft()
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -31,9 +34,19 @@ export default function UnlockExistingVault() {
     setError('')
 
     try {
+      // オンボーディングドラフトからS3設定を構築してUNLOCK_EXISTINGに渡す
+      const s3Config: S3Config = {
+        region: draft.region,
+        bucket: draft.bucket,
+        key: draft.key,
+        accessKeyId: draft.accessKeyId,
+        secretAccessKey: draft.secretAccessKey,
+        ...(draft.endpoint ? { endpoint: draft.endpoint } : {}),
+      }
+
       const response = await new Promise<{ success?: boolean; error?: string }>(
         (resolve, reject) => {
-          chrome.runtime.sendMessage({ type: 'UNLOCK', password }, (resp) => {
+          chrome.runtime.sendMessage({ type: 'UNLOCK_EXISTING', password, s3Config }, (resp) => {
             if (chrome.runtime.lastError) {
               reject(new Error(chrome.runtime.lastError.message))
             } else {

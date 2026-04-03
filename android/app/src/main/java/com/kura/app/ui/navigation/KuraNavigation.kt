@@ -19,6 +19,8 @@ import com.kura.app.ui.entries.*
 import com.kura.app.ui.home.*
 import com.kura.app.ui.labels.*
 import com.kura.app.ui.tools.*
+import com.kura.app.ui.components.SyncDialogState
+import com.kura.app.ui.components.SyncProgressDialog
 import com.kura.app.ui.sync.formatRelativeTime
 import com.kura.app.ui.settings.*
 import kotlinx.coroutines.flow.first
@@ -154,17 +156,32 @@ fun MainNavHost(appViewModel: AppViewModel) {
     val currentRoute = navBackStackEntry?.destination?.route
 
     // Sync state for drawer
-    var isSyncing by remember { mutableStateOf(false) }
+    var showSyncDialog by remember { mutableStateOf(false) }
+    var syncDialogState by remember { mutableStateOf(SyncDialogState.SYNCING) }
+    var syncErrorMessage by remember { mutableStateOf<String?>(null) }
     var lastSyncTime by remember { mutableStateOf<Long?>(null) }
 
     LaunchedEffect(Unit) {
         val ts = appViewModel.repository.getLastSyncTime()
-        if (ts > 0) lastSyncTime = ts
+        if (ts > 0) {
+            lastSyncTime = ts
+        } else {
+            val prefTs = appViewModel.preferences.lastSyncTimeFlow.first()
+            if (prefTs != null && prefTs > 0) lastSyncTime = prefTs
+        }
+    }
+
+    if (showSyncDialog) {
+        SyncProgressDialog(
+            state = syncDialogState,
+            errorMessage = syncErrorMessage,
+            onDismiss = { showSyncDialog = false }
+        )
     }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = currentRoute == Routes.HOME,
+        gesturesEnabled = currentRoute in listOf(Routes.HOME, Routes.TRASH, Routes.LABEL_MANAGER, Routes.PASSWORD_GENERATOR, Routes.SETTINGS),
         drawerContent = {
             ModalDrawerSheet(modifier = Modifier.width(300.dp)) {
                 // Header
@@ -205,13 +222,7 @@ fun MainNavHost(appViewModel: AppViewModel) {
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
 
                 NavigationDrawerItem(
-                    icon = {
-                        if (isSyncing) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Sync, contentDescription = null)
-                        }
-                    },
+                    icon = { Icon(Icons.Default.Sync, contentDescription = null) },
                     label = { Text("同期") },
                     badge = {
                         Text(
@@ -222,10 +233,12 @@ fun MainNavHost(appViewModel: AppViewModel) {
                     },
                     selected = false,
                     onClick = {
-                        if (isSyncing) return@NavigationDrawerItem
+                        if (showSyncDialog) return@NavigationDrawerItem
                         scope.launch {
                             drawerState.close()
-                            isSyncing = true
+                            syncDialogState = SyncDialogState.SYNCING
+                            syncErrorMessage = null
+                            showSyncDialog = true
                             try {
                                 val config = appViewModel.preferences.s3ConfigFlow.first()
                                 if (config != null) {
@@ -233,15 +246,20 @@ fun MainNavHost(appViewModel: AppViewModel) {
                                     if (result.synced) {
                                         val vaultBytes = appViewModel.repository.getVaultBytes()
                                         appViewModel.repository.writeVaultFile(vaultBytes)
+                                        result.lastSyncedAt?.let { ts ->
+                                            appViewModel.preferences.saveLastSyncTime(ts)
+                                            lastSyncTime = ts
+                                        }
                                     }
-                                    val ts = appViewModel.repository.getLastSyncTime()
-                                    if (ts > 0) {
-                                        appViewModel.preferences.saveLastSyncTime(ts)
-                                        lastSyncTime = ts
-                                    }
+                                    syncDialogState = SyncDialogState.SUCCESS
+                                } else {
+                                    syncErrorMessage = "S3の設定が見つかりません"
+                                    syncDialogState = SyncDialogState.ERROR
                                 }
-                            } catch (_: Exception) { }
-                            isSyncing = false
+                            } catch (e: Exception) {
+                                syncErrorMessage = e.localizedMessage ?: "同期に失敗しました"
+                                syncDialogState = SyncDialogState.ERROR
+                            }
                         }
                     },
                     modifier = Modifier.padding(horizontal = 12.dp)
@@ -365,13 +383,13 @@ fun MainNavHost(appViewModel: AppViewModel) {
             composable(Routes.TRASH) {
                 TrashScreen(
                     appViewModel = appViewModel,
-                    onBack = { navController.navigateUp() }
+                    onOpenDrawer = { scope.launch { drawerState.open() } }
                 )
             }
             composable(Routes.LABEL_MANAGER) {
                 LabelManagerScreen(
                     appViewModel = appViewModel,
-                    onBack = { navController.popBackStack() },
+                    onOpenDrawer = { scope.launch { drawerState.open() } },
                     onLabelClick = { labelId ->
                         navController.navigate(Routes.labelEntries(labelId))
                     }
@@ -393,13 +411,13 @@ fun MainNavHost(appViewModel: AppViewModel) {
             composable(Routes.PASSWORD_GENERATOR) {
                 PasswordGeneratorScreen(
                     appViewModel = appViewModel,
-                    onBack = { navController.popBackStack() }
+                    onOpenDrawer = { scope.launch { drawerState.open() } }
                 )
             }
             composable(Routes.SETTINGS) {
                 SettingsScreen(
                     appViewModel = appViewModel,
-                    onBack = { navController.popBackStack() },
+                    onOpenDrawer = { scope.launch { drawerState.open() } },
                     onLogout = {
                         appViewModel.setAppState(AppState.ONBOARDING)
                     }

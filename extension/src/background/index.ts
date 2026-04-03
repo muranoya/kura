@@ -68,6 +68,8 @@ interface WasmApi {
   api_change_master_password(vaultId: string, oldPassword: string, newPassword: string): void
   api_rotate_dek(vaultId: string, password: string): string
   api_regenerate_recovery_key(vaultId: string, password: string): string
+  api_encrypt_config(vaultId: string, password: string, plaintext: string): string
+  api_decrypt_config(vaultId: string, password: string, encryptedB64: string): string
   [key: string]: unknown
 }
 
@@ -76,6 +78,7 @@ const vault = vaultModule as unknown as WasmApi
 let wasmInitialized = false
 let unlocked = false
 let popupConnected = false
+let decryptedS3Config: S3Config | null = null
 
 // WASM 初期化関数
 async function initWasm() {
@@ -229,15 +232,14 @@ async function autoSync() {
   if (syncing) return
   syncing = true
   try {
-    // S3設定がない場合はローカル保存のみ
-    const s3Config = await getFromStorage<S3Config>(STORAGE_KEYS.S3_CONFIG)
-    if (!s3Config) {
+    // 復号済みS3設定がない場合はローカル保存のみ
+    if (!decryptedS3Config) {
       const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
       await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
       return
     }
 
-    await syncWithS3(s3Config)
+    await syncWithS3(decryptedS3Config)
 
     // 同期後に vault bytes / ETag / lastSyncTime を更新
     const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
@@ -326,6 +328,16 @@ async function handleMessage(
           // vault をロードしてアンロック
           vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
           vault.api_unlock(DEFAULT_VAULT_ID, message.password)
+          // 暗号化されたS3設定を復号してメモリに保持
+          const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
+          if (encryptedConfig) {
+            try {
+              const configJson = vault.api_decrypt_config(DEFAULT_VAULT_ID, message.password, encryptedConfig)
+              decryptedS3Config = JSON.parse(configJson)
+            } catch (e) {
+              console.error('[SW] Failed to decrypt S3 config:', e)
+            }
+          }
           unlocked = true
           // ポップアップが閉じている場合のみオートロック alarm を設定
           if (!popupConnected) {
@@ -359,6 +371,24 @@ async function handleMessage(
           }
           vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
           vault.api_unlock(DEFAULT_VAULT_ID, message.password)
+          // オンボーディング時のS3設定暗号化保存
+          if (message.s3Config) {
+            const configJson = JSON.stringify(message.s3Config)
+            const encrypted = vault.api_encrypt_config(DEFAULT_VAULT_ID, message.password, configJson)
+            await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
+            decryptedS3Config = message.s3Config
+          } else {
+            // 通常のアンロック: 暗号化S3設定を復号
+            const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
+            if (encryptedConfig) {
+              try {
+                const cJson = vault.api_decrypt_config(DEFAULT_VAULT_ID, message.password, encryptedConfig)
+                decryptedS3Config = JSON.parse(cJson)
+              } catch (e) {
+                console.error('[SW] Failed to decrypt S3 config:', e)
+              }
+            }
+          }
           unlocked = true
           // ポップアップが閉じている場合のみオートロック alarm を設定
           if (!popupConnected) {
@@ -383,6 +413,7 @@ async function handleMessage(
           const vaultBytes = vault.api_lock(DEFAULT_VAULT_ID)
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
           unlocked = false
+          decryptedS3Config = null
           chrome.alarms.clear('autolock')
           chrome.alarms.clear('autosync')
           sendResponse({ success: true })
@@ -405,7 +436,10 @@ async function handleMessage(
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, null)
 
           if (message.s3Config) {
-            await saveToStorage(STORAGE_KEYS.S3_CONFIG, message.s3Config)
+            const configJson = JSON.stringify(message.s3Config)
+            const encrypted = vault.api_encrypt_config(DEFAULT_VAULT_ID, message.masterPassword, configJson)
+            await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
+            decryptedS3Config = message.s3Config
           }
           unlocked = true
           if (!popupConnected) {
@@ -745,6 +779,12 @@ async function handleMessage(
         }
         try {
           vault.api_change_master_password(DEFAULT_VAULT_ID, message.oldPassword, message.newPassword)
+          // S3設定を新しいパスワードで再暗号化
+          if (decryptedS3Config) {
+            const configJson = JSON.stringify(decryptedS3Config)
+            const encrypted = vault.api_encrypt_config(DEFAULT_VAULT_ID, message.newPassword, configJson)
+            await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
+          }
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -787,7 +827,8 @@ async function handleMessage(
 
       case 'DOWNLOAD_VAULT': {
         try {
-          const s3Config = await getFromStorage<S3Config>(STORAGE_KEYS.S3_CONFIG)
+          // オンボーディング中はメッセージからS3設定を受け取る。既存セッションではメモリから使用。
+          const s3Config: S3Config | null = message.s3Config ?? decryptedS3Config
           if (!s3Config) {
             sendResponse({ success: false, error: 'S3 config not found' })
             break
@@ -817,7 +858,7 @@ async function handleMessage(
         try {
           const s3Config: S3Config | null = message.storageConfig
             ? JSON.parse(message.storageConfig)
-            : await getFromStorage<S3Config>(STORAGE_KEYS.S3_CONFIG)
+            : decryptedS3Config
 
           if (!s3Config) {
             sendResponse({ success: false, error: 'S3 config not found' })
@@ -852,14 +893,12 @@ async function handleMessage(
         }
         syncing = true
         try {
-          const s3Config = await getFromStorage<S3Config>(STORAGE_KEYS.S3_CONFIG)
-
-          if (!s3Config) {
+          if (!decryptedS3Config) {
             sendResponse({ success: true, status: 'idle', message: 'S3 config not set' })
             break
           }
 
-          await syncWithS3(s3Config)
+          await syncWithS3(decryptedS3Config)
 
           // 同期後、vault bytes と ETag を更新
           const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
@@ -875,6 +914,15 @@ async function handleMessage(
           sendResponse({ success: false, error: String(err) })
         } finally {
           syncing = false
+        }
+        break
+      }
+
+      case 'GET_DECRYPTED_S3_CONFIG': {
+        if (!unlocked || !decryptedS3Config) {
+          sendResponse({ success: true, config: null })
+        } else {
+          sendResponse({ success: true, config: decryptedS3Config })
         }
         break
       }
@@ -947,6 +995,7 @@ async function handleAutolockAlarm() {
     const vaultBytes = vault.api_lock(DEFAULT_VAULT_ID)
     await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
     unlocked = false
+    decryptedS3Config = null
   } catch (err) {
     console.error('[SW] Autolock failed:', err)
   }

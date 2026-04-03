@@ -5,8 +5,7 @@ import { syncVault } from '../../commands'
 import { usePushError } from '../../contexts/ErrorContext'
 import { useNotifySynced } from '../../contexts/SyncContext'
 import { STORAGE_KEYS } from '../../shared/constants'
-import { getFromStorage, saveToStorage } from '../../shared/storage'
-import type { S3Config } from '../../shared/types'
+import { saveToStorage } from '../../shared/storage'
 
 function formatRelativeTime(unixSecs: number): string {
   const diffMin = Math.floor((Date.now() / 1000 - unixSecs) / 60)
@@ -21,19 +20,18 @@ export default function SyncHeaderActions() {
   const notifySynced = useNotifySynced()
   const pushError = usePushError()
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null)
-  const [storageConfig, setStorageConfig] = useState<S3Config | null>(null)
+  const [hasConfig, setHasConfig] = useState(false)
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error'>('idle')
   const [_tick, setTick] = useState(0)
 
   // Load initial values
   useEffect(() => {
-    const loadData = async () => {
+    setHasConfig(sessionStorage.getItem('decryptedS3Config') !== null)
+
+    const loadSyncTime = async () => {
       try {
-        const [config, syncTime] = await Promise.all([
-          getFromStorage<S3Config>(STORAGE_KEYS.S3_CONFIG),
-          getFromStorage<number>(STORAGE_KEYS.LAST_SYNC_TIME),
-        ])
-        setStorageConfig(config ?? null)
+        const store = await Store.load('settings.json')
+        const syncTime = await store.get<number>(STORAGE_KEYS.LAST_SYNC_TIME)
         if (syncTime) {
           setLastSyncTime(syncTime)
         }
@@ -41,7 +39,7 @@ export default function SyncHeaderActions() {
         console.error('Failed to load sync data:', err)
       }
     }
-    loadData()
+    loadSyncTime()
   }, [])
 
   // Subscribe to storage changes for LAST_SYNC_TIME
@@ -78,12 +76,12 @@ export default function SyncHeaderActions() {
   }, [lastSyncTime])
 
   const handleSync = async () => {
-    if (!storageConfig) return
+    const configJson = sessionStorage.getItem('decryptedS3Config')
+    if (!configJson) return
 
     setSyncStatus('syncing')
 
     try {
-      const configJson = JSON.stringify(storageConfig)
       const result = await syncVault(configJson)
 
       if (result.last_synced_at) {
@@ -106,7 +104,7 @@ export default function SyncHeaderActions() {
   }
 
   // Return nothing if storage not configured
-  if (!storageConfig) return null
+  if (!hasConfig) return null
 
   return (
     <div className="flex items-center gap-1.5 ml-auto">

@@ -2,6 +2,8 @@ import { Lock } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
+import { STORAGE_KEYS } from '../../shared/constants'
+import { saveToStorage } from '../../shared/storage'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
@@ -23,9 +25,17 @@ export default function UnlockExistingVault() {
     setLoading(true)
     try {
       await commands.unlock(password)
+      // S3設定をマスターパスワードで暗号化して永続保存
+      const pendingConfig = sessionStorage.getItem('pendingS3Config')
+      if (pendingConfig) {
+        const encrypted = await commands.encryptConfig(password, pendingConfig)
+        await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
+        sessionStorage.removeItem('pendingS3Config')
+        sessionStorage.setItem('decryptedS3Config', pendingConfig)
+      }
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
-      commands.syncVaultIfConfigured().catch(() => {}) // バックグラウンド
+      commands.syncVaultIfConfigured().catch(() => {}) // バックグラウ���ド
       window.location.reload()
     } catch (_err) {
       setError('パスワードが違います')

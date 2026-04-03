@@ -1,8 +1,7 @@
 import { Check, Copy, ExternalLink, Tags, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../../../shared/constants'
-import { getFromStorage } from '../../../shared/storage'
+import { DEFAULT_SETTINGS } from '../../../shared/constants'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { PageHeader } from '../../components/layout/PageHeader'
@@ -73,9 +72,11 @@ export default function Settings() {
 
   const loadStorageConfig = async () => {
     try {
-      const config = await getFromStorage<Record<string, string>>(STORAGE_KEYS.S3_CONFIG)
-      if (config) {
-        setStorageConfig(config)
+      const response = await new Promise<{ success: boolean; config: Record<string, string> | null }>((resolve) => {
+        chrome.runtime.sendMessage({ type: 'GET_DECRYPTED_S3_CONFIG' }, resolve)
+      })
+      if (response?.success && response.config) {
+        setStorageConfig(response.config)
       }
     } catch (err) {
       console.error('Failed to load storage config:', err)
