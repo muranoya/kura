@@ -248,16 +248,7 @@ fun MainNavHost(appViewModel: AppViewModel) {
                     appViewModel = appViewModel,
                     onOpenDrawer = { scope.launch { drawerState.open() } },
                     onEntryClick = { id -> navController.navigate(Routes.entryDetail(id)) },
-                    onCreateClick = { navController.navigate(Routes.ENTRY_CREATE) },
-                    onCategoryClick = { type ->
-                        navController.navigate(Routes.ENTRY_LIST + "?type=$type")
-                    },
-                    onShowAllFavorites = {
-                        navController.navigate(Routes.ENTRY_LIST + "?favorites=true")
-                    },
-                    onShowAllEntries = {
-                        navController.navigate(Routes.ENTRY_LIST)
-                    }
+                    onCreateClick = { navController.navigate(Routes.ENTRY_CREATE) }
                 )
             }
             composable(
