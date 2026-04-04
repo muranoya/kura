@@ -30,6 +30,7 @@ export const STORAGE_KEYS = {
   S3_CONFIG: 's3Config',
   APP_SETTINGS: 'appSettings',
   LAST_SYNC_TIME: 'lastSyncTime',
+  SORT_CONFIG: 'entrySortConfig',
 }
 
 // Password generation defaults

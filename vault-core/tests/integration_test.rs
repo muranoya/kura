@@ -1,4 +1,4 @@
-use vault_core::{LockedVault, EntryType, EntryData};
+use vault_core::{LockedVault, EntryData};
 
 #[test]
 fn test_vault_create_unlock_lock_cycle() {
@@ -14,7 +14,7 @@ fn test_vault_create_unlock_lock_cycle() {
     let entry = unlocked
         .create_entry(
             "Test Login".to_string(),
-            EntryType::Login,
+            "login".to_string(),
             EntryData::new_login(
                 Some("https://example.com".to_string()),
                 "user@example.com".to_string(),
@@ -67,7 +67,7 @@ fn test_entry_encryption_decryption() {
     let entry = unlocked
         .create_entry(
             "Secret".to_string(),
-            EntryType::SecureNote,
+            "secure_note".to_string(),
             EntryData::new_secure_note(original_content.to_string(), None),
             vec![],
         )
@@ -110,7 +110,7 @@ fn test_multiple_entries_and_labels() {
     let _entry1 = unlocked
         .create_entry(
             "Gmail".to_string(),
-            EntryType::Login,
+            "login".to_string(),
             EntryData::new_login(
                 Some("https://gmail.com".to_string()),
                 "user@gmail.com".to_string(),
@@ -124,7 +124,7 @@ fn test_multiple_entries_and_labels() {
     let _entry2 = unlocked
         .create_entry(
             "GitHub".to_string(),
-            EntryType::Login,
+            "login".to_string(),
             EntryData::new_login(
                 Some("https://github.com".to_string()),
                 "user".to_string(),
@@ -158,7 +158,7 @@ fn test_database_serialization() {
     unlocked
         .create_entry(
             "Test".to_string(),
-            EntryType::SecureNote,
+            "secure_note".to_string(),
             EntryData::new_secure_note("test content".to_string(), None),
             vec![],
         )
@@ -180,7 +180,7 @@ fn test_entry_deletion_and_restoration() {
     let entry = unlocked
         .create_entry(
             "To Delete".to_string(),
-            EntryType::SecureNote,
+            "secure_note".to_string(),
             EntryData::new_secure_note("will be deleted".to_string(), None),
             vec![],
         )
@@ -226,7 +226,6 @@ fn test_password_generation() {
     let options = vault_core::PasswordOptions {
         length: 20,
         include_uppercase: true,
-        include_lowercase: true,
         include_numbers: true,
         include_symbols: false,
     };
@@ -278,7 +277,7 @@ fn test_delete_label_removes_label_id_from_entry() {
     let entry = unlocked
         .create_entry(
             "Test Entry".to_string(),
-            EntryType::Login,
+            "login".to_string(),
             EntryData::new_login(
                 Some("https://example.com".to_string()),
                 "user".to_string(),
@@ -331,7 +330,7 @@ fn test_delete_label_affects_all_entries_with_label() {
     let entry1 = unlocked
         .create_entry(
             "Entry 1".to_string(),
-            EntryType::Login,
+            "login".to_string(),
             EntryData::new_login(
                 Some("https://example1.com".to_string()),
                 "user1".to_string(),
@@ -346,7 +345,7 @@ fn test_delete_label_affects_all_entries_with_label() {
     let entry2 = unlocked
         .create_entry(
             "Entry 2".to_string(),
-            EntryType::Login,
+            "login".to_string(),
             EntryData::new_login(
                 Some("https://example2.com".to_string()),
                 "user2".to_string(),
@@ -361,7 +360,7 @@ fn test_delete_label_affects_all_entries_with_label() {
     let entry3 = unlocked
         .create_entry(
             "Entry 3".to_string(),
-            EntryType::Login,
+            "login".to_string(),
             EntryData::new_login(
                 Some("https://example3.com".to_string()),
                 "user3".to_string(),

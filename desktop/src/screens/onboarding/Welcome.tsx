@@ -20,31 +20,6 @@ export default function Welcome() {
         <p className="text-lg text-text-secondary mb-2">サーバ不要、自分一人のための</p>
         <p className="text-lg text-text-secondary mb-8">運用コストゼロのパスワードマネージャー</p>
 
-        {/* 特徴 */}
-        <div className="space-y-3 mb-8 text-left bg-bg-surface rounded-lg p-6 border border-border">
-          <div className="flex items-start gap-3">
-            <div className="text-accent mt-0.5">✓</div>
-            <div>
-              <p className="text-sm font-medium text-text-primary">完全なゼロ知識設計</p>
-              <p className="text-xs text-text-muted">すべての暗号化はクライアント側で行われます</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="text-accent mt-0.5">✓</div>
-            <div>
-              <p className="text-sm font-medium text-text-primary">クラウドストレージ連携</p>
-              <p className="text-xs text-text-muted">S3互換サービスなら何でも対応</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="text-accent mt-0.5">✓</div>
-            <div>
-              <p className="text-sm font-medium text-text-primary">ベンダーロックインなし</p>
-              <p className="text-xs text-text-muted">いつでも他のサービスに切り替え可能</p>
-            </div>
-          </div>
-        </div>
-
         {/* CTA */}
         <Button onClick={() => navigate('/onb/storage')} size="lg" className="w-full">
           始める

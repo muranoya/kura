@@ -6,8 +6,15 @@ import EntryCard from '../../components/entries/EntryCard'
 import EntryListPanel from '../../components/entries/EntryListPanel'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 import { Button } from '../../components/ui/button'
+import { STORAGE_KEYS } from '../../shared/constants'
+import { getFromStorage, saveToStorage } from '../../shared/storage'
 import { useSyncVersion } from '../../contexts/SyncContext'
-import type { EntryRow, EntryType } from '../../shared/types'
+import type { EntryRow, EntryType, SortConfig } from '../../shared/types'
+
+const DEFAULT_SORT: SortConfig = { field: 'created_at', order: 'desc' }
+
+// ページ遷移後もスクロール位置を保持するためモジュールレベルで管理
+const scrollPositions = new Map<string, number>()
 
 interface EntryListProps {
   onlyFavorites?: boolean
@@ -25,51 +32,57 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedType, setSelectedType] = useState<EntryType | undefined>(undefined)
+  const [sortConfig, setSortConfig] = useState<SortConfig>(DEFAULT_SORT)
+  const [sortLoaded, setSortLoaded] = useState(false)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const scrollKey = labelId ? `label-${labelId}` : onlyFavorites ? 'favorites' : 'entries'
+
+  // ソート設定をストレージから読み込み
+  useEffect(() => {
+    getFromStorage<SortConfig>(STORAGE_KEYS.SORT_CONFIG).then((saved) => {
+      if (saved) setSortConfig(saved)
+      setSortLoaded(true)
+    })
+  }, [])
+
+  const handleSortChange = useCallback((config: SortConfig) => {
+    setSortConfig(config)
+    saveToStorage(STORAGE_KEYS.SORT_CONFIG, config)
+  }, [])
 
   const loadEntries = useCallback(async () => {
     void syncVersion // trigger reload on sync
+    if (!sortLoaded) return
     try {
       setLoading(true)
-      console.log(
-        'DEBUG: loadEntries called with onlyFavorites=',
-        onlyFavorites,
-        'searchQuery=',
-        searchQuery,
-        'selectedType=',
-        selectedType,
-        'labelId=',
-        labelId,
-      )
       const data = await commands.listEntries({
         onlyFavorites,
         searchQuery: searchQuery || undefined,
         type: selectedType,
         labelId,
+        sortField: sortConfig.field,
+        sortOrder: sortConfig.order,
       })
-      console.log(
-        'DEBUG: received entries count=',
-        data.length,
-        'filter onlyFavorites=',
-        onlyFavorites,
-        'searchQuery=',
-        searchQuery,
-        'type=',
-        selectedType,
-        'labelId=',
-        labelId,
-      )
       setEntries(data)
     } catch (err) {
       setError(`アイテム読み込み失敗: ${err}`)
     } finally {
       setLoading(false)
     }
-  }, [onlyFavorites, searchQuery, selectedType, labelId, syncVersion])
+  }, [onlyFavorites, searchQuery, selectedType, labelId, syncVersion, sortConfig, sortLoaded])
 
   useEffect(() => {
-    loadEntries()
-  }, [loadEntries])
+    loadEntries().then(() => {
+      // エントリ読み込み完了後にスクロール位置を復元
+      const saved = scrollPositions.get(scrollKey)
+      if (saved != null && scrollRef.current) {
+        requestAnimationFrame(() => {
+          scrollRef.current?.scrollTo(0, saved)
+        })
+      }
+    })
+  }, [loadEntries, scrollKey])
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value)
@@ -86,6 +99,12 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
 
   const clearSearch = () => {
     setSearchQuery('')
+  }
+
+  const saveScrollPosition = () => {
+    if (scrollRef.current) {
+      scrollPositions.set(scrollKey, scrollRef.current.scrollTop)
+    }
   }
 
   const handleFavorite = async (id: string, currentFavorite: boolean) => {
@@ -141,6 +160,8 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
       <EntryListPanel
         selectedType={selectedType}
         onTypeChange={setSelectedType}
+        sortConfig={sortConfig}
+        onSortChange={handleSortChange}
         searchQuery={searchQuery}
         onSearchChange={handleSearchChange}
         onSearchClear={clearSearch}
@@ -165,11 +186,15 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
             </Button>
           )
         }
+        scrollRef={scrollRef}
         renderCard={(entry) => (
           <EntryCard
             variant="normal"
             entry={entry}
-            onClick={(id) => navigate(`/entries/${id}`)}
+            onClick={(id) => {
+              saveScrollPosition()
+              navigate(`/entries/${id}`)
+            }}
             onFavorite={handleFavorite}
             onDelete={handleDeleteClick}
           />

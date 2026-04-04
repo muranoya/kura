@@ -9,7 +9,7 @@ export default function PasswordGenerator() {
   const navigate = useNavigate()
 
   return (
-    <div className="h-full overflow-y-auto pb-20">
+    <div className="h-full overflow-y-auto">
       <PageHeader
         title="パスワード生成"
         showBackButton={false}

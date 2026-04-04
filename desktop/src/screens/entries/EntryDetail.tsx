@@ -19,6 +19,7 @@ interface FieldDisplayProps {
   value: string | null | undefined
   isPassword?: boolean
   isMasked?: boolean
+  isUrl?: boolean
   onToggleMask?: () => void
 }
 
@@ -27,14 +28,20 @@ function FieldDisplay({
   value,
   isPassword = false,
   isMasked = false,
+  isUrl = false,
   onToggleMask,
 }: FieldDisplayProps) {
   const [copied, setCopied] = useState(false)
   const [largeTextOpen, setLargeTextOpen] = useState(false)
   const isEmpty = !value
 
-  const handleCopy = () => {
+  const handleClick = async () => {
     if (isEmpty) return
+    if (isUrl) {
+      const { open } = await import('@tauri-apps/plugin-shell')
+      open(value)
+      return
+    }
     navigator.clipboard.writeText(value)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
@@ -47,10 +54,10 @@ function FieldDisplay({
           ? 'opacity-50'
           : 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80'
       } ${copied ? 'bg-accent-subtle' : ''}`}
-      onClick={handleCopy}
+      onClick={handleClick}
       role={isEmpty ? undefined : 'button'}
       tabIndex={isEmpty ? undefined : 0}
-      onKeyDown={isEmpty ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') handleCopy() }}
+      onKeyDown={isEmpty ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') handleClick() }}
     >
       <span className="text-xs text-text-secondary w-24 shrink-0">{label}</span>
       <span className={`text-sm flex-1 break-all ${
@@ -84,10 +91,19 @@ function FieldDisplay({
           <Maximize2 size={14} />
         </button>
       )}
-      {!isEmpty && (
-        <span className="shrink-0 text-text-muted">
+      {!isEmpty && isUrl && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            navigator.clipboard.writeText(value)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 1500)
+          }}
+          className="p-1 text-text-muted hover:text-text-primary transition-colors shrink-0"
+        >
           {copied ? <span className="text-xs text-success">コピーしました</span> : <Copy size={14} />}
-        </span>
+        </button>
       )}
       {!isEmpty && (
         <LargeTextDialog
@@ -198,7 +214,15 @@ export default function EntryDetail() {
   const [entry, setEntry] = useState<Entry | null>(null)
   const [loading, setLoading] = useState(true)
   const [allLabels, setAllLabels] = useState<Label[]>([])
-  const [passwordMasked, setPasswordMasked] = useState(true)
+  const [unmaskedFields, setUnmaskedFields] = useState<Set<string>>(new Set())
+  const toggleFieldMask = (key: string) => {
+    setUnmaskedFields(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -286,10 +310,10 @@ export default function EntryDetail() {
                 label="パスワード"
                 value={v.password as string}
                 isPassword={true}
-                isMasked={passwordMasked}
-                onToggleMask={() => setPasswordMasked(!passwordMasked)}
+                isMasked={!unmaskedFields.has('password')}
+                onToggleMask={() => toggleFieldMask('password')}
               />
-              <FieldDisplay label="URL" value={v.url as string} />
+              <FieldDisplay label="URL" value={v.url as string} isUrl={true} />
             </div>
           </>
         )}
@@ -308,8 +332,8 @@ export default function EntryDetail() {
                 label="PIN"
                 value={v.pin as string}
                 isPassword={true}
-                isMasked={passwordMasked}
-                onToggleMask={() => setPasswordMasked(!passwordMasked)}
+                isMasked={!unmaskedFields.has('bank-pin')}
+                onToggleMask={() => toggleFieldMask('bank-pin')}
               />
             </div>
           </>
@@ -353,15 +377,15 @@ export default function EntryDetail() {
                 label="CVV"
                 value={v.cvv as string}
                 isPassword={true}
-                isMasked={passwordMasked}
-                onToggleMask={() => setPasswordMasked(!passwordMasked)}
+                isMasked={!unmaskedFields.has('cvv')}
+                onToggleMask={() => toggleFieldMask('cvv')}
               />
               <FieldDisplay
                 label="暗証番号"
                 value={v.pin as string}
                 isPassword={true}
-                isMasked={passwordMasked}
-                onToggleMask={() => setPasswordMasked(!passwordMasked)}
+                isMasked={!unmaskedFields.has('cc-pin')}
+                onToggleMask={() => toggleFieldMask('cc-pin')}
               />
             </div>
           </>
@@ -377,8 +401,8 @@ export default function EntryDetail() {
                 label="パスワード"
                 value={v.password as string}
                 isPassword={true}
-                isMasked={passwordMasked}
-                onToggleMask={() => setPasswordMasked(!passwordMasked)}
+                isMasked={!unmaskedFields.has('password')}
+                onToggleMask={() => toggleFieldMask('password')}
               />
             </div>
           </>
@@ -411,10 +435,10 @@ export default function EntryDetail() {
                     label={field.name}
                     value={field.value}
                     isPassword={field.fieldType === 'password'}
-                    isMasked={passwordMasked && field.fieldType === 'password'}
+                    isMasked={field.fieldType === 'password' && !unmaskedFields.has(field.id)}
                     onToggleMask={
                       field.fieldType === 'password'
-                        ? () => setPasswordMasked(!passwordMasked)
+                        ? () => toggleFieldMask(field.id)
                         : undefined
                     }
                   />

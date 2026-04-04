@@ -139,12 +139,18 @@ fun EntryCreateScreen(
                     onLabelToggle = { id ->
                         selectedLabelIds = if (id in selectedLabelIds) selectedLabelIds - id else selectedLabelIds + id
                     },
-                    onGeneratePassword = { len, up, lo, num, sym ->
-                        appViewModel.repository.generatePassword(len, up, lo, num, sym)
+                    onGeneratePassword = { len, up, num, sym ->
+                        appViewModel.repository.generatePassword(len, up, num, sym)
                     },
                     onCopyToClipboard = { text ->
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         clipboard.setPrimaryClip(ClipData.newPlainText("kura", text))
+                    },
+                    onCreateLabel = { name ->
+                        val id = appViewModel.repository.createLabel(name)
+                        val newLabel = Label(id = id, name = name)
+                        labels = labels + newLabel
+                        newLabel
                     }
                 )
             }

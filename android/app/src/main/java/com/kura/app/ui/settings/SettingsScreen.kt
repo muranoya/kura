@@ -3,6 +3,10 @@ package com.kura.app.ui.settings
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.security.keystore.KeyPermanentlyInvalidatedException
+import android.widget.Toast
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -15,6 +19,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import com.kura.app.ui.components.ConfirmDialog
 import com.kura.app.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
@@ -26,7 +32,8 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     appViewModel: AppViewModel,
     onOpenDrawer: () -> Unit = {},
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onImport1pux: () -> Unit = {}
 ) {
     var showChangePasswordDialog by remember { mutableStateOf(false) }
     var showRotateDekDialog by remember { mutableStateOf(false) }
@@ -34,8 +41,17 @@ fun SettingsScreen(
     var showRecoveryKeyDisplay by remember { mutableStateOf(false) }
     var recoveryKeyValue by remember { mutableStateOf("") }
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showBiometricEnrollDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    val canUseBiometric = remember {
+        BiometricManager.from(context).canAuthenticate(
+            BiometricManager.Authenticators.BIOMETRIC_STRONG
+        ) == BiometricManager.BIOMETRIC_SUCCESS
+    }
+    val biometricEnabled by appViewModel.preferences.biometricEnabledFlow
+        .collectAsState(initial = false)
 
     Scaffold(
         topBar = {
@@ -57,6 +73,21 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // データセクション
+            Text("データ", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Card(onClick = onImport1pux, modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    headlineContent = { Text("1Passwordからインポート") },
+                    supportingContent = { Text(".1puxファイルからエントリを取り込む") },
+                    leadingContent = { Icon(Icons.Default.FileUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // セキュリティセクション
             Text("セキュリティ", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(4.dp))
@@ -86,6 +117,33 @@ fun SettingsScreen(
                     leadingContent = { Icon(Icons.Default.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 )
+            }
+
+            if (canUseBiometric) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    ListItem(
+                        headlineContent = { Text("生体認証でアンロック") },
+                        supportingContent = { Text("指紋認証や顔認証でアンロック") },
+                        leadingContent = {
+                            Icon(Icons.Default.Fingerprint, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = biometricEnabled,
+                                onCheckedChange = { enabled ->
+                                    if (enabled) {
+                                        showBiometricEnrollDialog = true
+                                    } else {
+                                        scope.launch {
+                                            appViewModel.biometricHelper.clearAll()
+                                            appViewModel.preferences.setBiometricEnabled(false)
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -151,6 +209,9 @@ fun SettingsScreen(
             onConfirm = { password ->
                 val newKey = appViewModel.repository.rotateDek(password)
                 appViewModel.repository.saveAndPush(appViewModel.preferences.s3ConfigFlow.first())
+                // DEKローテーション後は生体認証を無効化
+                appViewModel.biometricHelper.clearAll()
+                appViewModel.preferences.setBiometricEnabled(false)
                 recoveryKeyValue = newKey
                 showRotateDekDialog = false
                 showRecoveryKeyDisplay = true
@@ -203,6 +264,53 @@ fun SettingsScreen(
                 }
             },
             confirmButton = { Button(onClick = { showRecoveryKeyDisplay = false }) { Text("保管しました") } }
+        )
+    }
+
+    // Biometric enrollment dialog
+    if (showBiometricEnrollDialog) {
+        SinglePasswordDialog(
+            title = "生体認証の有効化",
+            description = "マスターパスワードを入力してから、生体認証で確認します。",
+            onConfirm = { password ->
+                // まずマスターパスワードが正しいか検証
+                appViewModel.repository.verifyPassword(password)
+
+                val activity = context as FragmentActivity
+                val biometricHelper = appViewModel.biometricHelper
+
+                biometricHelper.generateKey()
+                val cipher = biometricHelper.getEncryptCipher()
+
+                val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("kura")
+                    .setSubtitle("生体認証を登録")
+                    .setNegativeButtonText("キャンセル")
+                    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                    .build()
+
+                val biometricPrompt = BiometricPrompt(
+                    activity,
+                    ContextCompat.getMainExecutor(context),
+                    object : BiometricPrompt.AuthenticationCallback() {
+                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                            val authenticatedCipher = result.cryptoObject?.cipher ?: return
+                            biometricHelper.encryptAndStore(authenticatedCipher, password)
+                            scope.launch {
+                                appViewModel.preferences.setBiometricEnabled(true)
+                            }
+                            showBiometricEnrollDialog = false
+                        }
+
+                        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                            biometricHelper.clearAll()
+                            Toast.makeText(context, "生体認証の登録に失敗しました", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                )
+                biometricPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
+            },
+            onDismiss = { showBiometricEnrollDialog = false }
         )
     }
 
@@ -275,6 +383,9 @@ fun PasswordChangeDialog(
                             try {
                                 appViewModel.repository.changeMasterPassword(oldPassword, newPassword)
                                 appViewModel.repository.saveAndPush(appViewModel.preferences.s3ConfigFlow.first())
+                                // マスターパスワード変更後は生体認証を無効化
+                                appViewModel.biometricHelper.clearAll()
+                                appViewModel.preferences.setBiometricEnabled(false)
                                 onDismiss()
                             } catch (e: Exception) {
                                 error = "パスワード変更に失敗しました"

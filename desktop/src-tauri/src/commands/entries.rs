@@ -10,10 +10,12 @@ pub async fn list_entries(
     label_id: Option<String>,
     include_trash: bool,
     only_favorites: bool,
+    sort_field: Option<String>,
+    sort_order: Option<String>,
 ) -> Result<Vec<serde_json::Value>, String> {
     let manager = get_manager(&vault_id);
     tokio::task::spawn_blocking(move || {
-        let rows = manager.api_list_entries(search_query, entry_type, label_id, include_trash, only_favorites)?;
+        let rows = manager.api_list_entries(search_query, entry_type, label_id, include_trash, only_favorites, sort_field, sort_order)?;
         Ok(rows
             .into_iter()
             .map(|r| {
@@ -22,6 +24,7 @@ pub async fn list_entries(
                     "entryType": r.entry_type,
                     "name": r.name,
                     "isFavorite": r.is_favorite,
+                    "createdAt": r.created_at,
                     "updatedAt": r.updated_at,
                     "deletedAt": r.deleted_at,
                 })

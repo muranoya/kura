@@ -14,10 +14,14 @@ pub mod totp;
 #[cfg(any(feature = "desktop", feature = "android", feature = "wasm"))]
 pub mod api;
 
+#[cfg(any(feature = "desktop", feature = "android"))]
+pub mod import;
+
 pub use config::{VaultConfig, S3Config};
 pub use error::{VaultError, Result};
 pub use models::{
     Entry, EntryType, EntryFilter, EntryData, Label, VaultMeta, Argon2Params,
+    SortField, SortOrder,
 };
 pub use crypto::{Kek, Dek, RecoveryKey};
 pub use store::{VaultFile, VaultContents, VaultEntry, LabelValue};

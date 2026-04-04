@@ -32,8 +32,8 @@ fun PasswordGeneratorScreen(appViewModel: AppViewModel, onOpenDrawer: () -> Unit
         }
     ) { padding ->
         PasswordGeneratorPanel(
-            onGenerate = { length, upper, lower, numbers, symbols ->
-                appViewModel.repository.generatePassword(length, upper, lower, numbers, symbols)
+            onGenerate = { length, upper, numbers, symbols ->
+                appViewModel.repository.generatePassword(length, upper, numbers, symbols)
             },
             onCopy = { password ->
                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

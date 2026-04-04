@@ -16,6 +16,9 @@ interface WasmApi {
     type: string | null,
     labelId: string | null,
     includeTrash: boolean,
+    onlyFavorites: boolean,
+    sortField: string | null,
+    sortOrder: string | null,
   ): string
   api_get_entry(vaultId: string, id: string): string
   api_create_entry(
@@ -150,6 +153,9 @@ export async function listEntries(filter?: EntryFilter): Promise<EntryRow[]> {
       filter?.type || null,
       filter?.labelId || null,
       filter?.includeTrash || false,
+      filter?.onlyFavorites || false,
+      filter?.sortField || null,
+      filter?.sortOrder || null,
     )
     const rows = JSON.parse(result)
     // WASM が entry_type を返すため、type に変換

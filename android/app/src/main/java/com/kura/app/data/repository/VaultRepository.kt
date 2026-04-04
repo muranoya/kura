@@ -85,9 +85,11 @@ class VaultRepository(private val context: Context) {
         entryType: String? = null,
         labelId: String? = null,
         includeTrash: Boolean = false,
-        onlyFavorites: Boolean = false
+        onlyFavorites: Boolean = false,
+        sortField: String? = null,
+        sortOrder: String? = null
     ): List<EntryRow> = withContext(Dispatchers.IO) {
-        val jsonStr = VaultBridge.listEntries(DEFAULT_VAULT_ID, searchQuery, entryType, labelId, includeTrash, onlyFavorites)
+        val jsonStr = VaultBridge.listEntries(DEFAULT_VAULT_ID, searchQuery, entryType, labelId, includeTrash, onlyFavorites, sortField, sortOrder)
         json.decodeFromString<List<EntryRow>>(jsonStr)
     }
 
@@ -168,6 +170,10 @@ class VaultRepository(private val context: Context) {
     // Security
     // ========================================================================
 
+    suspend fun verifyPassword(password: String) = withContext(Dispatchers.IO) {
+        VaultBridge.verifyPassword(DEFAULT_VAULT_ID, password)
+    }
+
     suspend fun changeMasterPassword(oldPassword: String, newPassword: String) = withContext(Dispatchers.IO) {
         VaultBridge.changeMasterPassword(DEFAULT_VAULT_ID, oldPassword, newPassword)
     }
@@ -187,11 +193,10 @@ class VaultRepository(private val context: Context) {
     suspend fun generatePassword(
         length: Int = 16,
         uppercase: Boolean = true,
-        lowercase: Boolean = true,
         numbers: Boolean = true,
         symbols: Boolean = true
     ): String = withContext(Dispatchers.IO) {
-        VaultBridge.generatePassword(length, uppercase, lowercase, numbers, symbols)
+        VaultBridge.generatePassword(length, uppercase, numbers, symbols)
     }
 
     suspend fun generateTotp(secret: String, digits: Int = 6, period: Int = 30): String = withContext(Dispatchers.IO) {
@@ -208,6 +213,20 @@ class VaultRepository(private val context: Context) {
 
     suspend fun parseTotpPeriod(value: String): Long = withContext(Dispatchers.IO) {
         VaultBridge.parseTotpPeriod(value)
+    }
+
+    // ========================================================================
+    // Import
+    // ========================================================================
+
+    suspend fun import1puxPreview(fileBytes: ByteArray): ImportPreview = withContext(Dispatchers.IO) {
+        val jsonStr = VaultBridge.import1puxPreview(DEFAULT_VAULT_ID, fileBytes)
+        json.decodeFromString<ImportPreview>(jsonStr)
+    }
+
+    suspend fun import1puxExecute(fileBytes: ByteArray, actionsJson: String): ImportResult = withContext(Dispatchers.IO) {
+        val jsonStr = VaultBridge.import1puxExecute(DEFAULT_VAULT_ID, fileBytes, actionsJson)
+        json.decodeFromString<ImportResult>(jsonStr)
     }
 
     // ========================================================================

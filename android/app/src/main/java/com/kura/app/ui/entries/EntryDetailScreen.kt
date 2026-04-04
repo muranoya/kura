@@ -3,6 +3,8 @@ package com.kura.app.ui.entries
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -38,6 +40,7 @@ import com.kura.app.data.model.CustomField
 import com.kura.app.data.model.Entry
 import com.kura.app.data.model.Label
 import com.kura.app.ui.components.ConfirmDialog
+import com.kura.app.ui.components.LargeTextDialog
 import com.kura.app.ui.components.EntryTypeIcon
 import com.kura.app.ui.components.entryTypeDisplayName
 import com.kura.app.viewmodel.AppViewModel
@@ -215,23 +218,12 @@ fun EntryDetailScreen(
                                         value = strValue,
                                         isSecret = isSecret,
                                         isEmpty = isEmpty,
+                                        isUrl = key == "url",
                                         context = context,
                                         isMultiLine = key == "private_key" || key == "content"
                                     )
                                 }
                             }
-                        }
-
-                        // Notes
-                        DetailSection(title = "メモ") {
-                            val hasNotes = !e.notes.isNullOrEmpty()
-                            DetailField(
-                                label = "メモ",
-                                value = e.notes ?: "",
-                                isEmpty = !hasNotes,
-                                context = context,
-                                isMultiLine = true
-                            )
                         }
 
                         // Custom fields
@@ -268,6 +260,20 @@ fun EntryDetailScreen(
                                     }
                                 }
                             }
+                        }
+
+                        // Notes
+                        DetailSection(title = "メモ") {
+                            val hasNotes = !e.notes.isNullOrEmpty()
+                            DetailField(
+                                label = "メモ",
+                                value = e.notes ?: "",
+                                isEmpty = !hasNotes,
+                                context = context,
+                                isMultiLine = true,
+                                showLargeText = false,
+                                copyable = false
+                            )
                         }
 
                         // Timestamps
@@ -367,11 +373,15 @@ fun DetailField(
     value: String,
     isSecret: Boolean = false,
     isEmpty: Boolean = false,
+    isUrl: Boolean = false,
     context: Context,
-    isMultiLine: Boolean = false
+    isMultiLine: Boolean = false,
+    showLargeText: Boolean = true,
+    copyable: Boolean = true
 ) {
     var visible by remember { mutableStateOf(!isSecret) }
     var copied by remember { mutableStateOf(false) }
+    var largeTextOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val backgroundColor by animateColorAsState(
@@ -384,16 +394,21 @@ fun DetailField(
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (!isEmpty) {
+                if (!isEmpty && (copyable || isUrl)) {
                     Modifier.clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = ripple()
                     ) {
-                        val copyValue = if (isSecret && !visible) value else value
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText(label, copyValue))
-                        copied = true
-                        scope.launch { delay(1500); copied = false }
+                        if (isUrl) {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(value))
+                            context.startActivity(intent)
+                        } else {
+                            val copyValue = if (isSecret && !visible) value else value
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText(label, copyValue))
+                            copied = true
+                            scope.launch { delay(1500); copied = false }
+                        }
                     }
                 } else {
                     Modifier
@@ -437,6 +452,29 @@ fun DetailField(
                     )
                 }
             }
+            if (!isEmpty && showLargeText) {
+                IconButton(onClick = { largeTextOpen = true }, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Default.OpenInFull,
+                        contentDescription = "拡大表示",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            if (isUrl && !isEmpty) {
+                IconButton(onClick = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
+                    copied = true
+                    scope.launch { delay(1500); copied = false }
+                }, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = "コピー",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
             if (isSecret && !isEmpty) {
                 IconButton(onClick = { visible = !visible }, modifier = Modifier.size(32.dp)) {
                     Icon(
@@ -447,6 +485,14 @@ fun DetailField(
                 }
             }
         }
+    }
+
+    if (largeTextOpen) {
+        LargeTextDialog(
+            label = label,
+            value = value,
+            onDismiss = { largeTextOpen = false }
+        )
     }
 }
 
@@ -459,6 +505,7 @@ fun TotpField(
 ) {
     var totpCode by remember { mutableStateOf("") }
     var copied by remember { mutableStateOf(false) }
+    var largeTextOpen by remember { mutableStateOf(false) }
     var period by remember { mutableStateOf(30L) }
     var remainingSeconds by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
@@ -519,11 +566,29 @@ fun TotpField(
                     letterSpacing = 4.sp
                 )
             )
-            TotpCountdownCircle(
-                remainingSeconds = remainingSeconds,
-                period = period.toInt()
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { largeTextOpen = true }, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Default.OpenInFull,
+                        contentDescription = "拡大表示",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+                TotpCountdownCircle(
+                    remainingSeconds = remainingSeconds,
+                    period = period.toInt()
+                )
+            }
         }
+    }
+
+    if (largeTextOpen) {
+        LargeTextDialog(
+            label = label,
+            value = totpCode,
+            onDismiss = { largeTextOpen = false }
+        )
     }
 }
 

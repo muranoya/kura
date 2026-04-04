@@ -169,7 +169,6 @@ export async function setEntryLabels(entryId: string, labelIds: string[]): Promi
 export async function generatePassword(
   length = 16,
   includeUppercase = true,
-  includeLowercase = true,
   includeNumbers = true,
   includeSymbols = true,
 ): Promise<string> {
@@ -177,7 +176,6 @@ export async function generatePassword(
     type: 'GENERATE_PASSWORD',
     length,
     includeUppercase,
-    includeLowercase,
     includeNumbers,
     includeSymbols,
   })

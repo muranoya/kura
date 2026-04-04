@@ -5,7 +5,6 @@ use crate::error::Result;
 pub struct PasswordOptions {
     pub length: usize,
     pub include_uppercase: bool,
-    pub include_lowercase: bool,
     pub include_numbers: bool,
     pub include_symbols: bool,
 }
@@ -15,7 +14,6 @@ impl Default for PasswordOptions {
         PasswordOptions {
             length: 16,
             include_uppercase: true,
-            include_lowercase: true,
             include_numbers: true,
             include_symbols: true,
         }
@@ -28,13 +26,12 @@ pub fn generate_password(options: &PasswordOptions) -> Result<String> {
     const NUMBERS: &[u8] = b"0123456789";
     const SYMBOLS: &[u8] = b"!@#$%^&*()-_=+[]{}|;:,.<>?";
 
+    // Lowercase is always included
     let mut charset = Vec::new();
+    charset.extend_from_slice(LOWERCASE);
 
     if options.include_uppercase {
         charset.extend_from_slice(UPPERCASE);
-    }
-    if options.include_lowercase {
-        charset.extend_from_slice(LOWERCASE);
     }
     if options.include_numbers {
         charset.extend_from_slice(NUMBERS);
@@ -43,22 +40,14 @@ pub fn generate_password(options: &PasswordOptions) -> Result<String> {
         charset.extend_from_slice(SYMBOLS);
     }
 
-    if charset.is_empty() {
-        return Err(crate::error::VaultError::InvalidConfiguration(
-            "No characters available for password generation".to_string(),
-        ));
-    }
-
     use rand::Rng;
     let mut rng = rand::thread_rng();
 
     // Ensure at least one character from each enabled category
     let mut required: Vec<u8> = Vec::new();
+    required.push(LOWERCASE[rng.gen_range(0..LOWERCASE.len())]);
     if options.include_uppercase {
         required.push(UPPERCASE[rng.gen_range(0..UPPERCASE.len())]);
-    }
-    if options.include_lowercase {
-        required.push(LOWERCASE[rng.gen_range(0..LOWERCASE.len())]);
     }
     if options.include_numbers {
         required.push(NUMBERS[rng.gen_range(0..NUMBERS.len())]);
@@ -101,7 +90,7 @@ mod tests {
     #[test]
     fn test_default_password_generation() {
         let mut options = PasswordOptions::default();
-        options.length = 32; // Use longer password to ensure all character types are included
+        options.length = 32;
         let password = generate_password(&options).unwrap();
 
         assert_eq!(password.len(), 32);
@@ -111,17 +100,16 @@ mod tests {
     }
 
     #[test]
-    fn test_numbers_only() {
+    fn test_lowercase_always_included() {
         let options = PasswordOptions {
             length: 8,
             include_uppercase: false,
-            include_lowercase: false,
-            include_numbers: true,
+            include_numbers: false,
             include_symbols: false,
         };
 
         let password = generate_password(&options).unwrap();
         assert_eq!(password.len(), 8);
-        assert!(password.chars().all(|c| c.is_numeric()));
+        assert!(password.chars().all(|c| c.is_lowercase()));
     }
 }

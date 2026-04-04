@@ -1,9 +1,10 @@
-use super::EntryType;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use zeroize::Zeroize;
 use crate::{VaultError, error::Result};
 
+/// Known custom field types for validation at creation/edit time.
+/// Unknown types from newer clients are preserved as-is (stored as String).
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum CustomFieldType {
@@ -15,11 +16,36 @@ pub enum CustomFieldType {
     Totp,
 }
 
+impl CustomFieldType {
+    pub fn as_str(&self) -> &str {
+        match self {
+            CustomFieldType::Text => "text",
+            CustomFieldType::Password => "password",
+            CustomFieldType::Email => "email",
+            CustomFieldType::Url => "url",
+            CustomFieldType::Phone => "phone",
+            CustomFieldType::Totp => "totp",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "text" => Some(CustomFieldType::Text),
+            "password" => Some(CustomFieldType::Password),
+            "email" => Some(CustomFieldType::Email),
+            "url" => Some(CustomFieldType::Url),
+            "phone" => Some(CustomFieldType::Phone),
+            "totp" => Some(CustomFieldType::Totp),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CustomField {
     pub id: String,
     pub name: String,
-    pub field_type: CustomFieldType,
+    pub field_type: String,
     pub value: String,
 }
 
@@ -27,7 +53,7 @@ pub struct CustomField {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EntryData {
     #[serde(rename = "type")]
-    pub entry_type: EntryType,
+    pub entry_type: String,
     pub notes: Option<String>,
     pub typed_value: Value,
     #[serde(default)]
@@ -52,7 +78,7 @@ impl Drop for EntryData {
 impl EntryData {
     pub fn new_login(url: Option<String>, username: String, password: String, notes: Option<String>) -> Self {
         EntryData {
-            entry_type: EntryType::Login,
+            entry_type: "login".to_string(),
             notes,
             typed_value: json!({
                 "url": url,
@@ -65,7 +91,7 @@ impl EntryData {
 
     pub fn new_bank(bank_name: String, account_holder: String, branch_code: String, account_type: String, account_number: String, pin: String, notes: Option<String>) -> Self {
         EntryData {
-            entry_type: EntryType::Bank,
+            entry_type: "bank".to_string(),
             notes,
             typed_value: json!({
                 "bank_name": bank_name,
@@ -81,7 +107,7 @@ impl EntryData {
 
     pub fn new_ssh_key(private_key: String, notes: Option<String>) -> Self {
         EntryData {
-            entry_type: EntryType::SshKey,
+            entry_type: "ssh_key".to_string(),
             notes,
             typed_value: json!({
                 "private_key": private_key
@@ -92,7 +118,7 @@ impl EntryData {
 
     pub fn new_secure_note(content: String, notes: Option<String>) -> Self {
         EntryData {
-            entry_type: EntryType::SecureNote,
+            entry_type: "secure_note".to_string(),
             notes,
             typed_value: json!({
                 "content": content
@@ -103,7 +129,7 @@ impl EntryData {
 
     pub fn new_credit_card(cardholder: String, number: String, expiry: String, cvv: String, pin: String, notes: Option<String>) -> Self {
         EntryData {
-            entry_type: EntryType::CreditCard,
+            entry_type: "credit_card".to_string(),
             notes,
             typed_value: json!({
                 "cardholder": cardholder,
@@ -118,7 +144,7 @@ impl EntryData {
 
     pub fn new_password(username: String, password: String, notes: Option<String>) -> Self {
         EntryData {
-            entry_type: EntryType::Password,
+            entry_type: "password".to_string(),
             notes,
             typed_value: json!({
                 "username": username,
@@ -130,7 +156,7 @@ impl EntryData {
 
     pub fn new_software_license(license_key: String, notes: Option<String>) -> Self {
         EntryData {
-            entry_type: EntryType::SoftwareLicense,
+            entry_type: "software_license".to_string(),
             notes,
             typed_value: json!({
                 "license_key": license_key
@@ -141,7 +167,7 @@ impl EntryData {
 
     pub fn new_passkey(notes: Option<String>) -> Self {
         EntryData {
-            entry_type: EntryType::Passkey,
+            entry_type: "passkey".to_string(),
             notes,
             typed_value: json!({}),
             custom_fields: None,
@@ -173,6 +199,6 @@ mod tests {
         let json = data.to_json_string().unwrap();
         let deserialized = EntryData::from_json_string(&json).unwrap();
 
-        assert_eq!(deserialized.entry_type, EntryType::Login);
+        assert_eq!(deserialized.entry_type, "login".to_string());
     }
 }

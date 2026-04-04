@@ -193,6 +193,8 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_listEntries(
     label_id: JString,
     include_trash: jboolean,
     only_favorites: jboolean,
+    sort_field: JString,
+    sort_order: JString,
 ) -> jstring {
     let vid = get_string(&mut env, &vault_id);
     let sq = get_optional_string(&mut env, &search_query);
@@ -200,8 +202,10 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_listEntries(
     let li = get_optional_string(&mut env, &label_id);
     let it = include_trash != JNI_FALSE;
     let of = only_favorites != JNI_FALSE;
+    let sf = get_optional_string(&mut env, &sort_field);
+    let so = get_optional_string(&mut env, &sort_order);
 
-    match with_manager(&vid, |m| m.api_list_entries(sq, et, li, it, of)) {
+    match with_manager(&vid, |m| m.api_list_entries(sq, et, li, it, of, sf, so)) {
         Ok(rows) => {
             let json = serde_json::to_string(&rows).unwrap_or_else(|_| "[]".to_string());
             env.new_string(json).unwrap().into_raw()
@@ -430,6 +434,20 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_setEntryLabels(
 // ============================================================================
 
 #[no_mangle]
+pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_verifyPassword(
+    mut env: JNIEnv,
+    _class: JClass,
+    vault_id: JString,
+    password: JString,
+) {
+    let vid = get_string(&mut env, &vault_id);
+    let pw = get_string(&mut env, &password);
+    if let Err(e) = with_manager(&vid, |m| m.api_verify_password(pw)) {
+        let _ = env.throw_new("java/lang/RuntimeException", &e);
+    }
+}
+
+#[no_mangle]
 pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_changeMasterPassword(
     mut env: JNIEnv,
     _class: JClass,
@@ -485,14 +503,12 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_generatePassword(
     _class: JClass,
     length: jint,
     uppercase: jboolean,
-    lowercase: jboolean,
     numbers: jboolean,
     symbols: jboolean,
 ) -> jstring {
     match api_generate_password(
         length,
         uppercase != JNI_FALSE,
-        lowercase != JNI_FALSE,
         numbers != JNI_FALSE,
         symbols != JNI_FALSE,
     ) {
@@ -618,4 +634,40 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_restoreLastSyncTime(
 ) {
     let vid = get_string(&mut env, &vault_id);
     with_manager(&vid, |m| m.api_restore_last_sync_time(ts));
+}
+
+// ============================================================================
+// Import Operations
+// ============================================================================
+
+#[no_mangle]
+pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_import1puxPreview(
+    mut env: JNIEnv,
+    _class: JClass,
+    vault_id: JString,
+    file_bytes: JByteArray,
+) -> jstring {
+    let vid = get_string(&mut env, &vault_id);
+    let bytes = get_byte_array(&mut env, &file_bytes);
+    match with_manager(&vid, |m| m.api_import_1pux_preview(bytes)) {
+        Ok(json) => env.new_string(json).unwrap().into_raw(),
+        Err(e) => throw_err(&mut env, &e),
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_import1puxExecute(
+    mut env: JNIEnv,
+    _class: JClass,
+    vault_id: JString,
+    file_bytes: JByteArray,
+    actions_json: JString,
+) -> jstring {
+    let vid = get_string(&mut env, &vault_id);
+    let bytes = get_byte_array(&mut env, &file_bytes);
+    let actions = get_string(&mut env, &actions_json);
+    match with_manager(&vid, |m| m.api_import_1pux_execute(bytes, actions)) {
+        Ok(json) => env.new_string(json).unwrap().into_raw(),
+        Err(e) => throw_err(&mut env, &e),
+    }
 }

@@ -21,7 +21,7 @@ export function BottomNav() {
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 border-t border-border bg-bg-surface">
+    <nav className="shrink-0 border-t border-border bg-bg-surface">
       <div className="flex w-full justify-around">
         {TAB_ROUTES.map(({ path, icon: Icon, label }) => (
           <Link

@@ -13,6 +13,7 @@ use crate::store::VaultFile;
 pub(crate) const CURRENT_SCHEMA_VERSION: u32 = 1;
 
 /// Locked vault - encrypted data in memory, DEK not available
+#[derive(Clone)]
 pub struct LockedVault {
     pub(crate) vault_file: VaultFile,
     pub(crate) etag: Option<String>,

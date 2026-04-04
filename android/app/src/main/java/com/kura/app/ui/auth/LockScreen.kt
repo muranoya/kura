@@ -1,7 +1,12 @@
 package com.kura.app.ui.auth
 
+import android.security.keystore.KeyPermanentlyInvalidatedException
+import android.widget.Toast
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -9,11 +14,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import com.kura.app.ui.components.ConfirmDialog
 import com.kura.app.viewmodel.AppViewModel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @Composable
@@ -29,6 +38,77 @@ fun LockScreen(
     var isLoading by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val biometricAvailable = remember {
+        val canAuth = BiometricManager.from(context).canAuthenticate(
+            BiometricManager.Authenticators.BIOMETRIC_STRONG
+        ) == BiometricManager.BIOMETRIC_SUCCESS
+        canAuth && appViewModel.biometricHelper.isSetUp()
+    }
+
+    val showBiometricPrompt = remember {
+        { ->
+            val activity = context as FragmentActivity
+            val biometricHelper = appViewModel.biometricHelper
+
+            try {
+                val cipher = biometricHelper.getDecryptCipher()
+                val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("kura")
+                    .setSubtitle("生体認証でアンロック")
+                    .setNegativeButtonText("パスワードを使用")
+                    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                    .build()
+
+                val biometricPrompt = BiometricPrompt(
+                    activity,
+                    ContextCompat.getMainExecutor(context),
+                    object : BiometricPrompt.AuthenticationCallback() {
+                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                            val authenticatedCipher = result.cryptoObject?.cipher ?: return
+                            scope.launch {
+                                isLoading = true
+                                try {
+                                    val masterPassword = biometricHelper.decryptPassword(authenticatedCipher)
+                                    appViewModel.repository.unlock(masterPassword)
+                                    onUnlocked()
+                                } catch (e: Exception) {
+                                    error = "アンロックに失敗しました"
+                                } finally {
+                                    isLoading = false
+                                }
+                            }
+                        }
+
+                        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                            if (errorCode == BiometricPrompt.ERROR_LOCKOUT ||
+                                errorCode == BiometricPrompt.ERROR_LOCKOUT_PERMANENT
+                            ) {
+                                error = "生体認証がロックされました。しばらくしてからお試しください"
+                            }
+                            // ERROR_NEGATIVE_BUTTON / ERROR_USER_CANCELED: パスワード入力にフォールバック
+                        }
+                    }
+                )
+                biometricPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
+            } catch (_: KeyPermanentlyInvalidatedException) {
+                biometricHelper.clearAll()
+                scope.launch { appViewModel.preferences.setBiometricEnabled(false) }
+                Toast.makeText(context, "生体認証が無効になりました。設定から再度有効にしてください", Toast.LENGTH_LONG).show()
+            } catch (_: Exception) {
+                // キーやデータの不整合: フォールバック
+            }
+        }
+    }
+
+    // 画面表示時に自動で生体認証を表示
+    LaunchedEffect(Unit) {
+        val enabled = appViewModel.preferences.biometricEnabledFlow.first()
+        if (enabled && biometricAvailable) {
+            showBiometricPrompt()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -89,6 +169,19 @@ fun LockScreen(
         ) {
             if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             else Text("アンロック")
+        }
+
+        if (biometricAvailable) {
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { showBiometricPrompt() },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isLoading
+            ) {
+                Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("生体認証でアンロック")
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))

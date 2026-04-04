@@ -26,6 +26,8 @@ interface WasmApi {
     labelId: string | null,
     includeTrash: boolean,
     onlyFavorites: boolean,
+    sortField: string | null,
+    sortOrder: string | null,
   ): string
   api_get_entry(vaultId: string, id: string): string
   api_create_entry(
@@ -58,7 +60,6 @@ interface WasmApi {
   api_generate_password(
     length: number,
     includeUppercase: boolean,
-    includeLowercase: boolean,
     includeNumbers: boolean,
     includeSymbols: boolean,
   ): string
@@ -157,7 +158,7 @@ function normalizeEntry(raw: Record<string, unknown>): Record<string, unknown> {
     deletedAt: raw.deleted_at ?? null,
     notes: raw.notes ?? null,
     typedValue: raw.typed_value ?? {},
-    labels: raw.label_ids ?? [],
+    labels: raw.labels ?? raw.label_ids ?? [],
     customFields: ((raw.custom_fields as Record<string, unknown>[] | undefined) ?? []).map(
       (f: Record<string, unknown>) => ({
         id: f.id,
@@ -498,6 +499,8 @@ async function handleMessage(
             filter.labelId || null,
             filter.includeTrash || false,
             filter.onlyFavorites || false,
+            filter.sortField || null,
+            filter.sortOrder || null,
           )
           const rawEntries = JSON.parse(result)
           const entries = normalizeEntries(rawEntries)
@@ -644,7 +647,7 @@ async function handleMessage(
           break
         }
         try {
-          const result = vault.api_list_entries(DEFAULT_VAULT_ID, null, null, null, true, false)
+          const result = vault.api_list_entries(DEFAULT_VAULT_ID, null, null, null, true, false, null, null)
           const rawEntries = JSON.parse(result)
           const entries = normalizeEntries(rawEntries)
           sendResponse({ success: true, entries })
@@ -738,7 +741,6 @@ async function handleMessage(
           const password = vault.api_generate_password(
             message.length ?? 16,
             message.includeUppercase ?? true,
-            message.includeLowercase ?? true,
             message.includeNumbers ?? true,
             message.includeSymbols ?? true,
           )

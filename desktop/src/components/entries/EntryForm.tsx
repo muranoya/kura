@@ -26,6 +26,7 @@ export interface EntryFormProps {
   allLabels: Label[]
   selectedLabelIds: string[]
   onSelectedLabelIdsChange: (ids: string[]) => void
+  onCreateLabel?: (name: string) => Promise<Label>
   error?: string
 }
 
@@ -135,9 +136,13 @@ export default function EntryForm({
   allLabels,
   selectedLabelIds,
   onSelectedLabelIdsChange,
+  onCreateLabel,
   error,
 }: EntryFormProps) {
   const [secureNotePreviewMode, setSecureNotePreviewMode] = useState(false)
+  const [showNewLabelInput, setShowNewLabelInput] = useState(false)
+  const [newLabelName, setNewLabelName] = useState('')
+  const [creatingLabel, setCreatingLabel] = useState(false)
   const [activeGeneratorFieldId, setActiveGeneratorFieldId] = useState<string | null>(null)
   const [pendingFieldType, setPendingFieldType] = useState(false)
 
@@ -639,35 +644,99 @@ export default function EntryForm({
       {/* ラベル */}
       <div className="space-y-2">
         <span className="text-xs text-text-muted">ラベル</span>
-        {allLabels.length === 0 ? (
-          <p className="text-xs text-text-muted">ラベルがありません</p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {allLabels.map((label) => {
-              const isSelected = selectedLabelIds.includes(label.id)
-              return (
-                <button
-                  key={label.id}
-                  type="button"
-                  onClick={() => {
-                    if (isSelected) {
-                      onSelectedLabelIdsChange(selectedLabelIds.filter((lid) => lid !== label.id))
-                    } else {
+        <div className="flex flex-wrap gap-1.5">
+          {allLabels.map((label) => {
+            const isSelected = selectedLabelIds.includes(label.id)
+            return (
+              <button
+                key={label.id}
+                type="button"
+                onClick={() => {
+                  if (isSelected) {
+                    onSelectedLabelIdsChange(selectedLabelIds.filter((lid) => lid !== label.id))
+                  } else {
+                    onSelectedLabelIdsChange([...selectedLabelIds, label.id])
+                  }
+                }}
+                className={cn(
+                  'px-2.5 py-1 text-xs rounded-full border transition-colors',
+                  isSelected
+                    ? 'bg-accent text-white border-accent'
+                    : 'bg-transparent text-text-secondary border-border hover:border-accent/50 hover:text-text-primary',
+                )}
+              >
+                {label.name}
+              </button>
+            )
+          })}
+          {onCreateLabel && !showNewLabelInput && (
+            <button
+              type="button"
+              onClick={() => setShowNewLabelInput(true)}
+              className="px-2.5 py-1 text-xs rounded-full border border-dashed border-border text-text-muted hover:border-accent/50 hover:text-text-primary transition-colors flex items-center gap-1"
+            >
+              <Plus size={12} />
+              新規
+            </button>
+          )}
+          {onCreateLabel && showNewLabelInput && (
+            <div className="flex items-center gap-1">
+              <Input
+                autoFocus
+                value={newLabelName}
+                onChange={(e) => setNewLabelName(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    const trimmed = newLabelName.trim()
+                    if (!trimmed || creatingLabel) return
+                    setCreatingLabel(true)
+                    try {
+                      const label = await onCreateLabel(trimmed)
                       onSelectedLabelIdsChange([...selectedLabelIds, label.id])
+                      setNewLabelName('')
+                      setShowNewLabelInput(false)
+                    } catch (err) {
+                      console.error('ラベル作成失敗:', err)
+                    } finally {
+                      setCreatingLabel(false)
                     }
-                  }}
-                  className={cn(
-                    'px-2.5 py-1 text-xs rounded-full border transition-colors',
-                    isSelected
-                      ? 'bg-accent text-white border-accent'
-                      : 'bg-transparent text-text-secondary border-border hover:border-accent/50 hover:text-text-primary',
-                  )}
-                >
-                  {label.name}
-                </button>
-              )
-            })}
-          </div>
+                  } else if (e.key === 'Escape') {
+                    setShowNewLabelInput(false)
+                    setNewLabelName('')
+                  }
+                }}
+                placeholder="ラベル名"
+                className="h-7 w-28 text-xs"
+                disabled={creatingLabel}
+              />
+              <button
+                type="button"
+                disabled={creatingLabel || !newLabelName.trim()}
+                onClick={async () => {
+                  const trimmed = newLabelName.trim()
+                  if (!trimmed || creatingLabel) return
+                  setCreatingLabel(true)
+                  try {
+                    const label = await onCreateLabel(trimmed)
+                    onSelectedLabelIdsChange([...selectedLabelIds, label.id])
+                    setNewLabelName('')
+                    setShowNewLabelInput(false)
+                  } catch (err) {
+                    console.error('ラベル作成失敗:', err)
+                  } finally {
+                    setCreatingLabel(false)
+                  }
+                }}
+                className="p-1 rounded text-text-muted hover:text-accent disabled:opacity-50"
+              >
+                {creatingLabel ? <Timer size={14} className="animate-spin" /> : <Plus size={14} />}
+              </button>
+            </div>
+          )}
+        </div>
+        {allLabels.length === 0 && !onCreateLabel && (
+          <p className="text-xs text-text-muted">ラベルがありません</p>
         )}
       </div>
     </div>

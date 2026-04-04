@@ -118,6 +118,12 @@ export default function EntryEdit() {
           allLabels={allLabels}
           selectedLabelIds={selectedLabelIds}
           onSelectedLabelIdsChange={setSelectedLabelIds}
+          onCreateLabel={async (name) => {
+            const labelId = await commands.createLabel(name)
+            const newLabel: Label = { id: labelId, name }
+            setAllLabels((prev) => [...prev, newLabel])
+            return newLabel
+          }}
         />
       </div>
     </div>

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { STORAGE_KEYS } from '../../../shared/constants'
+import { getFromStorage, saveToStorage } from '../../../shared/storage'
 import * as commands from '../../commands'
 import EntryCard, { getTypeLabel } from '../../components/entries/EntryCard'
 import EntryListPanel from '../../components/entries/EntryListPanel'
@@ -12,7 +13,9 @@ import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import TotpCustomFieldDisplay from '../../components/entries/TotpCustomFieldDisplay'
 import { LargeTextDialog } from '../../components/ui/large-text-dialog'
-import type { Entry, EntryRow, EntryType } from '../../../shared/types'
+import type { Entry, EntryRow, EntryType, SortConfig } from '../../../shared/types'
+
+const DEFAULT_SORT: SortConfig = { field: 'created_at', order: 'desc' }
 
 interface EntryListProps {
   isFavorites?: boolean
@@ -29,6 +32,39 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
   const [selectedType, setSelectedType] = useState<EntryType | undefined>(undefined)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedLabelId, setSelectedLabelId] = useState<string | undefined>(undefined)
+  const [sortConfig, setSortConfig] = useState<SortConfig>(DEFAULT_SORT)
+
+  // ソート設定をストレージから読み込み
+  useEffect(() => {
+    getFromStorage<SortConfig>(STORAGE_KEYS.SORT_CONFIG).then((saved) => {
+      if (saved) setSortConfig(saved)
+    })
+  }, [])
+
+  const handleSortChange = (config: SortConfig) => {
+    setSortConfig(config)
+    saveToStorage(STORAGE_KEYS.SORT_CONFIG, config)
+    // ソート変更時にエントリを再読み込み
+    loadEntriesWithSort(config)
+  }
+
+  const loadEntriesWithSort = async (sort: SortConfig) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await commands.listEntries({
+        onlyFavorites: isFavorites,
+        labelId: selectedLabelId,
+        sortField: sort.field,
+        sortOrder: sort.order,
+      })
+      setEntries(result)
+    } catch (err) {
+      setError(String(err) || 'Failed to load entries')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // 詳細ペイン — location state から初期選択IDを取得
   const initialSelectedId = (location.state as { selectedId?: string } | null)?.selectedId ?? null
@@ -36,7 +72,15 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
   const [selectedLoading, setSelectedLoading] = useState(false)
   const [allLabels, setAllLabels] = useState<Array<{ id: string; name: string }>>([])
-  const [passwordMasked, setPasswordMasked] = useState(true)
+  const [unmaskedFields, setUnmaskedFields] = useState<Set<string>>(new Set())
+  const toggleFieldMask = (key: string) => {
+    setUnmaskedFields(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   // location state の selectedId を消費後クリア
   useEffect(() => {
@@ -95,6 +139,8 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
       const result = await commands.listEntries({
         onlyFavorites: isFavorites,
         labelId: selectedLabelId,
+        sortField: sortConfig.field,
+        sortOrder: sortConfig.order,
       })
       setEntries(result)
     } catch (err) {
@@ -142,10 +188,6 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
     <div className="h-full flex flex-col">
       {/* 全幅 sticky ヘッダー（左右ペインにまたがる） */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
-        <h1 className="text-sm font-semibold text-text-primary whitespace-nowrap">
-          {isFavorites ? 'お気に入り' : 'アイテム'}
-        </h1>
-
         {/* 検索ボックス */}
         <div className="relative flex-1">
           <Search
@@ -217,6 +259,8 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
             labels={allLabels}
             selectedLabelId={selectedLabelId}
             onLabelChange={setSelectedLabelId}
+            sortConfig={sortConfig}
+            onSortChange={handleSortChange}
             entries={filteredEntries}
             loading={loading}
             error={error ?? ''}
@@ -240,14 +284,14 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
         </div>
 
         {/* 右ペイン: 詳細 */}
-        <div className="flex-1 bg-bg-surface overflow-y-auto pb-20">
+        <div className="flex-1 bg-bg-surface overflow-y-auto">
           {selectedId && selectedEntry ? (
             <EntryDetailPane
               entry={selectedEntry}
               allLabels={allLabels}
               loading={selectedLoading}
-              passwordMasked={passwordMasked}
-              onToggleMask={() => setPasswordMasked(!passwordMasked)}
+              unmaskedFields={unmaskedFields}
+              onToggleFieldMask={toggleFieldMask}
               onEdit={() => navigate(`/entries/${selectedId}/edit`)}
               onDelete={() => handleDelete(selectedId)}
             />
@@ -267,8 +311,8 @@ interface EntryDetailPaneProps {
   entry: Entry
   allLabels: Array<{ id: string; name: string }>
   loading: boolean
-  passwordMasked: boolean
-  onToggleMask: () => void
+  unmaskedFields: Set<string>
+  onToggleFieldMask: (key: string) => void
   onEdit: () => void
   onDelete: () => void
 }
@@ -278,20 +322,26 @@ function PaneFieldDisplay({
   value,
   isPassword = false,
   isMasked = false,
+  isUrl = false,
   onToggleMask,
 }: {
   label: string
   value: string | null | undefined
   isPassword?: boolean
   isMasked?: boolean
+  isUrl?: boolean
   onToggleMask?: () => void
 }) {
   const [copied, setCopied] = useState(false)
   const [largeTextOpen, setLargeTextOpen] = useState(false)
   const isEmpty = !value
 
-  const handleCopy = () => {
+  const handleClick = () => {
     if (isEmpty) return
+    if (isUrl) {
+      chrome.tabs.create({ url: value })
+      return
+    }
     navigator.clipboard.writeText(value)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
@@ -304,10 +354,10 @@ function PaneFieldDisplay({
           ? 'opacity-50'
           : 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80'
       } ${copied ? 'bg-accent-subtle' : ''}`}
-      onClick={handleCopy}
+      onClick={handleClick}
       role={isEmpty ? undefined : 'button'}
       tabIndex={isEmpty ? undefined : 0}
-      onKeyDown={isEmpty ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') handleCopy() }}
+      onKeyDown={isEmpty ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') handleClick() }}
     >
       <span className="text-xs text-text-secondary w-20 shrink-0">{label}</span>
       <span className={`text-sm flex-1 break-all ${
@@ -341,10 +391,19 @@ function PaneFieldDisplay({
           <Maximize2 size={12} />
         </button>
       )}
-      {!isEmpty && (
-        <span className="shrink-0 text-text-muted">
+      {!isEmpty && isUrl && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            navigator.clipboard.writeText(value)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 1500)
+          }}
+          className="p-0.5 text-text-muted hover:text-text-primary transition-colors shrink-0"
+        >
           {copied ? <span className="text-xs text-success">コピーしました</span> : <Copy size={13} />}
-        </span>
+        </button>
       )}
       {!isEmpty && (
         <LargeTextDialog
@@ -377,8 +436,8 @@ function EntryDetailPane({
   entry,
   allLabels,
   loading,
-  passwordMasked,
-  onToggleMask,
+  unmaskedFields,
+  onToggleFieldMask,
   onEdit,
   onDelete,
 }: EntryDetailPaneProps) {
@@ -438,10 +497,10 @@ function EntryDetailPane({
               label="パスワード"
               value={v.password}
               isPassword
-              isMasked={passwordMasked}
-              onToggleMask={onToggleMask}
+              isMasked={!unmaskedFields.has('password')}
+              onToggleMask={() => onToggleFieldMask('password')}
             />
-            <PaneFieldDisplay label="URL" value={v.url} />
+            <PaneFieldDisplay label="URL" value={v.url} isUrl={true} />
           </div>
         </>
       )}
@@ -460,8 +519,8 @@ function EntryDetailPane({
               label="PIN"
               value={v.pin}
               isPassword
-              isMasked={passwordMasked}
-              onToggleMask={onToggleMask}
+              isMasked={!unmaskedFields.has('bank-pin')}
+              onToggleMask={() => onToggleFieldMask('bank-pin')}
             />
           </div>
         </>
@@ -503,15 +562,15 @@ function EntryDetailPane({
               label="CVV"
               value={v.cvv}
               isPassword
-              isMasked={passwordMasked}
-              onToggleMask={onToggleMask}
+              isMasked={!unmaskedFields.has('cvv')}
+              onToggleMask={() => onToggleFieldMask('cvv')}
             />
             <PaneFieldDisplay
               label="暗証番号"
               value={v.pin}
               isPassword
-              isMasked={passwordMasked}
-              onToggleMask={onToggleMask}
+              isMasked={!unmaskedFields.has('cc-pin')}
+              onToggleMask={() => onToggleFieldMask('cc-pin')}
             />
           </div>
         </>
@@ -527,8 +586,8 @@ function EntryDetailPane({
               label="パスワード"
               value={v.password}
               isPassword
-              isMasked={passwordMasked}
-              onToggleMask={onToggleMask}
+              isMasked={!unmaskedFields.has('password')}
+              onToggleMask={() => onToggleFieldMask('password')}
             />
           </div>
         </>
@@ -561,8 +620,8 @@ function EntryDetailPane({
                   label={field.name}
                   value={field.value}
                   isPassword={field.fieldType === 'password'}
-                  isMasked={passwordMasked && field.fieldType === 'password'}
-                  onToggleMask={field.fieldType === 'password' ? onToggleMask : undefined}
+                  isMasked={field.fieldType === 'password' && !unmaskedFields.has(field.id)}
+                  onToggleMask={field.fieldType === 'password' ? () => onToggleFieldMask(field.id) : undefined}
                 />
               )
             )}

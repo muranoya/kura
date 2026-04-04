@@ -1,15 +1,22 @@
 package com.kura.app.ui.labels
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.kura.app.data.model.Label
 import com.kura.app.ui.components.ConfirmDialog
 import com.kura.app.viewmodel.AppViewModel
@@ -69,29 +76,69 @@ fun LabelManagerScreen(
             }
         } else {
             LazyColumn(
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(padding)
             ) {
                 items(labels, key = { it.id }) { label ->
+                    val labelColor = MaterialTheme.colorScheme.primary
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { onLabelClick(label.id) }
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = { onLabelClick(label.id) }),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
+                                .padding(12.dp, 12.dp, 14.dp, 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Label, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(label.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                            IconButton(onClick = { editingLabel = label; editName = label.name }) {
-                                Icon(Icons.Default.Edit, contentDescription = "編集")
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(RoundedCornerShape(13.dp))
+                                    .background(labelColor.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Label,
+                                    contentDescription = null,
+                                    tint = labelColor,
+                                    modifier = Modifier.size(22.dp)
+                                )
                             }
-                            IconButton(onClick = { deleteTargetId = label.id }) {
-                                Icon(Icons.Default.Delete, contentDescription = "削除", tint = MaterialTheme.colorScheme.error)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = label.name,
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = { editingLabel = label; editName = label.name },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = "編集", modifier = Modifier.size(20.dp))
+                            }
+                            IconButton(
+                                onClick = { deleteTargetId = label.id },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "削除",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
                         }
                     }

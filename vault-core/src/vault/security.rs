@@ -111,7 +111,7 @@ impl UnlockedVault {
 mod tests {
     use super::*;
     use crate::vault::LockedVault;
-    use crate::models::entry::EntryType;
+
     use crate::store::VaultEntry;
     use zeroize::Zeroizing;
 
@@ -162,7 +162,7 @@ mod tests {
         vault.contents.entries.insert(
             uuid::Uuid::new_v4().to_string(),
             VaultEntry {
-                entry_type: EntryType::SecureNote,
+                entry_type: "secure_note".to_string(),
                 name: "test-note".to_string(),
                 created_at: 1000,
                 updated_at: 1000,

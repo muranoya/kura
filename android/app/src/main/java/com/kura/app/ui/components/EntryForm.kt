@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.kura.app.data.model.CustomField
 import com.kura.app.data.model.CustomFieldType
 import com.kura.app.data.model.Label
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 import java.util.UUID
 
@@ -37,11 +38,16 @@ fun EntryForm(
     labels: List<Label>,
     selectedLabelIds: Set<String>,
     onLabelToggle: (String) -> Unit,
-    onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean, Boolean) -> String)? = null,
+    onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean) -> String)? = null,
     onCopyToClipboard: ((String) -> Unit)? = null,
+    onCreateLabel: (suspend (String) -> Label)? = null,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
+    var showNewLabelInput by remember { mutableStateOf(false) }
+    var newLabelName by remember { mutableStateOf("") }
+    var creatingLabel by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -224,21 +230,19 @@ fun EntryForm(
         )
 
         // Notes section
-        if (entryType != "secure_note") {
-            FormSection(title = "メモ") {
-                FlatTextField(
-                    value = notes,
-                    onValueChange = onNotesChange,
-                    label = "メモ",
-                    minLines = 2,
-                    maxLines = 6,
-                    singleLine = false
-                )
-            }
+        FormSection(title = "メモ") {
+            FlatTextField(
+                value = notes,
+                onValueChange = onNotesChange,
+                label = "メモ",
+                minLines = 2,
+                maxLines = 6,
+                singleLine = false
+            )
         }
 
         // Labels section
-        if (labels.isNotEmpty()) {
+        if (labels.isNotEmpty() || onCreateLabel != null) {
             FormSection(title = "ラベル") {
                 FlowRow(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -255,8 +259,74 @@ fun EntryForm(
                             } else null
                         )
                     }
+                    if (onCreateLabel != null) {
+                        AssistChip(
+                            onClick = { showNewLabelInput = true },
+                            label = { Text("新規") },
+                            leadingIcon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                    }
                 }
             }
+        }
+
+        if (onCreateLabel != null && showNewLabelInput) {
+            AlertDialog(
+                onDismissRequest = {
+                    if (!creatingLabel) {
+                        showNewLabelInput = false
+                        newLabelName = ""
+                    }
+                },
+                title = { Text("新しいラベル") },
+                text = {
+                    OutlinedTextField(
+                        value = newLabelName,
+                        onValueChange = { newLabelName = it },
+                        placeholder = { Text("ラベル名") },
+                        singleLine = true,
+                        enabled = !creatingLabel,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val trimmed = newLabelName.trim()
+                            if (trimmed.isNotEmpty() && !creatingLabel) {
+                                creatingLabel = true
+                                coroutineScope.launch {
+                                    try {
+                                        val label = onCreateLabel(trimmed)
+                                        onLabelToggle(label.id)
+                                        newLabelName = ""
+                                        showNewLabelInput = false
+                                    } catch (_: Exception) { }
+                                    creatingLabel = false
+                                }
+                            }
+                        },
+                        enabled = newLabelName.trim().isNotEmpty() && !creatingLabel
+                    ) {
+                        if (creatingLabel) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text("追加")
+                        }
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showNewLabelInput = false
+                            newLabelName = ""
+                        },
+                        enabled = !creatingLabel
+                    ) {
+                        Text("キャンセル")
+                    }
+                }
+            )
         }
     }
 }
@@ -428,7 +498,7 @@ fun PasswordField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
-    onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean, Boolean) -> String)? = null,
+    onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean) -> String)? = null,
     onCopy: ((String) -> Unit)? = null
 ) {
     var visible by remember { mutableStateOf(false) }

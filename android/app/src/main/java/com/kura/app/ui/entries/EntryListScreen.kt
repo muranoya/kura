@@ -16,6 +16,7 @@ import com.kura.app.data.model.EntryRow
 import com.kura.app.data.model.EntryType
 import com.kura.app.ui.components.ConfirmDialog
 import com.kura.app.ui.components.EntryCard
+import com.kura.app.ui.home.SortBottomSheet
 import com.kura.app.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -37,7 +38,18 @@ fun EntryListScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf(initialType) }
     var deleteTargetId by remember { mutableStateOf<String?>(null) }
+    var sortField by remember { mutableStateOf("created_at") }
+    var sortOrder by remember { mutableStateOf("desc") }
+    var showSortSheet by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    // Load sort preferences
+    LaunchedEffect(Unit) {
+        appViewModel.preferences.sortFieldFlow.collect { sortField = it }
+    }
+    LaunchedEffect(Unit) {
+        appViewModel.preferences.sortOrderFlow.collect { sortOrder = it }
+    }
 
     val title = when {
         onlyFavorites -> "お気に入り"
@@ -54,14 +66,16 @@ fun EntryListScreen(
                     searchQuery = searchQuery.ifBlank { null },
                     entryType = selectedType,
                     labelId = labelId,
-                    onlyFavorites = onlyFavorites
+                    onlyFavorites = onlyFavorites,
+                    sortField = sortField,
+                    sortOrder = sortOrder
                 )
             } catch (_: Exception) { }
             loading = false
         }
     }
 
-    LaunchedEffect(searchQuery, selectedType, labelId, onlyFavorites) {
+    LaunchedEffect(searchQuery, selectedType, labelId, onlyFavorites, sortField, sortOrder) {
         delay(300) // debounce
         loadEntries()
     }
@@ -75,6 +89,18 @@ fun EntryListScreen(
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
                         }
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showSortSheet = true }) {
+                        Icon(
+                            Icons.Default.SwapVert,
+                            contentDescription = "並び替え",
+                            tint = if (sortField != "created_at" || sortOrder != "desc")
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             )
@@ -180,6 +206,22 @@ fun EntryListScreen(
                 }
             },
             onCancel = { deleteTargetId = null }
+        )
+    }
+
+    if (showSortSheet) {
+        SortBottomSheet(
+            currentField = sortField,
+            currentOrder = sortOrder,
+            onSelect = { field, order ->
+                sortField = field
+                sortOrder = order
+                showSortSheet = false
+                scope.launch {
+                    appViewModel.preferences.saveSortConfig(field, order)
+                }
+            },
+            onDismiss = { showSortSheet = false }
         )
     }
 }

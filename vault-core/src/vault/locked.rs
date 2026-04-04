@@ -241,7 +241,7 @@ mod tests {
     #[test]
     fn test_lock_unlock_preserves_data() {
         use crate::store::VaultEntry;
-        use crate::models::entry::EntryType;
+
         use zeroize::Zeroizing;
 
         let locked = LockedVault::create_new(PASSWORD).unwrap();
@@ -250,7 +250,7 @@ mod tests {
         unlocked.contents.entries.insert(
             "test-id".to_string(),
             VaultEntry {
-                entry_type: EntryType::SecureNote,
+                entry_type: "secure_note".to_string(),
                 name: "my note".to_string(),
                 created_at: 1000,
                 updated_at: 1000,

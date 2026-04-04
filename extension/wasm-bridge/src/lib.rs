@@ -127,9 +127,11 @@ pub fn api_list_entries(
     label_id: Option<String>,
     include_trash: bool,
     only_favorites: bool,
+    sort_field: Option<String>,
+    sort_order: Option<String>,
 ) -> Result<String, JsValue> {
     let entries = with_manager(&vault_id, |m| {
-        m.api_list_entries(search_query, entry_type, label_id, include_trash, only_favorites)
+        m.api_list_entries(search_query, entry_type, label_id, include_trash, only_favorites, sort_field, sort_order)
     }).map_err(to_js_err)?;
 
     serde_json::to_string(&entries).map_err(|e| to_js_err(format!("Serialization error: {}", e)))
@@ -271,12 +273,11 @@ pub fn api_decrypt_config(vault_id: String, password: String, encrypted_b64: Str
 pub fn api_generate_password(
     length: i32,
     include_uppercase: bool,
-    include_lowercase: bool,
     include_numbers: bool,
     include_symbols: bool,
 ) -> Result<String, JsValue> {
     vault_core::api::api_generate_password(
-        length, include_uppercase, include_lowercase, include_numbers, include_symbols,
+        length, include_uppercase, include_numbers, include_symbols,
     ).map_err(to_js_err)
 }
 

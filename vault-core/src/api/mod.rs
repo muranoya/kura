@@ -5,6 +5,9 @@ mod security;
 mod sync;
 mod utils;
 
+#[cfg(any(feature = "desktop", feature = "android"))]
+mod import;
+
 pub use sync::parse_s3_config;
 pub use utils::*;
 
@@ -18,6 +21,7 @@ pub struct EntryRow {
     pub entry_type: String,
     pub name: String,
     pub is_favorite: bool,
+    pub created_at: i64,
     pub updated_at: i64,
     pub deleted_at: Option<i64>,
 }

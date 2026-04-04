@@ -44,24 +44,6 @@ fun WelcomeScreen(onStart: () -> Unit) {
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        val features = listOf(
-            "ゼロ知識設計 — クライアント側で完全暗号化",
-            "S3互換ストレージに対応",
-            "ベンダーロックインなし"
-        )
-        features.forEach { feature ->
-            Text(
-                text = "• $feature",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 2.dp)
-            )
-        }
-
         Spacer(modifier = Modifier.height(48.dp))
         Button(
             onClick = onStart,

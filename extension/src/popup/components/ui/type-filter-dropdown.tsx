@@ -1,14 +1,15 @@
 import { Check, ChevronDown } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../lib/utils'
 
 interface TypeFilterDropdownProps {
   value: string
   onChange: (value: string) => void
   options: Array<{ value: string; label: string }>
+  iconTrigger?: React.ReactNode
 }
 
-export default function TypeFilterDropdown({ value, onChange, options }: TypeFilterDropdownProps) {
+export default function TypeFilterDropdown({ value, onChange, options, iconTrigger }: TypeFilterDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -44,34 +45,62 @@ export default function TypeFilterDropdown({ value, onChange, options }: TypeFil
 
   const selectedOption = options.find((o) => o.value === value)
 
+  // トリガーボタンの位置からメニュー座標を計算（overflow-hidden対策）
+  const menuStyle = useMemo(() => {
+    if (!isOpen || !triggerRef.current) return {}
+    const rect = triggerRef.current.getBoundingClientRect()
+    return {
+      top: rect.bottom + 4,
+      left: rect.left,
+    }
+  }, [isOpen])
+
   return (
     <div ref={containerRef} className="relative">
       {/* Trigger Button */}
-      <button
-        type="button"
-        ref={triggerRef}
-        onClick={() => setIsOpen(!isOpen)}
-        className={cn(
-          'flex h-9 w-full items-center justify-between rounded-md border px-3 py-2 text-sm',
-          'border-border bg-bg-surface text-text-primary',
-          'focus:outline-none focus:ring-2 focus:ring-accent',
-          'hover:bg-bg-elevated transition-colors',
-        )}
-      >
-        <span className="truncate">{selectedOption?.label || value}</span>
-        <ChevronDown
-          size={16}
-          className={cn('flex-shrink-0 opacity-50 transition-transform', isOpen && 'rotate-180')}
-        />
-      </button>
+      {iconTrigger ? (
+        <button
+          type="button"
+          ref={triggerRef}
+          onClick={() => setIsOpen(!isOpen)}
+          title={selectedOption?.label || value}
+          className={cn(
+            'flex h-9 w-9 items-center justify-center rounded-md border',
+            'border-border bg-bg-surface text-text-primary',
+            'focus:outline-none focus:ring-2 focus:ring-accent',
+            'hover:bg-bg-elevated transition-colors',
+          )}
+        >
+          {iconTrigger}
+        </button>
+      ) : (
+        <button
+          type="button"
+          ref={triggerRef}
+          onClick={() => setIsOpen(!isOpen)}
+          className={cn(
+            'flex h-9 w-full items-center justify-between rounded-md border px-3 py-2 text-sm',
+            'border-border bg-bg-surface text-text-primary',
+            'focus:outline-none focus:ring-2 focus:ring-accent',
+            'hover:bg-bg-elevated transition-colors',
+          )}
+        >
+          <span className="truncate">{selectedOption?.label || value}</span>
+          <ChevronDown
+            size={16}
+            className={cn('flex-shrink-0 opacity-50 transition-transform', isOpen && 'rotate-180')}
+          />
+        </button>
+      )}
 
       {/* Dropdown Menu */}
       {isOpen && (
         <div
+          style={menuStyle}
           className={cn(
-            'absolute top-full left-0 right-0 mt-1',
+            'fixed min-w-[200px]',
             'rounded-md border border-border bg-bg-surface shadow-lg',
-            'z-50',
+            'z-[9999]',
           )}
         >
           <ul className="max-h-64 overflow-y-auto py-1">

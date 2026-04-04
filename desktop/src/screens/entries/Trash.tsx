@@ -4,8 +4,12 @@ import { ConfirmDialog } from '../../components/ConfirmDialog'
 import EntryCard from '../../components/entries/EntryCard'
 import EntryListPanel from '../../components/entries/EntryListPanel'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
+import { STORAGE_KEYS } from '../../shared/constants'
+import { getFromStorage, saveToStorage } from '../../shared/storage'
 import { useSyncVersion } from '../../contexts/SyncContext'
-import type { EntryRow, EntryType } from '../../shared/types'
+import type { EntryRow, EntryType, SortConfig } from '../../shared/types'
+
+const DEFAULT_SORT: SortConfig = { field: 'created_at', order: 'desc' }
 
 export default function Trash() {
   const syncVersion = useSyncVersion()
@@ -16,6 +20,18 @@ export default function Trash() {
   const [purgeTargetId, setPurgeTargetId] = useState<string | null>(null)
   const [selectedType, setSelectedType] = useState<EntryType | undefined>(undefined)
   const [searchQuery, setSearchQuery] = useState('')
+  const [sortConfig, setSortConfig] = useState<SortConfig>(DEFAULT_SORT)
+
+  useEffect(() => {
+    getFromStorage<SortConfig>(STORAGE_KEYS.SORT_CONFIG).then((saved) => {
+      if (saved) setSortConfig(saved)
+    })
+  }, [])
+
+  const handleSortChange = useCallback((config: SortConfig) => {
+    setSortConfig(config)
+    saveToStorage(STORAGE_KEYS.SORT_CONFIG, config)
+  }, [])
 
   const loadTrashEntries = useCallback(async () => {
     void syncVersion // trigger reload on sync
@@ -110,6 +126,8 @@ export default function Trash() {
       <EntryListPanel
         selectedType={selectedType}
         onTypeChange={setSelectedType}
+        sortConfig={sortConfig}
+        onSortChange={handleSortChange}
         searchQuery={searchQuery}
         onSearchChange={handleSearchChange}
         onSearchClear={clearSearch}

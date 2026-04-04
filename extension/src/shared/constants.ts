@@ -33,6 +33,7 @@ export const STORAGE_KEYS = {
   ONBOARDING_FLOW: 'onboardingFlow',
   LAST_SYNC_TIME: 'lastSyncTime',
   LAST_ERROR: 'lastError',
+  SORT_CONFIG: 'entrySortConfig',
 }
 
 // Password generation defaults

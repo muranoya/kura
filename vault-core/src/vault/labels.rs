@@ -83,7 +83,7 @@ impl UnlockedVault {
 #[cfg(test)]
 mod tests {
     use crate::crypto::Dek;
-    use crate::models::{Argon2Params, EntryType, VaultMeta};
+    use crate::models::{Argon2Params, VaultMeta};
     use crate::store::{VaultContents, VaultEntry};
 
     fn make_vault() -> super::super::UnlockedVault {
@@ -105,7 +105,7 @@ mod tests {
 
     fn insert_entry(vault: &mut super::super::UnlockedVault, id: &str, name: &str) {
         vault.contents.entries.insert(id.to_string(), VaultEntry {
-            entry_type: EntryType::Login,
+            entry_type: "login".to_string(),
             name: name.to_string(),
             created_at: 1000,
             updated_at: 1000,

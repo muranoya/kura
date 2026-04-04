@@ -12,6 +12,8 @@ class SecureStorage(context: Context) {
     companion object {
         private const val FILE_NAME = "kura_secure_prefs"
         private const val KEY_S3_CONFIG = "s3_config"
+        private const val KEY_BIO_ENCRYPTED_PW = "biometric_encrypted_password"
+        private const val KEY_BIO_IV = "biometric_iv"
     }
 
     private val masterKey = MasterKey.Builder(context)
@@ -36,6 +38,29 @@ class SecureStorage(context: Context) {
 
     fun getS3Config(): String? {
         return prefs.getString(KEY_S3_CONFIG, null)
+    }
+
+    fun saveBiometricData(encryptedPassword: String, iv: String) {
+        prefs.edit()
+            .putString(KEY_BIO_ENCRYPTED_PW, encryptedPassword)
+            .putString(KEY_BIO_IV, iv)
+            .apply()
+    }
+
+    fun getBiometricEncryptedPassword(): String? =
+        prefs.getString(KEY_BIO_ENCRYPTED_PW, null)
+
+    fun getBiometricIv(): String? =
+        prefs.getString(KEY_BIO_IV, null)
+
+    fun hasBiometricData(): Boolean =
+        getBiometricEncryptedPassword() != null && getBiometricIv() != null
+
+    fun clearBiometricData() {
+        prefs.edit()
+            .remove(KEY_BIO_ENCRYPTED_PW)
+            .remove(KEY_BIO_IV)
+            .apply()
     }
 
     fun clearAll() {

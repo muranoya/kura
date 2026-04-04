@@ -23,6 +23,8 @@ import com.kura.app.ui.components.SyncDialogState
 import com.kura.app.ui.components.SyncProgressDialog
 import com.kura.app.ui.sync.formatRelativeTime
 import com.kura.app.ui.settings.*
+import com.kura.app.ui.import_.ImportPreviewScreen
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -49,6 +51,7 @@ object Routes {
     const val LABEL_ENTRIES = "labels/{labelId}/entries"
     const val PASSWORD_GENERATOR = "password_generator"
     const val SETTINGS = "settings"
+    const val IMPORT_1PUX = "import_1pux"
 
     fun recoveryKey(key: String) = "recovery_key/$key"
     fun entryDetail(id: String) = "entries/$id"
@@ -169,6 +172,16 @@ fun MainNavHost(appViewModel: AppViewModel) {
             val prefTs = appViewModel.preferences.lastSyncTimeFlow.first()
             if (prefTs != null && prefTs > 0) lastSyncTime = prefTs
         }
+
+        // アンロック直後の自動同期 + 1分ごとの定期同期
+        while (true) {
+            try {
+                appViewModel.backgroundSync()
+                val newTs = appViewModel.preferences.lastSyncTimeFlow.first()
+                if (newTs != null && newTs > 0) lastSyncTime = newTs
+            } catch (_: Exception) { }
+            delay(60_000L)
+        }
     }
 
     if (showSyncDialog) {
@@ -240,22 +253,10 @@ fun MainNavHost(appViewModel: AppViewModel) {
                             syncErrorMessage = null
                             showSyncDialog = true
                             try {
-                                val config = appViewModel.preferences.s3ConfigFlow.first()
-                                if (config != null) {
-                                    val result = appViewModel.repository.syncVault(config)
-                                    if (result.synced) {
-                                        val vaultBytes = appViewModel.repository.getVaultBytes()
-                                        appViewModel.repository.writeVaultFile(vaultBytes)
-                                        result.lastSyncedAt?.let { ts ->
-                                            appViewModel.preferences.saveLastSyncTime(ts)
-                                            lastSyncTime = ts
-                                        }
-                                    }
-                                    syncDialogState = SyncDialogState.SUCCESS
-                                } else {
-                                    syncErrorMessage = "S3の設定が見つかりません"
-                                    syncDialogState = SyncDialogState.ERROR
-                                }
+                                appViewModel.backgroundSync()
+                                val newTs = appViewModel.preferences.lastSyncTimeFlow.first()
+                                if (newTs != null && newTs > 0) lastSyncTime = newTs
+                                syncDialogState = SyncDialogState.SUCCESS
                             } catch (e: Exception) {
                                 syncErrorMessage = e.localizedMessage ?: "同期に失敗しました"
                                 syncDialogState = SyncDialogState.ERROR
@@ -420,6 +421,18 @@ fun MainNavHost(appViewModel: AppViewModel) {
                     onOpenDrawer = { scope.launch { drawerState.open() } },
                     onLogout = {
                         appViewModel.setAppState(AppState.ONBOARDING)
+                    },
+                    onImport1pux = {
+                        navController.navigate(Routes.IMPORT_1PUX) { launchSingleTop = true }
+                    }
+                )
+            }
+            composable(Routes.IMPORT_1PUX) {
+                ImportPreviewScreen(
+                    appViewModel = appViewModel,
+                    onBack = { navController.popBackStack() },
+                    onImportComplete = {
+                        navController.popBackStack(Routes.HOME, inclusive = false)
                     }
                 )
             }

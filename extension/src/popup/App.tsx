@@ -91,50 +91,50 @@ function AppContent() {
     <div className="relative w-full flex flex-col" style={{ height: '504px' }}>
       <ErrorBar />
       <div className="flex-1 overflow-hidden relative">
-      <Routes>
-        {/* Onboarding */}
-        {appState === 'onboarding' && (
-          <>
-            <Route path="/" element={<Welcome />} />
-            <Route path="/onb/storage" element={<StorageSetup />} />
-            <Route path="/onb/unlock-existing" element={<UnlockExistingVault />} />
-            <Route path="/onb/password" element={<MasterPassword />} />
-            <Route path="/onb/recovery" element={<RecoveryKey />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </>
-        )}
+        <Routes>
+          {/* Onboarding */}
+          {appState === 'onboarding' && (
+            <>
+              <Route path="/" element={<Welcome />} />
+              <Route path="/onb/storage" element={<StorageSetup />} />
+              <Route path="/onb/unlock-existing" element={<UnlockExistingVault />} />
+              <Route path="/onb/password" element={<MasterPassword />} />
+              <Route path="/onb/recovery" element={<RecoveryKey />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </>
+          )}
 
-        {/* Auth */}
-        {appState === 'locked' && (
-          <>
-            <Route path="/auth/lock" element={<Lock />} />
-            <Route path="/auth/recovery" element={<Recovery />} />
-            <Route path="*" element={<Navigate to="/auth/lock" replace />} />
-          </>
-        )}
+          {/* Auth */}
+          {appState === 'locked' && (
+            <>
+              <Route path="/auth/lock" element={<Lock />} />
+              <Route path="/auth/recovery" element={<Recovery />} />
+              <Route path="*" element={<Navigate to="/auth/lock" replace />} />
+            </>
+          )}
 
-        {/* Main App */}
-        {appState === 'unlocked' && (
-          <>
-            {/* Tab routes with BottomNav */}
-            <Route path="/entries" element={<EntryList />} />
-            <Route path="/favorites" element={<EntryList isFavorites />} />
-            <Route path="/labels" element={<LabelManager />} />
-            <Route path="/password-generator" element={<PasswordGenerator />} />
-            <Route path="/settings" element={<Settings />} />
+          {/* Main App */}
+          {appState === 'unlocked' && (
+            <>
+              {/* Tab routes with BottomNav */}
+              <Route path="/entries" element={<EntryList />} />
+              <Route path="/favorites" element={<EntryList isFavorites />} />
+              <Route path="/labels" element={<LabelManager />} />
+              <Route path="/password-generator" element={<PasswordGenerator />} />
+              <Route path="/settings" element={<Settings />} />
 
-            {/* Detail routes without BottomNav */}
-            <Route path="/entries/create" element={<EntryCreate />} />
-            <Route path="/entries/:id/edit" element={<EntryEdit />} />
-            <Route path="/trash" element={<Trash />} />
-            <Route path="*" element={<Navigate to="/entries" replace />} />
-          </>
-        )}
-      </Routes>
-
-      {/* BottomNav */}
-      {showBottomNav && <BottomNav />}
+              {/* Detail routes without BottomNav */}
+              <Route path="/entries/create" element={<EntryCreate />} />
+              <Route path="/entries/:id/edit" element={<EntryEdit />} />
+              <Route path="/trash" element={<Trash />} />
+              <Route path="*" element={<Navigate to="/entries" replace />} />
+            </>
+          )}
+        </Routes>
       </div>
+
+      {/* BottomNav - コンテンツ領域の外に配置 */}
+      {showBottomNav && <BottomNav />}
     </div>
   )
 }

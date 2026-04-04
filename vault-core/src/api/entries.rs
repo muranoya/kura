@@ -1,4 +1,4 @@
-use crate::models::{EntryType, EntryFilter};
+use crate::models::{EntryType, EntryFilter, SortField, SortOrder};
 use crate::sync::engine::SessionState;
 use serde_json::Value;
 
@@ -13,6 +13,8 @@ impl VaultManager {
         label_id: Option<String>,
         include_trash: bool,
         only_favorites: bool,
+        sort_field: Option<String>,
+        sort_order: Option<String>,
     ) -> Result<Vec<EntryRow>, String> {
         let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
         let unlocked = match session.as_ref() {
@@ -20,14 +22,20 @@ impl VaultManager {
             _ => return Err("Vault not unlocked".to_string()),
         };
 
+        let sort_field = sort_field
+            .and_then(|s| SortField::from_str(&s))
+            .unwrap_or_default();
+        let sort_order = sort_order
+            .and_then(|s| SortOrder::from_str(&s))
+            .unwrap_or_default();
+
         let mut filter = EntryFilter::new()
             .with_trash(include_trash)
-            .with_search(search_query.unwrap_or_default());
+            .with_search(search_query.unwrap_or_default())
+            .with_sort(sort_field, sort_order);
 
         if let Some(t) = entry_type {
-            if let Some(entry_type) = EntryType::from_str(&t) {
-                filter = filter.with_type(entry_type);
-            }
+            filter = filter.with_type(t);
         }
 
         if let Some(l) = label_id {
@@ -43,9 +51,10 @@ impl VaultManager {
 
         Ok(entries.into_iter().map(|entry| EntryRow {
             id: entry.id,
-            entry_type: entry.entry_type.as_str().to_string(),
+            entry_type: entry.entry_type,
             name: entry.name,
             is_favorite: entry.is_favorite,
+            created_at: entry.created_at,
             updated_at: entry.updated_at,
             deleted_at: entry.deleted_at,
         }).collect())
@@ -69,7 +78,7 @@ impl VaultManager {
 
         Ok(EntryDetail {
             id: entry.id,
-            entry_type: entry.entry_type.as_str().to_string(),
+            entry_type: entry.entry_type,
             name: entry.name,
             is_favorite: entry.is_favorite,
             created_at: entry.created_at,
@@ -98,7 +107,8 @@ impl VaultManager {
         let typed_value: Value = serde_json::from_str(&typed_value_json)
             .map_err(|e| format!("Invalid typed_value JSON: {}", e))?;
 
-        let et = EntryType::from_str(&entry_type)
+        // Validate that the entry type is known (refuse to create unknown types)
+        EntryType::from_str(&entry_type)
             .ok_or_else(|| format!("Invalid entry type: {}", entry_type))?;
 
         let custom_fields = if let Some(json) = custom_fields_json {
@@ -109,14 +119,14 @@ impl VaultManager {
         };
 
         let data = crate::models::EntryData {
-            entry_type: et,
+            entry_type: entry_type.clone(),
             typed_value,
             notes,
             custom_fields,
         };
 
         if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
-            let entry = unlocked.create_entry(name, et, data, label_ids)
+            let entry = unlocked.create_entry(name, entry_type, data, label_ids)
                 .map_err(|e| format!("Failed to create entry: {}", e))?;
             Ok(entry.id)
         } else {

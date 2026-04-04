@@ -1,4 +1,4 @@
-import { Copy, Maximize2 } from 'lucide-react'
+import { Maximize2 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as commands from '../../commands'
 import TotpDisplay from '../TotpDisplay'
@@ -83,11 +83,6 @@ export default function TotpCustomFieldDisplay({ label, value }: TotpCustomField
         >
           <Maximize2 size={14} />
         </button>
-      )}
-      {totpCode && (
-        <span className="shrink-0 text-text-muted">
-          {copied ? <span className="text-xs text-success">コピーしました</span> : <Copy size={14} />}
-        </span>
       )}
       {totpCode && (
         <LargeTextDialog

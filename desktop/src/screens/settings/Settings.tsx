@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
+import Import1puxDialog from './Import1puxDialog'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import {
@@ -89,6 +90,9 @@ export default function Settings() {
     setAutolockMinutes(minutes)
     saveSettings({ autolockMinutes: minutes })
   }
+
+  // Import Dialog
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
 
   // Change Master Password Dialog
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
@@ -296,6 +300,22 @@ export default function Settings() {
               className="w-full"
             >
               ログアウト
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* データ */}
+        <Card>
+          <CardHeader className="px-3 py-2">
+            <CardTitle className="text-sm font-medium">データ</CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3 pt-2 space-y-2">
+            <Button
+              variant="secondary"
+              onClick={() => setImportDialogOpen(true)}
+              className="w-full"
+            >
+              1Passwordからインポート
             </Button>
           </CardContent>
         </Card>
@@ -542,6 +562,16 @@ export default function Settings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* インポートダイアログ */}
+      <Import1puxDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImportComplete={() => {
+          // Trigger a refresh if needed
+          window.dispatchEvent(new CustomEvent('entries-changed'))
+        }}
+      />
 
       {/* リカバリーキー表示ダイアログ */}
       <Dialog open={recoveryKeyDisplayOpen} onOpenChange={setRecoveryKeyDisplayOpen}>

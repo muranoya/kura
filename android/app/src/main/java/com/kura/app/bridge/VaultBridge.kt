@@ -24,7 +24,9 @@ object VaultBridge {
         entryType: String?,
         labelId: String?,
         includeTrash: Boolean,
-        onlyFavorites: Boolean
+        onlyFavorites: Boolean,
+        sortField: String?,
+        sortOrder: String?
     ): String
 
     external fun getEntry(vaultId: String, id: String): String
@@ -61,6 +63,7 @@ object VaultBridge {
     external fun setEntryLabels(vaultId: String, entryId: String, labelIdsJson: String)
 
     // Security
+    external fun verifyPassword(vaultId: String, password: String)
     external fun changeMasterPassword(vaultId: String, oldPassword: String, newPassword: String)
     external fun rotateDek(vaultId: String, password: String): String
     external fun regenerateRecoveryKey(vaultId: String, password: String): String
@@ -69,7 +72,6 @@ object VaultBridge {
     external fun generatePassword(
         length: Int,
         uppercase: Boolean,
-        lowercase: Boolean,
         numbers: Boolean,
         symbols: Boolean
     ): String
@@ -78,6 +80,10 @@ object VaultBridge {
     external fun generateTotpDefault(secret: String): String
     external fun generateTotpFromValue(value: String): String
     external fun parseTotpPeriod(value: String): Long
+
+    // Import
+    external fun import1puxPreview(vaultId: String, fileBytes: ByteArray): String
+    external fun import1puxExecute(vaultId: String, fileBytes: ByteArray, actionsJson: String): String
 
     // Sync
     external fun mergeRemoteVault(vaultId: String, remoteBytes: ByteArray, remoteEtag: String)

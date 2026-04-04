@@ -49,6 +49,8 @@ export async function listEntries(filter?: EntryFilter): Promise<EntryRow[]> {
     labelId: filter?.labelId ?? null,
     includeTrash: filter?.includeTrash ?? false,
     onlyFavorites: filter?.onlyFavorites ?? false,
+    sortField: filter?.sortField ?? null,
+    sortOrder: filter?.sortOrder ?? null,
   })
 }
 
@@ -195,14 +197,12 @@ export async function decryptConfig(password: string, encryptedB64: string): Pro
 export async function generatePassword(
   length = 16,
   includeUppercase = true,
-  includeLowercase = true,
   includeNumbers = true,
   includeSymbols = true,
 ): Promise<string> {
   return invoke<string>('generate_password', {
     length,
     includeUppercase,
-    includeLowercase,
     includeNumbers,
     includeSymbols,
   })
@@ -295,4 +295,19 @@ export async function vaultFileExists(): Promise<boolean> {
 
 export async function deleteVaultFile(): Promise<void> {
   return invoke<void>('delete_vault_file')
+}
+
+// ============================================================================
+// Import
+// ============================================================================
+
+export async function import1puxPreview(filePath: string): Promise<Record<string, unknown>> {
+  return invoke<Record<string, unknown>>('import_1pux_preview', { vaultId, filePath })
+}
+
+export async function import1puxExecute(
+  filePath: string,
+  actionsJson: string,
+): Promise<Record<string, unknown>> {
+  return invoke<Record<string, unknown>>('import_1pux_execute', { vaultId, filePath, actionsJson })
 }

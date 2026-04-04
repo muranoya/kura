@@ -21,6 +21,7 @@ sha2 = "0.10"
 hmac = "0.12"
 totp-rs = "5"
 getrandom = { version = "0.2", features = ["js"] }  # WASM-compatible random
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [features]
 default = []

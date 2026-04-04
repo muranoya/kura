@@ -1,5 +1,5 @@
 use crate::error::{Result, VaultError};
-use crate::models::{EntryData, Entry, EntryFilter};
+use crate::models::{EntryData, Entry, EntryFilter, SortField, SortOrder};
 use crate::store::VaultEntry;
 
 use super::UnlockedVault;
@@ -13,7 +13,17 @@ impl UnlockedVault {
                 result.push(vault_entry_to_entry(id.clone(), vault_entry)?);
             }
         }
-        result.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        result.sort_by(|a, b| {
+            let cmp = match filter.sort_field {
+                SortField::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                SortField::CreatedAt => a.created_at.cmp(&b.created_at),
+                SortField::UpdatedAt => a.updated_at.cmp(&b.updated_at),
+            };
+            match filter.sort_order {
+                SortOrder::Asc => cmp,
+                SortOrder::Desc => cmp.reverse(),
+            }
+        });
         Ok(result)
     }
 
@@ -29,7 +39,7 @@ impl UnlockedVault {
     pub fn create_entry(
         &mut self,
         name: String,
-        entry_type: crate::models::EntryType,
+        entry_type: String,
         data: EntryData,
         label_ids: Vec<String>,
     ) -> Result<Entry> {
@@ -37,7 +47,7 @@ impl UnlockedVault {
         let now = crate::get_timestamp();
 
         let vault_entry = VaultEntry {
-            entry_type,
+            entry_type: entry_type.clone(),
             name: name.clone(),
             created_at: now,
             updated_at: now,
@@ -55,7 +65,7 @@ impl UnlockedVault {
         Ok(Entry {
             id,
             name,
-            entry_type,
+            entry_type: entry_type.clone(),
             is_favorite: false,
             created_at: now,
             updated_at: now,
@@ -157,7 +167,7 @@ impl UnlockedVault {
 mod tests {
     use super::*;
     use crate::crypto::Dek;
-    use crate::models::{Argon2Params, EntryType, VaultMeta};
+    use crate::models::{Argon2Params, VaultMeta, SortField, SortOrder};
     use crate::store::VaultContents;
     use super::super::UnlockedVault;
 
@@ -190,7 +200,7 @@ mod tests {
     fn insert_entry(vault: &mut UnlockedVault, id: &str, name: &str, created_at: i64) {
         let data = make_login_data();
         vault.contents.entries.insert(id.to_string(), VaultEntry {
-            entry_type: EntryType::Login,
+            entry_type: "login".to_string(),
             name: name.to_string(),
             created_at,
             updated_at: created_at,
@@ -208,10 +218,10 @@ mod tests {
     fn test_create_entry() {
         let mut vault = make_vault();
         let data = make_login_data();
-        let entry = vault.create_entry("Test".into(), EntryType::Login, data, vec![]).unwrap();
+        let entry = vault.create_entry("Test".into(), "login".to_string(), data, vec![]).unwrap();
 
         assert_eq!(entry.name, "Test");
-        assert_eq!(entry.entry_type, EntryType::Login);
+        assert_eq!(entry.entry_type, "login");
         assert!(!entry.is_favorite);
         assert!(entry.deleted_at.is_none());
         assert!(vault.contents.entries.contains_key(&entry.id));
@@ -230,8 +240,25 @@ mod tests {
         assert!(vault.get_entry("nonexistent").unwrap().is_none());
     }
 
+    fn insert_entry_with_updated(vault: &mut UnlockedVault, id: &str, name: &str, created_at: i64, updated_at: i64) {
+        let data = make_login_data();
+        vault.contents.entries.insert(id.to_string(), VaultEntry {
+            entry_type: "login".to_string(),
+            name: name.to_string(),
+            created_at,
+            updated_at,
+            deleted_at: None,
+            purged_at: None,
+            is_favorite: false,
+            label_ids: vec![],
+            typed_value: zeroize::Zeroizing::new(data.typed_value.to_string()),
+            notes: None,
+            custom_fields: None,
+        });
+    }
+
     #[test]
-    fn test_list_entries_sorted_by_created_at_desc() {
+    fn test_list_entries_default_sort_created_at_desc() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "old", "Old", 1000);
         insert_entry(&mut vault, "mid", "Mid", 2000);
@@ -244,6 +271,96 @@ mod tests {
         assert_eq!(entries[0].id, "new");
         assert_eq!(entries[1].id, "mid");
         assert_eq!(entries[2].id, "old");
+    }
+
+    #[test]
+    fn test_list_entries_sort_created_at_asc() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "old", "Old", 1000);
+        insert_entry(&mut vault, "mid", "Mid", 2000);
+        insert_entry(&mut vault, "new", "New", 3000);
+
+        let filter = EntryFilter::new().with_sort(SortField::CreatedAt, SortOrder::Asc);
+        let entries = vault.list_entries(&filter).unwrap();
+
+        assert_eq!(entries[0].id, "old");
+        assert_eq!(entries[1].id, "mid");
+        assert_eq!(entries[2].id, "new");
+    }
+
+    #[test]
+    fn test_list_entries_sort_name_asc() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "Charlie", 1000);
+        insert_entry(&mut vault, "e2", "Alice", 2000);
+        insert_entry(&mut vault, "e3", "Bob", 3000);
+
+        let filter = EntryFilter::new().with_sort(SortField::Name, SortOrder::Asc);
+        let entries = vault.list_entries(&filter).unwrap();
+
+        assert_eq!(entries[0].name, "Alice");
+        assert_eq!(entries[1].name, "Bob");
+        assert_eq!(entries[2].name, "Charlie");
+    }
+
+    #[test]
+    fn test_list_entries_sort_name_desc() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "Charlie", 1000);
+        insert_entry(&mut vault, "e2", "Alice", 2000);
+        insert_entry(&mut vault, "e3", "Bob", 3000);
+
+        let filter = EntryFilter::new().with_sort(SortField::Name, SortOrder::Desc);
+        let entries = vault.list_entries(&filter).unwrap();
+
+        assert_eq!(entries[0].name, "Charlie");
+        assert_eq!(entries[1].name, "Bob");
+        assert_eq!(entries[2].name, "Alice");
+    }
+
+    #[test]
+    fn test_list_entries_sort_name_case_insensitive() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "banana", 1000);
+        insert_entry(&mut vault, "e2", "Apple", 2000);
+        insert_entry(&mut vault, "e3", "cherry", 3000);
+
+        let filter = EntryFilter::new().with_sort(SortField::Name, SortOrder::Asc);
+        let entries = vault.list_entries(&filter).unwrap();
+
+        assert_eq!(entries[0].name, "Apple");
+        assert_eq!(entries[1].name, "banana");
+        assert_eq!(entries[2].name, "cherry");
+    }
+
+    #[test]
+    fn test_list_entries_sort_updated_at_desc() {
+        let mut vault = make_vault();
+        insert_entry_with_updated(&mut vault, "e1", "First", 1000, 5000);
+        insert_entry_with_updated(&mut vault, "e2", "Second", 2000, 3000);
+        insert_entry_with_updated(&mut vault, "e3", "Third", 3000, 4000);
+
+        let filter = EntryFilter::new().with_sort(SortField::UpdatedAt, SortOrder::Desc);
+        let entries = vault.list_entries(&filter).unwrap();
+
+        assert_eq!(entries[0].id, "e1"); // updated_at=5000
+        assert_eq!(entries[1].id, "e3"); // updated_at=4000
+        assert_eq!(entries[2].id, "e2"); // updated_at=3000
+    }
+
+    #[test]
+    fn test_list_entries_sort_updated_at_asc() {
+        let mut vault = make_vault();
+        insert_entry_with_updated(&mut vault, "e1", "First", 1000, 5000);
+        insert_entry_with_updated(&mut vault, "e2", "Second", 2000, 3000);
+        insert_entry_with_updated(&mut vault, "e3", "Third", 3000, 4000);
+
+        let filter = EntryFilter::new().with_sort(SortField::UpdatedAt, SortOrder::Asc);
+        let entries = vault.list_entries(&filter).unwrap();
+
+        assert_eq!(entries[0].id, "e2"); // updated_at=3000
+        assert_eq!(entries[1].id, "e3"); // updated_at=4000
+        assert_eq!(entries[2].id, "e1"); // updated_at=5000
     }
 
     #[test]
@@ -352,7 +469,7 @@ mod tests {
 
         let note_data = EntryData::new_secure_note("content".into(), None);
         vault.contents.entries.insert("e2".to_string(), VaultEntry {
-            entry_type: EntryType::SecureNote,
+            entry_type: "secure_note".to_string(),
             name: "Note".to_string(),
             created_at: 2000,
             updated_at: 2000,
@@ -365,7 +482,7 @@ mod tests {
             custom_fields: None,
         });
 
-        let filter = EntryFilter::new().with_type(EntryType::Login);
+        let filter = EntryFilter::new().with_type("login");
         let entries = vault.list_entries(&filter).unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].name, "Login");
@@ -488,7 +605,7 @@ pub(crate) fn vault_entry_to_entry(id: String, e: &VaultEntry) -> Result<Entry> 
         ))?;
 
     let data = EntryData {
-        entry_type: e.entry_type,
+        entry_type: e.entry_type.clone(),
         typed_value,
         notes: e.notes.clone(),
         custom_fields: e.custom_fields.clone(),
@@ -497,7 +614,7 @@ pub(crate) fn vault_entry_to_entry(id: String, e: &VaultEntry) -> Result<Entry> 
     Ok(Entry {
         id,
         name: e.name.clone(),
-        entry_type: e.entry_type,
+        entry_type: e.entry_type.clone(),
         is_favorite: e.is_favorite,
         created_at: e.created_at,
         updated_at: e.updated_at,

@@ -5,7 +5,6 @@ use crate::password_gen::{PasswordOptions, generate_password};
 pub fn api_generate_password(
     length: i32,
     include_uppercase: bool,
-    include_lowercase: bool,
     include_numbers: bool,
     include_symbols: bool,
 ) -> Result<String, String> {
@@ -14,7 +13,6 @@ pub fn api_generate_password(
     let options = PasswordOptions {
         length,
         include_uppercase,
-        include_lowercase,
         include_numbers,
         include_symbols,
     };

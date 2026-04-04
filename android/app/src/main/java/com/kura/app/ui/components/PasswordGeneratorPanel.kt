@@ -1,5 +1,6 @@
 package com.kura.app.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,23 +17,21 @@ import kotlin.math.roundToInt
 
 @Composable
 fun PasswordGeneratorPanel(
-    onGenerate: suspend (Int, Boolean, Boolean, Boolean, Boolean) -> String,
+    onGenerate: suspend (Int, Boolean, Boolean, Boolean) -> String,
     onCopy: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var password by remember { mutableStateOf("") }
     var length by remember { mutableFloatStateOf(16f) }
     var uppercase by remember { mutableStateOf(true) }
-    var lowercase by remember { mutableStateOf(true) }
     var numbers by remember { mutableStateOf(true) }
     var symbols by remember { mutableStateOf(true) }
     var isGenerating by remember { mutableStateOf(false) }
 
-    LaunchedEffect(length, uppercase, lowercase, numbers, symbols) {
-        if (!uppercase && !lowercase && !numbers && !symbols) return@LaunchedEffect
+    LaunchedEffect(length, uppercase, numbers, symbols) {
         isGenerating = true
         try {
-            password = onGenerate(length.roundToInt(), uppercase, lowercase, numbers, symbols)
+            password = onGenerate(length.roundToInt(), uppercase, numbers, symbols)
         } catch (_: Exception) { }
         isGenerating = false
     }
@@ -79,19 +78,24 @@ fun PasswordGeneratorPanel(
 
         // Toggle options
         Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { uppercase = !uppercase }
+            ) {
                 Checkbox(checked = uppercase, onCheckedChange = { uppercase = it })
                 Text("大文字 (A-Z)", style = MaterialTheme.typography.bodyMedium)
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = lowercase, onCheckedChange = { lowercase = it })
-                Text("小文字 (a-z)", style = MaterialTheme.typography.bodyMedium)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { numbers = !numbers }
+            ) {
                 Checkbox(checked = numbers, onCheckedChange = { numbers = it })
                 Text("数字 (0-9)", style = MaterialTheme.typography.bodyMedium)
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { symbols = !symbols }
+            ) {
                 Checkbox(checked = symbols, onCheckedChange = { symbols = it })
                 Text("記号 (!@#)", style = MaterialTheme.typography.bodyMedium)
             }

@@ -47,11 +47,17 @@ impl VaultManager {
             None => return Err("No vault loaded".to_string()),
         };
 
-        let unlocked = locked.unlock(&master_password)
-            .map_err(|e| format!("Failed to unlock: {}", e))?;
-
-        *session = Some(SessionState::Unlocked(unlocked));
-        Ok(())
+        let backup = locked.clone();
+        match locked.unlock(&master_password) {
+            Ok(unlocked) => {
+                *session = Some(SessionState::Unlocked(unlocked));
+                Ok(())
+            }
+            Err(e) => {
+                *session = Some(SessionState::Locked(backup));
+                Err(format!("Failed to unlock: {}", e))
+            }
+        }
     }
 
     /// リカバリーキーでアンロック（新しいマスターパスワード設定フロー）
@@ -64,13 +70,17 @@ impl VaultManager {
             None => return Err("No vault loaded".to_string()),
         };
 
-        let recovery_key_str = recovery_key.clone();
-
-        let unlocked = locked.unlock_with_recovery_key(&recovery_key_str)
-            .map_err(|e| format!("Failed to unlock with recovery key: {}", e))?;
-
-        *session = Some(SessionState::Unlocked(unlocked));
-        Ok(())
+        let backup = locked.clone();
+        match locked.unlock_with_recovery_key(&recovery_key) {
+            Ok(unlocked) => {
+                *session = Some(SessionState::Unlocked(unlocked));
+                Ok(())
+            }
+            Err(e) => {
+                *session = Some(SessionState::Locked(backup));
+                Err(format!("Failed to unlock with recovery key: {}", e))
+            }
+        }
     }
 
     /// ロック（vault_bytesを返す）

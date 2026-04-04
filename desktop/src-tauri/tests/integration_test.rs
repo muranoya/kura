@@ -78,7 +78,7 @@ fn test_recovery_key_unlock() {
 
     // Verify we can list entries (empty)
     let entries =
-        m.api_list_entries(None, None, None, false, false).expect("Failed to list entries");
+        m.api_list_entries(None, None, None, false, false, None, None).expect("Failed to list entries");
     assert_eq!(entries.len(), 0);
 }
 
@@ -88,6 +88,17 @@ fn test_wrong_password_fails() {
     m.api_create_new_vault(TEST_PASSWORD.to_string()).expect("Failed to create vault");
     let result = m.api_unlock("wrong-password".to_string());
     assert!(result.is_err());
+}
+
+#[test]
+fn test_unlock_succeeds_after_wrong_password() {
+    let m = VaultManager::new();
+    m.api_create_new_vault(TEST_PASSWORD.to_string()).expect("Failed to create vault");
+
+    let result = m.api_unlock("wrong-password".to_string());
+    assert!(result.is_err());
+
+    m.api_unlock(TEST_PASSWORD.to_string()).expect("Should unlock with correct password after failed attempt");
 }
 
 // ============================================================================
@@ -168,12 +179,12 @@ fn test_create_entries_of_all_types() {
     }
 
     // List all
-    let all = m.api_list_entries(None, None, None, false, false).expect("Failed to list entries");
+    let all = m.api_list_entries(None, None, None, false, false, None, None).expect("Failed to list entries");
     assert_eq!(all.len(), 5);
 
     // Filter by type
     for (entry_type, _, _) in &entries_data {
-        let filtered = m.api_list_entries(None, Some(entry_type.to_string()), None, false, false)
+        let filtered = m.api_list_entries(None, Some(entry_type.to_string()), None, false, false, None, None)
             .expect("Failed to filter entries");
         assert_eq!(filtered.len(), 1, "Expected 1 entry for type {}", entry_type);
     }
@@ -233,11 +244,11 @@ fn test_delete_restore_purge_entry() {
     m.api_delete_entry(entry_id.clone()).expect("Failed to delete entry");
 
     // Not in active list
-    let active = m.api_list_entries(None, None, None, false, false).expect("Failed to list");
+    let active = m.api_list_entries(None, None, None, false, false, None, None).expect("Failed to list");
     assert_eq!(active.len(), 0);
 
     // In trash list
-    let trash = m.api_list_entries(None, None, None, true, false).expect("Failed to list trash");
+    let trash = m.api_list_entries(None, None, None, true, false, None, None).expect("Failed to list trash");
     assert!(trash.iter().any(|e| e.id == entry_id));
 
     // Verify deleted_at is set
@@ -246,7 +257,7 @@ fn test_delete_restore_purge_entry() {
 
     // Restore
     m.api_restore_entry(entry_id.clone()).expect("Failed to restore entry");
-    let active = m.api_list_entries(None, None, None, false, false).expect("Failed to list");
+    let active = m.api_list_entries(None, None, None, false, false, None, None).expect("Failed to list");
     assert_eq!(active.len(), 1);
 
     // Purge
@@ -254,7 +265,7 @@ fn test_delete_restore_purge_entry() {
     m.api_purge_entry(entry_id.clone()).expect("Failed to purge entry");
 
     // Purged entry is a tombstone; not in active list
-    let active = m.api_list_entries(None, None, None, false, false).expect("Failed to list active");
+    let active = m.api_list_entries(None, None, None, false, false, None, None).expect("Failed to list active");
     assert_eq!(active.len(), 0);
 
     // Tombstone still exists in HashMap (with deleted_at set), so include_trash=true may include it.
@@ -289,13 +300,13 @@ fn test_set_favorite() {
 
     // Favorites-only filter
     let favorites =
-        m.api_list_entries(None, None, None, false, true).expect("Failed to list favorites");
+        m.api_list_entries(None, None, None, false, true, None, None).expect("Failed to list favorites");
     assert_eq!(favorites.len(), 1);
 
     // Unset favorite
     m.api_set_favorite(entry_id, false).expect("Failed to unset favorite");
     let favorites =
-        m.api_list_entries(None, None, None, false, true).expect("Failed to list favorites");
+        m.api_list_entries(None, None, None, false, true, None, None).expect("Failed to list favorites");
     assert_eq!(favorites.len(), 0);
 }
 
@@ -391,7 +402,7 @@ fn test_set_entry_labels() {
     assert_eq!(detail.labels.len(), 2);
 
     // Filter by label
-    let filtered = m.api_list_entries(None, None, Some(label1.clone()), false, false)
+    let filtered = m.api_list_entries(None, None, Some(label1.clone()), false, false, None, None)
         .expect("Failed to filter by label");
     assert_eq!(filtered.len(), 1);
 
@@ -483,7 +494,7 @@ fn test_vault_bytes_roundtrip() {
     m.api_unlock(TEST_PASSWORD.to_string()).expect("Failed to unlock");
 
     // Verify data survived the roundtrip
-    let entries = m.api_list_entries(None, None, None, false, false).expect("Failed to list");
+    let entries = m.api_list_entries(None, None, None, false, false, None, None).expect("Failed to list");
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].name, "Roundtrip Entry");
 
@@ -612,7 +623,7 @@ async fn test_sync_merge() {
     m.api_sync(&storage).await.expect("Failed to sync");
 
     // Both entries should exist
-    let entries = m.api_list_entries(None, None, None, false, false).expect("Failed to list");
+    let entries = m.api_list_entries(None, None, None, false, false, None, None).expect("Failed to list");
     assert_eq!(entries.len(), 2);
 
     let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();

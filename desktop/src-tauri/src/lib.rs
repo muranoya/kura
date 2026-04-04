@@ -59,6 +59,9 @@ pub fn run() {
             commands::storage::write_vault_file,
             commands::storage::vault_file_exists,
             commands::storage::delete_vault_file,
+            // Import
+            commands::import::import_1pux_preview,
+            commands::import::import_1pux_execute,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

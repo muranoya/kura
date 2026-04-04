@@ -43,6 +43,26 @@ impl VaultManager {
             .map_err(|e| format!("Decrypted config is not valid UTF-8: {}", e))
     }
 
+    /// マスターパスワードの検証（KEK導出→DEK復号を試みる）
+    pub fn api_verify_password(&self, password: String) -> Result<(), String> {
+        let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
+
+        if let Some(SessionState::Unlocked(ref unlocked)) = session.as_ref() {
+            use base64::Engine;
+            let engine = base64::engine::general_purpose::STANDARD;
+
+            let kek = crypto::kdf::derive_kek(&password, &unlocked.meta.argon2_params)
+                .map_err(|e| format!("Failed to derive KEK: {}", e))?;
+            let encrypted_dek_bytes = engine.decode(&unlocked.meta.encrypted_dek_master)
+                .map_err(|_| "Invalid base64".to_string())?;
+            crypto::dek::Dek::unwrap(&encrypted_dek_bytes, &kek)
+                .map_err(|_| "Invalid password".to_string())?;
+            Ok(())
+        } else {
+            Err("Vault not unlocked".to_string())
+        }
+    }
+
     /// マスターパスワード変更
     pub fn api_change_master_password(&self, old_password: String, new_password: String) -> Result<(), String> {
         let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());

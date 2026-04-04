@@ -12,12 +12,22 @@ export interface CustomField {
   value: string
 }
 
+// Sort types
+export type SortField = 'name' | 'created_at' | 'updated_at'
+export type SortOrder = 'asc' | 'desc'
+
+export interface SortConfig {
+  field: SortField
+  order: SortOrder
+}
+
 // Entry row for list display
 export interface EntryRow {
   id: string
   entryType: EntryType
   name: string
   isFavorite: boolean
+  createdAt: number
   updatedAt: number
   deletedAt: number | null
 }
@@ -44,6 +54,8 @@ export interface EntryFilter {
   labelId?: string
   includeTrash?: boolean
   onlyFavorites?: boolean
+  sortField?: SortField
+  sortOrder?: SortOrder
 }
 
 // Storage config for S3

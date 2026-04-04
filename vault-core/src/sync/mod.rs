@@ -254,14 +254,13 @@ fn apply_gc_labels(labels: &mut HashMap<String, LabelValue>, now: i64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::EntryType;
     use zeroize::Zeroizing;
 
     fn create_entry(id: &str, name: &str, timestamp: i64) -> (String, VaultEntry) {
         (
             id.to_string(),
             VaultEntry {
-                entry_type: EntryType::Login,
+                entry_type: "login".to_string(),
                 name: name.to_string(),
                 created_at: timestamp,
                 updated_at: timestamp,

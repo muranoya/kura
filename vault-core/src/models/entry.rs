@@ -2,6 +2,47 @@ use serde::{Deserialize, Serialize};
 
 use crate::EntryData;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum SortField {
+    #[serde(rename = "name")]
+    Name,
+    #[default]
+    #[serde(rename = "created_at")]
+    CreatedAt,
+    #[serde(rename = "updated_at")]
+    UpdatedAt,
+}
+
+impl SortField {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "name" => Some(SortField::Name),
+            "created_at" => Some(SortField::CreatedAt),
+            "updated_at" => Some(SortField::UpdatedAt),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum SortOrder {
+    #[serde(rename = "asc")]
+    Asc,
+    #[default]
+    #[serde(rename = "desc")]
+    Desc,
+}
+
+impl SortOrder {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "asc" => Some(SortOrder::Asc),
+            "desc" => Some(SortOrder::Desc),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EntryType {
     #[serde(rename = "login")]
@@ -56,7 +97,7 @@ impl EntryType {
 pub struct Entry {
     pub id: String,
     pub name: String,
-    pub entry_type: EntryType,
+    pub entry_type: String,
     pub is_favorite: bool,
     pub created_at: i64,
     pub updated_at: i64,
@@ -68,10 +109,12 @@ pub struct Entry {
 #[derive(Debug, Clone, Default)]
 pub struct EntryFilter {
     pub include_trash: bool,
-    pub entry_type: Option<EntryType>,
+    pub entry_type: Option<String>,
     pub label_id: Option<String>,
     pub favorites_only: bool,
     pub search_query: Option<String>, // Simple substring search on name
+    pub sort_field: SortField,
+    pub sort_order: SortOrder,
 }
 
 impl EntryFilter {
@@ -84,8 +127,8 @@ impl EntryFilter {
         self
     }
 
-    pub fn with_type(mut self, entry_type: EntryType) -> Self {
-        self.entry_type = Some(entry_type);
+    pub fn with_type(mut self, entry_type: impl Into<String>) -> Self {
+        self.entry_type = Some(entry_type.into());
         self
     }
 
@@ -109,12 +152,18 @@ impl EntryFilter {
         self
     }
 
+    pub fn with_sort(mut self, field: SortField, order: SortOrder) -> Self {
+        self.sort_field = field;
+        self.sort_order = order;
+        self
+    }
+
     pub fn matches(&self, entry: &crate::store::VaultEntry) -> bool {
         if !self.include_trash && entry.deleted_at.is_some() {
             return false;
         }
-        if let Some(entry_type) = self.entry_type {
-            if entry.entry_type != entry_type {
+        if let Some(ref entry_type) = self.entry_type {
+            if entry.entry_type != *entry_type {
                 return false;
             }
         }

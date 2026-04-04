@@ -4,11 +4,10 @@ use vault_core::api::{api_generate_password, api_generate_totp, api_generate_tot
 pub fn generate_password(
     length: i32,
     include_uppercase: bool,
-    include_lowercase: bool,
     include_numbers: bool,
     include_symbols: bool,
 ) -> Result<String, String> {
-    api_generate_password(length, include_uppercase, include_lowercase, include_numbers, include_symbols)
+    api_generate_password(length, include_uppercase, include_numbers, include_symbols)
 }
 
 #[tauri::command]

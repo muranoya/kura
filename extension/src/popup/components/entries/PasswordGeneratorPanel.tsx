@@ -17,7 +17,6 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
   // 設定
   const [length, setLength] = useState(16)
   const [includeUppercase, setIncludeUppercase] = useState(true)
-  const [includeLowercase, setIncludeLowercase] = useState(true)
   const [includeNumbers, setIncludeNumbers] = useState(true)
   const [includeSymbols, setIncludeSymbols] = useState(true)
 
@@ -28,7 +27,6 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
       const generated = await commands.generatePassword(
         length,
         includeUppercase,
-        includeLowercase,
         includeNumbers,
         includeSymbols,
       )
@@ -39,7 +37,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
     } finally {
       setLoading(false)
     }
-  }, [length, includeUppercase, includeLowercase, includeNumbers, includeSymbols])
+  }, [length, includeUppercase, includeNumbers, includeSymbols])
 
   // 初期パスワード生成と設定変更時に自動生成
   useEffect(() => {
@@ -147,21 +145,6 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                 </label>
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  id={`lowercase-${isInline ? 'inline' : 'screen'}`}
-                  type="checkbox"
-                  checked={includeLowercase}
-                  onChange={(e) => setIncludeLowercase(e.target.checked)}
-                  className="w-3 h-3 rounded border-border"
-                />
-                <label
-                  htmlFor={`lowercase-${isInline ? 'inline' : 'screen'}`}
-                  className="text-sm text-text-primary cursor-pointer"
-                >
-                  小文字 (a-z)
-                </label>
-              </div>
 
               <div className="flex items-center gap-2">
                 <input
@@ -282,18 +265,6 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                   </label>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <input
-                    id="lowercase"
-                    type="checkbox"
-                    checked={includeLowercase}
-                    onChange={(e) => setIncludeLowercase(e.target.checked)}
-                    className="w-4 h-4 rounded border-border"
-                  />
-                  <label htmlFor="lowercase" className="text-sm text-text-primary cursor-pointer">
-                    小文字 (a-z)
-                  </label>
-                </div>
 
                 <div className="flex items-center gap-2">
                   <input
