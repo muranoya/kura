@@ -1,3 +1,4 @@
+<!-- doc-status: implemented -->
 # UI ガイドライン
 
 ## 目的

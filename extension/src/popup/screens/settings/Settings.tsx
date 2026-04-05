@@ -211,7 +211,7 @@ export default function Settings() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <PageHeader title="設定" showBackButton={true} />
+      <PageHeader title="設定" showBackButton={false} />
 
       <div className="p-3">
         {/* 一般 */}

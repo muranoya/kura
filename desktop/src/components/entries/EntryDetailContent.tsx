@@ -1,4 +1,4 @@
-import { Copy, Eye, EyeOff, Maximize2, Pencil, Trash2 } from 'lucide-react'
+import { Check, Copy, Eye, EyeOff, Maximize2, Pencil, Star, Trash2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -45,9 +45,9 @@ function FieldDisplay({
 
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
-        isEmpty ? 'opacity-50' : 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80'
-      } ${copied ? 'bg-accent-subtle' : ''}`}
+      className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors border-l-2 ${
+        isEmpty ? 'opacity-50 border-transparent' : 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80 border-transparent'
+      } ${copied ? '!bg-accent-subtle !border-accent' : ''}`}
       onClick={handleClick}
       role={isEmpty ? undefined : 'button'}
       tabIndex={isEmpty ? undefined : 0}
@@ -59,7 +59,10 @@ function FieldDisplay({
             }
       }
     >
-      <span className="text-xs text-text-secondary w-24 shrink-0">{label}</span>
+      <span className="text-xs text-text-secondary w-24 shrink-0 flex items-center gap-1">
+        {label}
+        {copied && <Check size={12} className="text-success" />}
+      </span>
       <span
         className={`text-sm flex-1 break-all ${
           isEmpty
@@ -226,6 +229,7 @@ interface EntryDetailContentProps {
   allLabels: Label[]
   onEdit: () => void
   onDelete: () => void
+  onFavorite: () => void
 }
 
 export default function EntryDetailContent({
@@ -233,6 +237,7 @@ export default function EntryDetailContent({
   allLabels,
   onEdit,
   onDelete,
+  onFavorite,
 }: EntryDetailContentProps) {
   const [unmaskedFields, setUnmaskedFields] = useState<Set<string>>(new Set())
   const toggleFieldMask = (key: string) => {
@@ -255,6 +260,17 @@ export default function EntryDetailContent({
         </Badge>
         <h1 className="text-sm font-semibold text-text-primary truncate flex-1">{entry.name}</h1>
         <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={onFavorite}
+            className="p-1 rounded-md hover:bg-bg-elevated transition-colors"
+            title={entry.isFavorite ? 'お気に入り解除' : 'お気に入り'}
+          >
+            <Star
+              size={16}
+              className={entry.isFavorite ? 'fill-accent text-accent' : 'text-text-muted'}
+            />
+          </button>
           <Button size="sm" variant="secondary" onClick={onEdit} className="gap-1 h-7 text-xs">
             <Pencil size={13} />
             編集

@@ -6,14 +6,13 @@ import {
   Lock,
   RotateCw,
   ScrollText,
-  Star,
+
   Terminal,
   Trash2,
 } from 'lucide-react'
 import * as React from 'react'
 import type { EntryRow } from '../../../shared/types'
 import { Button } from '../ui/button'
-import { Card } from '../ui/card'
 
 // アイコン取得
 const getEntryIcon = (type: string) => {
@@ -56,7 +55,7 @@ interface EntryCardNormalProps {
   variant: 'normal'
   entry: EntryRow
   onClick: (id: string) => void
-  onFavorite: (id: string, current: boolean) => void
+
   isSelected?: boolean
 }
 
@@ -73,22 +72,23 @@ type EntryCardProps = EntryCardNormalProps | EntryCardTrashProps
 export default function EntryCard(props: EntryCardProps) {
   if (props.variant === 'normal') {
     const isSelected = props.isSelected || false
-    const selectedClass = isSelected
-      ? 'bg-accent-subtle border-l-2 border-accent'
-      : 'hover:border-accent/50'
 
     return (
-      <Card
-        className={`px-3 py-2 ${selectedClass} transition-colors cursor-pointer group`}
+      <div
+        className={`px-3 py-1.5 transition-colors cursor-pointer group ${
+          isSelected
+            ? 'bg-accent-subtle border-l-2 border-l-accent'
+            : 'border-l-2 border-l-transparent hover:bg-bg-elevated'
+        }`}
         onClick={() => props.onClick(props.entry.id)}
       >
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-2">
           {/* 左側: アイコン + 名前 */}
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="flex-shrink-0 w-6 h-6 rounded bg-accent/10 flex items-center justify-center text-accent">
               {React.cloneElement(
                 getEntryIcon(props.entry.entryType) as React.ReactElement<{ size: number }>,
-                { size: 16 },
+                { size: 14 },
               )}
             </div>
             <div className="min-w-0 flex-1">
@@ -100,33 +100,14 @@ export default function EntryCard(props: EntryCardProps) {
               )}
             </div>
           </div>
-
-          {/* 右側: アクション */}
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {/* お気に入りボタン */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                props.onFavorite(props.entry.id, props.entry.isFavorite)
-              }}
-              className="p-1.5 rounded-md hover:bg-bg-elevated transition-colors"
-              title={props.entry.isFavorite ? 'お気に入い解除' : 'お気に入い'}
-            >
-              <Star
-                size={14}
-                className={props.entry.isFavorite ? 'fill-accent text-accent' : 'text-text-muted'}
-              />
-            </button>
-          </div>
         </div>
-      </Card>
+      </div>
     )
   }
 
   // trash variant
   return (
-    <Card className="p-3">
+    <div className="px-3 py-2 border-l-2 border-l-transparent">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold text-text-primary truncate">{props.entry.name}</h3>
@@ -159,7 +140,7 @@ export default function EntryCard(props: EntryCardProps) {
           </Button>
         </div>
       </div>
-    </Card>
+    </div>
   )
 }
 

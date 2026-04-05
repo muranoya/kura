@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -350,7 +351,27 @@ private fun CustomFieldsSection(
                     val newList = customFields.toMutableList()
                     newList.removeAt(index)
                     onCustomFieldsChange(newList)
-                }
+                },
+                canMoveUp = customFields.size > 1 && index > 0,
+                canMoveDown = customFields.size > 1 && index < customFields.lastIndex,
+                onMoveUp = if (customFields.size > 1 && index > 0) {
+                    {
+                        val newList = customFields.toMutableList()
+                        val temp = newList[index]
+                        newList[index] = newList[index - 1]
+                        newList[index - 1] = temp
+                        onCustomFieldsChange(newList)
+                    }
+                } else null,
+                onMoveDown = if (customFields.size > 1 && index < customFields.lastIndex) {
+                    {
+                        val newList = customFields.toMutableList()
+                        val temp = newList[index]
+                        newList[index] = newList[index + 1]
+                        newList[index + 1] = temp
+                        onCustomFieldsChange(newList)
+                    }
+                } else null
             )
         }
         if (customFields.isNotEmpty()) SectionDivider()
@@ -494,24 +515,18 @@ fun PasswordField(
     onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean) -> String)? = null,
     onCopy: ((String) -> Unit)? = null
 ) {
-    var visible by remember { mutableStateOf(false) }
+    var isFocused by remember { mutableStateOf(false) }
     var showGenerator by remember { mutableStateOf(false) }
 
     TextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().onFocusChanged { isFocused = it.isFocused },
         singleLine = true,
-        visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+        visualTransformation = if (isFocused) VisualTransformation.None else PasswordVisualTransformation(),
         trailingIcon = {
             Row {
-                IconButton(onClick = { visible = !visible }) {
-                    Icon(
-                        if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = if (visible) "隠す" else "表示"
-                    )
-                }
                 if (onCopy != null && value.isNotEmpty()) {
                     IconButton(onClick = { onCopy(value) }) {
                         Icon(Icons.Default.ContentCopy, contentDescription = "コピー")
@@ -540,7 +555,8 @@ fun PasswordField(
         ) {
             PasswordGeneratorPanel(
                 onGenerate = onGeneratePassword,
-                onCopy = { generated ->
+                onCopy = {},
+                onUse = { generated ->
                     onValueChange(generated)
                     showGenerator = false
                 },
@@ -555,10 +571,14 @@ fun PasswordField(
 fun CustomFieldEditor(
     field: CustomField,
     onFieldChange: (CustomField) -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    canMoveUp: Boolean = false,
+    canMoveDown: Boolean = false,
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null
 ) {
     val isSecret = field.fieldType == "password" || field.fieldType == "totp"
-    var visible by remember { mutableStateOf(!isSecret) }
+    var isValueFocused by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         // Row 1: Field name + type badge (read-only) + delete
@@ -590,6 +610,30 @@ fun CustomFieldEditor(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                 )
             }
+            if (onMoveUp != null || onMoveDown != null) {
+                IconButton(
+                    onClick = { onMoveUp?.invoke() },
+                    enabled = canMoveUp,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.KeyboardArrowUp,
+                        contentDescription = "上へ移動",
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                IconButton(
+                    onClick = { onMoveDown?.invoke() },
+                    enabled = canMoveDown,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        contentDescription = "下へ移動",
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
             IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
                 Icon(
                     Icons.Default.RemoveCircleOutline,
@@ -604,21 +648,10 @@ fun CustomFieldEditor(
         TextField(
             value = field.value,
             onValueChange = { onFieldChange(field.copy(value = it)) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().onFocusChanged { isValueFocused = it.isFocused },
             singleLine = true,
             placeholder = { Text(if (field.fieldType == "totp") "otpauth:// URI または Base32 シークレット" else "値") },
-            visualTransformation = if (!visible && isSecret) PasswordVisualTransformation() else VisualTransformation.None,
-            trailingIcon = if (isSecret) {
-                {
-                    IconButton(onClick = { visible = !visible }) {
-                        Icon(
-                            if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            } else null,
+            visualTransformation = if (!isValueFocused && isSecret) PasswordVisualTransformation() else VisualTransformation.None,
             colors = TextFieldDefaults.colors(
                 unfocusedContainerColor = Color.Transparent,
                 focusedContainerColor = Color.Transparent,

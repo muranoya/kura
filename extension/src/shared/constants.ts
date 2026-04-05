@@ -33,6 +33,12 @@ export const STORAGE_KEYS = {
   LAST_SYNC_TIME: 'lastSyncTime',
   LAST_ERROR: 'lastError',
   SORT_CONFIG: 'entrySortConfig',
+  SEARCH_QUERY: 'entrySearchQuery',
+  ENTRY_TYPE_FILTER: 'entryTypeFilter',
+  LABEL_FILTER: 'entryLabelFilter',
+  SELECTED_ENTRY_ID: 'entrySelectedId',
+  FAVORITES_FILTER: 'entryFavoritesFilter',
+  SESSION_PASSWORD: 'sessionPassword',
 }
 
 // Password generation defaults

@@ -1,3 +1,4 @@
+<!-- doc-status: implemented -->
 # 1Password 1puxインポート設計書
 
 ## 1. 概要

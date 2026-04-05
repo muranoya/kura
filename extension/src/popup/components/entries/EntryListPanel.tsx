@@ -1,9 +1,13 @@
-import { ArrowUpDown, Filter, Tag } from 'lucide-react'
+import { ArrowUpDown, Filter, Star, Tag } from 'lucide-react'
 import type { EntryRow, EntryType, SortConfig } from '../../../shared/types'
 import { EmptyState } from '../layout/EmptyState'
 import TypeFilterDropdown from '../ui/type-filter-dropdown'
 
 interface EntryListPanelProps {
+  // お気に入りフィルター
+  onlyFavorites: boolean
+  onFavoritesChange: (enabled: boolean) => void
+
   // フィルター
   selectedType: EntryType | undefined
   onTypeChange: (type: EntryType | undefined) => void
@@ -51,6 +55,8 @@ const ENTRY_TYPES: Array<{ value: string; label: string }> = [
 ]
 
 export default function EntryListPanel({
+  onlyFavorites,
+  onFavoritesChange,
   selectedType,
   onTypeChange,
   labels,
@@ -77,6 +83,19 @@ export default function EntryListPanel({
       {/* フィルター（固定表示） */}
       <div className="shrink-0 p-3 border-b border-border">
         <div className="flex gap-2 items-center">
+          <button
+            type="button"
+            onClick={() => onFavoritesChange(!onlyFavorites)}
+            title={onlyFavorites ? 'お気に入りフィルター解除' : 'お気に入りのみ表示'}
+            className={`flex h-9 w-9 items-center justify-center rounded-md border transition-colors focus:outline-none focus:ring-2 focus:ring-accent ${
+              onlyFavorites
+                ? 'border-accent bg-accent/10 text-accent'
+                : 'border-border bg-bg-surface text-text-primary hover:bg-bg-elevated'
+            }`}
+          >
+            <Star size={16} className={onlyFavorites ? 'fill-accent' : ''} />
+          </button>
+
           <TypeFilterDropdown
             value={selectedType ?? 'all'}
             onChange={(v) => onTypeChange(v === 'all' ? undefined : (v as EntryType))}
@@ -106,21 +125,25 @@ export default function EntryListPanel({
       </div>
 
       {/* スクロール可能なリスト */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+      <div className="flex-1 overflow-y-auto">
         {/* エラーメッセージ */}
         {error && (
-          <div className="mb-3 p-3 rounded-md bg-danger/10 border border-danger/20">
+          <div className="m-3 p-3 rounded-md bg-danger/10 border border-danger/20">
             <p className="text-sm text-danger">{error}</p>
           </div>
         )}
 
         {/* コンテンツ */}
         {loading ? (
-          <EmptyState icon="⏳" title="読み込み中..." description="エントリを読み込んでいます" />
+          <div className="p-3">
+            <EmptyState icon="⏳" title="読み込み中..." description="エントリを読み込んでいます" />
+          </div>
         ) : entries.length === 0 ? (
-          <EmptyState icon="🔑" title={emptyTitle} description={emptyDescription} />
+          <div className="p-3">
+            <EmptyState icon="🔑" title={emptyTitle} description={emptyDescription} />
+          </div>
         ) : (
-          <div className="space-y-2">
+          <div className="divide-y divide-border">
             {entries.map((entry) => (
               <div key={entry.id}>{renderCard(entry)}</div>
             ))}

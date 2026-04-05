@@ -1,12 +1,18 @@
 // Service Worker エントリーポイント
 // WASM の初期化とメッセージハンドラーのセットアップ
 
-import * as vaultModule from '../../wasm/wasm_bridge'
 import { DEFAULT_VAULT_ID, STORAGE_KEYS } from '../shared/constants'
 import { ConflictError, VaultS3Client } from '../shared/s3-client'
-import { getFromStorage, saveToStorage } from '../shared/storage'
+import {
+  getFromSessionStorage,
+  getFromStorage,
+  removeFromSessionStorage,
+  saveToSessionStorage,
+  saveToStorage,
+} from '../shared/storage'
 import type { S3Config } from '../shared/types'
 import { handleAutofillMessage, initAutofill, onVaultLocked, onVaultUnlocked } from './autofill'
+import { initWasmManual } from './wasm-init'
 
 /** WASM API surface for Service Worker */
 interface WasmApi {
@@ -76,7 +82,7 @@ interface WasmApi {
   [key: string]: unknown
 }
 
-const vault = vaultModule as unknown as WasmApi
+let vault: WasmApi = null as unknown as WasmApi
 
 let wasmInitialized = false
 let unlocked = false
@@ -94,10 +100,11 @@ function updateExtensionIcon(isUnlocked: boolean) {
   })
 }
 
-// WASM 初期化関数
+// WASM 初期化関数（手動 fetch + instantiate で top-level await を回避）
 async function initWasm() {
   if (wasmInitialized) return
   try {
+    vault = (await initWasmManual()) as unknown as WasmApi
     wasmInitialized = true
   } catch (error) {
     console.error('[SW] WASM initialization error:', error)
@@ -159,14 +166,19 @@ self.addEventListener('install', (event: Event) => {
 self.addEventListener('activate', (event: Event) => {
   ;(event as unknown as { waitUntil(p: Promise<unknown>): void }).waitUntil(
     initWasm().then(() => {
-      setupAlarms()
       updateExtensionIcon(false)
     }),
   )
 })
 
-// Autofill の初期化（activate イベントに依存せずトップレベルで実行）
-initAutofill(vault, () => unlocked)
+// アラームリスナーはトップレベルで登録（SW再起動時にも確実に登録されるようにする）
+setupAlarms()
+
+// Autofill の初期化（vault はプロキシ経由でlazy参照）
+initAutofill(
+  new Proxy({} as WasmApi, { get: (_target, prop) => (vault as Record<string | symbol, unknown>)[prop] }),
+  () => unlocked,
+)
 
 // ========== ヘルパー関数 ==========
 
@@ -308,6 +320,48 @@ async function loadSettings(): Promise<AppSettings> {
   )
 }
 
+// ========== セッション復元 ==========
+
+async function tryRestoreSession(): Promise<boolean> {
+  console.log('[SW] tryRestoreSession: starting')
+  const password = await getFromSessionStorage<string>(STORAGE_KEYS.SESSION_PASSWORD)
+  console.log('[SW] tryRestoreSession: password retrieved?', !!password)
+  if (!password) return false
+
+  try {
+    await initWasm()
+    const vaultBytes = await getFromStorage<number[]>(STORAGE_KEYS.VAULT_BYTES)
+    const etag = await getFromStorage<string>(STORAGE_KEYS.VAULT_ETAG)
+    console.log('[SW] tryRestoreSession: vaultBytes?', !!vaultBytes, 'etag?', !!etag)
+    if (!vaultBytes) return false
+
+    vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
+    console.log('[SW] tryRestoreSession: vault loaded')
+    vault.api_unlock(DEFAULT_VAULT_ID, password)
+    console.log('[SW] tryRestoreSession: vault unlocked')
+
+    // S3設定の復号
+    const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
+    if (encryptedConfig) {
+      try {
+        const configJson = vault.api_decrypt_config(DEFAULT_VAULT_ID, password, encryptedConfig)
+        decryptedS3Config = JSON.parse(configJson)
+      } catch (e) {
+        console.error('[SW] Failed to decrypt S3 config during session restore:', e)
+      }
+    }
+
+    unlocked = true
+    updateExtensionIcon(true)
+    console.log('[SW] Session restored successfully')
+    return true
+  } catch (e) {
+    console.error('[SW] Session restore failed:', e)
+    await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
+    return false
+  }
+}
+
 // ========== メッセージハンドリング ==========
 
 async function handleMessage(
@@ -321,15 +375,19 @@ async function handleMessage(
     await initWasm()
 
     // Service Worker 再起動時の vault 自動復元
-    // vaultBytes が storage に存在し、unlocked が false の場合、vault をロードする
+    // セッションが残っていればアンロック状態まで復元、なければロック状態でvaultをロードする
+    console.log('[SW] handleMessage preamble: unlocked=', unlocked, 'type=', message.type)
     if (!unlocked) {
-      const vaultBytes = await getFromStorage<number[]>(STORAGE_KEYS.VAULT_BYTES)
-      if (vaultBytes) {
-        try {
-          const etag = await getFromStorage<string>(STORAGE_KEYS.VAULT_ETAG)
-          vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
-        } catch (e) {
-          console.error('[SW] Failed to auto-load vault:', e)
+      const restored = await tryRestoreSession()
+      if (!restored) {
+        const vaultBytes = await getFromStorage<number[]>(STORAGE_KEYS.VAULT_BYTES)
+        if (vaultBytes) {
+          try {
+            const etag = await getFromStorage<string>(STORAGE_KEYS.VAULT_ETAG)
+            vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
+          } catch (e) {
+            console.error('[SW] Failed to auto-load vault:', e)
+          }
         }
       }
     }
@@ -378,6 +436,7 @@ async function handleMessage(
           }
           unlocked = true
           updateExtensionIcon(true)
+          await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.password)
           // ポップアップが閉じている場合のみオートロック alarm を設定
           if (!popupConnected) {
             const settings = await loadSettings()
@@ -440,6 +499,7 @@ async function handleMessage(
           }
           unlocked = true
           updateExtensionIcon(true)
+          await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.password)
           // ポップアップが閉じている場合のみオートロック alarm を設定
           if (!popupConnected) {
             const settings = await loadSettings()
@@ -467,6 +527,7 @@ async function handleMessage(
           unlocked = false
           updateExtensionIcon(false)
           decryptedS3Config = null
+          await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
           chrome.alarms.clear('autolock')
           chrome.alarms.clear('autosync')
           // オートフィル: 全タブに通知してContent Scriptを無効化
@@ -501,6 +562,7 @@ async function handleMessage(
             decryptedS3Config = message.s3Config
           }
           unlocked = true
+          await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.masterPassword)
           if (!popupConnected) {
             const settings = await loadSettings()
             if (settings.autolockMinutes > 0) {
@@ -533,6 +595,7 @@ async function handleMessage(
           await autoSync()
           unlocked = true
           updateExtensionIcon(true)
+          await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.newPassword)
           if (!popupConnected) {
             const settings = await loadSettings()
             if (settings.autolockMinutes > 0) {
@@ -867,6 +930,7 @@ async function handleMessage(
             )
             await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
           }
+          await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.newPassword)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -1072,6 +1136,10 @@ function setupAlarms() {
 }
 
 async function handleAutolockAlarm() {
+  // SW再起動後にアラームが発火した場合、セッションを復元してからロックする
+  if (!unlocked) {
+    await tryRestoreSession()
+  }
   if (!unlocked) return
   try {
     const vaultBytes = vault.api_lock(DEFAULT_VAULT_ID)
@@ -1079,6 +1147,7 @@ async function handleAutolockAlarm() {
     unlocked = false
     updateExtensionIcon(false)
     decryptedS3Config = null
+    await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
     onVaultLocked()
   } catch (err) {
     console.error('[SW] Autolock failed:', err)
@@ -1105,6 +1174,9 @@ async function handleClipboardClearAlarm() {
 }
 
 async function handleAutosyncAlarm() {
+  if (!unlocked) {
+    await tryRestoreSession()
+  }
   if (!unlocked) return
   autoSync().catch((e) => {
     console.error('[SW] Periodic sync failed:', e)

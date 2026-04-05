@@ -50,18 +50,22 @@ export default function EntryListPanel({
       )}
 
       {/* スクロールエリア：エントリリスト */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
         {loading ? (
-          <EmptyState icon="⏳" title="読み込み中..." description="エントリを読み込んでいます" />
+          <div className="p-3">
+            <EmptyState icon="⏳" title="読み込み中..." description="エントリを読み込んでいます" />
+          </div>
         ) : entries.length === 0 ? (
-          <EmptyState
-            icon="🔑"
-            title={emptyTitle}
-            description={emptyDescription}
-            action={emptyAction}
-          />
+          <div className="p-3">
+            <EmptyState
+              icon="🔑"
+              title={emptyTitle}
+              description={emptyDescription}
+              action={emptyAction}
+            />
+          </div>
         ) : (
-          <div className="space-y-3">
+          <div className="divide-y divide-border">
             {entries.map((entry) => (
               <div key={entry.id}>{renderCard(entry)}</div>
             ))}

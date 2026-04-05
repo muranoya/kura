@@ -1,5 +1,5 @@
 import { type ClassValue, clsx } from 'clsx'
-import { KeyRound, Star, Wand2 } from 'lucide-react'
+import { KeyRound, Settings, Wand2 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { twMerge } from 'tailwind-merge'
 
@@ -9,8 +9,8 @@ function cn(...inputs: ClassValue[]) {
 
 const TAB_ROUTES = [
   { path: '/entries', icon: KeyRound, label: 'アイテム' },
-  { path: '/favorites', icon: Star, label: 'お気に入り' },
   { path: '/password-generator', icon: Wand2, label: '生成' },
+  { path: '/settings', icon: Settings, label: '設定' },
 ]
 
 export function BottomNav() {

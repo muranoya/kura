@@ -1,3 +1,4 @@
+<!-- doc-status: design -->
 # Android オートフィル機能 設計書
 
 ## 1. 概要

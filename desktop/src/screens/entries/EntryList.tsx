@@ -308,7 +308,7 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
                   saveScrollPosition()
                   setSelectedId(id)
                 }}
-                onFavorite={handleFavorite}
+
               />
             )}
           />
@@ -329,6 +329,7 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
                 navigate(`/entries/${selectedId}/edit`)
               }}
               onDelete={handleDetailDelete}
+              onFavorite={() => selectedId && handleFavorite(selectedId, selectedEntry.isFavorite)}
             />
           ) : (
             <div className="flex items-center justify-center h-full text-text-secondary">

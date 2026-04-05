@@ -1,4 +1,4 @@
-import { Link, Lock, Mail, Phone, Plus, Timer, Trash2, Type } from 'lucide-react'
+import { ChevronDown, ChevronUp, Link, Lock, Mail, Phone, Plus, Timer, Trash2, Type, Wand2 } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -69,6 +69,7 @@ export default function EntryForm({
   const [newLabelName, setNewLabelName] = useState('')
   const [creatingLabel, setCreatingLabel] = useState(false)
   const [activeGeneratorFieldId, setActiveGeneratorFieldId] = useState<string | null>(null)
+  const [focusedPasswordFieldId, setFocusedPasswordFieldId] = useState<string | null>(null)
   const [pendingFieldType, setPendingFieldType] = useState(false)
 
   const updateTypedValue = useCallback(
@@ -106,6 +107,19 @@ export default function EntryForm({
     [customFields, onCustomFieldsChange],
   )
 
+  const moveCustomField = useCallback(
+    (fieldId: string, direction: 'up' | 'down') => {
+      const index = customFields.findIndex((f) => f.id === fieldId)
+      if (index < 0) return
+      const newIndex = direction === 'up' ? index - 1 : index + 1
+      if (newIndex < 0 || newIndex >= customFields.length) return
+      const newFields = [...customFields]
+      ;[newFields[index], newFields[newIndex]] = [newFields[newIndex], newFields[index]]
+      onCustomFieldsChange(newFields)
+    },
+    [customFields, onCustomFieldsChange],
+  )
+
   const renderForm = useCallback(() => {
     const v = typedValue
 
@@ -127,14 +141,28 @@ export default function EntryForm({
               <UILabel htmlFor="password" className="text-sm">
                 パスワード
               </UILabel>
-              <Input
-                id="password"
-                type="password"
-                value={v.password || ''}
-                onChange={(e) => updateTypedValue('password', e.target.value)}
-                onFocus={() => setActiveGeneratorFieldId('password')}
-                onBlur={() => setActiveGeneratorFieldId(null)}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={focusedPasswordFieldId === 'password' ? 'text' : 'password'}
+                  value={v.password || ''}
+                  onChange={(e) => updateTypedValue('password', e.target.value)}
+                  onFocus={() => { setFocusedPasswordFieldId('password'); if (!v.password) setActiveGeneratorFieldId('password') }}
+                  onBlur={() => { setFocusedPasswordFieldId(null); setActiveGeneratorFieldId(null) }}
+                  className="pr-9"
+                />
+                {focusedPasswordFieldId === 'password' && !!(v.password) && (
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-text-muted hover:text-accent transition-colors"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setActiveGeneratorFieldId(activeGeneratorFieldId === 'password' ? null : 'password')}
+                    title="パスワード生成"
+                  >
+                    <Wand2 size={16} />
+                  </button>
+                )}
+              </div>
               {activeGeneratorFieldId === 'password' && (
                 <div role="presentation" onMouseDown={(e) => e.preventDefault()}>
                   <PasswordGeneratorPanel
@@ -217,14 +245,28 @@ export default function EntryForm({
               <UILabel htmlFor="pin" className="text-sm">
                 PIN
               </UILabel>
-              <Input
-                id="pin"
-                type="password"
-                value={v.pin || ''}
-                onChange={(e) => updateTypedValue('pin', e.target.value)}
-                onFocus={() => setActiveGeneratorFieldId('pin')}
-                onBlur={() => setActiveGeneratorFieldId(null)}
-              />
+              <div className="relative">
+                <Input
+                  id="pin"
+                  type={focusedPasswordFieldId === 'pin' ? 'text' : 'password'}
+                  value={v.pin || ''}
+                  onChange={(e) => updateTypedValue('pin', e.target.value)}
+                  onFocus={() => { setFocusedPasswordFieldId('pin'); if (!v.pin) setActiveGeneratorFieldId('pin') }}
+                  onBlur={() => { setFocusedPasswordFieldId(null); setActiveGeneratorFieldId(null) }}
+                  className="pr-9"
+                />
+                {focusedPasswordFieldId === 'pin' && !!(v.pin) && (
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-text-muted hover:text-accent transition-colors"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setActiveGeneratorFieldId(activeGeneratorFieldId === 'pin' ? null : 'pin')}
+                    title="パスワード生成"
+                  >
+                    <Wand2 size={16} />
+                  </button>
+                )}
+              </div>
               {activeGeneratorFieldId === 'pin' && (
                 <div role="presentation" onMouseDown={(e) => e.preventDefault()}>
                   <PasswordGeneratorPanel
@@ -345,24 +387,40 @@ export default function EntryForm({
               </UILabel>
               <Input
                 id="cvv"
-                type="password"
+                type={focusedPasswordFieldId === 'cvv' ? 'text' : 'password'}
                 value={v.cvv || ''}
                 onChange={(e) => updateTypedValue('cvv', e.target.value)}
                 placeholder="123"
+                onFocus={() => setFocusedPasswordFieldId('cvv')}
+                onBlur={() => setFocusedPasswordFieldId(null)}
               />
             </div>
             <div className="space-y-1">
               <UILabel htmlFor="cc_pin" className="text-sm">
                 暗証番号
               </UILabel>
-              <Input
-                id="cc_pin"
-                type="password"
-                value={v.pin || ''}
-                onChange={(e) => updateTypedValue('pin', e.target.value)}
-                onFocus={() => setActiveGeneratorFieldId('cc_pin')}
-                onBlur={() => setActiveGeneratorFieldId(null)}
-              />
+              <div className="relative">
+                <Input
+                  id="cc_pin"
+                  type={focusedPasswordFieldId === 'cc_pin' ? 'text' : 'password'}
+                  value={v.pin || ''}
+                  onChange={(e) => updateTypedValue('pin', e.target.value)}
+                  onFocus={() => { setFocusedPasswordFieldId('cc_pin'); if (!v.pin) setActiveGeneratorFieldId('cc_pin') }}
+                  onBlur={() => { setFocusedPasswordFieldId(null); setActiveGeneratorFieldId(null) }}
+                  className="pr-9"
+                />
+                {focusedPasswordFieldId === 'cc_pin' && !!(v.pin) && (
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-text-muted hover:text-accent transition-colors"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setActiveGeneratorFieldId(activeGeneratorFieldId === 'cc_pin' ? null : 'cc_pin')}
+                    title="パスワード生成"
+                  >
+                    <Wand2 size={16} />
+                  </button>
+                )}
+              </div>
               {activeGeneratorFieldId === 'cc_pin' && (
                 <div role="presentation" onMouseDown={(e) => e.preventDefault()}>
                   <PasswordGeneratorPanel
@@ -393,14 +451,28 @@ export default function EntryForm({
               <UILabel htmlFor="password" className="text-sm">
                 パスワード
               </UILabel>
-              <Input
-                id="password"
-                type="password"
-                value={v.password || ''}
-                onChange={(e) => updateTypedValue('password', e.target.value)}
-                onFocus={() => setActiveGeneratorFieldId('password')}
-                onBlur={() => setActiveGeneratorFieldId(null)}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={focusedPasswordFieldId === 'password' ? 'text' : 'password'}
+                  value={v.password || ''}
+                  onChange={(e) => updateTypedValue('password', e.target.value)}
+                  onFocus={() => { setFocusedPasswordFieldId('password'); if (!v.password) setActiveGeneratorFieldId('password') }}
+                  onBlur={() => { setFocusedPasswordFieldId(null); setActiveGeneratorFieldId(null) }}
+                  className="pr-9"
+                />
+                {focusedPasswordFieldId === 'password' && !!(v.password) && (
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-text-muted hover:text-accent transition-colors"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setActiveGeneratorFieldId(activeGeneratorFieldId === 'password' ? null : 'password')}
+                    title="パスワード生成"
+                  >
+                    <Wand2 size={16} />
+                  </button>
+                )}
+              </div>
               {activeGeneratorFieldId === 'password' && (
                 <div role="presentation" onMouseDown={(e) => e.preventDefault()}>
                   <PasswordGeneratorPanel
@@ -432,7 +504,7 @@ export default function EntryForm({
       default:
         return null
     }
-  }, [entryType, typedValue, updateTypedValue, secureNotePreviewMode, activeGeneratorFieldId])
+  }, [entryType, typedValue, updateTypedValue, secureNotePreviewMode, activeGeneratorFieldId, focusedPasswordFieldId])
 
   const renderCustomFields = useCallback(() => {
     return (
@@ -450,22 +522,61 @@ export default function EntryForm({
                 placeholder="フィールド名"
                 className="h-8 text-sm flex-[2] min-w-0"
               />
-              <Input
-                id={`field-value-${field.id}`}
-                type={
-                  field.fieldType === 'password' || field.fieldType === 'totp' ? 'password' : 'text'
-                }
-                value={field.value}
-                onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
-                placeholder={
-                  field.fieldType === 'totp' ? 'otpauth:// URI または Base32 シークレット' : '値'
-                }
-                className="h-8 text-sm flex-[3]"
-                onFocus={() =>
-                  field.fieldType === 'password' && setActiveGeneratorFieldId(`custom-${field.id}`)
-                }
-                onBlur={() => field.fieldType === 'password' && setActiveGeneratorFieldId(null)}
-              />
+              <div className="relative flex-[3]">
+                <Input
+                  id={`field-value-${field.id}`}
+                  type={
+                    (field.fieldType === 'password' || field.fieldType === 'totp')
+                      ? (focusedPasswordFieldId === `custom-${field.id}` ? 'text' : 'password')
+                      : 'text'
+                  }
+                  value={field.value}
+                  onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
+                  placeholder={
+                    field.fieldType === 'totp' ? 'otpauth:// URI または Base32 シークレット' : '値'
+                  }
+                  className={cn('h-8 text-sm', field.fieldType === 'password' && 'pr-9')}
+                  onFocus={() => {
+                    if (field.fieldType === 'password' || field.fieldType === 'totp') setFocusedPasswordFieldId(`custom-${field.id}`)
+                    if (field.fieldType === 'password' && !field.value) setActiveGeneratorFieldId(`custom-${field.id}`)
+                  }}
+                  onBlur={() => {
+                    if (field.fieldType === 'password' || field.fieldType === 'totp') setFocusedPasswordFieldId(null)
+                    if (field.fieldType === 'password') setActiveGeneratorFieldId(null)
+                  }}
+                />
+                {field.fieldType === 'password' && focusedPasswordFieldId === `custom-${field.id}` && !!field.value && (
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-text-muted hover:text-accent transition-colors"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setActiveGeneratorFieldId(activeGeneratorFieldId === `custom-${field.id}` ? null : `custom-${field.id}`)}
+                    title="パスワード生成"
+                  >
+                    <Wand2 size={14} />
+                  </button>
+                )}
+              </div>
+              {customFields.length > 1 && (
+                <div className="flex flex-col shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={() => moveCustomField(field.id, 'up')}
+                    disabled={customFields.indexOf(field) === 0}
+                    className="p-0.5 text-text-muted hover:text-text-primary disabled:opacity-30 disabled:cursor-default"
+                  >
+                    <ChevronUp size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveCustomField(field.id, 'down')}
+                    disabled={customFields.indexOf(field) === customFields.length - 1}
+                    className="p-0.5 text-text-muted hover:text-text-primary disabled:opacity-30 disabled:cursor-default"
+                  >
+                    <ChevronDown size={12} />
+                  </button>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => deleteCustomField(field.id)}
@@ -527,8 +638,10 @@ export default function EntryForm({
     customFields,
     updateCustomField,
     deleteCustomField,
+    moveCustomField,
     addCustomFieldWithType,
     activeGeneratorFieldId,
+    focusedPasswordFieldId,
     pendingFieldType,
   ])
 

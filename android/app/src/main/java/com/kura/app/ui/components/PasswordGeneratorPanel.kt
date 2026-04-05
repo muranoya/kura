@@ -5,6 +5,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -19,6 +20,7 @@ import kotlin.math.roundToInt
 fun PasswordGeneratorPanel(
     onGenerate: suspend (Int, Boolean, Boolean, Boolean) -> String,
     onCopy: (String) -> Unit,
+    onUse: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var password by remember { mutableStateOf("") }
@@ -58,8 +60,19 @@ fun PasswordGeneratorPanel(
                         .weight(1f)
                         .horizontalScroll(rememberScrollState())
                 )
-                IconButton(onClick = { if (password.isNotEmpty()) onCopy(password) }) {
-                    Icon(Icons.Default.ContentCopy, contentDescription = "コピー")
+                if (onUse != null) {
+                    FilledTonalButton(
+                        onClick = { if (password.isNotEmpty()) onUse(password) },
+                        enabled = password.isNotEmpty()
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("使用する")
+                    }
+                } else {
+                    IconButton(onClick = { if (password.isNotEmpty()) onCopy(password) }) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "コピー")
+                    }
                 }
             }
         }

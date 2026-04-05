@@ -1,4 +1,4 @@
-import { Maximize2 } from 'lucide-react'
+import { Check, Maximize2 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as commands from '../../commands'
 import TotpDisplay from '../TotpDisplay'
@@ -55,9 +55,9 @@ export default function TotpCustomFieldDisplay({ label, value }: TotpCustomField
 
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
-        totpCode ? 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80' : 'opacity-50'
-      } ${copied ? 'bg-accent-subtle' : ''}`}
+      className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors border-l-2 ${
+        totpCode ? 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80 border-transparent' : 'opacity-50 border-transparent'
+      } ${copied ? '!bg-accent-subtle !border-accent' : ''}`}
       onClick={handleCopy}
       role={totpCode ? 'button' : undefined}
       tabIndex={totpCode ? 0 : undefined}
@@ -69,7 +69,10 @@ export default function TotpCustomFieldDisplay({ label, value }: TotpCustomField
           : undefined
       }
     >
-      <span className="text-xs text-text-secondary w-24 shrink-0">{label}</span>
+      <span className="text-xs text-text-secondary w-24 shrink-0 flex items-center gap-1">
+        {label}
+        {copied && <Check size={12} className="text-success" />}
+      </span>
       <div className="flex-1 min-w-0">
         {error ? (
           <span className="text-xs text-danger">{error}</span>

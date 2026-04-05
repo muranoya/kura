@@ -20,14 +20,6 @@
     "type": "module"
   },
 
-  "offscreen_documents": [
-    {
-      "document": "src/background/offscreen.html",
-      "matches": ["<all_urls>"],
-      "reasons": ["CLIPBOARD"]
-    }
-  ],
-
   "web_accessible_resources": [
     {
       "resources": ["wasm/wasm_bridge_bg.wasm", "src/content/dropdown.css"],

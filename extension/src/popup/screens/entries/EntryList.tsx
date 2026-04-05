@@ -1,4 +1,5 @@
 import {
+  Check,
   Copy,
   Eye,
   EyeOff,
@@ -6,7 +7,8 @@ import {
   Pencil,
   Plus,
   Search,
-  Settings,
+
+  Star,
   Trash2,
   X,
 } from 'lucide-react'
@@ -16,7 +18,7 @@ import ReactMarkdown from 'react-markdown'
 import { useLocation, useNavigate } from 'react-router-dom'
 import remarkGfm from 'remark-gfm'
 import { STORAGE_KEYS } from '../../../shared/constants'
-import { getFromStorage, saveToStorage } from '../../../shared/storage'
+import { getFromStorage, removeFromStorage, saveToStorage } from '../../../shared/storage'
 import type { Entry, EntryRow, EntryType, SortConfig } from '../../../shared/types'
 import * as commands from '../../commands'
 import EntryCard, { getTypeLabel } from '../../components/entries/EntryCard'
@@ -31,11 +33,7 @@ import { markdownComponents } from '../../components/ui/markdown-components'
 
 const DEFAULT_SORT: SortConfig = { field: 'created_at', order: 'desc' }
 
-interface EntryListProps {
-  isFavorites?: boolean
-}
-
-export default function EntryList({ isFavorites = false }: EntryListProps) {
+export default function EntryList() {
   const navigate = useNavigate()
   const location = useLocation()
   const [entries, setEntries] = useState<EntryRow[]>([])
@@ -47,13 +45,58 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedLabelId, setSelectedLabelId] = useState<string | undefined>(undefined)
   const [sortConfig, setSortConfig] = useState<SortConfig>(DEFAULT_SORT)
+  const [onlyFavorites, setOnlyFavorites] = useState(false)
 
-  // ソート設定をストレージから読み込み
+  // フィルター・ソート設定をストレージから読み込み
   useEffect(() => {
     getFromStorage<SortConfig>(STORAGE_KEYS.SORT_CONFIG).then((saved) => {
       if (saved) setSortConfig(saved)
     })
+    getFromStorage<string>(STORAGE_KEYS.SEARCH_QUERY).then((saved) => {
+      if (saved) setSearchQuery(saved)
+    })
+    getFromStorage<EntryType>(STORAGE_KEYS.ENTRY_TYPE_FILTER).then((saved) => {
+      if (saved) setSelectedType(saved)
+    })
+    getFromStorage<string>(STORAGE_KEYS.LABEL_FILTER).then((saved) => {
+      if (saved) setSelectedLabelId(saved)
+    })
+    getFromStorage<boolean>(STORAGE_KEYS.FAVORITES_FILTER).then((saved) => {
+      if (saved) setOnlyFavorites(saved)
+    })
   }, [])
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query)
+    saveToStorage(STORAGE_KEYS.SEARCH_QUERY, query)
+  }
+
+  const handleTypeChange = (type: EntryType | undefined) => {
+    setSelectedType(type)
+    if (type) {
+      saveToStorage(STORAGE_KEYS.ENTRY_TYPE_FILTER, type)
+    } else {
+      removeFromStorage(STORAGE_KEYS.ENTRY_TYPE_FILTER)
+    }
+  }
+
+  const handleLabelChange = (labelId: string | undefined) => {
+    setSelectedLabelId(labelId)
+    if (labelId) {
+      saveToStorage(STORAGE_KEYS.LABEL_FILTER, labelId)
+    } else {
+      removeFromStorage(STORAGE_KEYS.LABEL_FILTER)
+    }
+  }
+
+  const handleFavoritesChange = (enabled: boolean) => {
+    setOnlyFavorites(enabled)
+    if (enabled) {
+      saveToStorage(STORAGE_KEYS.FAVORITES_FILTER, true)
+    } else {
+      removeFromStorage(STORAGE_KEYS.FAVORITES_FILTER)
+    }
+  }
 
   const handleSortChange = (config: SortConfig) => {
     setSortConfig(config)
@@ -66,7 +109,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
     setError(null)
     try {
       const result = await commands.listEntries({
-        onlyFavorites: isFavorites,
+        onlyFavorites,
         labelId: selectedLabelId,
         sortField: sort.field,
         sortOrder: sort.order,
@@ -82,6 +125,24 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
   // 詳細ペイン — location state から初期選択IDを取得
   const initialSelectedId = (location.state as { selectedId?: string } | null)?.selectedId ?? null
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId)
+
+  // ストレージから選択中アイテムIDを復元（location stateがない場合のみ）
+  useEffect(() => {
+    if (!initialSelectedId) {
+      getFromStorage<string>(STORAGE_KEYS.SELECTED_ENTRY_ID).then((saved) => {
+        if (saved) setSelectedId(saved)
+      })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSelectEntry = (id: string | null) => {
+    setSelectedId(id)
+    if (id) {
+      saveToStorage(STORAGE_KEYS.SELECTED_ENTRY_ID, id)
+    } else {
+      removeFromStorage(STORAGE_KEYS.SELECTED_ENTRY_ID)
+    }
+  }
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
   const [selectedLoading, setSelectedLoading] = useState(false)
   const [allLabels, setAllLabels] = useState<Array<{ id: string; name: string }>>([])
@@ -111,7 +172,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
     setError(null)
     try {
       const result = await commands.listEntries({
-        onlyFavorites: isFavorites,
+        onlyFavorites,
         labelId: selectedLabelId,
         sortField: sortConfig.field,
         sortOrder: sortConfig.order,
@@ -122,7 +183,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
       setError(String(err) || 'Failed to load entries')
       setLoading(false)
     }
-  }, [isFavorites, selectedLabelId, sortConfig])
+  }, [onlyFavorites, selectedLabelId, sortConfig])
 
   useEffect(() => {
     loadEntries()
@@ -173,7 +234,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
         await commands.deleteEntry(id)
         setEntries((prev) => prev.filter((e) => e.id !== id))
         if (selectedId === id) {
-          setSelectedId(null)
+          handleSelectEntry(null)
         }
       } catch (err) {
         setError(String(err) || 'Failed to delete entry')
@@ -211,13 +272,13 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
             type="text"
             placeholder="検索..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-9 pr-8 py-1.5 text-sm rounded-md border border-border bg-bg-elevated text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
           />
           {searchQuery && (
             <button
               type="button"
-              onClick={() => setSearchQuery('')}
+              onClick={() => handleSearchChange('')}
               className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
               title="検索をクリア"
             >
@@ -227,31 +288,18 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
         </div>
 
         {/* 新規追加ボタン */}
-        {!isFavorites && (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => navigate('/entries/create')}
-            className="gap-1 text-sm flex-shrink-0"
-          >
-            <Plus size={14} />
-            新規追加
-          </Button>
-        )}
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => navigate('/entries/create')}
+          className="gap-1 text-sm flex-shrink-0"
+        >
+          <Plus size={14} />
+          新規追加
+        </Button>
 
         {/* 同期ボタン */}
         <SyncActions onSyncComplete={loadEntries} />
-
-        {/* 設定ボタン */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/settings')}
-          className="h-8 w-8 p-0 flex-shrink-0"
-          title="設定"
-        >
-          <Settings size={16} />
-        </Button>
       </div>
 
       {/* 左右分割レイアウト */}
@@ -267,19 +315,21 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
 
           {/* リストコンテンツ */}
           <EntryListPanel
+            onlyFavorites={onlyFavorites}
+            onFavoritesChange={handleFavoritesChange}
             selectedType={selectedType}
-            onTypeChange={setSelectedType}
+            onTypeChange={handleTypeChange}
             labels={allLabels}
             selectedLabelId={selectedLabelId}
-            onLabelChange={setSelectedLabelId}
+            onLabelChange={handleLabelChange}
             sortConfig={sortConfig}
             onSortChange={handleSortChange}
             entries={filteredEntries}
             loading={loading}
             error={error ?? ''}
-            emptyTitle={isFavorites ? 'お気に入りがありません' : 'アイテムがありません'}
+            emptyTitle={onlyFavorites ? 'お気に入りがありません' : 'アイテムがありません'}
             emptyDescription={
-              isFavorites
+              onlyFavorites
                 ? 'お気に入りのアイテムをここに表示します'
                 : '新しいアイテムを作成してください'
             }
@@ -288,8 +338,8 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
                 variant="normal"
                 entry={entry}
                 isSelected={selectedId === entry.id}
-                onClick={(id) => setSelectedId(id)}
-                onFavorite={handleFavorite}
+                onClick={(id) => handleSelectEntry(id)}
+
               />
             )}
           />
@@ -306,6 +356,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
               onToggleFieldMask={toggleFieldMask}
               onEdit={() => navigate(`/entries/${selectedId}/edit`)}
               onDelete={() => handleDelete(selectedId)}
+              onFavorite={() => handleFavorite(selectedId, selectedEntry.isFavorite)}
             />
           ) : (
             <div className="h-full flex items-center justify-center">
@@ -327,6 +378,7 @@ interface EntryDetailPaneProps {
   onToggleFieldMask: (key: string) => void
   onEdit: () => void
   onDelete: () => void
+  onFavorite: () => void
 }
 
 function PaneFieldDisplay({
@@ -361,9 +413,9 @@ function PaneFieldDisplay({
 
   return (
     <div
-      className={`flex items-center gap-1.5 px-2 py-1.5 rounded transition-colors ${
-        isEmpty ? 'opacity-50' : 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80'
-      } ${copied ? 'bg-accent-subtle' : ''}`}
+      className={`flex items-center gap-1.5 px-2 py-1.5 rounded transition-colors border-l-2 ${
+        isEmpty ? 'opacity-50 border-transparent' : 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80 border-transparent'
+      } ${copied ? '!bg-accent-subtle !border-accent' : ''}`}
       onClick={handleClick}
       role={isEmpty ? undefined : 'button'}
       tabIndex={isEmpty ? undefined : 0}
@@ -375,7 +427,10 @@ function PaneFieldDisplay({
             }
       }
     >
-      <span className="text-xs text-text-secondary w-20 shrink-0">{label}</span>
+      <span className="text-xs text-text-secondary w-20 shrink-0 flex items-center gap-1">
+        {label}
+        {copied && <Check size={10} className="text-success" />}
+      </span>
       <span
         className={`text-sm flex-1 break-all ${
           isEmpty
@@ -466,6 +521,7 @@ function EntryDetailPane({
   onToggleFieldMask,
   onEdit,
   onDelete,
+  onFavorite,
 }: EntryDetailPaneProps) {
   if (loading) {
     return (
@@ -488,6 +544,17 @@ function EntryDetailPane({
           </Badge>
         </div>
         <div className="flex gap-1 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onFavorite}
+            className="p-1 rounded-md hover:bg-bg-elevated transition-colors"
+            title={entry.isFavorite ? 'お気に入り解除' : 'お気に入り'}
+          >
+            <Star
+              size={14}
+              className={entry.isFavorite ? 'fill-accent text-accent' : 'text-text-muted'}
+            />
+          </button>
           <Button size="sm" variant="secondary" onClick={onEdit} className="gap-1 text-xs h-7">
             <Pencil size={12} />
             編集

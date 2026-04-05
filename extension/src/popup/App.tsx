@@ -1,3 +1,4 @@
+import { Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { BottomNav } from './components/BottomNav'
@@ -20,7 +21,7 @@ import Settings from './screens/settings/Settings'
 
 type AppState = 'loading' | 'onboarding' | 'locked' | 'unlocked'
 
-const TAB_ROUTES = ['/entries', '/favorites', '/password-generator']
+const TAB_ROUTES = ['/entries', '/password-generator', '/settings']
 
 // BottomNav を表示すべきかチェック
 function shouldShowBottomNav(pathname: string, appState: AppState): boolean {
@@ -62,18 +63,31 @@ function AppContent() {
       }
 
       // Service Worker に IS_UNLOCKED メッセージを送信
-      const isUnlocked = await new Promise<boolean>((resolve) => {
-        if (typeof chrome !== 'undefined' && chrome.runtime) {
-          chrome.runtime.sendMessage(
-            { type: 'IS_UNLOCKED' },
-            (response: { unlocked?: boolean }) => {
-              resolve(response?.unlocked ?? false)
-            },
-          )
-        } else {
-          resolve(false)
-        }
-      })
+      const checkUnlocked = (): Promise<boolean> =>
+        new Promise<boolean>((resolve) => {
+          if (typeof chrome !== 'undefined' && chrome.runtime) {
+            chrome.runtime.sendMessage(
+              { type: 'IS_UNLOCKED' },
+              (response: { unlocked?: boolean }) => {
+                if (chrome.runtime.lastError) {
+                  resolve(false)
+                  return
+                }
+                resolve(response?.unlocked ?? false)
+              },
+            )
+          } else {
+            resolve(false)
+          }
+        })
+
+      let isUnlocked = await checkUnlocked()
+
+      // Event Page がまだセッション復元中の可能性があるため、リトライする
+      if (!isUnlocked) {
+        await new Promise((r) => setTimeout(r, 100))
+        isUnlocked = await checkUnlocked()
+      }
 
       setAppState(isUnlocked ? 'unlocked' : 'locked')
     }
@@ -82,7 +96,17 @@ function AppContent() {
   }, [location.state])
 
   if (appState === 'loading') {
-    return <div style={{ padding: '2rem', textAlign: 'center' }}>読み込み中...</div>
+    return (
+      <div className="flex items-center justify-center h-full bg-bg-base">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-accent/10 mb-3">
+            <Loader2 className="w-6 h-6 text-accent animate-spin" />
+          </div>
+          <h1 className="text-2xl font-bold text-text-primary mb-1">kura</h1>
+          <p className="text-sm text-text-secondary">Vaultを読み込んでいます...</p>
+        </div>
+      </div>
+    )
   }
 
   const showBottomNav = shouldShowBottomNav(location.pathname, appState)
@@ -118,7 +142,6 @@ function AppContent() {
             <>
               {/* Tab routes with BottomNav */}
               <Route path="/entries" element={<EntryList />} />
-              <Route path="/favorites" element={<EntryList isFavorites />} />
               <Route path="/labels" element={<LabelManager />} />
               <Route path="/password-generator" element={<PasswordGenerator />} />
               <Route path="/settings" element={<Settings />} />
