@@ -14,6 +14,7 @@ import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,11 +48,11 @@ fun HomeScreen(
     var selectedLabelId by remember { mutableStateOf<String?>(null) }
 
     // Search state
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchActive by remember { mutableStateOf(false) }
     var searchResults by remember { mutableStateOf<List<EntryRow>>(emptyList()) }
-    var searchSelectedType by remember { mutableStateOf<String?>(null) }
-    var searchSelectedLabelId by remember { mutableStateOf<String?>(null) }
+    var searchSelectedType by rememberSaveable { mutableStateOf<String?>(null) }
+    var searchSelectedLabelId by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Sort state
     var sortField by remember { mutableStateOf("created_at") }
@@ -66,6 +67,15 @@ fun HomeScreen(
     }
     LaunchedEffect(Unit) {
         appViewModel.preferences.sortOrderFlow.collect { sortOrder = it }
+    }
+    LaunchedEffect(Unit) {
+        appViewModel.preferences.filterTypeFlow.collect { selectedType = it }
+    }
+    LaunchedEffect(Unit) {
+        appViewModel.preferences.filterLabelIdFlow.collect { selectedLabelId = it }
+    }
+    LaunchedEffect(Unit) {
+        appViewModel.preferences.filterFavoritesOnlyFlow.collect { showFavoritesOnly = it }
     }
 
     fun loadData() {
@@ -215,7 +225,11 @@ fun HomeScreen(
                             color = MaterialTheme.colorScheme.surface,
                             shadowElevation = 2.dp,
                             modifier = Modifier.size(34.dp),
-                            onClick = { showFavoritesOnly = !showFavoritesOnly }
+                            onClick = {
+                            val newValue = !showFavoritesOnly
+                            showFavoritesOnly = newValue
+                            scope.launch { appViewModel.preferences.saveFilterFavoritesOnly(newValue) }
+                        }
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                 Icon(
@@ -276,7 +290,7 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(if (!searchActive) Modifier.padding(start = 16.dp, end = 16.dp).navigationBarsPadding() else Modifier),
-                windowInsets = WindowInsets(0),
+                windowInsets = if (!searchActive) WindowInsets(0) else WindowInsets.statusBars,
             ) {
                 // Search expanded content
                 Column {
@@ -382,10 +396,16 @@ fun HomeScreen(
                     // Sticky header
                     StickyHeaderContent(
                         selectedType = selectedType,
-                        onTypeSelected = { selectedType = it },
+                        onTypeSelected = {
+                            selectedType = it
+                            scope.launch { appViewModel.preferences.saveFilterType(it) }
+                        },
                         labels = labels,
                         selectedLabelId = selectedLabelId,
-                        onLabelSelected = { selectedLabelId = it }
+                        onLabelSelected = {
+                            selectedLabelId = it
+                            scope.launch { appViewModel.preferences.saveFilterLabelId(it) }
+                        }
                     )
 
                     // Entry list

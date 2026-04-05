@@ -4,12 +4,12 @@ import { useNavigate } from 'react-router-dom'
 import { STORAGE_KEYS } from '../../../shared/constants'
 import { removeFromStorage } from '../../../shared/storage'
 import type { S3Config } from '../../../shared/types'
-import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
 import { Label } from '../../components/ui/label'
 import { PasswordInput } from '../../components/ui/password-input'
+import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
 
 export default function UnlockExistingVault() {
   const navigate = useNavigate()

@@ -42,8 +42,8 @@ impl RecoveryKey {
     /// Parse from display string (with or without dashes)
     pub fn from_display_string(s: &str) -> Result<Self> {
         let clean = s.replace('-', "").to_uppercase();
-        let bytes = crate::codec::base32::decode(&clean)
-            .ok_or_else(|| VaultError::InvalidRecoveryKey)?;
+        let bytes =
+            crate::codec::base32::decode(&clean).ok_or_else(|| VaultError::InvalidRecoveryKey)?;
 
         if bytes.len() != 16 {
             return Err(VaultError::InvalidRecoveryKey);
@@ -52,9 +52,7 @@ impl RecoveryKey {
         let mut key_bytes = [0u8; 16];
         key_bytes.copy_from_slice(&bytes);
 
-        Ok(RecoveryKey {
-            bytes: key_bytes,
-        })
+        Ok(RecoveryKey { bytes: key_bytes })
     }
 
     /// Derive KEK from recovery key using Argon2
@@ -70,7 +68,6 @@ impl Drop for RecoveryKey {
         self.bytes.zeroize();
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -98,7 +95,8 @@ mod tests {
     #[test]
     fn test_recovery_key_round_trip() {
         // Test with known bytes for simpler verification
-        let original = RecoveryKey::from_bytes([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+        let original =
+            RecoveryKey::from_bytes([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
         let display = original.to_display_string();
 
         // Just verify display is not empty and has dashes
@@ -114,7 +112,7 @@ mod tests {
         // Verify display format
         assert!(!display.is_empty());
         let char_count = display.chars().count();
-        assert!(char_count > 10);  // Should have reasonable length
+        assert!(char_count > 10); // Should have reasonable length
     }
 
     #[test]

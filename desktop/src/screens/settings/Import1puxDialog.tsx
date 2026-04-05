@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react'
 import * as commands from '../../commands'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
-import { Input } from '../../components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -13,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog'
+import { Input } from '../../components/ui/input'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import {
   Select,
@@ -67,22 +67,33 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
 
   const dupConfCounts = useMemo(() => {
     if (!preview) return { high: 0, medium: 0, low: 0, none: 0 }
-    let high = 0, medium = 0, low = 0, none = 0
+    let high = 0
+    let medium = 0
+    let low = 0
+    let none = 0
     for (const item of preview.items) {
-      if (item.duplicates.length === 0) { none++; continue }
-      if (item.duplicates.some(d => d.confidence === 'high')) high++
-      if (item.duplicates.some(d => d.confidence === 'medium')) medium++
-      if (item.duplicates.some(d => d.confidence === 'low')) low++
+      if (item.duplicates.length === 0) {
+        none++
+        continue
+      }
+      if (item.duplicates.some((d) => d.confidence === 'high')) high++
+      if (item.duplicates.some((d) => d.confidence === 'medium')) medium++
+      if (item.duplicates.some((d) => d.confidence === 'low')) low++
     }
     return { high, medium, low, none }
   }, [preview])
 
   const filteredItems = useMemo(() => {
     if (!preview) return []
-    return preview.items.filter(item => {
+    return preview.items.filter((item) => {
       if (typeFilter && item.target_entry_type !== typeFilter) return false
       if (dupConfFilter === 'none' && item.duplicates.length > 0) return false
-      if (dupConfFilter && dupConfFilter !== 'none' && !item.duplicates.some(d => d.confidence === dupConfFilter)) return false
+      if (
+        dupConfFilter &&
+        dupConfFilter !== 'none' &&
+        !item.duplicates.some((d) => d.confidence === dupConfFilter)
+      )
+        return false
       if (archivedFilter && !item.is_archived) return false
       if (searchQuery) {
         if (!item.source_name.toLowerCase().includes(searchQuery.toLowerCase())) return false
@@ -186,7 +197,7 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
   }
 
   const setFilteredActions = (action: ImportAction) => {
-    const visibleIds = new Set(filteredItems.map(i => i.source_id))
+    const visibleIds = new Set(filteredItems.map((i) => i.source_id))
     setItemActions((prev) => {
       const next = new Map(prev)
       for (const [id, existing] of next) {
@@ -247,7 +258,11 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
             <div className="flex flex-wrap gap-2 py-2">
               <Badge
                 className="cursor-pointer"
-                variant={typeFilter || dupConfFilter || archivedFilter || searchQuery ? 'secondary' : 'default'}
+                variant={
+                  typeFilter || dupConfFilter || archivedFilter || searchQuery
+                    ? 'secondary'
+                    : 'default'
+                }
                 onClick={clearFilters}
               >
                 合計 {preview.stats.total_items} 件
@@ -257,7 +272,7 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
                   key={type_}
                   className="cursor-pointer"
                   variant={typeFilter === type_ ? 'primary' : 'secondary'}
-                  onClick={() => setTypeFilter(prev => prev === type_ ? null : type_)}
+                  onClick={() => setTypeFilter((prev) => (prev === type_ ? null : type_))}
                 >
                   {getEntryTypeLabel(type_)} {count}
                 </Badge>
@@ -266,7 +281,7 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
                 <Badge
                   className="cursor-pointer"
                   variant={dupConfFilter === 'none' ? 'primary' : 'secondary'}
-                  onClick={() => setDupConfFilter(prev => prev === 'none' ? null : 'none')}
+                  onClick={() => setDupConfFilter((prev) => (prev === 'none' ? null : 'none'))}
                 >
                   重複なし {dupConfCounts.none} 件
                 </Badge>
@@ -275,7 +290,7 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
                 <Badge
                   className="cursor-pointer"
                   variant={dupConfFilter === 'high' ? 'primary' : 'destructive'}
-                  onClick={() => setDupConfFilter(prev => prev === 'high' ? null : 'high')}
+                  onClick={() => setDupConfFilter((prev) => (prev === 'high' ? null : 'high'))}
                 >
                   重複(高) {dupConfCounts.high} 件
                 </Badge>
@@ -284,7 +299,7 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
                 <Badge
                   className="cursor-pointer"
                   variant={dupConfFilter === 'medium' ? 'primary' : 'destructive'}
-                  onClick={() => setDupConfFilter(prev => prev === 'medium' ? null : 'medium')}
+                  onClick={() => setDupConfFilter((prev) => (prev === 'medium' ? null : 'medium'))}
                 >
                   重複(中) {dupConfCounts.medium} 件
                 </Badge>
@@ -293,7 +308,7 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
                 <Badge
                   className="cursor-pointer"
                   variant={dupConfFilter === 'low' ? 'primary' : 'destructive'}
-                  onClick={() => setDupConfFilter(prev => prev === 'low' ? null : 'low')}
+                  onClick={() => setDupConfFilter((prev) => (prev === 'low' ? null : 'low'))}
                 >
                   重複(低) {dupConfCounts.low} 件
                 </Badge>
@@ -302,7 +317,7 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
                 <Badge
                   className="cursor-pointer"
                   variant={archivedFilter ? 'primary' : 'muted'}
-                  onClick={() => setArchivedFilter(prev => !prev)}
+                  onClick={() => setArchivedFilter((prev) => !prev)}
                 >
                   アーカイブ済み {preview.stats.archived_count} 件
                 </Badge>
@@ -445,8 +460,7 @@ function PreviewItemRow({
 }) {
   const hasDuplicates = item.duplicates.length > 0
 
-  const actionValue =
-    action === 'import' ? 'import' : action === 'skip' ? 'skip' : 'overwrite'
+  const actionValue = action === 'import' ? 'import' : action === 'skip' ? 'skip' : 'overwrite'
 
   const handleChange = (value: string) => {
     if (value === 'import') onActionChange('import')
@@ -472,16 +486,18 @@ function PreviewItemRow({
               {item.source_category.category_name}
             </Badge>
           )}
-          {item.has_attachments && (
-            <AlertTriangle className="h-3 w-3 text-warning shrink-0" />
-          )}
+          {item.has_attachments && <AlertTriangle className="h-3 w-3 text-warning shrink-0" />}
         </div>
         <div className="flex items-center gap-2 text-xs text-text-secondary">
           <span>{getEntryTypeLabel(item.target_entry_type)}</span>
           {hasDuplicates && (
             <span className="text-warning">
               重複: {item.duplicates[0].existing_entry_name}
-              {item.duplicates[0].confidence === 'high' ? ' (高)' : item.duplicates[0].confidence === 'medium' ? ' (中)' : ' (低)'}
+              {item.duplicates[0].confidence === 'high'
+                ? ' (高)'
+                : item.duplicates[0].confidence === 'medium'
+                  ? ' (中)'
+                  : ' (低)'}
             </span>
           )}
         </div>

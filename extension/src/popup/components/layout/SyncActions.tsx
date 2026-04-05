@@ -1,5 +1,5 @@
 import { Loader2, RefreshCw } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { STORAGE_KEYS } from '../../../shared/constants'
 import { getFromStorage } from '../../../shared/storage'
 import * as commands from '../../commands'
@@ -26,18 +26,7 @@ export function SyncActions({ onSyncComplete }: SyncActionsProps) {
   const [storageConfigExists, setStorageConfigExists] = useState(true)
   const [_tick, setTick] = useState(0)
 
-  useEffect(() => {
-    loadLastSyncTime()
-  }, [])
-
-  // Auto-update relative time every minute
-  useEffect(() => {
-    if (!lastSyncTime) return
-    const timer = setInterval(() => setTick((t) => t + 1), 60000)
-    return () => clearInterval(timer)
-  }, [lastSyncTime])
-
-  const loadLastSyncTime = async () => {
+  const loadLastSyncTime = useCallback(async () => {
     try {
       const config = await getFromStorage<Record<string, string>>(STORAGE_KEYS.S3_CONFIG)
       setStorageConfigExists(!!config)
@@ -54,7 +43,18 @@ export function SyncActions({ onSyncComplete }: SyncActionsProps) {
     } catch (err) {
       console.error('Failed to load sync time:', err)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadLastSyncTime()
+  }, [loadLastSyncTime])
+
+  // Auto-update relative time every minute
+  useEffect(() => {
+    if (!lastSyncTime) return
+    const timer = setInterval(() => setTick((t) => t + 1), 60000)
+    return () => clearInterval(timer)
+  }, [lastSyncTime])
 
   const handleSync = async () => {
     setSyncing(true)

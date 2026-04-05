@@ -36,7 +36,6 @@ const getEntryIcon = (type: string) => {
   }
 }
 
-
 // Normal variant (EntryList用)
 interface EntryCardNormalProps {
   variant: 'normal'
@@ -61,9 +60,7 @@ export default function EntryCard(props: EntryCardProps) {
     return (
       <Card
         className={`p-3 transition-colors cursor-pointer group ${
-          props.isSelected
-            ? 'border-accent bg-accent-subtle'
-            : 'hover:border-accent/50'
+          props.isSelected ? 'border-accent bg-accent-subtle' : 'hover:border-accent/50'
         }`}
         onClick={() => props.onClick(props.entry.id)}
       >
@@ -78,9 +75,7 @@ export default function EntryCard(props: EntryCardProps) {
                 {props.entry.name}
               </h3>
               {props.entry.subtitle && (
-                <p className="text-xs text-text-muted truncate mt-0.5">
-                  {props.entry.subtitle}
-                </p>
+                <p className="text-xs text-text-muted truncate mt-0.5">{props.entry.subtitle}</p>
               )}
             </div>
           </div>
@@ -102,7 +97,6 @@ export default function EntryCard(props: EntryCardProps) {
                 className={props.entry.isFavorite ? 'fill-accent text-accent' : 'text-text-muted'}
               />
             </button>
-
           </div>
         </div>
       </Card>

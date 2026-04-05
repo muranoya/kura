@@ -1,14 +1,16 @@
 // Re-export from shared/types for backward compatibility
 export type {
-  EntryType,
-  CustomFieldType,
-  CustomField,
-  EntryRow,
-  Entry,
-  Label,
-  EntryFilter,
-  S3Config,
   AppSettings,
+  AutofillCredentialCandidate,
+  AutofillFillData,
+  CustomField,
+  CustomFieldType,
+  Entry,
+  EntryFilter,
+  EntryRow,
+  EntryType,
+  Label,
+  S3Config,
 } from '../shared/types'
 
 // Legacy types for backward compatibility

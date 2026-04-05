@@ -1,12 +1,6 @@
 import { getEntryTypeLabel } from '../../../shared/constants'
 import EntryTypeIcon from '../EntryTypeIcon'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '../ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
 
 const ENTRY_TYPES = [
   'login',

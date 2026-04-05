@@ -15,7 +15,15 @@ pub async fn list_entries(
 ) -> Result<Vec<serde_json::Value>, String> {
     let manager = get_manager(&vault_id);
     tokio::task::spawn_blocking(move || {
-        let rows = manager.api_list_entries(search_query, entry_type, label_id, include_trash, only_favorites, sort_field, sort_order)?;
+        let rows = manager.api_list_entries(
+            search_query,
+            entry_type,
+            label_id,
+            include_trash,
+            only_favorites,
+            sort_field,
+            sort_order,
+        )?;
         Ok(rows
             .into_iter()
             .map(|r| {
@@ -42,10 +50,11 @@ pub async fn get_entry(vault_id: String, id: String) -> Result<serde_json::Value
     tokio::task::spawn_blocking(move || {
         let entry = manager.api_get_entry(id)?;
         // typed_value は JSON文字列なので、パースしてオブジェクトとして返す
-        let typed_value_obj: serde_json::Value = serde_json::from_str(&entry.typed_value)
-            .unwrap_or_else(|_| json!({}));
+        let typed_value_obj: serde_json::Value =
+            serde_json::from_str(&entry.typed_value).unwrap_or_else(|_| json!({}));
         // custom_fields も JSON文字列をパースしてオブジェクトとして返す
-        let custom_fields_obj: serde_json::Value = entry.custom_fields
+        let custom_fields_obj: serde_json::Value = entry
+            .custom_fields
             .and_then(|cf: String| serde_json::from_str(&cf).ok())
             .unwrap_or_else(|| json!([]));
         Ok(json!({
@@ -78,7 +87,14 @@ pub async fn create_entry(
 ) -> Result<String, String> {
     let manager = get_manager(&vault_id);
     tokio::task::spawn_blocking(move || {
-        manager.api_create_entry(entry_type, name, notes, typed_value_json, label_ids, custom_fields)
+        manager.api_create_entry(
+            entry_type,
+            name,
+            notes,
+            typed_value_json,
+            label_ids,
+            custom_fields,
+        )
     })
     .await
     .map_err(|e| format!("Task error: {}", e))?
@@ -96,7 +112,14 @@ pub async fn update_entry(
 ) -> Result<(), String> {
     let manager = get_manager(&vault_id);
     tokio::task::spawn_blocking(move || {
-        manager.api_update_entry(id, Some(name), notes, typed_value_json, label_ids, custom_fields)
+        manager.api_update_entry(
+            id,
+            Some(name),
+            notes,
+            typed_value_json,
+            label_ids,
+            custom_fields,
+        )
     })
     .await
     .map_err(|e| format!("Task error: {}", e))?

@@ -9,7 +9,12 @@ interface TypeFilterDropdownProps {
   iconTrigger?: React.ReactNode
 }
 
-export default function TypeFilterDropdown({ value, onChange, options, iconTrigger }: TypeFilterDropdownProps) {
+export default function TypeFilterDropdown({
+  value,
+  onChange,
+  options,
+  iconTrigger,
+}: TypeFilterDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)

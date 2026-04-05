@@ -44,7 +44,11 @@ pub async fn rename_label(vault_id: String, id: String, new_name: String) -> Res
 }
 
 #[tauri::command]
-pub async fn set_entry_labels(vault_id: String, entry_id: String, label_ids: Vec<String>) -> Result<(), String> {
+pub async fn set_entry_labels(
+    vault_id: String,
+    entry_id: String,
+    label_ids: Vec<String>,
+) -> Result<(), String> {
     let manager = get_manager(&vault_id);
     tokio::task::spawn_blocking(move || manager.api_set_entry_labels(entry_id, label_ids))
         .await

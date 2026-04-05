@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use crate::error::Result;
 use crate::vault::UnlockedVault;
 
-use super::{
-    ImportAction, ImportPreview, ImportPreviewItem, ImportPreviewStats, SourceCategory,
-    DuplicateConfidence,
-};
 use super::duplicate::detect_duplicates;
-use super::onepux::{get_category_info, ParsedItem};
 use super::onepux::parser::extract_metadata;
+use super::onepux::{get_category_info, ParsedItem};
+use super::{
+    DuplicateConfidence, ImportAction, ImportPreview, ImportPreviewItem, ImportPreviewStats,
+    SourceCategory,
+};
 
 /// Generate an import preview from parsed items and the current vault state.
 pub fn generate_preview(
@@ -20,7 +20,10 @@ pub fn generate_preview(
     let (account_name, vault_names) = extract_metadata(file_bytes)?;
 
     // Collect existing active entries for duplicate detection
-    let existing: Vec<(&str, &crate::store::VaultEntry)> = unlocked.contents.entries.iter()
+    let existing: Vec<(&str, &crate::store::VaultEntry)> = unlocked
+        .contents
+        .entries
+        .iter()
         .filter(|(_, e)| e.deleted_at.is_none())
         .map(|(id, e)| (id.as_str(), e))
         .collect();
@@ -42,7 +45,10 @@ pub fn generate_preview(
 
         let default_action = if is_archived {
             ImportAction::Skip
-        } else if duplicates.iter().any(|d| d.confidence == DuplicateConfidence::High) {
+        } else if duplicates
+            .iter()
+            .any(|d| d.confidence == DuplicateConfidence::High)
+        {
             ImportAction::Skip
         } else {
             ImportAction::Import

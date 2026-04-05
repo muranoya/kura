@@ -2,15 +2,14 @@ use crate::config::S3Config;
 use crate::storage::StorageBackend;
 use crate::sync::engine::SessionState;
 
-use super::{VaultManager, unix_now, SyncApiResult};
+use super::{unix_now, SyncApiResult, VaultManager};
 
 /// S3設定JSONをパースしてS3Configを生成
 ///
 /// `key`が指定されていない場合はデフォルト値 "vault.json" を使用する。
 pub fn parse_s3_config(storage_config: &str) -> Result<S3Config, String> {
-    let mut map: serde_json::Map<String, serde_json::Value> =
-        serde_json::from_str(storage_config)
-            .map_err(|e| format!("Failed to parse S3 config: {}", e))?;
+    let mut map: serde_json::Map<String, serde_json::Value> = serde_json::from_str(storage_config)
+        .map_err(|e| format!("Failed to parse S3 config: {}", e))?;
 
     if !map.contains_key("key") {
         map.insert(
@@ -22,7 +21,8 @@ pub fn parse_s3_config(storage_config: &str) -> Result<S3Config, String> {
     let config: S3Config = serde_json::from_value(serde_json::Value::Object(map))
         .map_err(|e| format!("Failed to parse S3 config: {}", e))?;
 
-    config.validate()
+    config
+        .validate()
         .map_err(|e| format!("Invalid S3 config: {}", e))?;
 
     Ok(config)
@@ -33,8 +33,12 @@ impl VaultManager {
     ///
     /// プラットフォーム側がS3からダウンロードしたバイト列とETagを受け取り、
     /// DEKで復号 → auto_merge → GC → セッション更新を行う。
-    pub fn api_merge_remote_vault(&self, remote_bytes: Vec<u8>, remote_etag: String) -> Result<(), String> {
-        use crate::store::{VaultFile, VaultContents};
+    pub fn api_merge_remote_vault(
+        &self,
+        remote_bytes: Vec<u8>,
+        remote_etag: String,
+    ) -> Result<(), String> {
+        use crate::store::{VaultContents, VaultFile};
 
         let remote_vault_file = VaultFile::from_bytes(&remote_bytes)
             .map_err(|e| format!("Failed to parse remote vault: {}", e))?;
@@ -117,14 +121,12 @@ impl VaultManager {
         let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
 
         match session.as_ref() {
-            Some(SessionState::Locked(locked)) => {
-                locked.to_vault_bytes()
-                    .map_err(|e| format!("Failed to serialize vault: {}", e))
-            }
-            Some(SessionState::Unlocked(unlocked)) => {
-                unlocked.to_vault_bytes()
-                    .map_err(|e| format!("Failed to serialize vault: {}", e))
-            }
+            Some(SessionState::Locked(locked)) => locked
+                .to_vault_bytes()
+                .map_err(|e| format!("Failed to serialize vault: {}", e)),
+            Some(SessionState::Unlocked(unlocked)) => unlocked
+                .to_vault_bytes()
+                .map_err(|e| format!("Failed to serialize vault: {}", e)),
             None => Err("No vault loaded".to_string()),
         }
     }
@@ -135,16 +137,19 @@ impl VaultManager {
     pub async fn api_sync(&self, storage: &dyn StorageBackend) -> Result<SyncApiResult, String> {
         const MAX_RETRIES: usize = 5;
 
-        let _outcome = crate::sync::engine::sync_with_storage(
-            storage,
-            &self.session,
-            MAX_RETRIES,
-        ).await?;
+        let _outcome =
+            crate::sync::engine::sync_with_storage(storage, &self.session, MAX_RETRIES).await?;
 
         let ts = unix_now();
-        *self.last_sync_time.lock().unwrap_or_else(|p| p.into_inner()) = Some(ts);
+        *self
+            .last_sync_time
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = Some(ts);
 
-        Ok(SyncApiResult { synced: true, last_synced_at: Some(ts) })
+        Ok(SyncApiResult {
+            synced: true,
+            last_synced_at: Some(ts),
+        })
     }
 
     /// ストレージへプッシュ（マージなし・上書き）
@@ -155,7 +160,10 @@ impl VaultManager {
         crate::sync::engine::push_to_storage(storage, &self.session).await?;
 
         let ts = unix_now();
-        *self.last_sync_time.lock().unwrap_or_else(|p| p.into_inner()) = Some(ts);
+        *self
+            .last_sync_time
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = Some(ts);
 
         Ok(ts)
     }
@@ -167,17 +175,26 @@ impl VaultManager {
 
     /// Vaultがアンロック状態かチェック
     pub fn api_is_unlocked(&self) -> bool {
-        self.session.lock().unwrap_or_else(|p| p.into_inner()).as_ref()
+        self.session
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .as_ref()
             .map_or(false, |s| matches!(s, SessionState::Unlocked(_)))
     }
 
     /// 最終同期時刻を取得（UNIXタイムスタンプ、秒）
     pub fn api_get_last_sync_time(&self) -> Option<i64> {
-        *self.last_sync_time.lock().unwrap_or_else(|p| p.into_inner())
+        *self
+            .last_sync_time
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
     }
 
     /// 最終同期時刻を復元（プラットフォーム側の永続ストレージから復元時に使用）
     pub fn api_restore_last_sync_time(&self, ts: i64) {
-        *self.last_sync_time.lock().unwrap_or_else(|p| p.into_inner()) = Some(ts);
+        *self
+            .last_sync_time
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = Some(ts);
     }
 }

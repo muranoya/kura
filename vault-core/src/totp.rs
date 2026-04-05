@@ -1,5 +1,5 @@
 use crate::codec::base32;
-use crate::error::{VaultError, Result};
+use crate::error::{Result, VaultError};
 
 /// TOTP コードを生成する
 ///
@@ -18,29 +18,33 @@ pub fn generate_totp(secret: &str, digits: u32, period: u64) -> Result<String> {
     let secret_normalized = secret.replace(" ", "").to_uppercase();
 
     // Base32 デコード
-    let secret_bytes = base32::decode(&secret_normalized)
-        .ok_or(VaultError::InvalidBase32)?;
+    let secret_bytes = base32::decode(&secret_normalized).ok_or(VaultError::InvalidBase32)?;
 
     if secret_bytes.is_empty() {
         return Err(VaultError::InvalidBase32);
     }
 
     // TOTP コードを生成
-    let totp = totp_rs::TOTP::new(
+    // new_unchecked: RFC 4226の最小128ビット秘密鍵長チェックをスキップ
+    // 多くのサービス（Google, GitHub等）が80ビット秘密鍵を発行するため
+    let totp = totp_rs::TOTP::new_unchecked(
         totp_rs::Algorithm::SHA1,
         digits as usize,
-        0,       // skew
-        period,  // step
+        0,      // skew
+        period, // step
         secret_bytes,
-    )
-    .map_err(|e| VaultError::InvalidInput(format!("TOTP generation failed: {}", e)))?;
+    );
 
     // 現在時刻のコードを取得してゼロ埋め
     let now = chrono::Utc::now().timestamp() as u64;
     let code = totp.generate(now);
 
     // ゼロ埋め
-    Ok(format!("{:0width$}", code.parse::<u32>().unwrap_or(0), width = digits as usize))
+    Ok(format!(
+        "{:0width$}",
+        code.parse::<u32>().unwrap_or(0),
+        width = digits as usize
+    ))
 }
 
 /// otpauth URI をパースしてシークレット・桁数・周期を抽出する
@@ -51,11 +55,14 @@ pub fn generate_totp(secret: &str, digits: u32, period: u64) -> Result<String> {
 /// secret は必須、digits（デフォルト6）と period（デフォルト30）はオプション
 pub fn parse_otpauth_uri(uri: &str) -> Result<(String, u32, u64)> {
     if !uri.starts_with("otpauth://totp/") && !uri.starts_with("otpauth://TOTP/") {
-        return Err(VaultError::InvalidInput("Not a valid otpauth TOTP URI".into()));
+        return Err(VaultError::InvalidInput(
+            "Not a valid otpauth TOTP URI".into(),
+        ));
     }
 
-    let query = uri.split('?').nth(1)
-        .ok_or(VaultError::InvalidInput("Missing query parameters in otpauth URI".into()))?;
+    let query = uri.split('?').nth(1).ok_or(VaultError::InvalidInput(
+        "Missing query parameters in otpauth URI".into(),
+    ))?;
 
     let mut secret = None;
     let mut digits = 6u32;
@@ -71,7 +78,9 @@ pub fn parse_otpauth_uri(uri: &str) -> Result<(String, u32, u64)> {
         }
     }
 
-    let secret = secret.ok_or(VaultError::InvalidInput("Missing secret parameter in otpauth URI".into()))?;
+    let secret = secret.ok_or(VaultError::InvalidInput(
+        "Missing secret parameter in otpauth URI".into(),
+    ))?;
     Ok((secret, digits, period))
 }
 
@@ -120,7 +129,7 @@ mod tests {
     #[test]
     fn test_generate_totp_default_with_test_secret() {
         // 20 バイト（160 ビット）のテストシークレットを Base32 エンコード
-        let test_bytes = b"0123456789ABCDEF0123";  // 20 バイト
+        let test_bytes = b"0123456789ABCDEF0123"; // 20 バイト
         let secret = base32::encode(test_bytes);
 
         let result = generate_totp_default(&secret);
@@ -136,7 +145,7 @@ mod tests {
     #[test]
     fn test_generate_totp_with_spaces() {
         // スペース区切りの秘密鍵もサポート
-        let test_bytes = b"0123456789ABCDEF0123";  // 20 バイト
+        let test_bytes = b"0123456789ABCDEF0123"; // 20 バイト
         let secret_base = base32::encode(test_bytes);
         let secret = format!("{} {}", &secret_base[..8], &secret_base[8..]);
 
@@ -153,7 +162,7 @@ mod tests {
     #[test]
     fn test_generate_totp_with_lowercase() {
         // 小文字の秘密鍵もサポート
-        let test_bytes = b"0123456789ABCDEF0123";  // 20 バイト
+        let test_bytes = b"0123456789ABCDEF0123"; // 20 バイト
         let secret = base32::encode(test_bytes).to_lowercase();
 
         let result = generate_totp_default(&secret);
@@ -163,6 +172,22 @@ mod tests {
                 assert!(code.chars().all(|c| c.is_ascii_digit()));
             }
             Err(e) => panic!("generate_totp_with_lowercase failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_generate_totp_with_short_secret() {
+        // 10 バイト（80 ビット）のシークレット。Google/GitHub等の多くのサービスが発行する長さ
+        let test_bytes = b"0123456789"; // 10 バイト
+        let secret = base32::encode(test_bytes);
+
+        let result = generate_totp_default(&secret);
+        match result {
+            Ok(code) => {
+                assert_eq!(code.len(), 6);
+                assert!(code.chars().all(|c| c.is_ascii_digit()));
+            }
+            Err(e) => panic!("80-bit secret should be accepted: {}", e),
         }
     }
 
@@ -186,7 +211,10 @@ mod tests {
     #[test]
     fn test_parse_otpauth_uri_full() {
         let secret = test_secret();
-        let uri = format!("otpauth://totp/Test:user@example.com?secret={}&digits=8&period=60&issuer=Test", secret);
+        let uri = format!(
+            "otpauth://totp/Test:user@example.com?secret={}&digits=8&period=60&issuer=Test",
+            secret
+        );
         let (parsed_secret, digits, period) = parse_otpauth_uri(&uri).unwrap();
         assert_eq!(parsed_secret, secret);
         assert_eq!(digits, 8);
@@ -251,7 +279,7 @@ mod tests {
 
     #[test]
     fn test_custom_digits() {
-        let test_bytes = b"0123456789ABCDEF0123";  // 20 バイト
+        let test_bytes = b"0123456789ABCDEF0123"; // 20 バイト
         let secret = base32::encode(test_bytes);
 
         let result = generate_totp(&secret, 8, 30);

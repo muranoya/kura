@@ -1,5 +1,5 @@
 import { Check, Edit2, Plus, Trash2, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { EmptyState } from '../../components/layout/EmptyState'
@@ -20,11 +20,7 @@ export default function LabelManager() {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [selectedDeleteId, setSelectedDeleteId] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadLabels()
-  }, [])
-
-  const loadLabels = async () => {
+  const loadLabels = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -35,7 +31,11 @@ export default function LabelManager() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadLabels()
+  }, [loadLabels])
 
   const handleCreateLabel = async () => {
     if (!newLabelName.trim()) {

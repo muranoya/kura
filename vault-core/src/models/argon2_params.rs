@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize};
 /// Used for both master password and recovery key derivation with the same salt
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Argon2Params {
-    pub salt: String, // base32-encoded
-    pub iterations: u32, // t_cost
-    pub memory: u32,  // m_cost in KiB
+    pub salt: String,     // base32-encoded
+    pub iterations: u32,  // t_cost
+    pub memory: u32,      // m_cost in KiB
     pub parallelism: u32, // p_cost
 }
 
@@ -17,7 +17,7 @@ impl Argon2Params {
         Argon2Params {
             salt: crate::codec::base32::encode(&salt_bytes),
             iterations: 3,
-            memory: 65536,  // 64 MiB
+            memory: 65536, // 64 MiB
             parallelism: 4,
         }
     }
@@ -30,7 +30,6 @@ impl Argon2Params {
         serde_json::from_str(json_str).map_err(|e| crate::error::VaultError::JsonError(e))
     }
 }
-
 
 #[cfg(test)]
 mod tests {

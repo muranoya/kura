@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom'
 import * as commands from './commands'
-import ErrorBar from './components/layout/ErrorBar'
 import Sidebar from './components/Sidebar'
-import { DEFAULT_SETTINGS, STORAGE_KEYS } from './shared/constants'
-import { getFromStorage } from './shared/storage'
-import type { AppSettings } from './shared/types'
+import ErrorBar from './components/layout/ErrorBar'
 import { ErrorProvider, usePushError } from './contexts/ErrorContext'
 import { SyncProvider, useNotifySynced } from './contexts/SyncContext'
 import Lock from './screens/auth/Lock'
@@ -24,6 +21,9 @@ import UnlockExistingVault from './screens/onboarding/UnlockExistingVault'
 import Welcome from './screens/onboarding/Welcome'
 import Settings from './screens/settings/Settings'
 import ConflictResolver from './screens/sync/ConflictResolver'
+import { DEFAULT_SETTINGS, STORAGE_KEYS } from './shared/constants'
+import { getFromStorage } from './shared/storage'
+import type { AppSettings } from './shared/types'
 
 type AppState = 'loading' | 'onboarding' | 'locked' | 'unlocked'
 
@@ -159,7 +159,7 @@ function AppContent() {
         if (synced) {
           notifySynced()
         }
-      } catch (e) {
+      } catch (_e) {
         pushError('同期に失敗しました', 'periodic-sync')
       }
     }, 60_000) // 1 minute
@@ -211,20 +211,20 @@ function AppContent() {
                 <div className="flex-1 flex flex-col overflow-hidden bg-bg-base">
                   <ErrorBar />
                   <div className="flex-1 overflow-auto">
-                  <Routes>
-                    <Route path="/entries" element={<EntryList />} />
-                    <Route path="/favorites" element={<EntryList onlyFavorites={true} />} />
-                    <Route path="/entries/create" element={<EntryCreate />} />
-                    <Route path="/entries/:id" element={<Navigate to="/entries" replace />} />
-                    <Route path="/entries/:id/edit" element={<EntryEdit />} />
-                    <Route path="/password-generator" element={<PasswordGenerator />} />
-                    <Route path="/trash" element={<Trash />} />
-                    <Route path="/sync/conflict-resolver" element={<ConflictResolver />} />
-                    <Route path="/labels" element={<LabelManager />} />
-                    <Route path="/labels/:labelId/entries" element={<LabelEntries />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="*" element={<Navigate to="/entries" replace />} />
-                  </Routes>
+                    <Routes>
+                      <Route path="/entries" element={<EntryList />} />
+                      <Route path="/favorites" element={<EntryList onlyFavorites={true} />} />
+                      <Route path="/entries/create" element={<EntryCreate />} />
+                      <Route path="/entries/:id" element={<Navigate to="/entries" replace />} />
+                      <Route path="/entries/:id/edit" element={<EntryEdit />} />
+                      <Route path="/password-generator" element={<PasswordGenerator />} />
+                      <Route path="/trash" element={<Trash />} />
+                      <Route path="/sync/conflict-resolver" element={<ConflictResolver />} />
+                      <Route path="/labels" element={<LabelManager />} />
+                      <Route path="/labels/:labelId/entries" element={<LabelEntries />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="*" element={<Navigate to="/entries" replace />} />
+                    </Routes>
                   </div>
                 </div>
               </div>

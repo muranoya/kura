@@ -7,7 +7,10 @@ use super::UnlockedVault;
 impl UnlockedVault {
     /// List labels
     pub fn list_labels(&self) -> Result<Vec<Label>> {
-        let mut result: Vec<Label> = self.contents.labels.iter()
+        let mut result: Vec<Label> = self
+            .contents
+            .labels
+            .iter()
             .filter(|(_, label)| label.deleted_at.is_none())
             .map(|(id, label)| Label {
                 id: id.clone(),
@@ -23,18 +26,28 @@ impl UnlockedVault {
     pub fn create_label(&mut self, name: String) -> Result<Label> {
         let id = uuid::Uuid::new_v4().to_string();
         let created_at = crate::get_timestamp();
-        self.contents.labels.insert(id.clone(), LabelValue {
-            name: name.clone(),
+        self.contents.labels.insert(
+            id.clone(),
+            LabelValue {
+                name: name.clone(),
+                created_at,
+                deleted_at: None,
+            },
+        );
+        Ok(Label {
+            id,
+            name,
             created_at,
-            deleted_at: None,
-        });
-        Ok(Label { id, name, created_at })
+        })
     }
 
     /// Delete label (converts to tombstone)
     /// Marks label as deleted for sync-safe deletion, removes from entries
     pub fn delete_label(&mut self, id: &str) -> Result<()> {
-        let label = self.contents.labels.get_mut(id)
+        let label = self
+            .contents
+            .labels
+            .get_mut(id)
             .ok_or_else(|| VaultError::LabelNotFound(id.to_string()))?;
 
         let now = crate::get_timestamp();
@@ -50,7 +63,10 @@ impl UnlockedVault {
 
     /// Rename label
     pub fn rename_label(&mut self, id: &str, new_name: String) -> Result<()> {
-        let label = self.contents.labels.get_mut(id)
+        let label = self
+            .contents
+            .labels
+            .get_mut(id)
             .ok_or_else(|| VaultError::LabelNotFound(id.to_string()))?;
         label.name = new_name;
         Ok(())
@@ -62,12 +78,17 @@ impl UnlockedVault {
         for lid in &label_ids {
             match self.contents.labels.get(lid) {
                 None => return Err(VaultError::LabelNotFound(lid.to_string())),
-                Some(l) if l.deleted_at.is_some() => return Err(VaultError::LabelNotFound(lid.to_string())),
+                Some(l) if l.deleted_at.is_some() => {
+                    return Err(VaultError::LabelNotFound(lid.to_string()))
+                }
                 _ => {}
             }
         }
 
-        let entry = self.contents.entries.get_mut(entry_id)
+        let entry = self
+            .contents
+            .entries
+            .get_mut(entry_id)
             .ok_or_else(|| VaultError::EntryNotFound(entry_id.to_string()))?;
 
         if entry.deleted_at.is_some() || entry.purged_at.is_some() {
@@ -90,11 +111,7 @@ mod tests {
         let dek = Dek::generate();
         let params = Argon2Params::default();
         let kek = crate::crypto::kdf::derive_kek("test", &params).unwrap();
-        let meta = VaultMeta::new(
-            dek.wrap(&kek).unwrap(),
-            dek.wrap(&kek).unwrap(),
-            params,
-        );
+        let meta = VaultMeta::new(dek.wrap(&kek).unwrap(), dek.wrap(&kek).unwrap(), params);
         super::super::UnlockedVault {
             meta,
             contents: VaultContents::new(),
@@ -104,19 +121,22 @@ mod tests {
     }
 
     fn insert_entry(vault: &mut super::super::UnlockedVault, id: &str, name: &str) {
-        vault.contents.entries.insert(id.to_string(), VaultEntry {
-            entry_type: "login".to_string(),
-            name: name.to_string(),
-            created_at: 1000,
-            updated_at: 1000,
-            deleted_at: None,
-            purged_at: None,
-            is_favorite: false,
-            label_ids: vec![],
-            typed_value: zeroize::Zeroizing::new("{}".to_string()),
-            notes: None,
-            custom_fields: None,
-        });
+        vault.contents.entries.insert(
+            id.to_string(),
+            VaultEntry {
+                entry_type: "login".to_string(),
+                name: name.to_string(),
+                created_at: 1000,
+                updated_at: 1000,
+                deleted_at: None,
+                purged_at: None,
+                is_favorite: false,
+                label_ids: vec![],
+                typed_value: zeroize::Zeroizing::new("{}".to_string()),
+                notes: None,
+                custom_fields: None,
+            },
+        );
     }
 
     #[test]
@@ -188,7 +208,9 @@ mod tests {
         let l2 = vault.create_label("Personal".into()).unwrap();
         insert_entry(&mut vault, "e1", "Entry1");
 
-        vault.set_entry_labels("e1", vec![l1.id.clone(), l2.id.clone()]).unwrap();
+        vault
+            .set_entry_labels("e1", vec![l1.id.clone(), l2.id.clone()])
+            .unwrap();
         assert_eq!(vault.contents.entries["e1"].label_ids.len(), 2);
     }
 

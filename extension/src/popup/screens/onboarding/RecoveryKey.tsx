@@ -87,12 +87,7 @@ export default function RecoveryKey() {
         </Card>
 
         {/* 完了ボタン */}
-        <Button
-          onClick={handleComplete}
-          disabled={completing}
-          className="w-full text-sm"
-          size="sm"
-        >
+        <Button onClick={handleComplete} disabled={completing} className="w-full text-sm" size="sm">
           {completing ? '確認中...' : '完了'}
         </Button>
       </div>

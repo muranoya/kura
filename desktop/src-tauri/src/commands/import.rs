@@ -7,11 +7,10 @@ pub async fn import_1pux_preview(
 ) -> Result<serde_json::Value, String> {
     let manager = get_manager(&vault_id);
     tokio::task::spawn_blocking(move || {
-        let file_bytes = std::fs::read(&file_path)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
+        let file_bytes =
+            std::fs::read(&file_path).map_err(|e| format!("Failed to read file: {}", e))?;
         let json_str = manager.api_import_1pux_preview(file_bytes)?;
-        serde_json::from_str(&json_str)
-            .map_err(|e| format!("Parse error: {}", e))
+        serde_json::from_str(&json_str).map_err(|e| format!("Parse error: {}", e))
     })
     .await
     .map_err(|e| format!("Task error: {}", e))?
@@ -25,11 +24,10 @@ pub async fn import_1pux_execute(
 ) -> Result<serde_json::Value, String> {
     let manager = get_manager(&vault_id);
     tokio::task::spawn_blocking(move || {
-        let file_bytes = std::fs::read(&file_path)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
+        let file_bytes =
+            std::fs::read(&file_path).map_err(|e| format!("Failed to read file: {}", e))?;
         let json_str = manager.api_import_1pux_execute(file_bytes, actions_json)?;
-        serde_json::from_str(&json_str)
-            .map_err(|e| format!("Parse error: {}", e))
+        serde_json::from_str(&json_str).map_err(|e| format!("Parse error: {}", e))
     })
     .await
     .map_err(|e| format!("Task error: {}", e))?

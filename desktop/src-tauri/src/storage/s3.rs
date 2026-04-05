@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use aws_sdk_s3::error::ProvideErrorMetadata;
 use tokio::time::{timeout, Duration};
-use vault_core::error::{Result, VaultError};
 use vault_core::config::S3Config;
+use vault_core::error::{Result, VaultError};
 use vault_core::StorageBackend;
 
 const S3_TIMEOUT: Duration = Duration::from_secs(3);
@@ -53,7 +53,8 @@ impl S3Storage {
 impl StorageBackend for S3Storage {
     async fn download(&self) -> Result<Option<(Vec<u8>, String)>> {
         let result = timeout(S3_TIMEOUT, async {
-            match self.client
+            match self
+                .client
                 .get_object()
                 .bucket(&self.bucket)
                 .key(&self.key)
@@ -61,22 +62,27 @@ impl StorageBackend for S3Storage {
                 .await
             {
                 Ok(response) => {
-                    let etag = response.e_tag()
+                    let etag = response
+                        .e_tag()
                         .unwrap_or(&String::new())
                         .trim_matches('"')
                         .to_string();
 
-                    let data = response.body
+                    let data = response
+                        .body
                         .collect()
                         .await
-                        .map_err(|e| VaultError::StorageError(format!("Failed to read S3 object: {}", e)))?
+                        .map_err(|e| {
+                            VaultError::StorageError(format!("Failed to read S3 object: {}", e))
+                        })?
                         .into_bytes()
                         .to_vec();
 
                     Ok(Some((data, etag)))
                 }
                 Err(aws_sdk_s3::error::SdkError::ServiceError(ref e))
-                    if e.err().is_no_such_key() => {
+                    if e.err().is_no_such_key() =>
+                {
                     Ok(None)
                 }
                 Err(e) => {
@@ -85,12 +91,13 @@ impl StorageBackend for S3Storage {
                             let code = service_err.err().code().unwrap_or("Unknown");
                             format!("S3 GetObject failed: {} - {}", code, e)
                         }
-                        _ => format!("S3 GetObject failed: {}", e)
+                        _ => format!("S3 GetObject failed: {}", e),
                     };
                     Err(VaultError::StorageError(error_msg))
                 }
             }
-        }).await
+        })
+        .await
         .map_err(|_| VaultError::StorageError("S3 operation timed out".to_string()))?;
 
         result
@@ -98,7 +105,8 @@ impl StorageBackend for S3Storage {
 
     async fn upload(&self, data: &[u8], etag: Option<&str>) -> Result<String> {
         let result = timeout(S3_TIMEOUT, async {
-            let mut put_request = self.client
+            let mut put_request = self
+                .client
                 .put_object()
                 .bucket(&self.bucket)
                 .key(&self.key)
@@ -112,7 +120,8 @@ impl StorageBackend for S3Storage {
 
             match put_request.send().await {
                 Ok(response) => {
-                    let new_etag = response.e_tag()
+                    let new_etag = response
+                        .e_tag()
                         .unwrap_or(&String::new())
                         .trim_matches('"')
                         .to_string();
@@ -131,12 +140,13 @@ impl StorageBackend for S3Storage {
                             let code = service_err.err().code().unwrap_or("Unknown");
                             format!("S3 PutObject failed: {} - {}", code, e)
                         }
-                        _ => format!("S3 PutObject failed: {}", e)
+                        _ => format!("S3 PutObject failed: {}", e),
                     };
                     Err(VaultError::StorageError(error_msg))
                 }
             }
-        }).await
+        })
+        .await
         .map_err(|_| VaultError::StorageError("S3 operation timed out".to_string()))?;
 
         result

@@ -81,7 +81,6 @@ export default function RecoveryKey() {
             </Button>
           </CardContent>
         </Card>
-
       </div>
     </div>
   )

@@ -31,7 +31,9 @@ pub async fn sync_with_storage(
     for attempt in 0..max_retries {
         // ローカルのcontentsを取得
         let local_contents = {
-            let session = vault_session.lock().map_err(|_| "Session lock poisoned".to_string())?;
+            let session = vault_session
+                .lock()
+                .map_err(|_| "Session lock poisoned".to_string())?;
             match session.as_ref() {
                 Some(SessionState::Unlocked(u)) => u.contents.clone(),
                 _ => return Err("Vault not unlocked".to_string()),
@@ -48,7 +50,9 @@ pub async fn sync_with_storage(
             None => {
                 // リモートに存在しない → ローカル状態をそのままアップロード
                 let (vault_bytes, etag) = {
-                    let session = vault_session.lock().map_err(|_| "Session lock poisoned".to_string())?;
+                    let session = vault_session
+                        .lock()
+                        .map_err(|_| "Session lock poisoned".to_string())?;
                     match session.as_ref() {
                         Some(SessionState::Unlocked(u)) => (
                             u.to_vault_bytes()
@@ -65,7 +69,9 @@ pub async fn sync_with_storage(
                     .map_err(|e| format!("S3 upload failed: {}", e))?;
 
                 {
-                    let mut session = vault_session.lock().map_err(|_| "Session lock poisoned".to_string())?;
+                    let mut session = vault_session
+                        .lock()
+                        .map_err(|_| "Session lock poisoned".to_string())?;
                     if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
                         u.set_etag(new_etag.clone());
                     }
@@ -78,7 +84,9 @@ pub async fn sync_with_storage(
                 let remote_contents = {
                     let remote_vault_file = VaultFile::from_bytes(&remote_bytes)
                         .map_err(|e| format!("Failed to parse remote vault: {}", e))?;
-                    let session = vault_session.lock().map_err(|_| "Session lock poisoned".to_string())?;
+                    let session = vault_session
+                        .lock()
+                        .map_err(|_| "Session lock poisoned".to_string())?;
                     match session.as_ref() {
                         Some(SessionState::Unlocked(u)) => {
                             // Vault UUIDの一致を検証
@@ -112,7 +120,9 @@ pub async fn sync_with_storage(
 
                 // セッション更新
                 {
-                    let mut session = vault_session.lock().map_err(|_| "Session lock poisoned".to_string())?;
+                    let mut session = vault_session
+                        .lock()
+                        .map_err(|_| "Session lock poisoned".to_string())?;
                     if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
                         u.contents.entries = merged_contents.entries.clone();
                         u.contents.labels = merged_contents.labels.clone();
@@ -122,7 +132,9 @@ pub async fn sync_with_storage(
 
                 // マージ済みvaultをシリアライズ
                 let (merged_vault_bytes, merged_etag) = {
-                    let session = vault_session.lock().map_err(|_| "Session lock poisoned".to_string())?;
+                    let session = vault_session
+                        .lock()
+                        .map_err(|_| "Session lock poisoned".to_string())?;
                     match session.as_ref() {
                         Some(SessionState::Unlocked(u)) => (
                             u.to_vault_bytes()
@@ -139,8 +151,9 @@ pub async fn sync_with_storage(
                     .await
                 {
                     Ok(new_etag) => {
-                        let mut session =
-                            vault_session.lock().map_err(|_| "Session lock poisoned".to_string())?;
+                        let mut session = vault_session
+                            .lock()
+                            .map_err(|_| "Session lock poisoned".to_string())?;
                         if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
                             u.set_etag(new_etag.clone());
                         }
@@ -173,7 +186,9 @@ pub async fn push_to_storage(
     vault_session: &Mutex<Option<SessionState>>,
 ) -> Result<String, String> {
     let (vault_bytes, etag) = {
-        let session = vault_session.lock().map_err(|_| "Session lock poisoned".to_string())?;
+        let session = vault_session
+            .lock()
+            .map_err(|_| "Session lock poisoned".to_string())?;
         match session.as_ref() {
             Some(SessionState::Unlocked(unlocked)) => {
                 let bytes = unlocked
@@ -192,7 +207,9 @@ pub async fn push_to_storage(
         .map_err(|e| format!("S3 upload failed: {}", e))?;
 
     {
-        let mut session = vault_session.lock().map_err(|_| "Session lock poisoned".to_string())?;
+        let mut session = vault_session
+            .lock()
+            .map_err(|_| "Session lock poisoned".to_string())?;
         if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
             unlocked.set_etag(new_etag.clone());
         }
@@ -215,7 +232,9 @@ pub async fn download_from_storage(
             let locked_vault = LockedVault::open(vault_bytes, Some(etag))
                 .map_err(|e| format!("Failed to open vault: {}", e))?;
 
-            let mut session = vault_session.lock().map_err(|_| "Session lock poisoned".to_string())?;
+            let mut session = vault_session
+                .lock()
+                .map_err(|_| "Session lock poisoned".to_string())?;
             *session = Some(SessionState::Locked(locked_vault));
 
             Ok(true)

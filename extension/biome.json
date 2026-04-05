@@ -1,13 +1,11 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.10/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
-    "useIgnoreFile": true
+    "useIgnoreFile": false
   },
-  "organizeImports": {
-    "enabled": true
-  },
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "linter": {
     "enabled": true,
     "rules": {
@@ -15,6 +13,9 @@
       "correctness": {
         "noUnusedImports": "error",
         "noUnusedVariables": "warn"
+      },
+      "a11y": {
+        "noStaticElementInteractions": "off"
       }
     }
   },
@@ -24,6 +25,12 @@
     "indentWidth": 2,
     "lineWidth": 100
   },
+  "css": {
+    "parser": {
+      "cssModules": false,
+      "tailwindDirectives": true
+    }
+  },
   "javascript": {
     "formatter": {
       "quoteStyle": "single",
@@ -32,6 +39,6 @@
     }
   },
   "files": {
-    "ignore": ["dist/**", "wasm/**", "wasm-bridge/**"]
+    "includes": ["**", "!**/dist", "!**/wasm", "!**/wasm-bridge"]
   }
 }

@@ -17,6 +17,10 @@ impl Label {
     }
 
     pub fn with_id(id: String, name: String, created_at: i64) -> Self {
-        Label { id, name, created_at }
+        Label {
+            id,
+            name,
+            created_at,
+        }
     }
 }

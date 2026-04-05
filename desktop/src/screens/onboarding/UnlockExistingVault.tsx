@@ -2,13 +2,13 @@ import { Lock } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
-import { STORAGE_KEYS } from '../../shared/constants'
-import { saveToStorage } from '../../shared/storage'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
 import { Label } from '../../components/ui/label'
 import { PasswordInput } from '../../components/ui/password-input'
+import { STORAGE_KEYS } from '../../shared/constants'
+import { saveToStorage } from '../../shared/storage'
 
 export default function UnlockExistingVault() {
   const navigate = useNavigate()

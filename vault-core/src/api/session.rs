@@ -1,5 +1,5 @@
-use crate::vault::LockedVault;
 use crate::sync::engine::SessionState;
+use crate::vault::LockedVault;
 
 use super::VaultManager;
 
@@ -10,14 +10,17 @@ impl VaultManager {
             .map_err(|e| format!("Failed to create vault: {}", e))?;
 
         // Get recovery key by unlocking first
-        let mut unlocked = locked_vault.unlock(&master_password)
+        let mut unlocked = locked_vault
+            .unlock(&master_password)
             .map_err(|e| format!("Failed to unlock: {}", e))?;
 
         // Generate new recovery key
-        let recovery_key = unlocked.regenerate_recovery_key(&master_password)
+        let recovery_key = unlocked
+            .regenerate_recovery_key(&master_password)
             .map_err(|e| format!("Failed to generate recovery key: {}", e))?;
 
-        let locked_vault = unlocked.lock()
+        let locked_vault = unlocked
+            .lock()
             .map_err(|e| format!("Failed to lock: {}", e))?;
 
         let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
@@ -89,9 +92,11 @@ impl VaultManager {
 
         match session.take() {
             Some(SessionState::Unlocked(unlocked)) => {
-                let locked = unlocked.lock()
+                let locked = unlocked
+                    .lock()
                     .map_err(|e| format!("Failed to lock: {}", e))?;
-                let vault_bytes = locked.to_vault_bytes()
+                let vault_bytes = locked
+                    .to_vault_bytes()
                     .map_err(|e| format!("Failed to serialize vault: {}", e))?;
 
                 *session = Some(SessionState::Locked(locked));

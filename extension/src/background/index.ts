@@ -3,9 +3,10 @@
 
 import * as vaultModule from '../../wasm/wasm_bridge'
 import { DEFAULT_VAULT_ID, STORAGE_KEYS } from '../shared/constants'
+import { ConflictError, VaultS3Client } from '../shared/s3-client'
 import { getFromStorage, saveToStorage } from '../shared/storage'
-import { VaultS3Client, ConflictError } from '../shared/s3-client'
 import type { S3Config } from '../shared/types'
+import { handleAutofillMessage, initAutofill, onVaultLocked, onVaultUnlocked } from './autofill'
 
 /** WASM API surface for Service Worker */
 interface WasmApi {
@@ -52,6 +53,7 @@ interface WasmApi {
   api_restore_entry(vaultId: string, id: string): void
   api_purge_entry(vaultId: string, id: string): void
   api_set_favorite(vaultId: string, id: string, isFavorite: boolean): void
+  api_list_login_urls(vaultId: string): string
   api_list_labels(vaultId: string): string
   api_create_label(vaultId: string, name: string): string
   api_delete_label(vaultId: string, id: string): void
@@ -107,15 +109,25 @@ async function initWasm() {
 
 function setupMessageHandlers() {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log(
+      '[SW] onMessage received:',
+      message.type,
+      'from:',
+      sender.url?.substring(0, 60) || sender.id,
+    )
     // async 処理を fire-and-forget で実行し、Promise で sendResponse を呼ぶ
-    handleMessage(message, sender, sendResponse).catch((err) => {
-      console.error('[SW] Unhandled error in message handler:', err)
-      try {
-        sendResponse({ success: false, error: String(err) })
-      } catch (e) {
-        console.error('[SW] Failed to send error response:', e)
-      }
-    })
+    handleMessage(message, sender, sendResponse)
+      .then(() => {
+        console.log('[SW] handleMessage completed for:', message.type)
+      })
+      .catch((err) => {
+        console.error('[SW] Unhandled error in message handler:', message.type, err)
+        try {
+          sendResponse({ success: false, error: String(err) })
+        } catch (e) {
+          console.error('[SW] Failed to send error response:', e)
+        }
+      })
     return true // 非同期レスポンスを許可
   })
 }
@@ -152,6 +164,9 @@ self.addEventListener('activate', (event: Event) => {
     }),
   )
 })
+
+// Autofill の初期化（activate イベントに依存せずトップレベルで実行）
+initAutofill(vault, () => unlocked)
 
 // ========== ヘルパー関数 ==========
 
@@ -319,6 +334,11 @@ async function handleMessage(
       }
     }
 
+    // Delegate autofill messages to the autofill module
+    if (typeof message.type === 'string' && message.type.startsWith('AUTOFILL_')) {
+      return handleAutofillMessage(message, _sender, sendResponse)
+    }
+
     switch (message.type) {
       // ========== Auth ==========
 
@@ -346,7 +366,11 @@ async function handleMessage(
           const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
           if (encryptedConfig) {
             try {
-              const configJson = vault.api_decrypt_config(DEFAULT_VAULT_ID, message.password, encryptedConfig)
+              const configJson = vault.api_decrypt_config(
+                DEFAULT_VAULT_ID,
+                message.password,
+                encryptedConfig,
+              )
               decryptedS3Config = JSON.parse(configJson)
             } catch (e) {
               console.error('[SW] Failed to decrypt S3 config:', e)
@@ -364,6 +388,8 @@ async function handleMessage(
           // 定期同期アラームを設定
           chrome.alarms.create('autosync', { periodInMinutes: 1 })
           sendResponse({ success: true })
+          // オートフィル: アクティブタブにContent Script注入
+          onVaultUnlocked()
           // アンロック後に同期（バックグラウンド）
           autoSync().catch((e) => console.error('[SW] Post-unlock sync failed:', e))
         } catch (err) {
@@ -389,7 +415,11 @@ async function handleMessage(
           // オンボーディング時のS3設定暗号化保存
           if (message.s3Config) {
             const configJson = JSON.stringify(message.s3Config)
-            const encrypted = vault.api_encrypt_config(DEFAULT_VAULT_ID, message.password, configJson)
+            const encrypted = vault.api_encrypt_config(
+              DEFAULT_VAULT_ID,
+              message.password,
+              configJson,
+            )
             await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
             decryptedS3Config = message.s3Config
           } else {
@@ -397,7 +427,11 @@ async function handleMessage(
             const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
             if (encryptedConfig) {
               try {
-                const cJson = vault.api_decrypt_config(DEFAULT_VAULT_ID, message.password, encryptedConfig)
+                const cJson = vault.api_decrypt_config(
+                  DEFAULT_VAULT_ID,
+                  message.password,
+                  encryptedConfig,
+                )
                 decryptedS3Config = JSON.parse(cJson)
               } catch (e) {
                 console.error('[SW] Failed to decrypt S3 config:', e)
@@ -416,6 +450,8 @@ async function handleMessage(
           // 定期同期アラームを設定
           chrome.alarms.create('autosync', { periodInMinutes: 1 })
           sendResponse({ success: true })
+          // オートフィル: アクティブタブにContent Script注入
+          onVaultUnlocked()
           // アンロック後に同期（バックグラウンド）
           autoSync().catch((e) => console.error('[SW] Post-unlock sync failed:', e))
         } catch (err) {
@@ -433,6 +469,8 @@ async function handleMessage(
           decryptedS3Config = null
           chrome.alarms.clear('autolock')
           chrome.alarms.clear('autosync')
+          // オートフィル: 全タブに通知してContent Scriptを無効化
+          onVaultLocked()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -454,7 +492,11 @@ async function handleMessage(
 
           if (message.s3Config) {
             const configJson = JSON.stringify(message.s3Config)
-            const encrypted = vault.api_encrypt_config(DEFAULT_VAULT_ID, message.masterPassword, configJson)
+            const encrypted = vault.api_encrypt_config(
+              DEFAULT_VAULT_ID,
+              message.masterPassword,
+              configJson,
+            )
             await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
             decryptedS3Config = message.s3Config
           }
@@ -480,7 +522,11 @@ async function handleMessage(
         }
         try {
           vault.api_unlock_with_recovery_key(DEFAULT_VAULT_ID, message.recoveryKey)
-          vault.api_change_master_password(DEFAULT_VAULT_ID, message.recoveryKey, message.newPassword)
+          vault.api_change_master_password(
+            DEFAULT_VAULT_ID,
+            message.recoveryKey,
+            message.newPassword,
+          )
           const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, null)
@@ -664,7 +710,16 @@ async function handleMessage(
           break
         }
         try {
-          const result = vault.api_list_entries(DEFAULT_VAULT_ID, null, null, null, true, false, null, null)
+          const result = vault.api_list_entries(
+            DEFAULT_VAULT_ID,
+            null,
+            null,
+            null,
+            true,
+            false,
+            null,
+            null,
+          )
           const rawEntries = JSON.parse(result)
           const entries = normalizeEntries(rawEntries)
           sendResponse({ success: true, entries })
@@ -797,11 +852,19 @@ async function handleMessage(
           break
         }
         try {
-          vault.api_change_master_password(DEFAULT_VAULT_ID, message.oldPassword, message.newPassword)
+          vault.api_change_master_password(
+            DEFAULT_VAULT_ID,
+            message.oldPassword,
+            message.newPassword,
+          )
           // S3設定を新しいパスワードで再暗号化
           if (decryptedS3Config) {
             const configJson = JSON.stringify(decryptedS3Config)
-            const encrypted = vault.api_encrypt_config(DEFAULT_VAULT_ID, message.newPassword, configJson)
+            const encrypted = vault.api_encrypt_config(
+              DEFAULT_VAULT_ID,
+              message.newPassword,
+              configJson,
+            )
             await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
           }
           await autoSync()
@@ -1016,6 +1079,7 @@ async function handleAutolockAlarm() {
     unlocked = false
     updateExtensionIcon(false)
     decryptedS3Config = null
+    onVaultLocked()
   } catch (err) {
     console.error('[SW] Autolock failed:', err)
   }

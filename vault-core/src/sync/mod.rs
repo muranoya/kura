@@ -60,16 +60,11 @@ impl SyncResult {
 
 /// Automatically merge local and remote vault contents using LWW + Tombstone strategy
 /// Note: This does NOT perform garbage collection. Call apply_gc_to_contents() separately.
-pub fn auto_merge(
-    local: &VaultContents,
-    remote: &VaultContents,
-) -> Result<MergeResult> {
+pub fn auto_merge(local: &VaultContents, remote: &VaultContents) -> Result<MergeResult> {
     let mut merged_entries: HashMap<String, VaultEntry> = HashMap::new();
 
     // Collect all entry IDs from both local and remote
-    let all_ids: HashSet<&String> = local.entries.keys()
-        .chain(remote.entries.keys())
-        .collect();
+    let all_ids: HashSet<&String> = local.entries.keys().chain(remote.entries.keys()).collect();
 
     for id in all_ids {
         let local_entry = local.entries.get(id);
@@ -153,9 +148,7 @@ fn is_soft_delete_newer_than_purge(
 ) -> bool {
     candidate_state == EntryState::SoftDeleted
         && other_state == EntryState::Purged
-        && other
-            .purged_at
-            .map_or(false, |t| candidate.updated_at > t)
+        && other.purged_at.map_or(false, |t| candidate.updated_at > t)
 }
 
 /// Merge labels using simple adoption or deletion priority
@@ -177,7 +170,7 @@ fn merge_labels(
             (Some(l), Some(r)) => {
                 // Both exist: prefer deleted (tombstone)
                 match (l.deleted_at, r.deleted_at) {
-                    (None, None) => Some(l.clone()), // Both active
+                    (None, None) => Some(l.clone()),    // Both active
                     (Some(_), None) => Some(l.clone()), // Local deleted
                     (None, Some(_)) => Some(r.clone()), // Remote deleted
                     (Some(l_ts), Some(r_ts)) => {
@@ -213,7 +206,9 @@ fn cleanup_orphaned_label_refs(
         .collect();
 
     for entry in entries.values_mut() {
-        entry.label_ids.retain(|lid| !deleted_label_ids.contains(lid));
+        entry
+            .label_ids
+            .retain(|lid| !deleted_label_ids.contains(lid));
     }
 }
 
@@ -275,14 +270,24 @@ mod tests {
         )
     }
 
-    fn create_soft_deleted(id: &str, name: &str, updated_at: i64, deleted_at: i64) -> (String, VaultEntry) {
+    fn create_soft_deleted(
+        id: &str,
+        name: &str,
+        updated_at: i64,
+        deleted_at: i64,
+    ) -> (String, VaultEntry) {
         let (id, mut entry) = create_entry(id, name, updated_at);
         entry.updated_at = updated_at;
         entry.deleted_at = Some(deleted_at);
         (id, entry)
     }
 
-    fn create_purged(id: &str, updated_at: i64, deleted_at: i64, purged_at: i64) -> (String, VaultEntry) {
+    fn create_purged(
+        id: &str,
+        updated_at: i64,
+        deleted_at: i64,
+        purged_at: i64,
+    ) -> (String, VaultEntry) {
         let (id, mut entry) = create_entry(id, "", updated_at);
         entry.updated_at = updated_at;
         entry.deleted_at = Some(deleted_at);
@@ -651,14 +656,14 @@ mod tests {
         let (_, entry2_remote) = create_entry("id2", "Edited Remote", 1500);
         let (id3, entry3) = create_entry("id3", "Remote Only", 1000);
 
-        let local = make_contents(vec![
-            (id1.clone(), entry1),
-            (id2.clone(), entry2_local),
-        ], vec![]);
-        let remote = make_contents(vec![
-            (id2.clone(), entry2_remote),
-            (id3.clone(), entry3),
-        ], vec![]);
+        let local = make_contents(
+            vec![(id1.clone(), entry1), (id2.clone(), entry2_local)],
+            vec![],
+        );
+        let remote = make_contents(
+            vec![(id2.clone(), entry2_remote), (id3.clone(), entry3)],
+            vec![],
+        );
 
         let result = merge(&local, &remote);
         assert_eq!(result.merged_entries.len(), 3);
@@ -677,11 +682,19 @@ mod tests {
     // ===== ラベルマージ =====
 
     fn label(name: &str) -> LabelValue {
-        LabelValue { name: name.to_string(), created_at: 0, deleted_at: None }
+        LabelValue {
+            name: name.to_string(),
+            created_at: 0,
+            deleted_at: None,
+        }
     }
 
     fn deleted_label(name: &str, deleted_at: i64) -> LabelValue {
-        LabelValue { name: name.to_string(), created_at: 0, deleted_at: Some(deleted_at) }
+        LabelValue {
+            name: name.to_string(),
+            created_at: 0,
+            deleted_at: Some(deleted_at),
+        }
     }
 
     #[test]
@@ -765,7 +778,8 @@ mod tests {
         let recent_purge = 30 * 86400; // 30日目にpurge（170日前 < 180日）
 
         let (id_old, entry_old) = create_purged("old", old_purge, old_purge, old_purge);
-        let (id_recent, entry_recent) = create_purged("recent", recent_purge, recent_purge, recent_purge);
+        let (id_recent, entry_recent) =
+            create_purged("recent", recent_purge, recent_purge, recent_purge);
         let (id_active, entry_active) = create_entry("active", "Active", now);
 
         let mut contents = make_contents(
@@ -860,8 +874,12 @@ mod tests {
 
     #[test]
     fn test_deletion_priority_ordering() {
-        assert!(EntryState::Purged.deletion_priority() > EntryState::SoftDeleted.deletion_priority());
-        assert!(EntryState::SoftDeleted.deletion_priority() > EntryState::Active.deletion_priority());
+        assert!(
+            EntryState::Purged.deletion_priority() > EntryState::SoftDeleted.deletion_priority()
+        );
+        assert!(
+            EntryState::SoftDeleted.deletion_priority() > EntryState::Active.deletion_priority()
+        );
     }
 
     // ===== Commutativity tests =====
@@ -925,12 +943,26 @@ mod tests {
         entry2r.updated_at = 2000;
 
         let a = make_contents(
-            vec![(id1.clone(), entry1), (id2.clone(), entry2), (id3.clone(), entry3.clone())],
-            vec![("l1".into(), label("Work")), ("l2".into(), deleted_label("Old", 500))],
+            vec![
+                (id1.clone(), entry1),
+                (id2.clone(), entry2),
+                (id3.clone(), entry3.clone()),
+            ],
+            vec![
+                ("l1".into(), label("Work")),
+                ("l2".into(), deleted_label("Old", 500)),
+            ],
         );
         let b = make_contents(
-            vec![(id1.clone(), entry1r), (id2.clone(), entry2r), (id3.clone(), entry3)],
-            vec![("l1".into(), deleted_label("Work", 1000)), ("l2".into(), label("Old"))],
+            vec![
+                (id1.clone(), entry1r),
+                (id2.clone(), entry2r),
+                (id3.clone(), entry3),
+            ],
+            vec![
+                ("l1".into(), deleted_label("Work", 1000)),
+                ("l2".into(), label("Old")),
+            ],
         );
 
         let ab = merge(&a, &b);

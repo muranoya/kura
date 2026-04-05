@@ -1,5 +1,12 @@
 // Entry types supported by kura
-export type EntryType = 'login' | 'bank' | 'ssh_key' | 'secure_note' | 'credit_card' | 'password' | 'software_license'
+export type EntryType =
+  | 'login'
+  | 'bank'
+  | 'ssh_key'
+  | 'secure_note'
+  | 'credit_card'
+  | 'password'
+  | 'software_license'
 
 // Custom field types
 export type CustomFieldType = 'text' | 'password' | 'email' | 'url' | 'phone' | 'totp'
@@ -89,10 +96,7 @@ export interface DuplicateCandidate {
   reason: string
 }
 
-export type ImportAction =
-  | 'import'
-  | { overwrite: { existing_entry_id: string } }
-  | 'skip'
+export type ImportAction = 'import' | { overwrite: { existing_entry_id: string } } | 'skip'
 
 export interface SourceCategory {
   category_uuid: string

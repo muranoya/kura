@@ -28,10 +28,8 @@ export default function TotpDisplay({ totp, period = 30 }: TotpDisplayProps) {
 
   return (
     <div className="flex items-center justify-end gap-1.5">
-      <span className="font-mono text-sm tracking-widest text-text-primary">
-        {totp}
-      </span>
-      <svg width="28" height="28" viewBox="0 0 28 28" className="shrink-0">
+      <span className="font-mono text-sm tracking-widest text-text-primary">{totp}</span>
+      <svg width="28" height="28" viewBox="0 0 28 28" className="shrink-0" aria-hidden="true">
         <circle
           cx="14"
           cy="14"

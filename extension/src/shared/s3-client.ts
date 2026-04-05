@@ -1,7 +1,7 @@
 import {
-  S3Client,
   GetObjectCommand,
   PutObjectCommand,
+  S3Client,
   type S3ClientConfig,
 } from '@aws-sdk/client-s3'
 import { FetchHttpHandler } from '@smithy/fetch-http-handler'
@@ -27,9 +27,9 @@ export class VaultS3Client {
         secretAccessKey: config.secretAccessKey,
       },
       requestHandler: new FetchHttpHandler({
-        requestInit: {
-          cache: 'no-store',
-        },
+        requestInit: () => ({
+          cache: 'no-store' as RequestCache,
+        }),
       }),
     }
 
@@ -78,15 +78,28 @@ export class VaultS3Client {
         params.IfMatch = etag
       }
 
-      console.log('[VaultS3Client] upload params:', { bucket: this.bucket, key: this.key, bodySize: data.length, ifMatch: params.IfMatch ?? '(none)' })
+      console.log('[VaultS3Client] upload params:', {
+        bucket: this.bucket,
+        key: this.key,
+        bodySize: data.length,
+        ifMatch: params.IfMatch ?? '(none)',
+      })
       const response = await this.client.send(new PutObjectCommand(params))
       const newEtag = response.ETag?.replace(/"/g, '') ?? ''
       console.log('[VaultS3Client] upload success, new ETag:', newEtag)
       return newEtag
     } catch (err: unknown) {
-      console.error('[VaultS3Client] upload error:', JSON.stringify(err, Object.getOwnPropertyNames(err as object), 2))
+      console.error(
+        '[VaultS3Client] upload error:',
+        JSON.stringify(err, Object.getOwnPropertyNames(err as object), 2),
+      )
       const e = err as Record<string, unknown>
-      console.error('[VaultS3Client] error details:', { name: e.name, Code: e.Code, message: e.message, metadata: e.$metadata })
+      console.error('[VaultS3Client] error details:', {
+        name: e.name,
+        Code: e.Code,
+        message: e.message,
+        metadata: e.$metadata,
+      })
       if (isS3Error(err, 'PreconditionFailed', 412)) throw new ConflictError()
       throw new Error(`S3 upload failed: ${String(err)}`)
     }

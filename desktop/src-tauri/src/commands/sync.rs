@@ -1,11 +1,14 @@
-use vault_core::api::parse_s3_config;
 use serde_json::json;
+use vault_core::api::parse_s3_config;
 
-use crate::storage::S3Storage;
 use super::get_manager;
+use crate::storage::S3Storage;
 
 #[tauri::command]
-pub async fn sync_vault(vault_id: String, storage_config: String) -> Result<serde_json::Value, String> {
+pub async fn sync_vault(
+    vault_id: String,
+    storage_config: String,
+) -> Result<serde_json::Value, String> {
     let s3_config = parse_s3_config(&storage_config)?;
     let s3_storage = S3Storage::new(s3_config)
         .await

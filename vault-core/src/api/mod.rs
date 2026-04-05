@@ -1,7 +1,7 @@
-mod session;
 mod entries;
 mod labels;
 mod security;
+mod session;
 mod sync;
 mod utils;
 
@@ -42,6 +42,15 @@ pub struct EntryDetail {
     pub labels: Vec<String>,
     #[serde(default)]
     pub custom_fields: Option<String>, // JSON文字列
+}
+
+/// オートフィル候補データ（パスワードを含まない）
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct AutofillCandidate {
+    pub id: String,
+    pub name: String,
+    pub url: String,
+    pub username: Option<String>,
 }
 
 /// ラベルデータ

@@ -1,5 +1,5 @@
 use crate::error::{Result, VaultError};
-use crate::models::{EntryData, Entry, EntryFilter, SortField, SortOrder};
+use crate::models::{Entry, EntryData, EntryFilter, SortField, SortOrder};
 use crate::store::VaultEntry;
 
 use super::UnlockedVault;
@@ -60,7 +60,9 @@ impl UnlockedVault {
             custom_fields: data.custom_fields.clone(),
         };
 
-        self.contents.entries.insert(id.clone(), vault_entry.clone());
+        self.contents
+            .entries
+            .insert(id.clone(), vault_entry.clone());
 
         Ok(Entry {
             id,
@@ -77,7 +79,10 @@ impl UnlockedVault {
 
     /// Update entry (only active entries can be updated)
     pub fn update_entry(&mut self, id: &str, name: String, data: EntryData) -> Result<()> {
-        let entry = self.contents.entries.get_mut(id)
+        let entry = self
+            .contents
+            .entries
+            .get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
 
         if entry.deleted_at.is_some() || entry.purged_at.is_some() {
@@ -95,7 +100,10 @@ impl UnlockedVault {
 
     /// Delete entry (soft delete to trash)
     pub fn delete_entry(&mut self, id: &str) -> Result<()> {
-        let entry = self.contents.entries.get_mut(id)
+        let entry = self
+            .contents
+            .entries
+            .get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
         let now = crate::get_timestamp();
         entry.deleted_at = Some(now);
@@ -105,11 +113,16 @@ impl UnlockedVault {
 
     /// Restore entry from trash (only soft-deleted entries can be restored)
     pub fn restore_entry(&mut self, id: &str) -> Result<()> {
-        let entry = self.contents.entries.get_mut(id)
+        let entry = self
+            .contents
+            .entries
+            .get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
 
         if entry.purged_at.is_some() {
-            return Err(VaultError::InvalidInput("Cannot restore a purged entry".to_string()));
+            return Err(VaultError::InvalidInput(
+                "Cannot restore a purged entry".to_string(),
+            ));
         }
 
         entry.deleted_at = None;
@@ -121,7 +134,10 @@ impl UnlockedVault {
     /// Clears sensitive data and marks as purged for sync-safe deletion.
     /// Idempotent: calling on an already-purged entry is a no-op.
     pub fn purge_entry(&mut self, id: &str) -> Result<()> {
-        let entry = self.contents.entries.get_mut(id)
+        let entry = self
+            .contents
+            .entries
+            .get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
 
         // Already purged — no-op for idempotency
@@ -150,7 +166,10 @@ impl UnlockedVault {
 
     /// Set entry favorite (only active entries)
     pub fn set_favorite(&mut self, id: &str, is_favorite: bool) -> Result<()> {
-        let entry = self.contents.entries.get_mut(id)
+        let entry = self
+            .contents
+            .entries
+            .get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
 
         if entry.deleted_at.is_some() || entry.purged_at.is_some() {
@@ -165,21 +184,17 @@ impl UnlockedVault {
 
 #[cfg(test)]
 mod tests {
+    use super::super::UnlockedVault;
     use super::*;
     use crate::crypto::Dek;
-    use crate::models::{Argon2Params, VaultMeta, SortField, SortOrder};
+    use crate::models::{Argon2Params, SortField, SortOrder, VaultMeta};
     use crate::store::VaultContents;
-    use super::super::UnlockedVault;
 
     fn make_vault() -> UnlockedVault {
         let dek = Dek::generate();
         let params = Argon2Params::default();
         let kek = crate::crypto::kdf::derive_kek("test", &params).unwrap();
-        let meta = VaultMeta::new(
-            dek.wrap(&kek).unwrap(),
-            dek.wrap(&kek).unwrap(),
-            params,
-        );
+        let meta = VaultMeta::new(dek.wrap(&kek).unwrap(), dek.wrap(&kek).unwrap(), params);
         UnlockedVault {
             meta,
             contents: VaultContents::new(),
@@ -199,26 +214,31 @@ mod tests {
 
     fn insert_entry(vault: &mut UnlockedVault, id: &str, name: &str, created_at: i64) {
         let data = make_login_data();
-        vault.contents.entries.insert(id.to_string(), VaultEntry {
-            entry_type: "login".to_string(),
-            name: name.to_string(),
-            created_at,
-            updated_at: created_at,
-            deleted_at: None,
-            purged_at: None,
-            is_favorite: false,
-            label_ids: vec![],
-            typed_value: zeroize::Zeroizing::new(data.typed_value.to_string()),
-            notes: None,
-            custom_fields: None,
-        });
+        vault.contents.entries.insert(
+            id.to_string(),
+            VaultEntry {
+                entry_type: "login".to_string(),
+                name: name.to_string(),
+                created_at,
+                updated_at: created_at,
+                deleted_at: None,
+                purged_at: None,
+                is_favorite: false,
+                label_ids: vec![],
+                typed_value: zeroize::Zeroizing::new(data.typed_value.to_string()),
+                notes: None,
+                custom_fields: None,
+            },
+        );
     }
 
     #[test]
     fn test_create_entry() {
         let mut vault = make_vault();
         let data = make_login_data();
-        let entry = vault.create_entry("Test".into(), "login".to_string(), data, vec![]).unwrap();
+        let entry = vault
+            .create_entry("Test".into(), "login".to_string(), data, vec![])
+            .unwrap();
 
         assert_eq!(entry.name, "Test");
         assert_eq!(entry.entry_type, "login");
@@ -240,21 +260,30 @@ mod tests {
         assert!(vault.get_entry("nonexistent").unwrap().is_none());
     }
 
-    fn insert_entry_with_updated(vault: &mut UnlockedVault, id: &str, name: &str, created_at: i64, updated_at: i64) {
+    fn insert_entry_with_updated(
+        vault: &mut UnlockedVault,
+        id: &str,
+        name: &str,
+        created_at: i64,
+        updated_at: i64,
+    ) {
         let data = make_login_data();
-        vault.contents.entries.insert(id.to_string(), VaultEntry {
-            entry_type: "login".to_string(),
-            name: name.to_string(),
-            created_at,
-            updated_at,
-            deleted_at: None,
-            purged_at: None,
-            is_favorite: false,
-            label_ids: vec![],
-            typed_value: zeroize::Zeroizing::new(data.typed_value.to_string()),
-            notes: None,
-            custom_fields: None,
-        });
+        vault.contents.entries.insert(
+            id.to_string(),
+            VaultEntry {
+                entry_type: "login".to_string(),
+                name: name.to_string(),
+                created_at,
+                updated_at,
+                deleted_at: None,
+                purged_at: None,
+                is_favorite: false,
+                label_ids: vec![],
+                typed_value: zeroize::Zeroizing::new(data.typed_value.to_string()),
+                notes: None,
+                custom_fields: None,
+            },
+        );
     }
 
     #[test]
@@ -391,7 +420,9 @@ mod tests {
             "newpass".into(),
             Some("notes".into()),
         );
-        vault.update_entry("e1", "Updated".into(), new_data).unwrap();
+        vault
+            .update_entry("e1", "Updated".into(), new_data)
+            .unwrap();
 
         let entry = vault.get_entry("e1").unwrap().unwrap();
         assert_eq!(entry.name, "Updated");
@@ -468,19 +499,22 @@ mod tests {
         insert_entry(&mut vault, "e1", "Login", 1000);
 
         let note_data = EntryData::new_secure_note("content".into(), None);
-        vault.contents.entries.insert("e2".to_string(), VaultEntry {
-            entry_type: "secure_note".to_string(),
-            name: "Note".to_string(),
-            created_at: 2000,
-            updated_at: 2000,
-            deleted_at: None,
-            purged_at: None,
-            is_favorite: false,
-            label_ids: vec![],
-            typed_value: zeroize::Zeroizing::new(note_data.typed_value.to_string()),
-            notes: None,
-            custom_fields: None,
-        });
+        vault.contents.entries.insert(
+            "e2".to_string(),
+            VaultEntry {
+                entry_type: "secure_note".to_string(),
+                name: "Note".to_string(),
+                created_at: 2000,
+                updated_at: 2000,
+                deleted_at: None,
+                purged_at: None,
+                is_favorite: false,
+                label_ids: vec![],
+                typed_value: zeroize::Zeroizing::new(note_data.typed_value.to_string()),
+                notes: None,
+                custom_fields: None,
+            },
+        );
 
         let filter = EntryFilter::new().with_type("login");
         let entries = vault.list_entries(&filter).unwrap();
@@ -599,10 +633,10 @@ mod tests {
 pub(crate) fn vault_entry_to_entry(id: String, e: &VaultEntry) -> Result<Entry> {
     // Convert typed_value back to EntryData
     // Zeroizing<String> contains JSON that needs to be parsed
-    let typed_value: serde_json::Value = serde_json::from_str(e.typed_value.as_ref())
-        .map_err(|err| VaultError::InvalidInput(
-            format!("Corrupted typed_value for entry {}: {}", id, err)
-        ))?;
+    let typed_value: serde_json::Value =
+        serde_json::from_str(e.typed_value.as_ref()).map_err(|err| {
+            VaultError::InvalidInput(format!("Corrupted typed_value for entry {}: {}", id, err))
+        })?;
 
     let data = EntryData {
         entry_type: e.entry_type.clone(),

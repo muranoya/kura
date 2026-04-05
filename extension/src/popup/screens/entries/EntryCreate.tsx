@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import type { CustomField, Label } from '../../../shared/types'
 import * as commands from '../../commands'
 import EntryForm from '../../components/entries/EntryForm'
 import EntryTypeSelectDialog from '../../components/entries/EntryTypeSelectDialog'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { usePushError } from '../../contexts/ErrorContext'
-import type { CustomField, Label } from '../../../shared/types'
 
 export default function EntryCreate() {
   const navigate = useNavigate()

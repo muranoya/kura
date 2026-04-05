@@ -296,6 +296,103 @@ default: help
 	echo ""
 	echo "✅ All tests passed!"
 
+# vault-core - Lint & format check (Rust)
+@check-vault-core:
+	echo ""
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "🔍 Checking vault-core (lint & format)..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	echo "🦀 Cargo check (vault-core)..."
+	cargo check --manifest-path {{VAULT_CORE_DIR}}/Cargo.toml
+	echo ""
+	echo "🦀 Cargo fmt check (vault-core)..."
+	cargo fmt --manifest-path {{VAULT_CORE_DIR}}/Cargo.toml -- --check
+	echo ""
+	echo "✅ vault-core checks passed!"
+
+# Desktop app - Lint & format check (TypeScript + Biome + Rust)
+@check-desktop:
+	echo ""
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "🔍 Checking desktop app (lint & format)..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	echo "📥 Installing dependencies..."
+	cd {{DESKTOP_DIR}} && pnpm install --silent
+	echo ""
+	echo "📝 TypeScript type check..."
+	cd {{DESKTOP_DIR}} && pnpm tsc --noEmit
+	echo ""
+	echo "🔧 Biome check (lint & format)..."
+	cd {{DESKTOP_DIR}} && pnpm run check
+	echo ""
+	echo "🦀 Cargo check (src-tauri)..."
+	cargo check --manifest-path {{DESKTOP_DIR}}/src-tauri/Cargo.toml
+	echo ""
+	echo "🦀 Cargo fmt check (src-tauri)..."
+	cargo fmt --manifest-path {{DESKTOP_DIR}}/src-tauri/Cargo.toml -- --check
+	echo ""
+	echo "✅ Desktop checks passed!"
+
+# Browser extension - Lint & format check (TypeScript + Biome + Rust)
+@check-extension:
+	echo ""
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "🔍 Checking extension (lint & format)..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	echo "📥 Installing dependencies..."
+	cd {{EXTENSION_DIR}} && pnpm install --silent
+	echo ""
+	echo "📝 TypeScript type check..."
+	cd {{EXTENSION_DIR}} && pnpm tsc --noEmit
+	echo ""
+	echo "🔧 Biome check (lint & format)..."
+	cd {{EXTENSION_DIR}} && pnpm run check
+	echo ""
+	echo "🦀 Cargo check (wasm-bridge)..."
+	cargo check --manifest-path {{EXTENSION_DIR}}/wasm-bridge/Cargo.toml
+	echo ""
+	echo "🦀 Cargo fmt check (wasm-bridge)..."
+	cargo fmt --manifest-path {{EXTENSION_DIR}}/wasm-bridge/Cargo.toml -- --check
+	echo ""
+	echo "✅ Extension checks passed!"
+
+# Android app - Lint & format check (Kotlin + Rust)
+@check-android:
+	echo ""
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "🔍 Checking Android app (lint & format)..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	echo "🦀 Cargo check (rust-jni)..."
+	cargo check --manifest-path {{ANDROID_JNI_DIR}}/Cargo.toml
+	echo ""
+	echo "🦀 Cargo fmt check (rust-jni)..."
+	cargo fmt --manifest-path {{ANDROID_JNI_DIR}}/Cargo.toml -- --check
+	echo ""
+	echo "🤖 Kotlin lint (Gradle)..."
+	cd {{ANDROID_DIR}} && ./gradlew lintDebug
+	echo ""
+	echo "✅ Android checks passed!"
+
+# 全 lint & format チェック
+@check-all:
+	echo ""
+	echo "╔━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╗"
+	echo "║              kura Lint & Format Check                  ║"
+	echo "║       Checking all apps: Desktop, Extension, Android   ║"
+	echo "╚━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╝"
+	just check-vault-core
+	just check-desktop
+	just check-extension
+	just check-android
+	echo ""
+	echo "╔━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╗"
+	echo "║              ✅ All checks passed!                         ║"
+	echo "╚━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╝"
+
 # クリーンアップ
 @clean:
 	echo "🧹 Cleaning build artifacts..."
@@ -336,6 +433,13 @@ default: help
 	echo "    just test-android         - Run Android tests"
 	echo "    just test-desktop         - Run desktop tests (frontend + integration)"
 	echo "    just test-all             - Run all tests"
+	echo ""
+	echo "  🔍 Check (Lint & Format):"
+	echo "    just check-vault-core     - Lint & format check for vault-core"
+	echo "    just check-desktop        - Lint & format check for desktop"
+	echo "    just check-extension      - Lint & format check for extension"
+	echo "    just check-android        - Lint & format check for Android"
+	echo "    just check-all            - Run all lint & format checks"
 	echo ""
 	echo "  🔧 Utilities:"
 	echo "    just release-all          - Build all apps for release"

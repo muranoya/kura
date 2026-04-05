@@ -1,6 +1,6 @@
 use crate::error::{Result, VaultError};
+use argon2::{Algorithm, Argon2, Params, Version};
 use zeroize::Zeroize;
-use argon2::{Argon2, Algorithm, Version, Params};
 
 /// Key Encryption Key - 32 bytes, automatically zeroized on drop
 #[derive(Clone)]
@@ -35,37 +35,33 @@ pub fn derive_kek(password: &str, params: &crate::models::Argon2Params) -> Resul
         .ok_or_else(|| VaultError::InvalidConfiguration("Invalid salt encoding".to_string()))?;
 
     if salt_bytes.len() < MIN_SALT_LENGTH {
-        return Err(VaultError::InvalidConfiguration(
-            format!("Salt must be at least {} bytes, got {}", MIN_SALT_LENGTH, salt_bytes.len())
-        ));
+        return Err(VaultError::InvalidConfiguration(format!(
+            "Salt must be at least {} bytes, got {}",
+            MIN_SALT_LENGTH,
+            salt_bytes.len()
+        )));
     }
 
     if params.iterations < MIN_ARGON2_ITERATIONS {
-        return Err(VaultError::InvalidConfiguration(
-            format!("Argon2 iterations must be at least {}", MIN_ARGON2_ITERATIONS)
-        ));
+        return Err(VaultError::InvalidConfiguration(format!(
+            "Argon2 iterations must be at least {}",
+            MIN_ARGON2_ITERATIONS
+        )));
     }
 
     if params.memory < MIN_ARGON2_MEMORY {
-        return Err(VaultError::InvalidConfiguration(
-            format!("Argon2 memory must be at least {} KiB", MIN_ARGON2_MEMORY)
-        ));
+        return Err(VaultError::InvalidConfiguration(format!(
+            "Argon2 memory must be at least {} KiB",
+            MIN_ARGON2_MEMORY
+        )));
     }
 
-    let argon2_params = Params::new(
-        params.memory,
-        params.iterations,
-        params.parallelism,
-        None,
-    ).map_err(|e| VaultError::EncryptionError(format!("Invalid Argon2 params: {}", e)))?;
+    let argon2_params = Params::new(params.memory, params.iterations, params.parallelism, None)
+        .map_err(|e| VaultError::EncryptionError(format!("Invalid Argon2 params: {}", e)))?;
 
     let mut hash_output = [0u8; 32];
 
-    let argon2 = Argon2::new(
-        Algorithm::Argon2id,
-        Version::V0x13,
-        argon2_params,
-    );
+    let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, argon2_params);
 
     argon2
         .hash_password_into(password.as_bytes(), &salt_bytes, &mut hash_output)

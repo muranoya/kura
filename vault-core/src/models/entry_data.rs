@@ -1,7 +1,7 @@
+use crate::{error::Result, VaultError};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use zeroize::Zeroize;
-use crate::{VaultError, error::Result};
 
 /// Known custom field types for validation at creation/edit time.
 /// Unknown types from newer clients are preserved as-is (stored as String).
@@ -76,7 +76,12 @@ impl Drop for EntryData {
 }
 
 impl EntryData {
-    pub fn new_login(url: Option<String>, username: String, password: String, notes: Option<String>) -> Self {
+    pub fn new_login(
+        url: Option<String>,
+        username: String,
+        password: String,
+        notes: Option<String>,
+    ) -> Self {
         EntryData {
             entry_type: "login".to_string(),
             notes,
@@ -89,7 +94,15 @@ impl EntryData {
         }
     }
 
-    pub fn new_bank(bank_name: String, account_holder: String, branch_code: String, account_type: String, account_number: String, pin: String, notes: Option<String>) -> Self {
+    pub fn new_bank(
+        bank_name: String,
+        account_holder: String,
+        branch_code: String,
+        account_type: String,
+        account_number: String,
+        pin: String,
+        notes: Option<String>,
+    ) -> Self {
         EntryData {
             entry_type: "bank".to_string(),
             notes,
@@ -127,7 +140,14 @@ impl EntryData {
         }
     }
 
-    pub fn new_credit_card(cardholder: String, number: String, expiry: String, cvv: String, pin: String, notes: Option<String>) -> Self {
+    pub fn new_credit_card(
+        cardholder: String,
+        number: String,
+        expiry: String,
+        cvv: String,
+        pin: String,
+        notes: Option<String>,
+    ) -> Self {
         EntryData {
             entry_type: "credit_card".to_string(),
             notes,

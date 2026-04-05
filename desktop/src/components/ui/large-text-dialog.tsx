@@ -1,9 +1,4 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from './dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog'
 
 interface LargeTextDialogProps {
   open: boolean

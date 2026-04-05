@@ -1,5 +1,12 @@
 // Entry types supported by kura
-export type EntryType = 'login' | 'bank' | 'ssh_key' | 'secure_note' | 'credit_card' | 'password' | 'software_license'
+export type EntryType =
+  | 'login'
+  | 'bank'
+  | 'ssh_key'
+  | 'secure_note'
+  | 'credit_card'
+  | 'password'
+  | 'software_license'
 
 // Custom field types
 export type CustomFieldType = 'text' | 'password' | 'email' | 'url' | 'phone' | 'totp'
@@ -85,4 +92,19 @@ export interface AppSettings {
   clipboardClearSeconds: number
   autolockMinutes: number
   theme?: 'light' | 'dark'
+}
+
+// Autofill types
+
+/** Credential candidate shown in the dropdown (no password) */
+export interface AutofillCredentialCandidate {
+  entryId: string
+  name: string
+  username: string | null
+}
+
+/** Full credential data sent only when the user selects a candidate */
+export interface AutofillFillData {
+  username: string | null
+  password: string | null
 }

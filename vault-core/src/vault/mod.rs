@@ -1,12 +1,12 @@
-mod locked;
 mod entries;
 mod labels;
+mod locked;
 mod security;
 mod state;
 
+use crate::crypto::Dek;
 use crate::models::VaultMeta;
 use crate::store::VaultContents;
-use crate::crypto::Dek;
 use crate::store::VaultFile;
 
 /// Current schema version for vault.json

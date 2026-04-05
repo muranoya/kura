@@ -85,9 +85,7 @@ export default function EntryCard(props: EntryCardProps) {
         <div className="flex items-center justify-between gap-3">
           {/* 左側: アイコン + 名前 */}
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div
-              className="flex-shrink-0 w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center text-accent"
-            >
+            <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
               {React.cloneElement(
                 getEntryIcon(props.entry.entryType) as React.ReactElement<{ size: number }>,
                 { size: 16 },
@@ -98,9 +96,7 @@ export default function EntryCard(props: EntryCardProps) {
                 {props.entry.name}
               </h3>
               {props.entry.subtitle && (
-                <p className="text-xs text-text-muted truncate mt-0.5">
-                  {props.entry.subtitle}
-                </p>
+                <p className="text-xs text-text-muted truncate mt-0.5">{props.entry.subtitle}</p>
               )}
             </div>
           </div>

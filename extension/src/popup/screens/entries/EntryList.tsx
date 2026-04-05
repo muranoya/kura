@@ -1,22 +1,33 @@
-import { Copy, Eye, EyeOff, Maximize2, Pencil, Plus, Search, Settings, Trash2, X } from 'lucide-react'
+import {
+  Copy,
+  Eye,
+  EyeOff,
+  Maximize2,
+  Pencil,
+  Plus,
+  Search,
+  Settings,
+  Trash2,
+  X,
+} from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { markdownComponents } from '../../components/ui/markdown-components'
+import remarkGfm from 'remark-gfm'
 import { STORAGE_KEYS } from '../../../shared/constants'
 import { getFromStorage, saveToStorage } from '../../../shared/storage'
+import type { Entry, EntryRow, EntryType, SortConfig } from '../../../shared/types'
 import * as commands from '../../commands'
 import EntryCard, { getTypeLabel } from '../../components/entries/EntryCard'
 import EntryListPanel from '../../components/entries/EntryListPanel'
+import TotpCustomFieldDisplay from '../../components/entries/TotpCustomFieldDisplay'
 import { EmptyState } from '../../components/layout/EmptyState'
 import { SyncActions } from '../../components/layout/SyncActions'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
-import TotpCustomFieldDisplay from '../../components/entries/TotpCustomFieldDisplay'
 import { LargeTextDialog } from '../../components/ui/large-text-dialog'
-import type { Entry, EntryRow, EntryType, SortConfig } from '../../../shared/types'
+import { markdownComponents } from '../../components/ui/markdown-components'
 
 const DEFAULT_SORT: SortConfig = { field: 'created_at', order: 'desc' }
 
@@ -77,7 +88,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
   const [allLabels, setAllLabels] = useState<Array<{ id: string; name: string }>>([])
   const [unmaskedFields, setUnmaskedFields] = useState<Set<string>>(new Set())
   const toggleFieldMask = (key: string) => {
-    setUnmaskedFields(prev => {
+    setUnmaskedFields((prev) => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
@@ -90,17 +101,34 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
     if (initialSelectedId) {
       navigate(location.pathname, { replace: true, state: {} })
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initialSelectedId, navigate, location.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // マウント時にラベル一覧を取得（フィルターUI用）
   useEffect(() => {
     commands.listLabels().then(setAllLabels).catch(console.error)
   }, [])
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: loadEntries is stable
+  const loadEntries = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await commands.listEntries({
+        onlyFavorites: isFavorites,
+        labelId: selectedLabelId,
+        sortField: sortConfig.field,
+        sortOrder: sortConfig.order,
+      })
+      setEntries(result)
+    } catch (err) {
+      setError(String(err) || 'Failed to load entries')
+    } finally {
+      setLoading(false)
+    }
+  }, [isFavorites, selectedLabelId, sortConfig])
+
   useEffect(() => {
     loadEntries()
-  }, [isFavorites, selectedLabelId])
+  }, [loadEntries])
 
   // バックグラウンド自動同期の完了を検知してデータを再読み込み
   useEffect(() => {
@@ -111,7 +139,7 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
     }
     chrome.storage.onChanged.addListener(listener)
     return () => chrome.storage.onChanged.removeListener(listener)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadEntries])
 
   // 詳細ペインを読み込み
   useEffect(() => {
@@ -134,24 +162,6 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
 
     loadDetail()
   }, [selectedId])
-
-  const loadEntries = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const result = await commands.listEntries({
-        onlyFavorites: isFavorites,
-        labelId: selectedLabelId,
-        sortField: sortConfig.field,
-        sortOrder: sortConfig.order,
-      })
-      setEntries(result)
-    } catch (err) {
-      setError(String(err) || 'Failed to load entries')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const filteredEntries = useMemo(() => {
     return entries
@@ -180,7 +190,9 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
         prev.map((e) => (e.id === id ? { ...e, isFavorite: !currentFavorite } : e)),
       )
       if (selectedEntry && selectedEntry.id === id) {
-        setSelectedEntry((prev: Entry | null) => (prev ? { ...prev, isFavorite: !currentFavorite } : prev))
+        setSelectedEntry((prev: Entry | null) =>
+          prev ? { ...prev, isFavorite: !currentFavorite } : prev,
+        )
       }
     } catch (err) {
       setError(String(err) || 'Failed to update favorite')
@@ -352,33 +364,38 @@ function PaneFieldDisplay({
   return (
     <div
       className={`flex items-center gap-1.5 px-2 py-1.5 rounded transition-colors ${
-        isEmpty
-          ? 'opacity-50'
-          : 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80'
+        isEmpty ? 'opacity-50' : 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80'
       } ${copied ? 'bg-accent-subtle' : ''}`}
       onClick={handleClick}
       role={isEmpty ? undefined : 'button'}
       tabIndex={isEmpty ? undefined : 0}
-      onKeyDown={isEmpty ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') handleClick() }}
+      onKeyDown={
+        isEmpty
+          ? undefined
+          : (e) => {
+              if (e.key === 'Enter' || e.key === ' ') handleClick()
+            }
+      }
     >
       <span className="text-xs text-text-secondary w-20 shrink-0">{label}</span>
-      <span className={`text-sm flex-1 break-all ${
-        isEmpty
-          ? 'text-text-secondary italic'
-          : isPassword && isMasked
-            ? 'font-mono text-text-primary tracking-wider'
-            : 'font-mono text-text-primary'
-      }`}>
-        {isEmpty
-          ? '未設定'
-          : isPassword && isMasked
-            ? '••••••••'
-            : value}
+      <span
+        className={`text-sm flex-1 break-all ${
+          isEmpty
+            ? 'text-text-secondary italic'
+            : isPassword && isMasked
+              ? 'font-mono text-text-primary tracking-wider'
+              : 'font-mono text-text-primary'
+        }`}
+      >
+        {isEmpty ? '未設定' : isPassword && isMasked ? '••••••••' : value}
       </span>
       {!isEmpty && isPassword && onToggleMask && (
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); onToggleMask() }}
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleMask()
+          }}
           className="p-0.5 text-text-muted hover:text-text-primary transition-colors shrink-0"
         >
           {isMasked ? <EyeOff size={12} /> : <Eye size={12} />}
@@ -387,7 +404,10 @@ function PaneFieldDisplay({
       {!isEmpty && (
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); setLargeTextOpen(true) }}
+          onClick={(e) => {
+            e.stopPropagation()
+            setLargeTextOpen(true)
+          }}
           className="p-0.5 text-text-muted hover:text-text-primary transition-colors shrink-0"
         >
           <Maximize2 size={12} />
@@ -404,7 +424,11 @@ function PaneFieldDisplay({
           }}
           className="p-0.5 text-text-muted hover:text-text-primary transition-colors shrink-0"
         >
-          {copied ? <span className="text-xs text-success">コピーしました</span> : <Copy size={13} />}
+          {copied ? (
+            <span className="text-xs text-success">コピーしました</span>
+          ) : (
+            <Copy size={13} />
+          )}
         </button>
       )}
       {!isEmpty && (
@@ -422,7 +446,9 @@ function PaneFieldDisplay({
 function PaneSectionHeading({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-center gap-1.5 pt-2 pb-0.5 px-0.5">
-      <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">{children}</span>
+      <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">
+        {children}
+      </span>
       <div className="flex-1 border-t border-border" />
     </div>
   )
@@ -615,15 +641,11 @@ function EntryDetailPane({
 
       {/* カスタムフィールド */}
       {entry.customFields && entry.customFields.length > 0 && (
-        <>
-          <div className="space-y-0">
-            {entry.customFields.map((field: { id: string; name: string; value: string; fieldType: string }) =>
+        <div className="space-y-0">
+          {entry.customFields.map(
+            (field: { id: string; name: string; value: string; fieldType: string }) =>
               field.fieldType === 'totp' ? (
-                <TotpCustomFieldDisplay
-                  key={field.id}
-                  label={field.name}
-                  value={field.value}
-                />
+                <TotpCustomFieldDisplay key={field.id} label={field.name} value={field.value} />
               ) : (
                 <PaneFieldDisplay
                   key={field.id}
@@ -631,12 +653,13 @@ function EntryDetailPane({
                   value={field.value}
                   isPassword={field.fieldType === 'password'}
                   isMasked={field.fieldType === 'password' && !unmaskedFields.has(field.id)}
-                  onToggleMask={field.fieldType === 'password' ? () => onToggleFieldMask(field.id) : undefined}
+                  onToggleMask={
+                    field.fieldType === 'password' ? () => onToggleFieldMask(field.id) : undefined
+                  }
                 />
-              )
-            )}
-          </div>
-        </>
+              ),
+          )}
+        </div>
       )}
 
       {/* メモ */}
@@ -651,12 +674,8 @@ function EntryDetailPane({
 
       {/* タイムスタンプ */}
       <div className="mt-4 pt-2 border-t border-border space-y-0.5 text-xs text-text-secondary">
-        {entry.updatedAt > 0 && (
-          <div>更新: {formatTimestamp(entry.updatedAt)}</div>
-        )}
-        {entry.createdAt > 0 && (
-          <div>作成: {formatTimestamp(entry.createdAt)}</div>
-        )}
+        {entry.updatedAt > 0 && <div>更新: {formatTimestamp(entry.updatedAt)}</div>}
+        {entry.createdAt > 0 && <div>作成: {formatTimestamp(entry.createdAt)}</div>}
       </div>
     </div>
   )

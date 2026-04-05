@@ -22,6 +22,9 @@ class PreferencesManager(private val context: Context) {
         val SORT_ORDER = stringPreferencesKey("entry_sort_order")
         val FAVORITES_EXPANDED = booleanPreferencesKey("favorites_expanded")
         val AUTOLOCK_MINUTES = intPreferencesKey("autolock_minutes")
+        val FILTER_TYPE = stringPreferencesKey("filter_type")
+        val FILTER_LABEL_ID = stringPreferencesKey("filter_label_id")
+        val FILTER_FAVORITES_ONLY = booleanPreferencesKey("filter_favorites_only")
     }
 
     val s3ConfigFlow: Flow<String?> get() = secureStorage.s3ConfigFlow
@@ -33,6 +36,9 @@ class PreferencesManager(private val context: Context) {
     val sortOrderFlow: Flow<String> = context.dataStore.data.map { it[SORT_ORDER] ?: "desc" }
     val favoritesExpandedFlow: Flow<Boolean> = context.dataStore.data.map { it[FAVORITES_EXPANDED] ?: true }
     val autolockMinutesFlow: Flow<Int> = context.dataStore.data.map { it[AUTOLOCK_MINUTES] ?: 5 }
+    val filterTypeFlow: Flow<String?> = context.dataStore.data.map { it[FILTER_TYPE] }
+    val filterLabelIdFlow: Flow<String?> = context.dataStore.data.map { it[FILTER_LABEL_ID] }
+    val filterFavoritesOnlyFlow: Flow<Boolean> = context.dataStore.data.map { it[FILTER_FAVORITES_ONLY] ?: false }
 
     suspend fun saveS3Config(configJson: String) {
         secureStorage.saveS3Config(configJson)
@@ -67,6 +73,22 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun saveAutolockMinutes(minutes: Int) {
         context.dataStore.edit { it[AUTOLOCK_MINUTES] = minutes }
+    }
+
+    suspend fun saveFilterType(type: String?) {
+        context.dataStore.edit {
+            if (type != null) it[FILTER_TYPE] = type else it.remove(FILTER_TYPE)
+        }
+    }
+
+    suspend fun saveFilterLabelId(labelId: String?) {
+        context.dataStore.edit {
+            if (labelId != null) it[FILTER_LABEL_ID] = labelId else it.remove(FILTER_LABEL_ID)
+        }
+    }
+
+    suspend fun saveFilterFavoritesOnly(favoritesOnly: Boolean) {
+        context.dataStore.edit { it[FILTER_FAVORITES_ONLY] = favoritesOnly }
     }
 
     fun hasBiometricData(): Boolean = secureStorage.hasBiometricData()

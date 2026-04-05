@@ -1,4 +1,4 @@
-use vault_core::{LockedVault, EntryData};
+use vault_core::{EntryData, LockedVault};
 
 #[cfg(any(feature = "desktop", feature = "android", feature = "wasm"))]
 use vault_core::api::VaultManager;
@@ -11,7 +11,9 @@ fn test_vault_create_unlock_lock_cycle() {
     let locked = LockedVault::create_new(master_password).expect("Failed to create vault");
 
     // Unlock with correct password
-    let mut unlocked = locked.unlock(master_password).expect("Failed to unlock vault");
+    let mut unlocked = locked
+        .unlock(master_password)
+        .expect("Failed to unlock vault");
 
     // Create an entry
     let entry = unlocked
@@ -85,7 +87,10 @@ fn test_entry_encryption_decryption() {
     // Check that the decrypted content matches original
     if let vault_core::serde_json::Value::Object(ref retrieved_obj) = retrieved.data.typed_value {
         if let Some(vault_core::serde_json::Value::String(content)) = retrieved_obj.get("content") {
-            assert_eq!(content, original_content, "Content should match after encryption/decryption");
+            assert_eq!(
+                content, original_content,
+                "Content should match after encryption/decryption"
+            );
         } else {
             panic!("Content field not found or not a string");
         }
@@ -299,7 +304,10 @@ fn test_delete_label_removes_label_id_from_entry() {
         .expect("Failed to get entry")
         .expect("Entry not found");
     assert_eq!(entry_before.labels.len(), 1, "Entry should have 1 label");
-    assert_eq!(entry_before.labels[0], label.id, "Entry should have the created label");
+    assert_eq!(
+        entry_before.labels[0], label.id,
+        "Entry should have the created label"
+    );
 
     // Delete label
     unlocked
@@ -311,7 +319,11 @@ fn test_delete_label_removes_label_id_from_entry() {
         .get_entry(&entry_id)
         .expect("Failed to get entry")
         .expect("Entry not found");
-    assert_eq!(entry_after.labels.len(), 0, "Entry should have no labels after label deletion");
+    assert_eq!(
+        entry_after.labels.len(),
+        0,
+        "Entry should have no labels after label deletion"
+    );
 }
 
 #[test]
@@ -388,7 +400,11 @@ fn test_delete_label_affects_all_entries_with_label() {
         .get_entry(&entry1_id)
         .expect("Failed to get entry 1")
         .expect("Entry 1 not found");
-    assert_eq!(entry1_after.labels.len(), 0, "Entry 1 should have no labels");
+    assert_eq!(
+        entry1_after.labels.len(),
+        0,
+        "Entry 1 should have no labels"
+    );
 
     // Verify entry 2 only has other_label
     let entry2_after = unlocked
@@ -396,15 +412,25 @@ fn test_delete_label_affects_all_entries_with_label() {
         .expect("Failed to get entry 2")
         .expect("Entry 2 not found");
     assert_eq!(entry2_after.labels.len(), 1, "Entry 2 should have 1 label");
-    assert_eq!(entry2_after.labels[0], other_label.id, "Entry 2 should only have other_label");
+    assert_eq!(
+        entry2_after.labels[0], other_label.id,
+        "Entry 2 should only have other_label"
+    );
 
     // Verify entry 3 is unaffected
     let entry3_after = unlocked
         .get_entry(&entry3_id)
         .expect("Failed to get entry 3")
         .expect("Entry 3 not found");
-    assert_eq!(entry3_after.labels.len(), 1, "Entry 3 should still have 1 label");
-    assert_eq!(entry3_after.labels[0], other_label.id, "Entry 3 should still have other_label");
+    assert_eq!(
+        entry3_after.labels.len(),
+        1,
+        "Entry 3 should still have 1 label"
+    );
+    assert_eq!(
+        entry3_after.labels[0], other_label.id,
+        "Entry 3 should still have other_label"
+    );
 }
 
 #[test]
@@ -425,7 +451,11 @@ fn test_merge_rejects_vault_uuid_mismatch() {
     let result = manager.api_merge_remote_vault(other_bytes, "etag-1".to_string());
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(err.contains("Vault UUID mismatch"), "Error should mention UUID mismatch, got: {}", err);
+    assert!(
+        err.contains("Vault UUID mismatch"),
+        "Error should mention UUID mismatch, got: {}",
+        err
+    );
 }
 
 #[test]
@@ -439,7 +469,9 @@ fn test_merge_accepts_same_vault_uuid() {
 
     // 同じvaultをマネージャーにロード
     let manager = VaultManager::new();
-    manager.api_load_vault(vault_bytes.clone(), "etag-1".to_string()).unwrap();
+    manager
+        .api_load_vault(vault_bytes.clone(), "etag-1".to_string())
+        .unwrap();
     manager.api_unlock(password.to_string()).unwrap();
 
     // 同じvaultのバイト列をマージ → UUID一致なので成功
@@ -455,5 +487,8 @@ fn test_delete_label_not_found_returns_error() {
 
     // Try to delete non-existent label
     let result = unlocked.delete_label("non_existent_label_id");
-    assert!(result.is_err(), "Should return error when deleting non-existent label");
+    assert!(
+        result.is_err(),
+        "Should return error when deleting non-existent label"
+    );
 }

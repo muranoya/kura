@@ -1,15 +1,15 @@
-mod raw_json_serde;
+pub mod codec;
 pub mod config;
+pub mod crypto;
 pub mod error;
 pub mod models;
-pub mod crypto;
-pub mod store;
-pub mod storage;
-pub mod vault;
-pub mod sync;
 pub mod password_gen;
-pub mod codec;
+mod raw_json_serde;
+pub mod storage;
+pub mod store;
+pub mod sync;
 pub mod totp;
+pub mod vault;
 
 #[cfg(any(feature = "desktop", feature = "android", feature = "wasm"))]
 pub mod api;
@@ -17,19 +17,18 @@ pub mod api;
 #[cfg(any(feature = "desktop", feature = "android"))]
 pub mod import;
 
-pub use config::{VaultConfig, S3Config};
-pub use error::{VaultError, Result};
+pub use config::{S3Config, VaultConfig};
+pub use crypto::{Dek, Kek, RecoveryKey};
+pub use error::{Result, VaultError};
 pub use models::{
-    Entry, EntryType, EntryFilter, EntryData, Label, VaultMeta, Argon2Params,
-    SortField, SortOrder,
+    Argon2Params, Entry, EntryData, EntryFilter, EntryType, Label, SortField, SortOrder, VaultMeta,
 };
-pub use crypto::{Kek, Dek, RecoveryKey};
-pub use store::{VaultFile, VaultContents, VaultEntry, LabelValue};
+pub use password_gen::{generate_password, PasswordOptions};
 pub use storage::StorageBackend;
-pub use vault::{LockedVault, UnlockedVault};
+pub use store::{LabelValue, VaultContents, VaultEntry, VaultFile};
 pub use sync::SyncResult;
-pub use password_gen::{PasswordOptions, generate_password};
 pub use totp::{generate_totp, generate_totp_default};
+pub use vault::{LockedVault, UnlockedVault};
 
 // Re-export useful types for clients
 pub use serde_json;

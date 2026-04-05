@@ -9,7 +9,11 @@ pub async fn create_vault(vault_id: String, master_password: String) -> Result<S
 }
 
 #[tauri::command]
-pub async fn load_vault(vault_id: String, vault_bytes: Vec<u8>, etag: String) -> Result<(), String> {
+pub async fn load_vault(
+    vault_id: String,
+    vault_bytes: Vec<u8>,
+    etag: String,
+) -> Result<(), String> {
     let manager = get_manager(&vault_id);
     tokio::task::spawn_blocking(move || manager.api_load_vault(vault_bytes, etag))
         .await
@@ -25,7 +29,10 @@ pub async fn unlock(vault_id: String, master_password: String) -> Result<(), Str
 }
 
 #[tauri::command]
-pub async fn unlock_with_recovery_key(vault_id: String, recovery_key: String) -> Result<(), String> {
+pub async fn unlock_with_recovery_key(
+    vault_id: String,
+    recovery_key: String,
+) -> Result<(), String> {
     let manager = get_manager(&vault_id);
     tokio::task::spawn_blocking(move || manager.api_unlock_with_recovery_key(recovery_key))
         .await

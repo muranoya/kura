@@ -1,11 +1,5 @@
 import { getEntryTypeLabel } from '../../shared/constants'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '../ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
 import { getEntryIcon } from './EntryCard'
 
 const ENTRY_TYPES = [

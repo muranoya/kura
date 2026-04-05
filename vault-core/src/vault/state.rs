@@ -27,7 +27,10 @@ impl UnlockedVault {
 
         // Open remote vault file
         let remote_vault_file = VaultFile::from_bytes(&remote_bytes)?;
-        let remote_contents = crate::crypto::encryption::decrypt_vault(&remote_vault_file.encrypted_vault, &self.dek)?;
+        let remote_contents = crate::crypto::encryption::decrypt_vault(
+            &remote_vault_file.encrypted_vault,
+            &self.dek,
+        )?;
 
         // Auto-merge local and remote using LWW + Tombstone strategy
         let merge_result = crate::sync::auto_merge(&self.contents, &remote_contents)?;

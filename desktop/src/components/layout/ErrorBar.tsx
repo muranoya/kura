@@ -17,6 +17,7 @@ export default function ErrorBar() {
         <span className="text-danger/70 text-xs shrink-0">+{errors.length - 1}</span>
       )}
       <button
+        type="button"
         onClick={() => dismissError(latest.key)}
         className="shrink-0 text-danger/70 hover:text-danger cursor-pointer"
       >

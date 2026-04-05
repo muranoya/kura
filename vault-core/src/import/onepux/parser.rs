@@ -7,14 +7,16 @@ use super::types::*;
 /// Parse a .1pux file (ZIP archive) and extract all items as ParsedItems.
 pub fn parse_1pux(file_bytes: &[u8]) -> Result<Vec<ParsedItem>> {
     let cursor = std::io::Cursor::new(file_bytes);
-    let mut archive = zip::ZipArchive::new(cursor)
-        .map_err(|e| VaultError::InvalidInput(format!("Invalid 1pux file (not a valid ZIP): {}", e)))?;
+    let mut archive = zip::ZipArchive::new(cursor).map_err(|e| {
+        VaultError::InvalidInput(format!("Invalid 1pux file (not a valid ZIP): {}", e))
+    })?;
 
     // Read export.data from the ZIP
     let mut export_data = String::new();
     {
-        let mut file = archive.by_name("export.data")
-            .map_err(|_| VaultError::InvalidInput("1pux file does not contain export.data".to_string()))?;
+        let mut file = archive.by_name("export.data").map_err(|_| {
+            VaultError::InvalidInput("1pux file does not contain export.data".to_string())
+        })?;
         file.read_to_string(&mut export_data)
             .map_err(|e| VaultError::InvalidInput(format!("Failed to read export.data: {}", e)))?;
     }
@@ -24,7 +26,8 @@ pub fn parse_1pux(file_bytes: &[u8]) -> Result<Vec<ParsedItem>> {
 
     // Check if there are attachment files in the ZIP
     let has_files_dir = (0..archive.len()).any(|i| {
-        archive.by_index(i)
+        archive
+            .by_index(i)
             .map(|f| f.name().starts_with("files/"))
             .unwrap_or(false)
     });
@@ -50,7 +53,8 @@ pub fn extract_metadata(file_bytes: &[u8]) -> Result<(String, Vec<String>)> {
 
     let mut export_data = String::new();
     {
-        let mut file = archive.by_name("export.data")
+        let mut file = archive
+            .by_name("export.data")
             .map_err(|_| VaultError::InvalidInput("No export.data".to_string()))?;
         file.read_to_string(&mut export_data)
             .map_err(|e| VaultError::InvalidInput(format!("Read error: {}", e)))?;
@@ -59,11 +63,15 @@ pub fn extract_metadata(file_bytes: &[u8]) -> Result<(String, Vec<String>)> {
     let export: OnePuxExport = serde_json::from_str(&export_data)
         .map_err(|e| VaultError::InvalidInput(format!("JSON error: {}", e)))?;
 
-    let account_name = export.accounts.first()
+    let account_name = export
+        .accounts
+        .first()
         .map(|a| a.attrs.account_name.clone())
         .unwrap_or_default();
 
-    let vault_names: Vec<String> = export.accounts.iter()
+    let vault_names: Vec<String> = export
+        .accounts
+        .iter()
         .flat_map(|a| a.vaults.iter().map(|v| v.attrs.name.clone()))
         .collect();
 
@@ -108,7 +116,12 @@ fn convert_item(item: &OnePuxItem, vault_name: &str, _has_files_dir: bool) -> Pa
 
             if let Some(parsed) = parse_section_field_value(&field.value) {
                 // Skip empty values
-                if parsed.as_str().is_empty() && !matches!(parsed, ParsedFieldValue::Date(_) | ParsedFieldValue::MonthYear(_)) {
+                if parsed.as_str().is_empty()
+                    && !matches!(
+                        parsed,
+                        ParsedFieldValue::Date(_) | ParsedFieldValue::MonthYear(_)
+                    )
+                {
                     continue;
                 }
                 fields.push(ParsedField {
@@ -121,13 +134,19 @@ fn convert_item(item: &OnePuxItem, vault_name: &str, _has_files_dir: bool) -> Pa
         }
     }
 
-    let url = item.overview.url.clone()
+    let url = item
+        .overview
+        .url
+        .clone()
         .or_else(|| item.overview.urls.first().map(|u| u.url.clone()));
 
     let urls: Vec<String> = item.overview.urls.iter().map(|u| u.url.clone()).collect();
 
     let has_attachments = item.details.document_attributes.is_some();
-    let attachment_file_name = item.details.document_attributes.as_ref()
+    let attachment_file_name = item
+        .details
+        .document_attributes
+        .as_ref()
         .and_then(|da| da.file_name.clone());
 
     ParsedItem {

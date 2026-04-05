@@ -205,11 +205,9 @@ impl ParsedFieldValue {
 
     pub fn to_string_value(&self) -> String {
         match self {
-            ParsedFieldValue::Date(ts) => {
-                chrono::DateTime::from_timestamp(*ts, 0)
-                    .map(|dt| dt.format("%Y-%m-%d").to_string())
-                    .unwrap_or_else(|| ts.to_string())
-            }
+            ParsedFieldValue::Date(ts) => chrono::DateTime::from_timestamp(*ts, 0)
+                .map(|dt| dt.format("%Y-%m-%d").to_string())
+                .unwrap_or_else(|| ts.to_string()),
             ParsedFieldValue::MonthYear(val) => {
                 let year = val / 100;
                 let month = val % 100;
@@ -221,7 +219,10 @@ impl ParsedFieldValue {
 
     pub fn custom_field_type(&self) -> &str {
         match self {
-            ParsedFieldValue::Text(_) | ParsedFieldValue::Date(_) | ParsedFieldValue::MonthYear(_) | ParsedFieldValue::Address(_) => "text",
+            ParsedFieldValue::Text(_)
+            | ParsedFieldValue::Date(_)
+            | ParsedFieldValue::MonthYear(_)
+            | ParsedFieldValue::Address(_) => "text",
             ParsedFieldValue::Concealed(_) => "password",
             ParsedFieldValue::Email(_) => "email",
             ParsedFieldValue::Url(_) => "url",

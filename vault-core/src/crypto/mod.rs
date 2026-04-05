@@ -1,9 +1,9 @@
-pub mod kdf;
+pub mod config;
 pub mod dek;
 pub mod encryption;
+pub mod kdf;
 pub mod recovery;
-pub mod config;
 
-pub use kdf::Kek;
 pub use dek::Dek;
+pub use kdf::Kek;
 pub use recovery::RecoveryKey;

@@ -120,9 +120,7 @@ export function EntryFilterBar({
     <div className="flex gap-2">
       <Select
         value={selectedType ?? 'all'}
-        onValueChange={(value) =>
-          onTypeChange(value === 'all' ? undefined : (value as EntryType))
-        }
+        onValueChange={(value) => onTypeChange(value === 'all' ? undefined : (value as EntryType))}
       >
         <SelectTrigger className="w-[140px]">
           <SelectValue placeholder="カテゴリ" />

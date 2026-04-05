@@ -2,12 +2,12 @@ import { Check, X } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { S3Config } from '../../../shared/types'
-import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Label } from '../../components/ui/label'
 import { PasswordInput } from '../../components/ui/password-input'
+import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
 
 export default function MasterPassword() {
   const navigate = useNavigate()
@@ -55,7 +55,9 @@ export default function MasterPassword() {
           })
         })
 
-        navigate('/onb/recovery', { state: { recoveryKey: response.recoveryKey, fromOnboarding: true } })
+        navigate('/onb/recovery', {
+          state: { recoveryKey: response.recoveryKey, fromOnboarding: true },
+        })
       } else {
         const errorMsg = response?.error || 'Vault作成に失敗しました'
         alert(errorMsg)
@@ -125,7 +127,6 @@ export default function MasterPassword() {
                 </div>
               )}
             </div>
-
           </CardContent>
         </Card>
 

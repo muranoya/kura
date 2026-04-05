@@ -147,7 +147,6 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                 </label>
               </div>
 
-
               <div className="flex items-center gap-2">
                 <input
                   id={`numbers-${isInline ? 'inline' : 'screen'}`}
@@ -266,7 +265,6 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                     大文字 (A-Z)
                   </label>
                 </div>
-
 
                 <div className="flex items-center gap-2">
                   <input

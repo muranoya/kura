@@ -44,15 +44,15 @@ export default function TotpDisplay({ totp, period = 30 }: TotpDisplayProps) {
       >
         {totp}
       </span>
-      <svg width="28" height="28" viewBox="0 0 28 28" style={{ flexShrink: 0 }}>
-        <circle
-          cx="14"
-          cy="14"
-          r={radius}
-          fill="none"
-          stroke="#e5e7eb"
-          strokeWidth="2.5"
-        />
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 28 28"
+        role="img"
+        aria-label="TOTP countdown"
+        style={{ flexShrink: 0 }}
+      >
+        <circle cx="14" cy="14" r={radius} fill="none" stroke="#e5e7eb" strokeWidth="2.5" />
         <circle
           cx="14"
           cy="14"

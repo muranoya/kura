@@ -118,7 +118,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                 min="1"
                 max="128"
                 value={length}
-                onChange={(e) => setLength(Number.parseInt(e.target.value))}
+                onChange={(e) => setLength(Number.parseInt(e.target.value, 10))}
                 className="h-2 px-0 py-0 w-full"
               />
               <div className="flex gap-2 text-sm text-text-secondary">
@@ -144,7 +144,6 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                   大文字 (A-Z)
                 </label>
               </div>
-
 
               <div className="flex items-center gap-2">
                 <input
@@ -240,7 +239,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                     min="1"
                     max="128"
                     value={length}
-                    onChange={(e) => setLength(Number.parseInt(e.target.value))}
+                    onChange={(e) => setLength(Number.parseInt(e.target.value, 10))}
                     className="h-2 px-0 py-0 w-full"
                   />
                 </div>
@@ -264,7 +263,6 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                     大文字 (A-Z)
                   </label>
                 </div>
-
 
                 <div className="flex items-center gap-2">
                   <input

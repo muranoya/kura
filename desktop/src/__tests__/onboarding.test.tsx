@@ -40,7 +40,10 @@ const mockedCommands = vi.mocked(commands)
 // Helper: render onboarding flow with all routes
 function renderOnboarding(initialRoute = '/') {
   return render(
-    <MemoryRouter initialEntries={[initialRoute]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter
+      initialEntries={[initialRoute]}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <Routes>
         <Route path="/" element={<Welcome />} />
         <Route path="/onb/storage" element={<StorageSetup />} />

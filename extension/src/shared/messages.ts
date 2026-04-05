@@ -1,6 +1,13 @@
 // Type-safe messaging between popup and Service Worker
 
-import type { EntryFilter, EntryRow, Label, SyncConflict } from '../vault/types'
+import type {
+  AutofillCredentialCandidate,
+  AutofillFillData,
+  EntryFilter,
+  EntryRow,
+  Label,
+  SyncConflict,
+} from '../vault/types'
 
 export type Message =
   // Auth
@@ -52,11 +59,11 @@ export type Message =
       type: 'GENERATE_PASSWORD'
       length: number
       includeUppercase: boolean
-      includeLowercase: boolean
       includeNumbers: boolean
       includeSymbols: boolean
     }
   | { type: 'GENERATE_TOTP'; secret: string }
+  | { type: 'GENERATE_TOTP_FROM_VALUE'; value: string }
 
   // Security
   | { type: 'CHANGE_MASTER_PASSWORD'; oldPassword: string; newPassword: string }
@@ -74,6 +81,10 @@ export type Message =
   | { type: 'GET_SETTINGS' }
   | { type: 'SAVE_SETTINGS'; settings: Record<string, unknown> }
   | { type: 'CLIPBOARD_COPIED' }
+
+  // Autofill (Content Script → Service Worker)
+  | { type: 'AUTOFILL_GET_CREDENTIALS'; url: string }
+  | { type: 'AUTOFILL_FILL_REQUEST'; entryId: string }
 
 export type MessageResponse =
   // Common
@@ -123,6 +134,12 @@ export type MessageResponse =
   // Settings responses
   | ({ success: true } & {
       settings?: Record<string, unknown>
+    })
+
+  // Autofill responses
+  | ({ success: true } & {
+      credentials?: AutofillCredentialCandidate[]
+      fillData?: AutofillFillData
     })
 
 export function sendMessage<T extends Message>(

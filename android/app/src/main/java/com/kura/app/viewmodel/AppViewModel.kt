@@ -13,7 +13,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class AppState {
     LOADING, ONBOARDING, LOCKED, UNLOCKED
@@ -97,15 +99,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun onAppForegrounded() {
         autolockJob?.cancel()
         autolockJob = null
+        if (_appState.value == AppState.UNLOCKED) {
+            viewModelScope.launch {
+                val unlocked = try { repository.isUnlocked() } catch (_: Exception) { false }
+                if (!unlocked) {
+                    _appState.value = AppState.LOCKED
+                }
+            }
+        }
     }
 
     private suspend fun performAutoLock() {
-        try {
-            val encryptedBytes = repository.lock()
-            repository.writeVaultFile(encryptedBytes)
-            _appState.value = AppState.LOCKED
-        } catch (_: Exception) {
-            // Lock failed - vault remains in current state
+        withContext(NonCancellable) {
+            try {
+                val encryptedBytes = repository.lock()
+                repository.writeVaultFile(encryptedBytes)
+                _appState.value = AppState.LOCKED
+            } catch (_: Exception) {
+                // Lock failed - vault remains in current state
+            }
         }
     }
 

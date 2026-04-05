@@ -221,7 +221,14 @@ export async function updateEntry(
 ): Promise<void> {
   await ensureWasmReady()
   try {
-    wasm.api_update_entry(DEFAULT_VAULT_ID, id, name, notes || null, JSON.stringify(typedValue), labelIds || [])
+    wasm.api_update_entry(
+      DEFAULT_VAULT_ID,
+      id,
+      name,
+      notes || null,
+      JSON.stringify(typedValue),
+      labelIds || [],
+    )
   } catch (error) {
     console.error('[Vault] Failed to update entry:', error)
     throw error

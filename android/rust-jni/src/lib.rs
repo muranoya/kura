@@ -14,8 +14,11 @@ fn with_manager<F, R>(vault_id: &str, f: F) -> R
 where
     F: FnOnce(&VaultManager) -> R,
 {
-    let mut map = MANAGERS.lock().unwrap_or_else(|p: PoisonError<_>| p.into_inner());
-    let manager = map.entry(vault_id.to_string())
+    let mut map = MANAGERS
+        .lock()
+        .unwrap_or_else(|p: PoisonError<_>| p.into_inner());
+    let manager = map
+        .entry(vault_id.to_string())
         .or_insert_with(|| Arc::new(VaultManager::new()));
     f(manager)
 }
@@ -29,19 +32,13 @@ fn get_optional_string(env: &mut JNIEnv, s: &JString) -> Option<String> {
     if s.is_null() {
         None
     } else {
-        Some(
-            env.get_string(s)
-                .expect("Failed to get string")
-                .into(),
-        )
+        Some(env.get_string(s).expect("Failed to get string").into())
     }
 }
 
 /// Get a Rust String from a JString (non-null).
 fn get_string(env: &mut JNIEnv, s: &JString) -> String {
-    env.get_string(s)
-        .expect("Failed to get string")
-        .into()
+    env.get_string(s).expect("Failed to get string").into()
 }
 
 /// Throw a RuntimeException and return a default value.
@@ -52,7 +49,8 @@ fn throw_err<T: Default>(env: &mut JNIEnv, msg: &str) -> T {
 
 /// Convert a byte[] to Vec<u8>.
 fn get_byte_array(env: &mut JNIEnv, arr: &JByteArray) -> Vec<u8> {
-    env.convert_byte_array(arr).expect("Failed to convert byte array")
+    env.convert_byte_array(arr)
+        .expect("Failed to convert byte array")
 }
 
 // ============================================================================
@@ -66,7 +64,9 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_destroyVault(
     vault_id: JString,
 ) {
     let vid = get_string(&mut env, &vault_id);
-    let mut map = MANAGERS.lock().unwrap_or_else(|p: PoisonError<_>| p.into_inner());
+    let mut map = MANAGERS
+        .lock()
+        .unwrap_or_else(|p: PoisonError<_>| p.into_inner());
     map.remove(&vid);
 }
 
@@ -252,8 +252,7 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_createEntry(
     let li_json = get_string(&mut env, &label_ids_json);
     let cf = get_optional_string(&mut env, &custom_fields_json);
 
-    let label_ids: Vec<String> =
-        serde_json::from_str(&li_json).unwrap_or_default();
+    let label_ids: Vec<String> = serde_json::from_str(&li_json).unwrap_or_default();
 
     match with_manager(&vid, |m| m.api_create_entry(et, n, no, tv, label_ids, cf)) {
         Ok(id) => env.new_string(id).unwrap().into_raw(),
@@ -280,8 +279,8 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_updateEntry(
     let no = get_optional_string(&mut env, &notes);
     let cf = get_optional_string(&mut env, &custom_fields_json);
 
-    let li: Option<Vec<String>> = get_optional_string(&mut env, &label_ids_json)
-        .and_then(|s| serde_json::from_str(&s).ok());
+    let li: Option<Vec<String>> =
+        get_optional_string(&mut env, &label_ids_json).and_then(|s| serde_json::from_str(&s).ok());
 
     if let Err(e) = with_manager(&vid, |m| m.api_update_entry(entry_id, n, no, tv, li, cf)) {
         let _ = env.throw_new("java/lang/RuntimeException", &e);
@@ -422,8 +421,7 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_setEntryLabels(
     let vid = get_string(&mut env, &vault_id);
     let eid = get_string(&mut env, &entry_id);
     let li_json = get_string(&mut env, &label_ids_json);
-    let label_ids: Vec<String> =
-        serde_json::from_str(&li_json).unwrap_or_default();
+    let label_ids: Vec<String> = serde_json::from_str(&li_json).unwrap_or_default();
     if let Err(e) = with_manager(&vid, |m| m.api_set_entry_labels(eid, label_ids)) {
         let _ = env.throw_new("java/lang/RuntimeException", &e);
     }
@@ -635,4 +633,3 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_restoreLastSyncTime(
     let vid = get_string(&mut env, &vault_id);
     with_manager(&vid, |m| m.api_restore_last_sync_time(ts));
 }
-

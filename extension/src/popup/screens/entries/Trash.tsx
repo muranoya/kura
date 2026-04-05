@@ -1,12 +1,12 @@
 import { RotateCcw, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { STORAGE_KEYS } from '../../../shared/constants'
+import type { EntryRow } from '../../../shared/types'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { EmptyState } from '../../components/layout/EmptyState'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
-import type { EntryRow } from '../../../shared/types'
 
 export default function Trash() {
   const [entries, setEntries] = useState<EntryRow[]>([])
@@ -15,22 +15,7 @@ export default function Trash() {
   const [confirmPurgeOpen, setConfirmPurgeOpen] = useState(false)
   const [selectedPurgeId, setSelectedPurgeId] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadTrash()
-  }, [])
-
-  // バックグラウンド自動同期の完了を検知してデータを再読み込み
-  useEffect(() => {
-    const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
-      if (changes[STORAGE_KEYS.LAST_SYNC_TIME]) {
-        loadTrash()
-      }
-    }
-    chrome.storage.onChanged.addListener(listener)
-    return () => chrome.storage.onChanged.removeListener(listener)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadTrash = async () => {
+  const loadTrash = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -41,7 +26,22 @@ export default function Trash() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadTrash()
+  }, [loadTrash])
+
+  // バックグラウンド自動同期の完了を検知してデータを再読み込み
+  useEffect(() => {
+    const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+      if (changes[STORAGE_KEYS.LAST_SYNC_TIME]) {
+        loadTrash()
+      }
+    }
+    chrome.storage.onChanged.addListener(listener)
+    return () => chrome.storage.onChanged.removeListener(listener)
+  }, [loadTrash])
 
   const handleRestore = async (id: string) => {
     try {

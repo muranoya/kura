@@ -4,9 +4,9 @@ import { ConfirmDialog } from '../../components/ConfirmDialog'
 import EntryCard from '../../components/entries/EntryCard'
 import EntryListPanel, { EntryFilterBar } from '../../components/entries/EntryListPanel'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
+import { useSyncVersion } from '../../contexts/SyncContext'
 import { STORAGE_KEYS } from '../../shared/constants'
 import { getFromStorage, saveToStorage } from '../../shared/storage'
-import { useSyncVersion } from '../../contexts/SyncContext'
 import type { EntryRow, EntryType, SortConfig } from '../../shared/types'
 
 const DEFAULT_SORT: SortConfig = { field: 'created_at', order: 'desc' }

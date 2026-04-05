@@ -24,9 +24,11 @@ fn unique_key() -> String {
 /// Create vault and unlock it. Returns (manager, recovery key).
 fn setup_unlocked_vault() -> (VaultManager, String) {
     let m = VaultManager::new();
-    let recovery_key =
-        m.api_create_new_vault(TEST_PASSWORD.to_string()).expect("Failed to create vault");
-    m.api_unlock(TEST_PASSWORD.to_string()).expect("Failed to unlock vault");
+    let recovery_key = m
+        .api_create_new_vault(TEST_PASSWORD.to_string())
+        .expect("Failed to create vault");
+    m.api_unlock(TEST_PASSWORD.to_string())
+        .expect("Failed to unlock vault");
     (m, recovery_key)
 }
 
@@ -37,8 +39,9 @@ fn setup_unlocked_vault() -> (VaultManager, String) {
 #[test]
 fn test_create_vault_returns_recovery_key() {
     let m = VaultManager::new();
-    let recovery_key =
-        m.api_create_new_vault(TEST_PASSWORD.to_string()).expect("Failed to create vault");
+    let recovery_key = m
+        .api_create_new_vault(TEST_PASSWORD.to_string())
+        .expect("Failed to create vault");
     assert!(!recovery_key.is_empty());
     // After create, session is Locked
     assert!(!m.api_is_unlocked());
@@ -47,10 +50,12 @@ fn test_create_vault_returns_recovery_key() {
 #[test]
 fn test_create_unlock_lock_cycle() {
     let m = VaultManager::new();
-    m.api_create_new_vault(TEST_PASSWORD.to_string()).expect("Failed to create vault");
+    m.api_create_new_vault(TEST_PASSWORD.to_string())
+        .expect("Failed to create vault");
 
     // Unlock
-    m.api_unlock(TEST_PASSWORD.to_string()).expect("Failed to unlock");
+    m.api_unlock(TEST_PASSWORD.to_string())
+        .expect("Failed to unlock");
     assert!(m.api_is_unlocked());
 
     // Lock -> returns vault bytes
@@ -59,8 +64,10 @@ fn test_create_unlock_lock_cycle() {
     assert!(!m.api_is_unlocked());
 
     // Reload and unlock again
-    m.api_load_vault(vault_bytes, String::new()).expect("Failed to load vault");
-    m.api_unlock(TEST_PASSWORD.to_string()).expect("Failed to unlock again");
+    m.api_load_vault(vault_bytes, String::new())
+        .expect("Failed to load vault");
+    m.api_unlock(TEST_PASSWORD.to_string())
+        .expect("Failed to unlock again");
     assert!(m.api_is_unlocked());
 }
 
@@ -72,20 +79,24 @@ fn test_recovery_key_unlock() {
     let vault_bytes = m.api_lock().expect("Failed to lock");
 
     // Load and unlock with recovery key
-    m.api_load_vault(vault_bytes, String::new()).expect("Failed to load vault");
-    m.api_unlock_with_recovery_key(recovery_key).expect("Failed to unlock with recovery key");
+    m.api_load_vault(vault_bytes, String::new())
+        .expect("Failed to load vault");
+    m.api_unlock_with_recovery_key(recovery_key)
+        .expect("Failed to unlock with recovery key");
     assert!(m.api_is_unlocked());
 
     // Verify we can list entries (empty)
-    let entries =
-        m.api_list_entries(None, None, None, false, false, None, None).expect("Failed to list entries");
+    let entries = m
+        .api_list_entries(None, None, None, false, false, None, None)
+        .expect("Failed to list entries");
     assert_eq!(entries.len(), 0);
 }
 
 #[test]
 fn test_wrong_password_fails() {
     let m = VaultManager::new();
-    m.api_create_new_vault(TEST_PASSWORD.to_string()).expect("Failed to create vault");
+    m.api_create_new_vault(TEST_PASSWORD.to_string())
+        .expect("Failed to create vault");
     let result = m.api_unlock("wrong-password".to_string());
     assert!(result.is_err());
 }
@@ -93,12 +104,14 @@ fn test_wrong_password_fails() {
 #[test]
 fn test_unlock_succeeds_after_wrong_password() {
     let m = VaultManager::new();
-    m.api_create_new_vault(TEST_PASSWORD.to_string()).expect("Failed to create vault");
+    m.api_create_new_vault(TEST_PASSWORD.to_string())
+        .expect("Failed to create vault");
 
     let result = m.api_unlock("wrong-password".to_string());
     assert!(result.is_err());
 
-    m.api_unlock(TEST_PASSWORD.to_string()).expect("Should unlock with correct password after failed attempt");
+    m.api_unlock(TEST_PASSWORD.to_string())
+        .expect("Should unlock with correct password after failed attempt");
 }
 
 // ============================================================================
@@ -109,18 +122,18 @@ fn test_unlock_succeeds_after_wrong_password() {
 fn test_create_and_get_login_entry() {
     let (m, _) = setup_unlocked_vault();
 
-    let typed_value =
-        r#"{"url":"https://github.com","username":"user@example.com","password":"secret123","totp":null}"#;
+    let typed_value = r#"{"url":"https://github.com","username":"user@example.com","password":"secret123","totp":null}"#;
 
-    let entry_id = m.api_create_entry(
-        "login".to_string(),
-        "GitHub".to_string(),
-        Some("My GitHub account".to_string()),
-        typed_value.to_string(),
-        vec![],
-        None,
-    )
-    .expect("Failed to create entry");
+    let entry_id = m
+        .api_create_entry(
+            "login".to_string(),
+            "GitHub".to_string(),
+            Some("My GitHub account".to_string()),
+            typed_value.to_string(),
+            vec![],
+            None,
+        )
+        .expect("Failed to create entry");
 
     assert!(!entry_id.is_empty());
 
@@ -179,14 +192,30 @@ fn test_create_entries_of_all_types() {
     }
 
     // List all
-    let all = m.api_list_entries(None, None, None, false, false, None, None).expect("Failed to list entries");
+    let all = m
+        .api_list_entries(None, None, None, false, false, None, None)
+        .expect("Failed to list entries");
     assert_eq!(all.len(), 5);
 
     // Filter by type
     for (entry_type, _, _) in &entries_data {
-        let filtered = m.api_list_entries(None, Some(entry_type.to_string()), None, false, false, None, None)
+        let filtered = m
+            .api_list_entries(
+                None,
+                Some(entry_type.to_string()),
+                None,
+                false,
+                false,
+                None,
+                None,
+            )
             .expect("Failed to filter entries");
-        assert_eq!(filtered.len(), 1, "Expected 1 entry for type {}", entry_type);
+        assert_eq!(
+            filtered.len(),
+            1,
+            "Expected 1 entry for type {}",
+            entry_type
+        );
     }
 }
 
@@ -196,15 +225,16 @@ fn test_update_entry() {
 
     let typed_value =
         r#"{"url":"https://example.com","username":"old_user","password":"old_pass","totp":null}"#;
-    let entry_id = m.api_create_entry(
-        "login".to_string(),
-        "Original Name".to_string(),
-        None,
-        typed_value.to_string(),
-        vec![],
-        None,
-    )
-    .expect("Failed to create entry");
+    let entry_id = m
+        .api_create_entry(
+            "login".to_string(),
+            "Original Name".to_string(),
+            None,
+            typed_value.to_string(),
+            vec![],
+            None,
+        )
+        .expect("Failed to create entry");
 
     let new_typed_value =
         r#"{"url":"https://updated.com","username":"new_user","password":"new_pass","totp":null}"#;
@@ -230,47 +260,64 @@ fn test_delete_restore_purge_entry() {
     let (m, _) = setup_unlocked_vault();
 
     let typed_value = r#"{"content":"temp note"}"#;
-    let entry_id = m.api_create_entry(
-        "secure_note".to_string(),
-        "To Delete".to_string(),
-        None,
-        typed_value.to_string(),
-        vec![],
-        None,
-    )
-    .expect("Failed to create entry");
+    let entry_id = m
+        .api_create_entry(
+            "secure_note".to_string(),
+            "To Delete".to_string(),
+            None,
+            typed_value.to_string(),
+            vec![],
+            None,
+        )
+        .expect("Failed to create entry");
 
     // Soft delete
-    m.api_delete_entry(entry_id.clone()).expect("Failed to delete entry");
+    m.api_delete_entry(entry_id.clone())
+        .expect("Failed to delete entry");
 
     // Not in active list
-    let active = m.api_list_entries(None, None, None, false, false, None, None).expect("Failed to list");
+    let active = m
+        .api_list_entries(None, None, None, false, false, None, None)
+        .expect("Failed to list");
     assert_eq!(active.len(), 0);
 
     // In trash list
-    let trash = m.api_list_entries(None, None, None, true, false, None, None).expect("Failed to list trash");
+    let trash = m
+        .api_list_entries(None, None, None, true, false, None, None)
+        .expect("Failed to list trash");
     assert!(trash.iter().any(|e| e.id == entry_id));
 
     // Verify deleted_at is set
-    let detail = m.api_get_entry(entry_id.clone()).expect("Failed to get entry");
+    let detail = m
+        .api_get_entry(entry_id.clone())
+        .expect("Failed to get entry");
     assert!(detail.deleted_at.is_some());
 
     // Restore
-    m.api_restore_entry(entry_id.clone()).expect("Failed to restore entry");
-    let active = m.api_list_entries(None, None, None, false, false, None, None).expect("Failed to list");
+    m.api_restore_entry(entry_id.clone())
+        .expect("Failed to restore entry");
+    let active = m
+        .api_list_entries(None, None, None, false, false, None, None)
+        .expect("Failed to list");
     assert_eq!(active.len(), 1);
 
     // Purge
-    m.api_delete_entry(entry_id.clone()).expect("Failed to delete for purge");
-    m.api_purge_entry(entry_id.clone()).expect("Failed to purge entry");
+    m.api_delete_entry(entry_id.clone())
+        .expect("Failed to delete for purge");
+    m.api_purge_entry(entry_id.clone())
+        .expect("Failed to purge entry");
 
     // Purged entry is a tombstone; not in active list
-    let active = m.api_list_entries(None, None, None, false, false, None, None).expect("Failed to list active");
+    let active = m
+        .api_list_entries(None, None, None, false, false, None, None)
+        .expect("Failed to list active");
     assert_eq!(active.len(), 0);
 
     // Tombstone still exists in HashMap (with deleted_at set), so include_trash=true may include it.
     // Verify the entry is indeed purged by checking purged_at via get_entry.
-    let detail = m.api_get_entry(entry_id).expect("Failed to get purged entry");
+    let detail = m
+        .api_get_entry(entry_id)
+        .expect("Failed to get purged entry");
     assert!(detail.deleted_at.is_some());
 }
 
@@ -279,34 +326,43 @@ fn test_set_favorite() {
     let (m, _) = setup_unlocked_vault();
 
     let typed_value = r#"{"content":"fav note"}"#;
-    let entry_id = m.api_create_entry(
-        "secure_note".to_string(),
-        "Favorite Test".to_string(),
-        None,
-        typed_value.to_string(),
-        vec![],
-        None,
-    )
-    .expect("Failed to create entry");
+    let entry_id = m
+        .api_create_entry(
+            "secure_note".to_string(),
+            "Favorite Test".to_string(),
+            None,
+            typed_value.to_string(),
+            vec![],
+            None,
+        )
+        .expect("Failed to create entry");
 
     // Initially not favorite
-    let detail = m.api_get_entry(entry_id.clone()).expect("Failed to get entry");
+    let detail = m
+        .api_get_entry(entry_id.clone())
+        .expect("Failed to get entry");
     assert!(!detail.is_favorite);
 
     // Set favorite
-    m.api_set_favorite(entry_id.clone(), true).expect("Failed to set favorite");
-    let detail = m.api_get_entry(entry_id.clone()).expect("Failed to get entry");
+    m.api_set_favorite(entry_id.clone(), true)
+        .expect("Failed to set favorite");
+    let detail = m
+        .api_get_entry(entry_id.clone())
+        .expect("Failed to get entry");
     assert!(detail.is_favorite);
 
     // Favorites-only filter
-    let favorites =
-        m.api_list_entries(None, None, None, false, true, None, None).expect("Failed to list favorites");
+    let favorites = m
+        .api_list_entries(None, None, None, false, true, None, None)
+        .expect("Failed to list favorites");
     assert_eq!(favorites.len(), 1);
 
     // Unset favorite
-    m.api_set_favorite(entry_id, false).expect("Failed to unset favorite");
-    let favorites =
-        m.api_list_entries(None, None, None, false, true, None, None).expect("Failed to list favorites");
+    m.api_set_favorite(entry_id, false)
+        .expect("Failed to unset favorite");
+    let favorites = m
+        .api_list_entries(None, None, None, false, true, None, None)
+        .expect("Failed to list favorites");
     assert_eq!(favorites.len(), 0);
 }
 
@@ -318,8 +374,12 @@ fn test_set_favorite() {
 fn test_create_and_list_labels() {
     let (m, _) = setup_unlocked_vault();
 
-    let id1 = m.api_create_label("Work".to_string()).expect("Failed to create label");
-    let id2 = m.api_create_label("Personal".to_string()).expect("Failed to create label");
+    let id1 = m
+        .api_create_label("Work".to_string())
+        .expect("Failed to create label");
+    let id2 = m
+        .api_create_label("Personal".to_string())
+        .expect("Failed to create label");
     assert!(!id1.is_empty());
     assert!(!id2.is_empty());
 
@@ -335,8 +395,11 @@ fn test_create_and_list_labels() {
 fn test_rename_label() {
     let (m, _) = setup_unlocked_vault();
 
-    let label_id = m.api_create_label("Old Name".to_string()).expect("Failed to create label");
-    m.api_rename_label(label_id.clone(), "New Name".to_string()).expect("Failed to rename label");
+    let label_id = m
+        .api_create_label("Old Name".to_string())
+        .expect("Failed to create label");
+    m.api_rename_label(label_id.clone(), "New Name".to_string())
+        .expect("Failed to rename label");
 
     let labels = m.api_list_labels().expect("Failed to list labels");
     assert_eq!(labels.len(), 1);
@@ -347,25 +410,31 @@ fn test_rename_label() {
 fn test_delete_label_cascades_to_entries() {
     let (m, _) = setup_unlocked_vault();
 
-    let label_id = m.api_create_label("ToDelete".to_string()).expect("Failed to create label");
+    let label_id = m
+        .api_create_label("ToDelete".to_string())
+        .expect("Failed to create label");
 
     let typed_value = r#"{"content":"test"}"#;
-    let entry_id = m.api_create_entry(
-        "secure_note".to_string(),
-        "Labeled Entry".to_string(),
-        None,
-        typed_value.to_string(),
-        vec![label_id.clone()],
-        None,
-    )
-    .expect("Failed to create entry");
+    let entry_id = m
+        .api_create_entry(
+            "secure_note".to_string(),
+            "Labeled Entry".to_string(),
+            None,
+            typed_value.to_string(),
+            vec![label_id.clone()],
+            None,
+        )
+        .expect("Failed to create entry");
 
     // Verify entry has the label
-    let detail = m.api_get_entry(entry_id.clone()).expect("Failed to get entry");
+    let detail = m
+        .api_get_entry(entry_id.clone())
+        .expect("Failed to get entry");
     assert_eq!(detail.labels.len(), 1);
 
     // Delete label
-    m.api_delete_label(label_id).expect("Failed to delete label");
+    m.api_delete_label(label_id)
+        .expect("Failed to delete label");
 
     // Label gone from list
     let labels = m.api_list_labels().expect("Failed to list labels");
@@ -380,34 +449,43 @@ fn test_delete_label_cascades_to_entries() {
 fn test_set_entry_labels() {
     let (m, _) = setup_unlocked_vault();
 
-    let label1 = m.api_create_label("Label A".to_string()).expect("Failed to create label");
-    let label2 = m.api_create_label("Label B".to_string()).expect("Failed to create label");
+    let label1 = m
+        .api_create_label("Label A".to_string())
+        .expect("Failed to create label");
+    let label2 = m
+        .api_create_label("Label B".to_string())
+        .expect("Failed to create label");
 
     let typed_value = r#"{"content":"test"}"#;
-    let entry_id = m.api_create_entry(
-        "secure_note".to_string(),
-        "Multi Label".to_string(),
-        None,
-        typed_value.to_string(),
-        vec![],
-        None,
-    )
-    .expect("Failed to create entry");
+    let entry_id = m
+        .api_create_entry(
+            "secure_note".to_string(),
+            "Multi Label".to_string(),
+            None,
+            typed_value.to_string(),
+            vec![],
+            None,
+        )
+        .expect("Failed to create entry");
 
     // Assign both labels
     m.api_set_entry_labels(entry_id.clone(), vec![label1.clone(), label2.clone()])
         .expect("Failed to set labels");
 
-    let detail = m.api_get_entry(entry_id.clone()).expect("Failed to get entry");
+    let detail = m
+        .api_get_entry(entry_id.clone())
+        .expect("Failed to get entry");
     assert_eq!(detail.labels.len(), 2);
 
     // Filter by label
-    let filtered = m.api_list_entries(None, None, Some(label1.clone()), false, false, None, None)
+    let filtered = m
+        .api_list_entries(None, None, Some(label1.clone()), false, false, None, None)
         .expect("Failed to filter by label");
     assert_eq!(filtered.len(), 1);
 
     // Clear labels
-    m.api_set_entry_labels(entry_id.clone(), vec![]).expect("Failed to clear labels");
+    m.api_set_entry_labels(entry_id.clone(), vec![])
+        .expect("Failed to clear labels");
     let detail = m.api_get_entry(entry_id).expect("Failed to get entry");
     assert_eq!(detail.labels.len(), 0);
 }
@@ -474,27 +552,34 @@ fn test_vault_bytes_roundtrip() {
     let (m, _) = setup_unlocked_vault();
 
     // Create some data
-    let label_id = m.api_create_label("Roundtrip".to_string()).expect("Failed to create label");
+    let label_id = m
+        .api_create_label("Roundtrip".to_string())
+        .expect("Failed to create label");
     let typed_value = r#"{"content":"roundtrip test"}"#;
-    let entry_id = m.api_create_entry(
-        "secure_note".to_string(),
-        "Roundtrip Entry".to_string(),
-        Some("roundtrip notes".to_string()),
-        typed_value.to_string(),
-        vec![label_id.clone()],
-        None,
-    )
-    .expect("Failed to create entry");
+    let entry_id = m
+        .api_create_entry(
+            "secure_note".to_string(),
+            "Roundtrip Entry".to_string(),
+            Some("roundtrip notes".to_string()),
+            typed_value.to_string(),
+            vec![label_id.clone()],
+            None,
+        )
+        .expect("Failed to create entry");
 
     // Get vault bytes
     let vault_bytes = m.api_get_vault_bytes().expect("Failed to get vault bytes");
 
     // Create a fresh vault session by loading the bytes
-    m.api_load_vault(vault_bytes, String::new()).expect("Failed to load vault");
-    m.api_unlock(TEST_PASSWORD.to_string()).expect("Failed to unlock");
+    m.api_load_vault(vault_bytes, String::new())
+        .expect("Failed to load vault");
+    m.api_unlock(TEST_PASSWORD.to_string())
+        .expect("Failed to unlock");
 
     // Verify data survived the roundtrip
-    let entries = m.api_list_entries(None, None, None, false, false, None, None).expect("Failed to list");
+    let entries = m
+        .api_list_entries(None, None, None, false, false, None, None)
+        .expect("Failed to list");
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].name, "Roundtrip Entry");
 
@@ -518,15 +603,16 @@ async fn test_push_and_download() {
 
     // Create an entry
     let typed_value = r#"{"content":"sync test"}"#;
-    let entry_id = m.api_create_entry(
-        "secure_note".to_string(),
-        "Sync Entry".to_string(),
-        None,
-        typed_value.to_string(),
-        vec![],
-        None,
-    )
-    .expect("Failed to create entry");
+    let entry_id = m
+        .api_create_entry(
+            "secure_note".to_string(),
+            "Sync Entry".to_string(),
+            None,
+            typed_value.to_string(),
+            vec![],
+            None,
+        )
+        .expect("Failed to create entry");
 
     // Push to MinIO
     let storage = S3Storage::new(minio_config(&key))
@@ -535,7 +621,8 @@ async fn test_push_and_download() {
     m.api_push(&storage).await.expect("Failed to push");
 
     // Overwrite session with a new vault
-    m.api_create_new_vault("temporary-password".to_string()).expect("Failed to create temp vault");
+    m.api_create_new_vault("temporary-password".to_string())
+        .expect("Failed to create temp vault");
 
     // Download from MinIO
     let storage = S3Storage::new(minio_config(&key))
@@ -545,7 +632,8 @@ async fn test_push_and_download() {
     assert!(found);
 
     // Unlock with original password
-    m.api_unlock(TEST_PASSWORD.to_string()).expect("Failed to unlock after download");
+    m.api_unlock(TEST_PASSWORD.to_string())
+        .expect("Failed to unlock after download");
     assert!(m.api_is_unlocked());
 
     // Verify entry exists
@@ -623,7 +711,9 @@ async fn test_sync_merge() {
     m.api_sync(&storage).await.expect("Failed to sync");
 
     // Both entries should exist
-    let entries = m.api_list_entries(None, None, None, false, false, None, None).expect("Failed to list");
+    let entries = m
+        .api_list_entries(None, None, None, false, false, None, None)
+        .expect("Failed to list");
     assert_eq!(entries.len(), 2);
 
     let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
@@ -637,8 +727,11 @@ async fn test_vault_json_on_s3() {
     let (m, _) = setup_unlocked_vault();
 
     // Create entries and labels
-    let label_id = m.api_create_label("S3 Label".to_string()).expect("Failed to create label");
-    let typed_value = r#"{"url":"https://example.com","username":"user","password":"pass","totp":null}"#;
+    let label_id = m
+        .api_create_label("S3 Label".to_string())
+        .expect("Failed to create label");
+    let typed_value =
+        r#"{"url":"https://example.com","username":"user","password":"pass","totp":null}"#;
     m.api_create_entry(
         "login".to_string(),
         "S3 Entry".to_string(),
@@ -663,8 +756,7 @@ async fn test_vault_json_on_s3() {
         .expect("No object found");
     assert!(!etag.is_empty());
 
-    let json: serde_json::Value =
-        serde_json::from_slice(&raw_bytes).expect("Not valid JSON on S3");
+    let json: serde_json::Value = serde_json::from_slice(&raw_bytes).expect("Not valid JSON on S3");
     assert!(json["schema_version"].is_u64());
     assert!(json["meta"].is_object());
     assert!(json["encrypted_vault"].is_string());

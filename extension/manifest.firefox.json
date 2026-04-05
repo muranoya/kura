@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "サーバ不要、自分一人のための、運用コストゼロのパスワードマネージャー",
 
-  "permissions": ["storage", "alarms", "clipboardWrite"],
+  "permissions": ["storage", "alarms", "clipboardWrite", "tabs"],
 
   "action": {
     "default_popup": "src/popup/index.html",
@@ -22,8 +22,16 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["wasm/wasm_bridge_bg.wasm"],
+      "resources": ["wasm/wasm_bridge_bg.wasm", "src/content/dropdown.css"],
       "matches": ["<all_urls>"]
+    }
+  ],
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/main.ts"],
+      "run_at": "document_idle"
     }
   ],
 

@@ -46,10 +46,7 @@ export function ErrorProvider({ children }: { children: React.ReactNode }) {
     })
 
     // Listen for new errors from Service Worker
-    const listener = (
-      changes: { [key: string]: chrome.storage.StorageChange },
-      area: string,
-    ) => {
+    const listener = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
       if (area !== 'local' || !changes[STORAGE_KEYS.LAST_ERROR]) return
       const newError = changes[STORAGE_KEYS.LAST_ERROR].newValue as AppError | undefined
       if (newError) {

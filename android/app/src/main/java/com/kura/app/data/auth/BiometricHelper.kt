@@ -1,5 +1,6 @@
 package com.kura.app.data.auth
 
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
@@ -52,7 +53,14 @@ class BiometricHelper(private val secureStorage: SecureStorage) {
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
             .setKeySize(256)
             .setUserAuthenticationRequired(true)
-            .setUserAuthenticationParameters(0, KeyProperties.AUTH_BIOMETRIC_STRONG)
+            .apply {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    setUserAuthenticationParameters(0, KeyProperties.AUTH_BIOMETRIC_STRONG)
+                } else {
+                    @Suppress("DEPRECATION")
+                    setUserAuthenticationValidityDurationSeconds(-1)
+                }
+            }
             .setInvalidatedByBiometricEnrollment(true)
             .build()
 

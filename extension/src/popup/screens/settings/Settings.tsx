@@ -1,5 +1,5 @@
 import { Check, Copy, ExternalLink, Tags, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DEFAULT_SETTINGS } from '../../../shared/constants'
 import * as commands from '../../commands'
@@ -65,14 +65,12 @@ export default function Settings() {
   const [recoveryKeyDisplayValue, setRecoveryKeyDisplayValue] = useState('')
   const [recoveryKeyCopied, setRecoveryKeyCopied] = useState(false)
 
-  useEffect(() => {
-    loadStorageConfig()
-    loadSettings()
-  }, [])
-
-  const loadStorageConfig = async () => {
+  const loadStorageConfig = useCallback(async () => {
     try {
-      const response = await new Promise<{ success: boolean; config: Record<string, string> | null }>((resolve) => {
+      const response = await new Promise<{
+        success: boolean
+        config: Record<string, string> | null
+      }>((resolve) => {
         chrome.runtime.sendMessage({ type: 'GET_DECRYPTED_S3_CONFIG' }, resolve)
       })
       if (response?.success && response.config) {
@@ -81,16 +79,21 @@ export default function Settings() {
     } catch (err) {
       console.error('Failed to load storage config:', err)
     }
-  }
+  }, [])
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       const settings = await commands.getSettings()
       setAutolockMinutes(settings.autolockMinutes ?? DEFAULT_SETTINGS.autolockMinutes)
     } catch (err) {
       console.error('Failed to load settings:', err)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadStorageConfig()
+    loadSettings()
+  }, [loadStorageConfig, loadSettings])
 
   const handleAutolockChange = async (value: string) => {
     const minutes = Number(value)
@@ -319,9 +322,7 @@ export default function Settings() {
               </div>
               <div>
                 <span className="font-medium text-text-secondary block mb-1">ファイルパス</span>
-                <p className="text-text-primary font-mono break-all">
-                  {storageConfig.key}
-                </p>
+                <p className="text-text-primary font-mono break-all">{storageConfig.key}</p>
               </div>
               {storageConfig.endpoint && (
                 <div>

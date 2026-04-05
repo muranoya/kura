@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import type { CustomField, Entry, Label } from '../../../shared/types'
 import * as commands from '../../commands'
 import EntryForm from '../../components/entries/EntryForm'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
-import type { CustomField, Entry, Label } from '../../../shared/types'
 
 export default function EntryEdit() {
   const { id } = useParams<{ id: string }>()

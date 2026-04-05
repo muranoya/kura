@@ -6,11 +6,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import remarkGfm from 'remark-gfm'
 import * as commands from '../../commands'
 import TotpCustomFieldDisplay from '../../components/entries/TotpCustomFieldDisplay'
-import { LargeTextDialog } from '../../components/ui/large-text-dialog'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
-import { usePushError } from '../../contexts/ErrorContext'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
+import { LargeTextDialog } from '../../components/ui/large-text-dialog'
+import { usePushError } from '../../contexts/ErrorContext'
 import { getEntryTypeLabel } from '../../shared/constants'
 import type { Entry, Label } from '../../shared/types'
 
@@ -50,33 +50,38 @@ function FieldDisplay({
   return (
     <div
       className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
-        isEmpty
-          ? 'opacity-50'
-          : 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80'
+        isEmpty ? 'opacity-50' : 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80'
       } ${copied ? 'bg-accent-subtle' : ''}`}
       onClick={handleClick}
       role={isEmpty ? undefined : 'button'}
       tabIndex={isEmpty ? undefined : 0}
-      onKeyDown={isEmpty ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') handleClick() }}
+      onKeyDown={
+        isEmpty
+          ? undefined
+          : (e) => {
+              if (e.key === 'Enter' || e.key === ' ') handleClick()
+            }
+      }
     >
       <span className="text-xs text-text-secondary w-24 shrink-0">{label}</span>
-      <span className={`text-sm flex-1 break-all ${
-        isEmpty
-          ? 'text-text-secondary italic'
-          : isPassword && isMasked
-            ? 'font-mono text-text-primary tracking-wider'
-            : 'font-mono text-text-primary'
-      }`}>
-        {isEmpty
-          ? '未設定'
-          : isPassword && isMasked
-            ? '••••••••'
-            : value}
+      <span
+        className={`text-sm flex-1 break-all ${
+          isEmpty
+            ? 'text-text-secondary italic'
+            : isPassword && isMasked
+              ? 'font-mono text-text-primary tracking-wider'
+              : 'font-mono text-text-primary'
+        }`}
+      >
+        {isEmpty ? '未設定' : isPassword && isMasked ? '••••••••' : value}
       </span>
       {!isEmpty && isPassword && onToggleMask && (
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); onToggleMask() }}
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleMask()
+          }}
           className="p-1 text-text-muted hover:text-text-primary transition-colors shrink-0"
         >
           {isMasked ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -85,7 +90,10 @@ function FieldDisplay({
       {!isEmpty && (
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); setLargeTextOpen(true) }}
+          onClick={(e) => {
+            e.stopPropagation()
+            setLargeTextOpen(true)
+          }}
           className="p-1 text-text-muted hover:text-text-primary transition-colors shrink-0"
         >
           <Maximize2 size={14} />
@@ -102,7 +110,11 @@ function FieldDisplay({
           }}
           className="p-1 text-text-muted hover:text-text-primary transition-colors shrink-0"
         >
-          {copied ? <span className="text-xs text-success">コピーしました</span> : <Copy size={14} />}
+          {copied ? (
+            <span className="text-xs text-success">コピーしました</span>
+          ) : (
+            <Copy size={14} />
+          )}
         </button>
       )}
       {!isEmpty && (
@@ -120,7 +132,9 @@ function FieldDisplay({
 function SectionHeading({ children }: { children?: ReactNode }) {
   return (
     <div className="flex items-center gap-2 pt-3 pb-1 px-1">
-      <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">{children}</span>
+      <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">
+        {children}
+      </span>
       <div className="flex-1 border-t border-border" />
     </div>
   )
@@ -216,7 +230,7 @@ export default function EntryDetail() {
   const [allLabels, setAllLabels] = useState<Label[]>([])
   const [unmaskedFields, setUnmaskedFields] = useState<Set<string>>(new Set())
   const toggleFieldMask = (key: string) => {
-    setUnmaskedFields(prev => {
+    setUnmaskedFields((prev) => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
@@ -263,7 +277,12 @@ export default function EntryDetail() {
         </Badge>
         <h1 className="text-sm font-semibold text-text-primary truncate flex-1">{entry.name}</h1>
         <div className="flex items-center gap-1.5 shrink-0">
-          <Button size="sm" variant="secondary" onClick={() => navigate(`/entries/${id}/edit`)} className="gap-1 h-7 text-xs">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => navigate(`/entries/${id}/edit`)}
+            className="gap-1 h-7 text-xs"
+          >
             <Pencil size={13} />
             編集
           </Button>
@@ -272,7 +291,10 @@ export default function EntryDetail() {
             variant="destructive"
             onClick={() => {
               if (confirm('このエントリを削除しますか？')) {
-                commands.deleteEntry(id!).then(() => navigate('/entries')).catch((err) => pushError(`アイテム削除に失敗しました: ${err}`))
+                commands
+                  .deleteEntry(id as string)
+                  .then(() => navigate('/entries'))
+                  .catch((err) => pushError(`アイテム削除に失敗しました: ${err}`))
               }
             }}
             className="gap-1 h-7 text-xs"
@@ -426,32 +448,24 @@ export default function EntryDetail() {
 
         {/* カスタムフィールド */}
         {entry.customFields && entry.customFields.length > 0 && (
-          <>
-            <div className="space-y-0.5">
-              {entry.customFields.map((field) =>
-                field.fieldType === 'totp' ? (
-                  <TotpCustomFieldDisplay
-                    key={field.id}
-                    label={field.name}
-                    value={field.value}
-                  />
-                ) : (
-                  <FieldDisplay
-                    key={field.id}
-                    label={field.name}
-                    value={field.value}
-                    isPassword={field.fieldType === 'password'}
-                    isMasked={field.fieldType === 'password' && !unmaskedFields.has(field.id)}
-                    onToggleMask={
-                      field.fieldType === 'password'
-                        ? () => toggleFieldMask(field.id)
-                        : undefined
-                    }
-                  />
-                )
-              )}
-            </div>
-          </>
+          <div className="space-y-0.5">
+            {entry.customFields.map((field) =>
+              field.fieldType === 'totp' ? (
+                <TotpCustomFieldDisplay key={field.id} label={field.name} value={field.value} />
+              ) : (
+                <FieldDisplay
+                  key={field.id}
+                  label={field.name}
+                  value={field.value}
+                  isPassword={field.fieldType === 'password'}
+                  isMasked={field.fieldType === 'password' && !unmaskedFields.has(field.id)}
+                  onToggleMask={
+                    field.fieldType === 'password' ? () => toggleFieldMask(field.id) : undefined
+                  }
+                />
+              ),
+            )}
+          </div>
         )}
 
         {/* メモ */}
@@ -466,12 +480,8 @@ export default function EntryDetail() {
 
         {/* タイムスタンプ */}
         <div className="mt-6 pt-3 border-t border-border space-y-0.5 text-xs text-text-secondary">
-          {entry.updatedAt > 0 && (
-            <div>更新: {formatTimestamp(entry.updatedAt)}</div>
-          )}
-          {entry.createdAt > 0 && (
-            <div>作成: {formatTimestamp(entry.createdAt)}</div>
-          )}
+          {entry.updatedAt > 0 && <div>更新: {formatTimestamp(entry.updatedAt)}</div>}
+          {entry.createdAt > 0 && <div>作成: {formatTimestamp(entry.createdAt)}</div>}
         </div>
       </div>
     </div>

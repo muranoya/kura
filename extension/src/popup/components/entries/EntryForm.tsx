@@ -5,11 +5,11 @@ import remarkGfm from 'remark-gfm'
 import { getEntryTypeLabel } from '../../../shared/constants'
 import type { CustomField, CustomFieldType, Label } from '../../../shared/types'
 import { cn } from '../../lib/utils'
-import { markdownComponents } from '../ui/markdown-components'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label as UILabel } from '../ui/label'
+import { markdownComponents } from '../ui/markdown-components'
 import { Textarea } from '../ui/textarea'
 import PasswordGeneratorPanel from './PasswordGeneratorPanel'
 
@@ -136,7 +136,7 @@ export default function EntryForm({
                 onBlur={() => setActiveGeneratorFieldId(null)}
               />
               {activeGeneratorFieldId === 'password' && (
-                <div onMouseDown={(e) => e.preventDefault()}>
+                <div role="presentation" onMouseDown={(e) => e.preventDefault()}>
                   <PasswordGeneratorPanel
                     onUse={(pw) => {
                       updateTypedValue('password', pw)
@@ -226,7 +226,7 @@ export default function EntryForm({
                 onBlur={() => setActiveGeneratorFieldId(null)}
               />
               {activeGeneratorFieldId === 'pin' && (
-                <div onMouseDown={(e) => e.preventDefault()}>
+                <div role="presentation" onMouseDown={(e) => e.preventDefault()}>
                   <PasswordGeneratorPanel
                     onUse={(pw) => {
                       updateTypedValue('pin', pw)
@@ -364,7 +364,7 @@ export default function EntryForm({
                 onBlur={() => setActiveGeneratorFieldId(null)}
               />
               {activeGeneratorFieldId === 'cc_pin' && (
-                <div onMouseDown={(e) => e.preventDefault()}>
+                <div role="presentation" onMouseDown={(e) => e.preventDefault()}>
                   <PasswordGeneratorPanel
                     onUse={(pw) => {
                       updateTypedValue('pin', pw)
@@ -402,7 +402,7 @@ export default function EntryForm({
                 onBlur={() => setActiveGeneratorFieldId(null)}
               />
               {activeGeneratorFieldId === 'password' && (
-                <div onMouseDown={(e) => e.preventDefault()}>
+                <div role="presentation" onMouseDown={(e) => e.preventDefault()}>
                   <PasswordGeneratorPanel
                     onUse={(pw) => {
                       updateTypedValue('password', pw)
@@ -452,10 +452,14 @@ export default function EntryForm({
               />
               <Input
                 id={`field-value-${field.id}`}
-                type={field.fieldType === 'password' || field.fieldType === 'totp' ? 'password' : 'text'}
+                type={
+                  field.fieldType === 'password' || field.fieldType === 'totp' ? 'password' : 'text'
+                }
                 value={field.value}
                 onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
-                placeholder={field.fieldType === 'totp' ? 'otpauth:// URI または Base32 シークレット' : '値'}
+                placeholder={
+                  field.fieldType === 'totp' ? 'otpauth:// URI または Base32 シークレット' : '値'
+                }
                 className="h-8 text-sm flex-[3]"
                 onFocus={() =>
                   field.fieldType === 'password' && setActiveGeneratorFieldId(`custom-${field.id}`)
@@ -470,17 +474,16 @@ export default function EntryForm({
                 <Trash2 size={14} />
               </button>
             </div>
-            {field.fieldType === 'password' &&
-              activeGeneratorFieldId === `custom-${field.id}` && (
-                <div onMouseDown={(e) => e.preventDefault()}>
-                  <PasswordGeneratorPanel
-                    onUse={(pw) => {
-                      updateCustomField(field.id, { value: pw })
-                      setActiveGeneratorFieldId(null)
-                    }}
-                  />
-                </div>
-              )}
+            {field.fieldType === 'password' && activeGeneratorFieldId === `custom-${field.id}` && (
+              <div onMouseDown={(e) => e.preventDefault()}>
+                <PasswordGeneratorPanel
+                  onUse={(pw) => {
+                    updateCustomField(field.id, { value: pw })
+                    setActiveGeneratorFieldId(null)
+                  }}
+                />
+              </div>
+            )}
           </div>
         ))}
         {pendingFieldType ? (

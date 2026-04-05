@@ -7,9 +7,9 @@ import EntryDetailContent from '../../components/entries/EntryDetailContent'
 import EntryListPanel, { EntryFilterBar } from '../../components/entries/EntryListPanel'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 import { Button } from '../../components/ui/button'
+import { useSyncVersion } from '../../contexts/SyncContext'
 import { STORAGE_KEYS } from '../../shared/constants'
 import { getFromStorage, saveToStorage } from '../../shared/storage'
-import { useSyncVersion } from '../../contexts/SyncContext'
 import type { Entry, EntryRow, EntryType, Label, SortConfig } from '../../shared/types'
 
 const DEFAULT_SORT: SortConfig = { field: 'created_at', order: 'desc' }
@@ -95,7 +95,16 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
     } finally {
       setLoading(false)
     }
-  }, [onlyFavorites, searchQuery, selectedType, labelId, syncVersion, sortConfig, sortLoaded, typeFilterLoaded])
+  }, [
+    onlyFavorites,
+    searchQuery,
+    selectedType,
+    labelId,
+    syncVersion,
+    sortConfig,
+    sortLoaded,
+    typeFilterLoaded,
+  ])
 
   useEffect(() => {
     loadEntries().then(() => {
@@ -139,7 +148,9 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
       }
     }
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [selectedId])
 
   const handleSearchChange = (value: string) => {

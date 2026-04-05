@@ -174,10 +174,14 @@ impl EntryFilter {
         if let Some(query) = &self.search_query {
             let q = query.to_lowercase();
             let name_match = entry.name.to_lowercase().contains(&q);
-            let notes_match = entry.notes.as_deref()
+            let notes_match = entry
+                .notes
+                .as_deref()
                 .map(|n| n.to_lowercase().contains(&q))
                 .unwrap_or(false);
-            let custom_match = entry.custom_fields.as_ref()
+            let custom_match = entry
+                .custom_fields
+                .as_ref()
                 .map(|fields| fields.iter().any(|f| f.name.to_lowercase().contains(&q)))
                 .unwrap_or(false);
             if !name_match && !notes_match && !custom_match {

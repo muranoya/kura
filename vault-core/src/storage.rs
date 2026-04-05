@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use crate::error::Result;
+use async_trait::async_trait;
 
 #[cfg(not(target_arch = "wasm32"))]
 #[async_trait]

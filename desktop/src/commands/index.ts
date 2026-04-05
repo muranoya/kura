@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { DEFAULT_VAULT_ID, STORAGE_KEYS } from '../shared/constants'
-import { getFromStorage, saveToStorage } from '../shared/storage'
+import { saveToStorage } from '../shared/storage'
 import type { CustomFieldType, Entry, EntryFilter, EntryRow, Label } from '../shared/types'
 
 const vaultId = DEFAULT_VAULT_ID

@@ -100,19 +100,43 @@ fn map_to_login(item: &ParsedItem) -> (EntryData, Option<String>) {
 }
 
 fn map_to_credit_card(item: &ParsedItem) -> (EntryData, Option<String>) {
-    let cardholder = find_field(item, &["cardholder"], &["cardholder name", "cardholder"]).unwrap_or_default();
-    let number = find_field(item, &["ccnum"], &["card number", "number", "ccnum"]).unwrap_or_default();
-    let expiry = find_field(item, &["expiry"], &["expiry date", "expiry", "expdate"]).unwrap_or_default();
+    let cardholder =
+        find_field(item, &["cardholder"], &["cardholder name", "cardholder"]).unwrap_or_default();
+    let number =
+        find_field(item, &["ccnum"], &["card number", "number", "ccnum"]).unwrap_or_default();
+    let expiry =
+        find_field(item, &["expiry"], &["expiry date", "expiry", "expdate"]).unwrap_or_default();
     let cvv = find_field(item, &["cvv"], &["verification number", "cvv"]).unwrap_or_default();
     let pin = find_field(item, &["pin"], &["pin"]).unwrap_or_default();
 
-    let skip_ids = &["cardholder", "ccnum", "expiry", "cvv", "pin", "type", "validFrom"];
-    let skip_titles = &["cardholder name", "cardholder", "card number", "number", "ccnum",
-                         "expiry date", "expiry", "expdate", "verification number", "cvv", "pin",
-                         "type", "valid from"];
+    let skip_ids = &[
+        "cardholder",
+        "ccnum",
+        "expiry",
+        "cvv",
+        "pin",
+        "type",
+        "validFrom",
+    ];
+    let skip_titles = &[
+        "cardholder name",
+        "cardholder",
+        "card number",
+        "number",
+        "ccnum",
+        "expiry date",
+        "expiry",
+        "expdate",
+        "verification number",
+        "cvv",
+        "pin",
+        "type",
+        "valid from",
+    ];
     let extra_fields = build_filtered_fields(item, skip_ids, skip_titles);
 
-    let mut data = EntryData::new_credit_card(cardholder, number, expiry, cvv, pin, build_notes(item));
+    let mut data =
+        EntryData::new_credit_card(cardholder, number, expiry, cvv, pin, build_notes(item));
     if !extra_fields.is_empty() {
         data.custom_fields = Some(extra_fields);
     }
@@ -147,7 +171,9 @@ fn map_to_secure_note(item: &ParsedItem) -> (EntryData, Option<String>) {
 }
 
 fn map_to_password(item: &ParsedItem) -> (EntryData, Option<String>) {
-    let password = item.password.clone()
+    let password = item
+        .password
+        .clone()
         .or_else(|| find_field(item, &["password"], &["password", "ssn"]))
         .unwrap_or_default();
     let username = item.username.clone().unwrap_or_default();
@@ -165,11 +191,15 @@ fn map_to_password(item: &ParsedItem) -> (EntryData, Option<String>) {
 
 fn map_to_software_license(item: &ParsedItem) -> (EntryData, Option<String>) {
     let license_key_titles = [
-        "license key", "reg code", "product key", "key",
-        "ライセンスキー", "登録コード", "プロダクトキー",
+        "license key",
+        "reg code",
+        "product key",
+        "key",
+        "ライセンスキー",
+        "登録コード",
+        "プロダクトキー",
     ];
-    let license_key = find_field(item, &["reg_code"], &license_key_titles)
-        .unwrap_or_default();
+    let license_key = find_field(item, &["reg_code"], &license_key_titles).unwrap_or_default();
 
     let skip_ids = &["reg_code"];
     let extra_fields = build_filtered_fields(item, skip_ids, &license_key_titles);
@@ -183,19 +213,56 @@ fn map_to_software_license(item: &ParsedItem) -> (EntryData, Option<String>) {
 
 fn map_to_bank(item: &ParsedItem) -> (EntryData, Option<String>) {
     let bank_name = find_field(item, &["bankName"], &["bank name", "bank"]).unwrap_or_default();
-    let account_holder = find_field(item, &["owner"], &["owner", "name on account", "account holder"]).unwrap_or_default();
-    let branch_code = find_field(item, &["routingNo"], &["routing number", "branch code", "sort code"]).unwrap_or_default();
-    let account_type = find_field(item, &["accountType"], &["type", "account type"]).unwrap_or_default();
+    let account_holder = find_field(
+        item,
+        &["owner"],
+        &["owner", "name on account", "account holder"],
+    )
+    .unwrap_or_default();
+    let branch_code = find_field(
+        item,
+        &["routingNo"],
+        &["routing number", "branch code", "sort code"],
+    )
+    .unwrap_or_default();
+    let account_type =
+        find_field(item, &["accountType"], &["type", "account type"]).unwrap_or_default();
     let account_number = find_field(item, &["accountNo"], &["account number"]).unwrap_or_default();
     let pin = find_field(item, &["PIN"], &["pin"]).unwrap_or_default();
 
-    let skip_ids = &["bankName", "owner", "routingNo", "accountType", "accountNo", "PIN"];
-    let skip_titles = &["bank name", "bank", "owner", "name on account", "account holder",
-                         "routing number", "branch code", "sort code", "type", "account type",
-                         "account number", "pin"];
+    let skip_ids = &[
+        "bankName",
+        "owner",
+        "routingNo",
+        "accountType",
+        "accountNo",
+        "PIN",
+    ];
+    let skip_titles = &[
+        "bank name",
+        "bank",
+        "owner",
+        "name on account",
+        "account holder",
+        "routing number",
+        "branch code",
+        "sort code",
+        "type",
+        "account type",
+        "account number",
+        "pin",
+    ];
     let extra_fields = build_filtered_fields(item, skip_ids, skip_titles);
 
-    let mut data = EntryData::new_bank(bank_name, account_holder, branch_code, account_type, account_number, pin, build_notes(item));
+    let mut data = EntryData::new_bank(
+        bank_name,
+        account_holder,
+        branch_code,
+        account_type,
+        account_number,
+        pin,
+        build_notes(item),
+    );
     if !extra_fields.is_empty() {
         data.custom_fields = Some(extra_fields);
     }
@@ -271,19 +338,25 @@ fn find_concealed_field(item: &ParsedItem) -> Option<String> {
 }
 
 fn build_all_custom_fields(item: &ParsedItem) -> Vec<CustomField> {
-    item.fields.iter().map(|f| {
-        CustomField {
+    item.fields
+        .iter()
+        .map(|f| CustomField {
             id: uuid::Uuid::new_v4().to_string(),
             name: f.field_title.clone(),
             field_type: f.value.custom_field_type().to_string(),
             value: f.value.to_string_value(),
-        }
-    }).collect()
+        })
+        .collect()
 }
 
 /// Filter out fields that match known IDs or title fallbacks, returning the rest as custom fields.
-fn build_filtered_fields(item: &ParsedItem, skip_ids: &[&str], skip_titles: &[&str]) -> Vec<CustomField> {
-    item.fields.iter()
+fn build_filtered_fields(
+    item: &ParsedItem,
+    skip_ids: &[&str],
+    skip_titles: &[&str],
+) -> Vec<CustomField> {
+    item.fields
+        .iter()
         .filter(|f| {
             // Skip if field ID matches
             if let Some(ref fid) = f.field_id {
@@ -295,21 +368,19 @@ fn build_filtered_fields(item: &ParsedItem, skip_ids: &[&str], skip_titles: &[&s
             let title_lower = f.field_title.to_lowercase();
             !skip_titles.iter().any(|s| title_lower == *s)
         })
-        .map(|f| {
-            CustomField {
-                id: uuid::Uuid::new_v4().to_string(),
-                name: f.field_title.clone(),
-                field_type: f.value.custom_field_type().to_string(),
-                value: f.value.to_string_value(),
-            }
+        .map(|f| CustomField {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: f.field_title.clone(),
+            field_type: f.value.custom_field_type().to_string(),
+            value: f.value.to_string_value(),
         })
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::types::*;
+    use super::*;
 
     fn make_login_item() -> ParsedItem {
         ParsedItem {
@@ -323,14 +394,12 @@ mod tests {
             password: Some("secret123".into()),
             notes: Some("My notes".into()),
             tags: vec!["work".into()],
-            fields: vec![
-                ParsedField {
-                    field_id: Some("extra_email".into()),
-                    section_title: Some("Extra".into()),
-                    field_title: "Recovery Email".into(),
-                    value: ParsedFieldValue::Email("recovery@example.com".into()),
-                },
-            ],
+            fields: vec![ParsedField {
+                field_id: Some("extra_email".into()),
+                section_title: Some("Extra".into()),
+                field_title: "Recovery Email".into(),
+                value: ParsedFieldValue::Email("recovery@example.com".into()),
+            }],
             has_attachments: false,
             attachment_file_name: None,
             is_favorite: true,

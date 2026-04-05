@@ -22,7 +22,9 @@ fn to_js_err(e: String) -> JsValue {
 }
 
 fn get_manager(vault_id: &str) -> Arc<VaultManager> {
-    let mut map = MANAGERS.lock().unwrap_or_else(|p: PoisonError<_>| p.into_inner());
+    let mut map = MANAGERS
+        .lock()
+        .unwrap_or_else(|p: PoisonError<_>| p.into_inner());
     map.entry(vault_id.to_string())
         .or_insert_with(|| Arc::new(VaultManager::new()))
         .clone()
@@ -48,7 +50,9 @@ pub fn init_panic_hook() {
 /// vault_idに対応するVaultManagerを破棄する
 #[wasm_bindgen]
 pub fn api_destroy_vault(vault_id: String) {
-    let mut map = MANAGERS.lock().unwrap_or_else(|p: PoisonError<_>| p.into_inner());
+    let mut map = MANAGERS
+        .lock()
+        .unwrap_or_else(|p: PoisonError<_>| p.into_inner());
     map.remove(&vault_id);
 }
 
@@ -105,8 +109,15 @@ pub fn api_is_unlocked(vault_id: String) -> bool {
 /// JS側がS3からダウンロードしたバイト列とETagを受け取り、
 /// DEKで復号 → auto_merge → GC → セッション更新を行う。
 #[wasm_bindgen]
-pub fn api_merge_remote_vault(vault_id: String, remote_bytes: &[u8], remote_etag: String) -> Result<(), JsValue> {
-    with_manager(&vault_id, |m| m.api_merge_remote_vault(remote_bytes.to_vec(), remote_etag)).map_err(to_js_err)
+pub fn api_merge_remote_vault(
+    vault_id: String,
+    remote_bytes: &[u8],
+    remote_etag: String,
+) -> Result<(), JsValue> {
+    with_manager(&vault_id, |m| {
+        m.api_merge_remote_vault(remote_bytes.to_vec(), remote_etag)
+    })
+    .map_err(to_js_err)
 }
 
 /// アップロード成功後にETagを更新
@@ -131,8 +142,17 @@ pub fn api_list_entries(
     sort_order: Option<String>,
 ) -> Result<String, JsValue> {
     let entries = with_manager(&vault_id, |m| {
-        m.api_list_entries(search_query, entry_type, label_id, include_trash, only_favorites, sort_field, sort_order)
-    }).map_err(to_js_err)?;
+        m.api_list_entries(
+            search_query,
+            entry_type,
+            label_id,
+            include_trash,
+            only_favorites,
+            sort_field,
+            sort_order,
+        )
+    })
+    .map_err(to_js_err)?;
 
     serde_json::to_string(&entries).map_err(|e| to_js_err(format!("Serialization error: {}", e)))
 }
@@ -154,8 +174,16 @@ pub fn api_create_entry(
     custom_fields_json: Option<String>,
 ) -> Result<String, JsValue> {
     with_manager(&vault_id, |m| {
-        m.api_create_entry(entry_type, name, notes, typed_value_json, label_ids, custom_fields_json)
-    }).map_err(to_js_err)
+        m.api_create_entry(
+            entry_type,
+            name,
+            notes,
+            typed_value_json,
+            label_ids,
+            custom_fields_json,
+        )
+    })
+    .map_err(to_js_err)
 }
 
 #[wasm_bindgen]
@@ -169,8 +197,16 @@ pub fn api_update_entry(
     custom_fields_json: Option<String>,
 ) -> Result<(), JsValue> {
     with_manager(&vault_id, |m| {
-        m.api_update_entry(id, name, notes, typed_value_json, label_ids, custom_fields_json)
-    }).map_err(to_js_err)
+        m.api_update_entry(
+            id,
+            name,
+            notes,
+            typed_value_json,
+            label_ids,
+            custom_fields_json,
+        )
+    })
+    .map_err(to_js_err)
 }
 
 #[wasm_bindgen]
@@ -191,6 +227,13 @@ pub fn api_purge_entry(vault_id: String, id: String) -> Result<(), JsValue> {
 #[wasm_bindgen]
 pub fn api_set_favorite(vault_id: String, id: String, is_favorite: bool) -> Result<(), JsValue> {
     with_manager(&vault_id, |m| m.api_set_favorite(id, is_favorite)).map_err(to_js_err)
+}
+
+/// オートフィル候補を返す（全loginエントリのid, name, url, usernameを取��）
+#[wasm_bindgen]
+pub fn api_list_login_urls(vault_id: String) -> Result<String, JsValue> {
+    let candidates = with_manager(&vault_id, |m| m.api_list_login_urls()).map_err(to_js_err)?;
+    serde_json::to_string(&candidates).map_err(|e| to_js_err(format!("Serialization error: {}", e)))
 }
 
 // ============================================================================
@@ -219,7 +262,11 @@ pub fn api_rename_label(vault_id: String, id: String, new_name: String) -> Resul
 }
 
 #[wasm_bindgen]
-pub fn api_set_entry_labels(vault_id: String, entry_id: String, label_ids: Vec<String>) -> Result<(), JsValue> {
+pub fn api_set_entry_labels(
+    vault_id: String,
+    entry_id: String,
+    label_ids: Vec<String>,
+) -> Result<(), JsValue> {
     with_manager(&vault_id, |m| m.api_set_entry_labels(entry_id, label_ids)).map_err(to_js_err)
 }
 
@@ -228,8 +275,15 @@ pub fn api_set_entry_labels(vault_id: String, entry_id: String, label_ids: Vec<S
 // ============================================================================
 
 #[wasm_bindgen]
-pub fn api_change_master_password(vault_id: String, old_password: String, new_password: String) -> Result<(), JsValue> {
-    with_manager(&vault_id, |m| m.api_change_master_password(old_password, new_password)).map_err(to_js_err)
+pub fn api_change_master_password(
+    vault_id: String,
+    old_password: String,
+    new_password: String,
+) -> Result<(), JsValue> {
+    with_manager(&vault_id, |m| {
+        m.api_change_master_password(old_password, new_password)
+    })
+    .map_err(to_js_err)
 }
 
 #[wasm_bindgen]
@@ -242,7 +296,8 @@ pub fn api_upgrade_argon2_params(
 ) -> Result<String, JsValue> {
     with_manager(&vault_id, |m| {
         m.api_upgrade_argon2_params(password, iterations, memory, parallelism)
-    }).map_err(to_js_err)
+    })
+    .map_err(to_js_err)
 }
 
 #[wasm_bindgen]
@@ -256,12 +311,20 @@ pub fn api_regenerate_recovery_key(vault_id: String, password: String) -> Result
 }
 
 #[wasm_bindgen]
-pub fn api_encrypt_config(vault_id: String, password: String, plaintext: String) -> Result<String, JsValue> {
+pub fn api_encrypt_config(
+    vault_id: String,
+    password: String,
+    plaintext: String,
+) -> Result<String, JsValue> {
     with_manager(&vault_id, |m| m.api_encrypt_config(password, plaintext)).map_err(to_js_err)
 }
 
 #[wasm_bindgen]
-pub fn api_decrypt_config(vault_id: String, password: String, encrypted_b64: String) -> Result<String, JsValue> {
+pub fn api_decrypt_config(
+    vault_id: String,
+    password: String,
+    encrypted_b64: String,
+) -> Result<String, JsValue> {
     with_manager(&vault_id, |m| m.api_decrypt_config(password, encrypted_b64)).map_err(to_js_err)
 }
 
@@ -277,8 +340,12 @@ pub fn api_generate_password(
     include_symbols: bool,
 ) -> Result<String, JsValue> {
     vault_core::api::api_generate_password(
-        length, include_uppercase, include_numbers, include_symbols,
-    ).map_err(to_js_err)
+        length,
+        include_uppercase,
+        include_numbers,
+        include_symbols,
+    )
+    .map_err(to_js_err)
 }
 
 #[wasm_bindgen]

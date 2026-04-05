@@ -1,0 +1,111 @@
+:host {
+  all: initial;
+  position: fixed;
+  z-index: 2147483647;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #1a1a1a;
+}
+
+.kura-dropdown {
+  position: absolute;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.12),
+    0 1px 3px rgba(0, 0, 0, 0.08);
+  max-height: 280px;
+  overflow-y: auto;
+  min-width: 260px;
+  max-width: 400px;
+}
+
+.kura-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  transition: background-color 0.1s;
+}
+
+.kura-dropdown-item:first-child {
+  border-radius: 8px 8px 0 0;
+}
+
+.kura-dropdown-item:hover,
+.kura-dropdown-item[data-selected="true"] {
+  background-color: #f0f4ff;
+}
+
+.kura-dropdown-item + .kura-dropdown-item {
+  border-top: 1px solid #f0f0f0;
+}
+
+.kura-item-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #4f46e5;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.kura-item-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.kura-item-name {
+  font-weight: 500;
+  font-size: 14px;
+  color: #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kura-item-username {
+  font-size: 12px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kura-dropdown-locked .kura-item-icon {
+  background: #9ca3af;
+}
+
+.kura-dropdown-locked .kura-item-icon svg {
+  display: block;
+}
+
+.kura-dropdown-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 12px;
+  color: #6b7280;
+  cursor: default;
+}
+
+.kura-dropdown-footer span {
+  font-weight: 600;
+  color: #4f46e5;
+}

@@ -1,5 +1,5 @@
-use crate::error::{Result, VaultError};
 use crate::crypto::Dek;
+use crate::error::{Result, VaultError};
 use crate::models::Argon2Params;
 use crate::store::VaultFile;
 
@@ -49,13 +49,12 @@ impl LockedVault {
 
         // Validate schema version
         if vault_file.schema_version != CURRENT_SCHEMA_VERSION {
-            return Err(VaultError::UnsupportedSchemaVersion(vault_file.schema_version));
+            return Err(VaultError::UnsupportedSchemaVersion(
+                vault_file.schema_version,
+            ));
         }
 
-        Ok(LockedVault {
-            vault_file,
-            etag,
-        })
+        Ok(LockedVault { vault_file, etag })
     }
 
     /// Unlock vault with master password
@@ -63,16 +62,21 @@ impl LockedVault {
         use base64::Engine;
 
         // Derive KEK from password
-        let kek = crate::crypto::kdf::derive_kek(master_password, &self.vault_file.meta.argon2_params)?;
+        let kek =
+            crate::crypto::kdf::derive_kek(master_password, &self.vault_file.meta.argon2_params)?;
 
         // Decode and unwrap DEK
         let engine = base64::engine::general_purpose::STANDARD;
-        let encrypted_dek_bytes = engine.decode(&self.vault_file.meta.encrypted_dek_master)
-            .map_err(|_| VaultError::DecryptionError("Invalid base64 in encrypted_dek_master".to_string()))?;
+        let encrypted_dek_bytes = engine
+            .decode(&self.vault_file.meta.encrypted_dek_master)
+            .map_err(|_| {
+                VaultError::DecryptionError("Invalid base64 in encrypted_dek_master".to_string())
+            })?;
         let dek = Dek::unwrap(&encrypted_dek_bytes, &kek)?;
 
         // Decrypt vault contents
-        let contents = crate::crypto::encryption::decrypt_vault(&self.vault_file.encrypted_vault, &dek)?;
+        let contents =
+            crate::crypto::encryption::decrypt_vault(&self.vault_file.encrypted_vault, &dek)?;
 
         Ok(UnlockedVault {
             meta: self.vault_file.meta,
@@ -105,11 +109,15 @@ impl LockedVault {
         let kek = recovery_key.derive_kek(&self.vault_file.meta.argon2_params)?;
 
         let engine = base64::engine::general_purpose::STANDARD;
-        let encrypted_dek_bytes = engine.decode(&self.vault_file.meta.encrypted_dek_recovery)
-            .map_err(|_| VaultError::DecryptionError("Invalid base64 in encrypted_dek_recovery".to_string()))?;
+        let encrypted_dek_bytes = engine
+            .decode(&self.vault_file.meta.encrypted_dek_recovery)
+            .map_err(|_| {
+                VaultError::DecryptionError("Invalid base64 in encrypted_dek_recovery".to_string())
+            })?;
         let dek = Dek::unwrap(&encrypted_dek_bytes, &kek)?;
 
-        let contents = crate::crypto::encryption::decrypt_vault(&self.vault_file.encrypted_vault, &dek)?;
+        let contents =
+            crate::crypto::encryption::decrypt_vault(&self.vault_file.encrypted_vault, &dek)?;
 
         Ok(UnlockedVault {
             meta: self.vault_file.meta,
@@ -201,7 +209,10 @@ mod tests {
         let tampered = serde_json::to_vec(&vault_json).unwrap();
 
         let result = LockedVault::open(tampered, None);
-        assert!(matches!(result, Err(VaultError::UnsupportedSchemaVersion(999))));
+        assert!(matches!(
+            result,
+            Err(VaultError::UnsupportedSchemaVersion(999))
+        ));
     }
 
     #[test]
@@ -224,7 +235,9 @@ mod tests {
         let recovery_str = recovery_key.to_display_string();
 
         let locked_again = unlocked.lock().unwrap();
-        let unlocked_again = locked_again.unlock_with_recovery_key(&recovery_str).unwrap();
+        let unlocked_again = locked_again
+            .unlock_with_recovery_key(&recovery_str)
+            .unwrap();
 
         assert!(unlocked_again.contents.entries.is_empty());
     }
@@ -237,7 +250,9 @@ mod tests {
         // Using a random recovery key should fail
         let other_locked = LockedVault::create_new("other-password").unwrap();
         let mut other_unlocked = other_locked.unlock("other-password").unwrap();
-        let other_recovery = other_unlocked.regenerate_recovery_key("other-password").unwrap();
+        let other_recovery = other_unlocked
+            .regenerate_recovery_key("other-password")
+            .unwrap();
         let other_recovery_str = other_recovery.to_display_string();
 
         let result = locked.unlock_with_recovery_key(&other_recovery_str);

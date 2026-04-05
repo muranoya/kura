@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
-import Import1puxDialog from './Import1puxDialog'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import {
@@ -27,6 +26,7 @@ import { usePushError } from '../../contexts/ErrorContext'
 import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../../shared/constants'
 import { clearStorage, getFromStorage, saveToStorage } from '../../shared/storage'
 import type { AppSettings } from '../../shared/types'
+import Import1puxDialog from './Import1puxDialog'
 
 const AUTOLOCK_OPTIONS = [
   { value: '0', label: '無効' },
@@ -350,9 +350,7 @@ export default function Settings() {
                   <span className="text-xs font-medium text-text-secondary block mb-1">
                     ファイルパス
                   </span>
-                  <p className="text-sm text-text-primary font-mono">
-                    {storageConfig.key}
-                  </p>
+                  <p className="text-sm text-text-primary font-mono">{storageConfig.key}</p>
                 </div>
                 {storageConfig.endpoint && (
                   <div>

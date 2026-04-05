@@ -1,7 +1,7 @@
 use crate::store::VaultEntry;
 
-use super::{DuplicateCandidate, DuplicateConfidence};
 use super::onepux::types::ParsedItem;
+use super::{DuplicateCandidate, DuplicateConfidence};
 
 /// Detect duplicate candidates for a parsed item against existing vault entries.
 pub fn detect_duplicates(
@@ -34,7 +34,8 @@ pub fn detect_duplicates(
 
         // Medium confidence
         let entry_name_normalized = normalize_name(&entry.name);
-        if entry_name_normalized == item_name_normalized && !item_name_normalized.is_empty()
+        if entry_name_normalized == item_name_normalized
+            && !item_name_normalized.is_empty()
             && entry.entry_type == target_entry_type
         {
             candidates.push(DuplicateCandidate {
@@ -87,7 +88,11 @@ pub fn detect_duplicates(
     candidates
 }
 
-fn check_high_confidence(item: &ParsedItem, target_type: &str, entry: &VaultEntry) -> Option<String> {
+fn check_high_confidence(
+    item: &ParsedItem,
+    target_type: &str,
+    entry: &VaultEntry,
+) -> Option<String> {
     if entry.entry_type != target_type {
         return None;
     }
@@ -114,38 +119,60 @@ fn check_high_confidence(item: &ParsedItem, target_type: &str, entry: &VaultEntr
             None
         }
         "credit_card" => {
-            let entry_number = typed_value.get("number").and_then(|v| v.as_str()).unwrap_or("");
-            let entry_holder = typed_value.get("cardholder").and_then(|v| v.as_str()).unwrap_or("");
+            let entry_number = typed_value
+                .get("number")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let entry_holder = typed_value
+                .get("cardholder")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
 
-            let item_number = find_field(item, &["card number", "number", "ccnum"]).unwrap_or_default();
-            let item_holder = find_field(item, &["cardholder name", "cardholder"]).unwrap_or_default();
+            let item_number =
+                find_field(item, &["card number", "number", "ccnum"]).unwrap_or_default();
+            let item_holder =
+                find_field(item, &["cardholder name", "cardholder"]).unwrap_or_default();
 
             let entry_last4 = last_n(entry_number, 4);
             let item_last4 = last_n(&item_number, 4);
 
-            if !entry_last4.is_empty() && entry_last4 == item_last4
-                && !entry_holder.is_empty() && entry_holder.to_lowercase() == item_holder.to_lowercase()
+            if !entry_last4.is_empty()
+                && entry_last4 == item_last4
+                && !entry_holder.is_empty()
+                && entry_holder.to_lowercase() == item_holder.to_lowercase()
             {
                 return Some(format!("カード下4桁 + 名義一致: ****{}", entry_last4));
             }
             None
         }
         "bank" => {
-            let entry_account = typed_value.get("account_number").and_then(|v| v.as_str()).unwrap_or("");
-            let entry_branch = typed_value.get("branch_code").and_then(|v| v.as_str()).unwrap_or("");
+            let entry_account = typed_value
+                .get("account_number")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let entry_branch = typed_value
+                .get("branch_code")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
 
             let item_account = find_field(item, &["account number"]).unwrap_or_default();
-            let item_branch = find_field(item, &["routing number", "branch code", "sort code"]).unwrap_or_default();
+            let item_branch = find_field(item, &["routing number", "branch code", "sort code"])
+                .unwrap_or_default();
 
-            if !entry_account.is_empty() && entry_account == item_account
-                && !entry_branch.is_empty() && entry_branch == item_branch
+            if !entry_account.is_empty()
+                && entry_account == item_account
+                && !entry_branch.is_empty()
+                && entry_branch == item_branch
             {
                 return Some("口座番号 + 支店コード一致".to_string());
             }
             None
         }
         "ssh_key" => {
-            let entry_key = typed_value.get("private_key").and_then(|v| v.as_str()).unwrap_or("");
+            let entry_key = typed_value
+                .get("private_key")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let item_key = find_field(item, &["private key"]).unwrap_or_default();
 
             let entry_prefix = &entry_key[..entry_key.len().min(64)];
@@ -157,8 +184,12 @@ fn check_high_confidence(item: &ParsedItem, target_type: &str, entry: &VaultEntr
             None
         }
         "software_license" => {
-            let entry_key = typed_value.get("license_key").and_then(|v| v.as_str()).unwrap_or("");
-            let item_key = find_field(item, &["license key", "reg code", "product key", "key"]).unwrap_or_default();
+            let entry_key = typed_value
+                .get("license_key")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let item_key = find_field(item, &["license key", "reg code", "product key", "key"])
+                .unwrap_or_default();
 
             if !entry_key.is_empty() && entry_key == item_key {
                 return Some("ライセンスキー一致".to_string());
@@ -249,9 +280,18 @@ mod tests {
 
     #[test]
     fn test_extract_domain() {
-        assert_eq!(extract_domain("https://www.example.com/login"), Some("example.com".into()));
-        assert_eq!(extract_domain("http://example.com:8080/path"), Some("example.com".into()));
-        assert_eq!(extract_domain("https://sub.example.com"), Some("sub.example.com".into()));
+        assert_eq!(
+            extract_domain("https://www.example.com/login"),
+            Some("example.com".into())
+        );
+        assert_eq!(
+            extract_domain("http://example.com:8080/path"),
+            Some("example.com".into())
+        );
+        assert_eq!(
+            extract_domain("https://sub.example.com"),
+            Some("sub.example.com".into())
+        );
         assert_eq!(extract_domain("example.com"), Some("example.com".into()));
         assert_eq!(extract_domain(""), None);
     }

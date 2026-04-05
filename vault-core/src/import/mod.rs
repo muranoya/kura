@@ -1,5 +1,5 @@
-pub mod onepux;
 pub mod duplicate;
+pub mod onepux;
 pub mod preview;
 
 use serde::{Deserialize, Serialize};
@@ -115,15 +115,16 @@ pub fn execute_import(
     unlocked: &mut UnlockedVault,
 ) -> Result<ImportResult> {
     // Build action lookup: source_id -> action
-    let action_map: std::collections::HashMap<&str, &ImportItemAction> = actions.iter()
-        .map(|a| (a.source_id.as_str(), a))
-        .collect();
+    let action_map: std::collections::HashMap<&str, &ImportItemAction> =
+        actions.iter().map(|a| (a.source_id.as_str(), a)).collect();
 
     // Collect existing labels for tag→label resolution
-    let existing_labels = unlocked.list_labels()
+    let existing_labels = unlocked
+        .list_labels()
         .map_err(|e| VaultError::InvalidInput(format!("Failed to list labels: {}", e)))?;
 
-    let mut label_name_to_id: std::collections::HashMap<String, String> = existing_labels.iter()
+    let mut label_name_to_id: std::collections::HashMap<String, String> = existing_labels
+        .iter()
         .map(|l| (l.name.to_lowercase(), l.id.clone()))
         .collect();
 
@@ -140,7 +141,8 @@ pub fn execute_import(
         // Determine the action and target type
         let (action, target_type) = match action_info {
             Some(info) => {
-                let default_type = onepux::get_category_info(&parsed.category_uuid).default_entry_type;
+                let default_type =
+                    onepux::get_category_info(&parsed.category_uuid).default_entry_type;
                 let target = info.target_entry_type.as_deref().unwrap_or(&default_type);
                 (&info.action, target.to_string())
             }
@@ -172,7 +174,13 @@ pub fn execute_import(
                 });
             }
             ImportAction::Import => {
-                match create_entry_from_parsed(parsed, &target_type, &mut label_name_to_id, &mut labels_created, unlocked) {
+                match create_entry_from_parsed(
+                    parsed,
+                    &target_type,
+                    &mut label_name_to_id,
+                    &mut labels_created,
+                    unlocked,
+                ) {
                     Ok(entry_id) => {
                         created_count += 1;
                         results.push(ImportItemResult {
@@ -198,7 +206,14 @@ pub fn execute_import(
                 }
             }
             ImportAction::Overwrite { existing_entry_id } => {
-                match overwrite_entry_from_parsed(parsed, &target_type, existing_entry_id, &mut label_name_to_id, &mut labels_created, unlocked) {
+                match overwrite_entry_from_parsed(
+                    parsed,
+                    &target_type,
+                    existing_entry_id,
+                    &mut label_name_to_id,
+                    &mut labels_created,
+                    unlocked,
+                ) {
                     Ok(()) => {
                         overwritten_count += 1;
                         results.push(ImportItemResult {
@@ -248,12 +263,7 @@ fn create_entry_from_parsed(
     // Resolve tags to label IDs
     let label_ids = resolve_labels(&mapped.tags, label_map, labels_created, unlocked)?;
 
-    let entry = unlocked.create_entry(
-        mapped.name,
-        mapped.entry_type,
-        mapped.data,
-        label_ids,
-    )?;
+    let entry = unlocked.create_entry(mapped.name, mapped.entry_type, mapped.data, label_ids)?;
 
     // Overwrite timestamps with original 1pux values
     if let Some(ve) = unlocked.contents.entries.get_mut(&entry.id) {

@@ -527,10 +527,14 @@ export default function EntryForm({
               />
               <Input
                 id={`field-value-${field.id}`}
-                type={field.fieldType === 'password' || field.fieldType === 'totp' ? 'password' : 'text'}
+                type={
+                  field.fieldType === 'password' || field.fieldType === 'totp' ? 'password' : 'text'
+                }
                 value={field.value}
                 onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
-                placeholder={field.fieldType === 'totp' ? 'otpauth:// URI または Base32 シークレット' : '値'}
+                placeholder={
+                  field.fieldType === 'totp' ? 'otpauth:// URI または Base32 シークレット' : '値'
+                }
                 className="h-8 text-xs flex-[3]"
                 onFocus={() =>
                   field.fieldType === 'password' && setActiveGeneratorFieldId(`custom-${field.id}`)
@@ -545,17 +549,16 @@ export default function EntryForm({
                 <Trash2 size={14} />
               </button>
             </div>
-            {field.fieldType === 'password' &&
-              activeGeneratorFieldId === `custom-${field.id}` && (
-                <div onMouseDown={(e) => e.preventDefault()}>
-                  <PasswordGeneratorPanel
-                    onUse={(pw) => {
-                      updateCustomField(field.id, { value: pw })
-                      setActiveGeneratorFieldId(null)
-                    }}
-                  />
-                </div>
-              )}
+            {field.fieldType === 'password' && activeGeneratorFieldId === `custom-${field.id}` && (
+              <div onMouseDown={(e) => e.preventDefault()}>
+                <PasswordGeneratorPanel
+                  onUse={(pw) => {
+                    updateCustomField(field.id, { value: pw })
+                    setActiveGeneratorFieldId(null)
+                  }}
+                />
+              </div>
+            )}
           </div>
         ))}
         {pendingFieldType ? (

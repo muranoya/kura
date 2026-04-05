@@ -1,10 +1,10 @@
-use serde::{Deserialize, Serialize};
 use super::Argon2Params;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaultMeta {
     pub vault_uuid: String,
-    pub encrypted_dek_master: String,  // base64-encoded
+    pub encrypted_dek_master: String,   // base64-encoded
     pub encrypted_dek_recovery: String, // base64-encoded
     pub argon2_params: Argon2Params,
     pub created_at: i64,

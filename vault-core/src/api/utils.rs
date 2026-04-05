@@ -1,5 +1,7 @@
-use crate::totp::{generate_totp, generate_totp_default, generate_totp_from_value, parse_totp_period};
-use crate::password_gen::{PasswordOptions, generate_password};
+use crate::password_gen::{generate_password, PasswordOptions};
+use crate::totp::{
+    generate_totp, generate_totp_default, generate_totp_from_value, parse_totp_period,
+};
 
 /// パスワード生成
 pub fn api_generate_password(
@@ -8,7 +10,9 @@ pub fn api_generate_password(
     include_numbers: bool,
     include_symbols: bool,
 ) -> Result<String, String> {
-    let length = length.try_into().map_err(|_| "Invalid length".to_string())?;
+    let length = length
+        .try_into()
+        .map_err(|_| "Invalid length".to_string())?;
 
     let options = PasswordOptions {
         length,
@@ -17,8 +21,7 @@ pub fn api_generate_password(
         include_symbols,
     };
 
-    generate_password(&options)
-        .map_err(|e| format!("Failed to generate password: {}", e))
+    generate_password(&options).map_err(|e| format!("Failed to generate password: {}", e))
 }
 
 /// TOTP生成
@@ -29,14 +32,12 @@ pub fn api_generate_totp(secret: String, digits: u32, period: u32) -> Result<Str
 
 /// TOTP生成（デフォルト）
 pub fn api_generate_totp_default(secret: String) -> Result<String, String> {
-    generate_totp_default(&secret)
-        .map_err(|e| format!("Failed to generate TOTP: {}", e))
+    generate_totp_default(&secret).map_err(|e| format!("Failed to generate TOTP: {}", e))
 }
 
 /// TOTP生成（otpauth URI または生シークレットから）
 pub fn api_generate_totp_from_value(value: String) -> Result<String, String> {
-    generate_totp_from_value(&value)
-        .map_err(|e| format!("Failed to generate TOTP: {}", e))
+    generate_totp_from_value(&value).map_err(|e| format!("Failed to generate TOTP: {}", e))
 }
 
 /// TOTP周期の取得（otpauth URI から抽出、デフォルト30秒）

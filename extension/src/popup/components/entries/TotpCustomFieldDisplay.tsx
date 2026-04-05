@@ -55,14 +55,18 @@ export default function TotpCustomFieldDisplay({ label, value }: TotpCustomField
   return (
     <div
       className={`flex items-center gap-1.5 px-2 py-1.5 rounded transition-colors ${
-        totpCode
-          ? 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80'
-          : 'opacity-50'
+        totpCode ? 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80' : 'opacity-50'
       } ${copied ? 'bg-accent-subtle' : ''}`}
       onClick={handleCopy}
       role={totpCode ? 'button' : undefined}
       tabIndex={totpCode ? 0 : undefined}
-      onKeyDown={totpCode ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleCopy() } : undefined}
+      onKeyDown={
+        totpCode
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') handleCopy()
+            }
+          : undefined
+      }
     >
       <span className="text-xs text-text-secondary w-20 shrink-0">{label}</span>
       <div className="flex-1 min-w-0">
@@ -77,7 +81,10 @@ export default function TotpCustomFieldDisplay({ label, value }: TotpCustomField
       {totpCode && (
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); setLargeTextOpen(true) }}
+          onClick={(e) => {
+            e.stopPropagation()
+            setLargeTextOpen(true)
+          }}
           className="p-0.5 text-text-muted hover:text-text-primary transition-colors shrink-0"
         >
           <Maximize2 size={12} />

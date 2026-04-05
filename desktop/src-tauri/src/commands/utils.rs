@@ -1,4 +1,7 @@
-use vault_core::api::{api_generate_password, api_generate_totp, api_generate_totp_default, api_generate_totp_from_value, api_parse_totp_period};
+use vault_core::api::{
+    api_generate_password, api_generate_totp, api_generate_totp_default,
+    api_generate_totp_from_value, api_parse_totp_period,
+};
 
 #[tauri::command]
 pub fn generate_password(

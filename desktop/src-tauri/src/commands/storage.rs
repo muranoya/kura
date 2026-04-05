@@ -15,9 +15,7 @@ pub async fn read_vault_file(app: tauri::AppHandle) -> Result<Option<Vec<u8>>, S
         if !path.exists() {
             return Ok(None);
         }
-        std::fs::read(&path)
-            .map(Some)
-            .map_err(|e| e.to_string())
+        std::fs::read(&path).map(Some).map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| format!("Task error: {}", e))?
