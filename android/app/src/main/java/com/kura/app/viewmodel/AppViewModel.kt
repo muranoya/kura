@@ -7,6 +7,8 @@ import com.kura.app.data.auth.BiometricHelper
 import com.kura.app.data.preferences.PreferencesManager
 import com.kura.app.data.preferences.SecureStorage
 import com.kura.app.data.repository.VaultRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +27,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _appState = MutableStateFlow(AppState.LOADING)
     val appState: StateFlow<AppState> = _appState
+
+    private var autolockJob: Job? = null
 
     private val _syncVersion = MutableStateFlow(0)
     val syncVersion: StateFlow<Int> = _syncVersion.asStateFlow()
@@ -77,6 +81,32 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _syncVersion.value++
         }
         return result.synced
+    }
+
+    fun onAppBackgrounded() {
+        if (_appState.value != AppState.UNLOCKED) return
+        autolockJob?.cancel()
+        autolockJob = viewModelScope.launch {
+            val minutes = preferences.autolockMinutesFlow.first()
+            if (minutes == 0) return@launch
+            delay(minutes * 60 * 1000L)
+            performAutoLock()
+        }
+    }
+
+    fun onAppForegrounded() {
+        autolockJob?.cancel()
+        autolockJob = null
+    }
+
+    private suspend fun performAutoLock() {
+        try {
+            val encryptedBytes = repository.lock()
+            repository.writeVaultFile(encryptedBytes)
+            _appState.value = AppState.LOCKED
+        } catch (_: Exception) {
+            // Lock failed - vault remains in current state
+        }
     }
 
     fun getS3ConfigJson(): String? {

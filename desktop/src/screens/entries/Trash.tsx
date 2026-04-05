@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import EntryCard from '../../components/entries/EntryCard'
-import EntryListPanel from '../../components/entries/EntryListPanel'
+import EntryListPanel, { EntryFilterBar } from '../../components/entries/EntryListPanel'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
 import { STORAGE_KEYS } from '../../shared/constants'
 import { getFromStorage, saveToStorage } from '../../shared/storage'
@@ -118,19 +118,25 @@ export default function Trash() {
   return (
     <div className="flex flex-col h-screen bg-bg-base">
       {/* sticky ヘッダー */}
-      <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
-        <h1 className="text-sm font-semibold text-text-primary flex-1">ゴミ箱</h1>
-        <SyncHeaderActions />
+      <div className="sticky top-0 z-10 border-b border-border bg-bg-surface shrink-0">
+        <div className="flex items-center gap-2 px-3 py-2">
+          <h1 className="text-sm font-semibold text-text-primary flex-1">ゴミ箱</h1>
+          <SyncHeaderActions />
+        </div>
+        <div className="px-3 pb-2">
+          <EntryFilterBar
+            selectedType={selectedType}
+            onTypeChange={setSelectedType}
+            sortConfig={sortConfig}
+            onSortChange={handleSortChange}
+            searchQuery={searchQuery}
+            onSearchChange={handleSearchChange}
+            onSearchClear={clearSearch}
+          />
+        </div>
       </div>
 
       <EntryListPanel
-        selectedType={selectedType}
-        onTypeChange={setSelectedType}
-        sortConfig={sortConfig}
-        onSortChange={handleSortChange}
-        searchQuery={searchQuery}
-        onSearchChange={handleSearchChange}
-        onSearchClear={clearSearch}
         entries={entries}
         loading={loading}
         error={error}

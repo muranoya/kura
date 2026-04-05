@@ -23,7 +23,6 @@ import com.kura.app.ui.components.SyncDialogState
 import com.kura.app.ui.components.SyncProgressDialog
 import com.kura.app.ui.sync.formatRelativeTime
 import com.kura.app.ui.settings.*
-import com.kura.app.ui.import_.ImportPreviewScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -51,7 +50,6 @@ object Routes {
     const val LABEL_ENTRIES = "labels/{labelId}/entries"
     const val PASSWORD_GENERATOR = "password_generator"
     const val SETTINGS = "settings"
-    const val IMPORT_1PUX = "import_1pux"
 
     fun recoveryKey(key: String) = "recovery_key/$key"
     fun entryDetail(id: String) = "entries/$id"
@@ -421,18 +419,6 @@ fun MainNavHost(appViewModel: AppViewModel) {
                     onOpenDrawer = { scope.launch { drawerState.open() } },
                     onLogout = {
                         appViewModel.setAppState(AppState.ONBOARDING)
-                    },
-                    onImport1pux = {
-                        navController.navigate(Routes.IMPORT_1PUX) { launchSingleTop = true }
-                    }
-                )
-            }
-            composable(Routes.IMPORT_1PUX) {
-                ImportPreviewScreen(
-                    appViewModel = appViewModel,
-                    onBack = { navController.popBackStack() },
-                    onImportComplete = {
-                        navController.popBackStack(Routes.HOME, inclusive = false)
                     }
                 )
             }

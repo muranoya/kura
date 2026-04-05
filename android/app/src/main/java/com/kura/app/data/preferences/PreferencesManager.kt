@@ -21,6 +21,7 @@ class PreferencesManager(private val context: Context) {
         val SORT_FIELD = stringPreferencesKey("entry_sort_field")
         val SORT_ORDER = stringPreferencesKey("entry_sort_order")
         val FAVORITES_EXPANDED = booleanPreferencesKey("favorites_expanded")
+        val AUTOLOCK_MINUTES = intPreferencesKey("autolock_minutes")
     }
 
     val s3ConfigFlow: Flow<String?> get() = secureStorage.s3ConfigFlow
@@ -31,6 +32,7 @@ class PreferencesManager(private val context: Context) {
     val sortFieldFlow: Flow<String> = context.dataStore.data.map { it[SORT_FIELD] ?: "created_at" }
     val sortOrderFlow: Flow<String> = context.dataStore.data.map { it[SORT_ORDER] ?: "desc" }
     val favoritesExpandedFlow: Flow<Boolean> = context.dataStore.data.map { it[FAVORITES_EXPANDED] ?: true }
+    val autolockMinutesFlow: Flow<Int> = context.dataStore.data.map { it[AUTOLOCK_MINUTES] ?: 5 }
 
     suspend fun saveS3Config(configJson: String) {
         secureStorage.saveS3Config(configJson)
@@ -61,6 +63,10 @@ class PreferencesManager(private val context: Context) {
             it[SORT_FIELD] = field
             it[SORT_ORDER] = order
         }
+    }
+
+    suspend fun saveAutolockMinutes(minutes: Int) {
+        context.dataStore.edit { it[AUTOLOCK_MINUTES] = minutes }
     }
 
     fun hasBiometricData(): Boolean = secureStorage.hasBiometricData()

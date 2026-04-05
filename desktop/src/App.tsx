@@ -11,7 +11,6 @@ import { SyncProvider, useNotifySynced } from './contexts/SyncContext'
 import Lock from './screens/auth/Lock'
 import Recovery from './screens/auth/Recovery'
 import EntryCreate from './screens/entries/EntryCreate'
-import EntryDetail from './screens/entries/EntryDetail'
 import EntryEdit from './screens/entries/EntryEdit'
 import EntryList from './screens/entries/EntryList'
 import LabelEntries from './screens/entries/LabelEntries'
@@ -57,6 +56,13 @@ function AppContent() {
       loadAutolockSettings()
     }
   }, [appState, loadAutolockSettings])
+
+  // トレイアイコンをロック状態に応じて切り替え
+  useEffect(() => {
+    if (appState === 'locked' || appState === 'unlocked') {
+      commands.setTrayIcon(appState === 'locked').catch(console.error)
+    }
+  }, [appState])
 
   // 自動ロックタイマー
   useEffect(() => {
@@ -209,7 +215,7 @@ function AppContent() {
                     <Route path="/entries" element={<EntryList />} />
                     <Route path="/favorites" element={<EntryList onlyFavorites={true} />} />
                     <Route path="/entries/create" element={<EntryCreate />} />
-                    <Route path="/entries/:id" element={<EntryDetail />} />
+                    <Route path="/entries/:id" element={<Navigate to="/entries" replace />} />
                     <Route path="/entries/:id/edit" element={<EntryEdit />} />
                     <Route path="/password-generator" element={<PasswordGenerator />} />
                     <Route path="/trash" element={<Trash />} />

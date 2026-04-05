@@ -636,38 +636,3 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_restoreLastSyncTime(
     with_manager(&vid, |m| m.api_restore_last_sync_time(ts));
 }
 
-// ============================================================================
-// Import Operations
-// ============================================================================
-
-#[no_mangle]
-pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_import1puxPreview(
-    mut env: JNIEnv,
-    _class: JClass,
-    vault_id: JString,
-    file_bytes: JByteArray,
-) -> jstring {
-    let vid = get_string(&mut env, &vault_id);
-    let bytes = get_byte_array(&mut env, &file_bytes);
-    match with_manager(&vid, |m| m.api_import_1pux_preview(bytes)) {
-        Ok(json) => env.new_string(json).unwrap().into_raw(),
-        Err(e) => throw_err(&mut env, &e),
-    }
-}
-
-#[no_mangle]
-pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_import1puxExecute(
-    mut env: JNIEnv,
-    _class: JClass,
-    vault_id: JString,
-    file_bytes: JByteArray,
-    actions_json: JString,
-) -> jstring {
-    let vid = get_string(&mut env, &vault_id);
-    let bytes = get_byte_array(&mut env, &file_bytes);
-    let actions = get_string(&mut env, &actions_json);
-    match with_manager(&vid, |m| m.api_import_1pux_execute(bytes, actions)) {
-        Ok(json) => env.new_string(json).unwrap().into_raw(),
-        Err(e) => throw_err(&mut env, &e),
-    }
-}

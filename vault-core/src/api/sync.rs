@@ -46,6 +46,14 @@ impl VaultManager {
             _ => return Err("Vault not unlocked".to_string()),
         };
 
+        // Vault UUIDの一致を検証
+        if remote_vault_file.meta.vault_uuid != unlocked.meta.vault_uuid {
+            return Err(format!(
+                "Vault UUID mismatch: local={}, remote={}",
+                unlocked.meta.vault_uuid, remote_vault_file.meta.vault_uuid
+            ));
+        }
+
         // ローカルcontentsを取得
         let local_contents = unlocked.contents.clone();
 

@@ -75,7 +75,7 @@ export default function EntryEdit() {
       await commands.writeVaultFile(vaultBytes)
       // S3に同期（バックグラウンド）
       commands.syncVaultIfConfigured().catch((e) => console.warn('Sync failed:', e))
-      navigate(`/entries/${id}`)
+      navigate('/entries')
     } catch (err) {
       setError(`保存失敗: ${err}`)
     } finally {
@@ -130,7 +130,7 @@ export default function EntryEdit() {
 
       {/* sticky bottom ボタンバー */}
       <div className="shrink-0 sticky bottom-0 flex justify-end gap-2 px-3 py-2 border-t border-border bg-bg-surface">
-        <Button variant="secondary" size="sm" onClick={() => navigate(`/entries/${id}`)}>
+        <Button variant="secondary" size="sm" onClick={() => navigate('/entries')}>
           キャンセル
         </Button>
         <Button size="sm" onClick={handleSave} disabled={saving}>

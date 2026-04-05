@@ -1,6 +1,8 @@
 mod commands;
 pub mod storage;
 
+use tauri::Manager;
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -8,8 +10,12 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .setup(|_app| {
-            // Future setup for system tray, autolock timer, etc.
+        .setup(|app| {
+            let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/locked.png"))
+                .expect("Failed to load app icon");
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_icon(icon.clone());
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -21,6 +27,7 @@ pub fn run() {
             commands::session::lock,
             commands::session::get_vault_bytes,
             commands::session::is_unlocked,
+            commands::session::set_tray_icon,
             // Entries
             commands::entries::list_entries,
             commands::entries::get_entry,

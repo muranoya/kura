@@ -165,15 +165,6 @@ impl EntryData {
         }
     }
 
-    pub fn new_passkey(notes: Option<String>) -> Self {
-        EntryData {
-            entry_type: "passkey".to_string(),
-            notes,
-            typed_value: json!({}),
-            custom_fields: None,
-        }
-    }
-
     pub fn to_json_string(&self) -> Result<String> {
         serde_json::to_string(self).map_err(|e| VaultError::JsonError(e))
     }

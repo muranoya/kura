@@ -49,3 +49,18 @@ pub fn is_unlocked(vault_id: String) -> bool {
     let manager = get_manager(&vault_id);
     manager.api_is_unlocked()
 }
+
+#[tauri::command]
+pub fn set_tray_icon(app: tauri::AppHandle, is_locked: bool) -> Result<(), String> {
+    let tray = app.tray_by_id("main").ok_or("Tray not found")?;
+    let icon_bytes: &[u8] = if is_locked {
+        include_bytes!("../../icons/locked.png")
+    } else {
+        include_bytes!("../../icons/unlocked.png")
+    };
+    let icon = tauri::image::Image::from_bytes(icon_bytes)
+        .map_err(|e| format!("Failed to load icon: {}", e))?;
+    tray.set_icon(Some(icon))
+        .map_err(|e| format!("Failed to set icon: {}", e))?;
+    Ok(())
+}

@@ -13,6 +13,7 @@ export type {
 
 // Legacy types for backward compatibility
 export interface VaultMeta {
+  vault_uuid: string
   encrypted_dek_master: string
   encrypted_dek_recovery: string
   argon2_params: {

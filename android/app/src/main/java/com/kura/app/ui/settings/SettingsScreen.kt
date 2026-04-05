@@ -32,8 +32,7 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     appViewModel: AppViewModel,
     onOpenDrawer: () -> Unit = {},
-    onLogout: () -> Unit,
-    onImport1pux: () -> Unit = {}
+    onLogout: () -> Unit
 ) {
     var showChangePasswordDialog by remember { mutableStateOf(false) }
     var showRotateDekDialog by remember { mutableStateOf(false) }
@@ -44,6 +43,10 @@ fun SettingsScreen(
     var showBiometricEnrollDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    val autolockMinutes by appViewModel.preferences.autolockMinutesFlow
+        .collectAsState(initial = 5)
+    var autolockExpanded by remember { mutableStateOf(false) }
 
     val canUseBiometric = remember {
         BiometricManager.from(context).canAuthenticate(
@@ -73,21 +76,6 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // データセクション
-            Text("データ", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Card(onClick = onImport1pux, modifier = Modifier.fillMaxWidth()) {
-                ListItem(
-                    headlineContent = { Text("1Passwordからインポート") },
-                    supportingContent = { Text(".1puxファイルからエントリを取り込む") },
-                    leadingContent = { Icon(Icons.Default.FileUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
             // セキュリティセクション
             Text("セキュリティ", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(4.dp))
@@ -116,6 +104,47 @@ fun SettingsScreen(
                     supportingContent = { Text("新しいリカバリーキーを生成して表示") },
                     leadingContent = { Icon(Icons.Default.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                )
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    headlineContent = { Text("自動ロック") },
+                    supportingContent = { Text("バックグラウンド移行後の自動ロック時間") },
+                    leadingContent = {
+                        Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    },
+                    trailingContent = {
+                        ExposedDropdownMenuBox(
+                            expanded = autolockExpanded,
+                            onExpandedChange = { autolockExpanded = it }
+                        ) {
+                            OutlinedTextField(
+                                value = if (autolockMinutes == 0) "無効" else "${autolockMinutes}分",
+                                onValueChange = {},
+                                readOnly = true,
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .width(120.dp),
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = autolockExpanded) },
+                                singleLine = true
+                            )
+                            ExposedDropdownMenu(
+                                expanded = autolockExpanded,
+                                onDismissRequest = { autolockExpanded = false }
+                            ) {
+                                listOf(0, 1, 3, 5, 10, 15, 30, 60).forEach { minutes ->
+                                    DropdownMenuItem(
+                                        text = { Text(if (minutes == 0) "無効" else "${minutes}分") },
+                                        onClick = {
+                                            scope.launch { appViewModel.preferences.saveAutolockMinutes(minutes) }
+                                            autolockExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
                 )
             }
 

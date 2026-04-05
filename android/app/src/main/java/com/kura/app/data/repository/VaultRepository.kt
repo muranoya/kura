@@ -216,20 +216,6 @@ class VaultRepository(private val context: Context) {
     }
 
     // ========================================================================
-    // Import
-    // ========================================================================
-
-    suspend fun import1puxPreview(fileBytes: ByteArray): ImportPreview = withContext(Dispatchers.IO) {
-        val jsonStr = VaultBridge.import1puxPreview(DEFAULT_VAULT_ID, fileBytes)
-        json.decodeFromString<ImportPreview>(jsonStr)
-    }
-
-    suspend fun import1puxExecute(fileBytes: ByteArray, actionsJson: String): ImportResult = withContext(Dispatchers.IO) {
-        val jsonStr = VaultBridge.import1puxExecute(DEFAULT_VAULT_ID, fileBytes, actionsJson)
-        json.decodeFromString<ImportResult>(jsonStr)
-    }
-
-    // ========================================================================
     // Sync
     // ========================================================================
 

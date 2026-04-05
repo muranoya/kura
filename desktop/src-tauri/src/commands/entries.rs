@@ -23,6 +23,7 @@ pub async fn list_entries(
                     "id": r.id,
                     "entryType": r.entry_type,
                     "name": r.name,
+                    "subtitle": r.subtitle,
                     "isFavorite": r.is_favorite,
                     "createdAt": r.created_at,
                     "updatedAt": r.updated_at,

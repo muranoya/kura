@@ -1,7 +1,10 @@
 import { Copy, Eye, EyeOff, Maximize2, Pencil, Plus, Search, Settings, Trash2, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { markdownComponents } from '../../components/ui/markdown-components'
 import { STORAGE_KEYS } from '../../../shared/constants'
 import { getFromStorage, saveToStorage } from '../../../shared/storage'
 import * as commands from '../../commands'
@@ -274,7 +277,6 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
               <EntryCard
                 variant="normal"
                 entry={entry}
-                compact
                 isSelected={selectedId === entry.id}
                 onClick={(id) => setSelectedId(id)}
                 onFavorite={handleFavorite}
@@ -512,7 +514,7 @@ function EntryDetailPane({
           <div className="space-y-0">
             <PaneFieldDisplay label="銀行名" value={v.bank_name} />
             <PaneFieldDisplay label="支店コード" value={v.branch_code} />
-            <PaneFieldDisplay label="種類" value={v.account_type} />
+            <PaneFieldDisplay label="口座種別" value={v.account_type} />
             <PaneFieldDisplay label="口座名義" value={v.account_holder} />
             <PaneFieldDisplay label="口座番号" value={v.account_number} />
             <PaneFieldDisplay
@@ -541,8 +543,10 @@ function EntryDetailPane({
         <>
           <PaneSectionHeading>ノート</PaneSectionHeading>
           {v.content ? (
-            <div className="p-2 rounded-md bg-bg-elevated border border-border text-text-primary text-xs whitespace-pre-wrap break-words mt-0.5">
-              {v.content}
+            <div className="p-2 rounded-md bg-bg-elevated border border-border text-text-primary prose prose-invert max-w-none text-xs mt-0.5">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                {v.content}
+              </ReactMarkdown>
             </div>
           ) : (
             <div className="px-2 py-1.5 text-sm text-text-secondary italic">未設定</div>
@@ -556,7 +560,13 @@ function EntryDetailPane({
           <PaneSectionHeading>クレジットカード</PaneSectionHeading>
           <div className="space-y-0">
             <PaneFieldDisplay label="カード名義" value={v.cardholder} />
-            <PaneFieldDisplay label="カード番号" value={v.number} />
+            <PaneFieldDisplay
+              label="カード番号"
+              value={v.number}
+              isPassword
+              isMasked={!unmaskedFields.has('cc-number')}
+              onToggleMask={() => onToggleFieldMask('cc-number')}
+            />
             <PaneFieldDisplay label="有効期限" value={v.expiry} />
             <PaneFieldDisplay
               label="CVV"

@@ -3,6 +3,7 @@ use super::Argon2Params;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaultMeta {
+    pub vault_uuid: String,
     pub encrypted_dek_master: String,  // base64-encoded
     pub encrypted_dek_recovery: String, // base64-encoded
     pub argon2_params: Argon2Params,
@@ -19,6 +20,7 @@ impl VaultMeta {
         let engine = base64::engine::general_purpose::STANDARD;
 
         VaultMeta {
+            vault_uuid: uuid::Uuid::new_v4().to_string(),
             encrypted_dek_master: engine.encode(&encrypted_dek_master),
             encrypted_dek_recovery: engine.encode(&encrypted_dek_recovery),
             argon2_params,

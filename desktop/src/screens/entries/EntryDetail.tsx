@@ -70,7 +70,7 @@ function FieldDisplay({
         {isEmpty
           ? '未設定'
           : isPassword && isMasked
-            ? '•'.repeat(Math.max(8, value.length))
+            ? '••••••••'
             : value}
       </span>
       {!isEmpty && isPassword && onToggleMask && (
@@ -325,7 +325,7 @@ export default function EntryDetail() {
             <div className="space-y-0.5">
               <FieldDisplay label="銀行名" value={v.bank_name as string} />
               <FieldDisplay label="支店コード" value={v.branch_code as string} />
-              <FieldDisplay label="種類" value={v.account_type as string} />
+              <FieldDisplay label="口座種別" value={v.account_type as string} />
               <FieldDisplay label="口座名義" value={v.account_holder as string} />
               <FieldDisplay label="口座番号" value={v.account_number as string} />
               <FieldDisplay
@@ -371,7 +371,13 @@ export default function EntryDetail() {
             <SectionHeading>クレジットカード</SectionHeading>
             <div className="space-y-0.5">
               <FieldDisplay label="カード名義" value={v.cardholder as string} />
-              <FieldDisplay label="カード番号" value={v.number as string} />
+              <FieldDisplay
+                label="カード番号"
+                value={v.number as string}
+                isPassword={true}
+                isMasked={!unmaskedFields.has('cc-number')}
+                onToggleMask={() => toggleFieldMask('cc-number')}
+              />
               <FieldDisplay label="有効期限" value={v.expiry as string} />
               <FieldDisplay
                 label="CVV"

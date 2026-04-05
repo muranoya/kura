@@ -1,11 +1,8 @@
 package com.kura.app.ui.home
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -19,18 +16,14 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kura.app.data.model.EntryRow
 import com.kura.app.data.model.EntryType
 import com.kura.app.data.model.Label
 import com.kura.app.ui.components.EntryCard
-import com.kura.app.ui.components.EntryTypeIcon
-import com.kura.app.ui.components.entryTypeColor
 import com.kura.app.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -44,7 +37,6 @@ fun HomeScreen(
     onCreateClick: () -> Unit,
 ) {
     var allEntries by remember { mutableStateOf<List<EntryRow>>(emptyList()) }
-    var favoriteEntries by remember { mutableStateOf<List<EntryRow>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var lastSyncTime by remember { mutableStateOf<Long?>(null) }
     var isSyncing by remember { mutableStateOf(false) }
@@ -66,9 +58,6 @@ fun HomeScreen(
     var sortOrder by remember { mutableStateOf("desc") }
     var showSortSheet by remember { mutableStateOf(false) }
 
-    // Favorites accordion state (persisted)
-    var favoritesExpanded by remember { mutableStateOf(true) }
-
     val scope = rememberCoroutineScope()
 
     // Load preferences
@@ -77,9 +66,6 @@ fun HomeScreen(
     }
     LaunchedEffect(Unit) {
         appViewModel.preferences.sortOrderFlow.collect { sortOrder = it }
-    }
-    LaunchedEffect(Unit) {
-        appViewModel.preferences.favoritesExpandedFlow.collect { favoritesExpanded = it }
     }
 
     fun loadData() {
@@ -93,7 +79,6 @@ fun HomeScreen(
                     sortField = sortField,
                     sortOrder = sortOrder
                 )
-                favoriteEntries = appViewModel.repository.listEntries(onlyFavorites = true, sortField = sortField, sortOrder = sortOrder)
                 labels = appViewModel.repository.listLabels()
                 val ts = appViewModel.repository.getLastSyncTime()
                 if (ts > 0) lastSyncTime = ts
@@ -163,16 +148,16 @@ fun HomeScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     // Menu button
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.surface,
                         shadowElevation = 2.dp,
-                        modifier = Modifier.size(38.dp),
+                        modifier = Modifier.size(34.dp),
                         onClick = onOpenDrawer
                     ) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
@@ -180,7 +165,7 @@ fun HomeScreen(
                                 Icons.Default.Menu,
                                 contentDescription = "メニュー",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
@@ -189,7 +174,7 @@ fun HomeScreen(
                     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
                             "kura",
-                            style = MaterialTheme.typography.headlineSmall.copy(
+                            style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.ExtraBold,
                                 letterSpacing = (-0.5).sp
                             )
@@ -205,13 +190,13 @@ fun HomeScreen(
                         )
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         // Add button
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.surface,
                             shadowElevation = 2.dp,
-                            modifier = Modifier.size(38.dp),
+                            modifier = Modifier.size(34.dp),
                             onClick = onCreateClick
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
@@ -219,17 +204,17 @@ fun HomeScreen(
                                     Icons.Default.Add,
                                     contentDescription = "新規作成",
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
 
                         // Favorites toggle
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.surface,
                             shadowElevation = 2.dp,
-                            modifier = Modifier.size(38.dp),
+                            modifier = Modifier.size(34.dp),
                             onClick = { showFavoritesOnly = !showFavoritesOnly }
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
@@ -237,17 +222,17 @@ fun HomeScreen(
                                     if (showFavoritesOnly) Icons.Default.Star else Icons.Outlined.StarOutline,
                                     contentDescription = "お気に入りフィルター",
                                     tint = if (showFavoritesOnly) Color(0xFFD97706) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
 
                         // Sort button
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.surface,
                             shadowElevation = 2.dp,
-                            modifier = Modifier.size(38.dp),
+                            modifier = Modifier.size(34.dp),
                             onClick = { showSortSheet = true }
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
@@ -258,7 +243,7 @@ fun HomeScreen(
                                         MaterialTheme.colorScheme.primary
                                     else
                                         MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
@@ -291,6 +276,7 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(if (!searchActive) Modifier.padding(start = 16.dp, end = 16.dp).navigationBarsPadding() else Modifier),
+                windowInsets = WindowInsets(0),
             ) {
                 // Search expanded content
                 Column {
@@ -306,7 +292,7 @@ fun HomeScreen(
                                 label = { Text("全て") }
                             )
                         }
-                        items(EntryType.entries.filter { it != EntryType.PASSKEY }) { type ->
+                        items(EntryType.entries) { type ->
                             FilterChip(
                                 selected = searchSelectedType == type.value,
                                 onClick = { searchSelectedType = if (searchSelectedType == type.value) null else type.value },
@@ -395,27 +381,17 @@ fun HomeScreen(
                 Column(modifier = Modifier.fillMaxSize()) {
                     // Sticky header
                     StickyHeaderContent(
-                        favoriteEntries = favoriteEntries,
-                        favoritesExpanded = favoritesExpanded,
-                        onFavoritesExpandedChange = { expanded ->
-                            favoritesExpanded = expanded
-                            scope.launch {
-                                appViewModel.preferences.saveFavoritesExpanded(expanded)
-                            }
-                        },
-                        showFavoritesOnly = showFavoritesOnly,
                         selectedType = selectedType,
                         onTypeSelected = { selectedType = it },
                         labels = labels,
                         selectedLabelId = selectedLabelId,
-                        onLabelSelected = { selectedLabelId = it },
-                        onEntryClick = onEntryClick
+                        onLabelSelected = { selectedLabelId = it }
                     )
 
                     // Entry list
                     LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(0.dp),
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 80.dp)
                     ) {
                         if (displayEntries.isEmpty()) {
                             item {
@@ -452,7 +428,7 @@ fun HomeScreen(
                             }
                         } else {
                             items(displayEntries, key = { it.id }) { entry ->
-                                Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+                                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                                     EntryCard(
                                         entry = entry,
                                         onClick = { onEntryClick(entry.id) },
@@ -464,6 +440,10 @@ fun HomeScreen(
                                                 } catch (_: Exception) { }
                                             }
                                         }
+                                    )
+                                    HorizontalDivider(
+                                        thickness = 0.5.dp,
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                                     )
                                 }
                             }
@@ -552,151 +532,47 @@ fun SortBottomSheet(
 
 @Composable
 private fun StickyHeaderContent(
-    favoriteEntries: List<EntryRow>,
-    favoritesExpanded: Boolean,
-    onFavoritesExpandedChange: (Boolean) -> Unit,
-    showFavoritesOnly: Boolean,
     selectedType: String?,
     onTypeSelected: (String?) -> Unit,
     labels: List<Label>,
     selectedLabelId: String?,
-    onLabelSelected: (String?) -> Unit,
-    onEntryClick: (String) -> Unit
+    onLabelSelected: (String?) -> Unit
 ) {
-    // Favorites section (accordion)
-    if (favoriteEntries.isNotEmpty() && !showFavoritesOnly) {
-        Column(modifier = Modifier.padding(top = 20.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onFavoritesExpandedChange(!favoritesExpanded) }
-                    .padding(horizontal = 20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Star,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = Color(0xFFD97706)
-                    )
-                    Text(
-                        "お気に入り",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-                }
-                Icon(
-                    if (favoritesExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (favoritesExpanded) "折りたたむ" else "展開する",
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            AnimatedVisibility(
-                visible = favoritesExpanded,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
-                Column {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(favoriteEntries, key = { "fav_${it.id}" }) { entry ->
-                            FavoriteCard(
-                                entry = entry,
-                                onClick = { onEntryClick(entry.id) }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
+    var labelDropdownExpanded by remember { mutableStateOf(false) }
+    val selectedLabelName = labels.find { it.id == selectedLabelId }?.name
 
-    // Filter chips
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
-        modifier = Modifier.padding(top = 18.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        item {
-            FilterChip(
-                selected = selectedType == null,
-                onClick = { onTypeSelected(null) },
-                label = {
-                    Text(
-                        "全て",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-                },
-                shape = RoundedCornerShape(20.dp),
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        }
-        items(EntryType.entries.filter { it != EntryType.PASSKEY }) { type ->
-            FilterChip(
-                selected = selectedType == type.value,
-                onClick = {
-                    onTypeSelected(if (selectedType == type.value) null else type.value)
-                },
-                label = {
-                    Text(
-                        type.displayName,
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-                },
-                shape = RoundedCornerShape(20.dp),
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        }
-    }
-
-    // Label filter chips
-    if (labels.isNotEmpty()) {
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
-            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            item {
-                Icon(
-                    Icons.AutoMirrored.Filled.Label,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            items(labels, key = { it.id }) { label ->
+        // Label dropdown button (fixed on left)
+        if (labels.isNotEmpty()) {
+            Box(modifier = Modifier.padding(start = 16.dp)) {
                 FilterChip(
-                    selected = selectedLabelId == label.id,
-                    onClick = {
-                        onLabelSelected(if (selectedLabelId == label.id) null else label.id)
-                    },
+                    selected = selectedLabelId != null,
+                    onClick = { labelDropdownExpanded = true },
                     label = {
                         Text(
-                            label.name,
+                            selectedLabelName ?: "ラベル",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold
                             )
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Label,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        Icon(
+                            if (labelDropdownExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
                         )
                     },
                     shape = RoundedCornerShape(20.dp),
@@ -705,56 +581,100 @@ private fun StickyHeaderContent(
                         selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 )
+                DropdownMenu(
+                    expanded = labelDropdownExpanded,
+                    onDismissRequest = { labelDropdownExpanded = false }
+                ) {
+                    if (selectedLabelId != null) {
+                        DropdownMenuItem(
+                            text = { Text("クリア") },
+                            onClick = {
+                                onLabelSelected(null)
+                                labelDropdownExpanded = false
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                        )
+                        HorizontalDivider()
+                    }
+                    labels.forEach { label ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    label.name,
+                                    fontWeight = if (selectedLabelId == label.id) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            onClick = {
+                                onLabelSelected(if (selectedLabelId == label.id) null else label.id)
+                                labelDropdownExpanded = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Label,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = if (selectedLabelId == label.id)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        )
+                    }
+                }
             }
         }
-    } else {
-        Spacer(modifier = Modifier.height(8.dp))
-    }
-}
 
-@Composable
-private fun FavoriteCard(
-    entry: EntryRow,
-    onClick: () -> Unit
-) {
-    val typeColor = entryTypeColor(entry.entryType)
-
-    Card(
-        onClick = onClick,
-        modifier = Modifier.width(118.dp),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp, 14.dp, 14.dp, 12.dp)
+        // Scrollable type filter chips
+        LazyRow(
+            contentPadding = PaddingValues(start = if (labels.isNotEmpty()) 7.dp else 16.dp, end = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
         ) {
-            // Icon with colored background
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(typeColor.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                EntryTypeIcon(
-                    entryType = entry.entryType,
-                    tint = typeColor,
-                    modifier = Modifier.size(18.dp)
+            item {
+                FilterChip(
+                    selected = selectedType == null,
+                    onClick = { onTypeSelected(null) },
+                    label = {
+                        Text(
+                            "全て",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                    },
+                    shape = RoundedCornerShape(20.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 )
             }
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                entry.name,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            items(EntryType.entries) { type ->
+                FilterChip(
+                    selected = selectedType == type.value,
+                    onClick = {
+                        onTypeSelected(if (selectedType == type.value) null else type.value)
+                    },
+                    label = {
+                        Text(
+                            type.displayName,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                    },
+                    shape = RoundedCornerShape(20.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                )
+            }
         }
     }
 }
+

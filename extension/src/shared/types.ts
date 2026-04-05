@@ -1,5 +1,5 @@
 // Entry types supported by kura
-export type EntryType = 'login' | 'bank' | 'ssh_key' | 'secure_note' | 'credit_card' | 'passkey' | 'password' | 'software_license'
+export type EntryType = 'login' | 'bank' | 'ssh_key' | 'secure_note' | 'credit_card' | 'password' | 'software_license'
 
 // Custom field types
 export type CustomFieldType = 'text' | 'password' | 'email' | 'url' | 'phone' | 'totp'
@@ -26,6 +26,7 @@ export interface EntryRow {
   id: string
   entryType: EntryType
   name: string
+  subtitle: string | null
   isFavorite: boolean
   createdAt: number
   updatedAt: number

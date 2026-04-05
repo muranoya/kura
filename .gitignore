@@ -15,9 +15,15 @@ node_modules/
 
 # Desktop (Tauri)
 desktop/dist/
+desktop/src-tauri/icons/*.png
+desktop/src-tauri/icons/*.ico
+desktop/src-tauri/icons/*.icns
+desktop/src-tauri/icons/android/
+desktop/src-tauri/icons/ios/
 
 # Extension
 extension/dist/
+extension/public/icons/
 extension/wasm/
 extension/kura-extension-firefox.zip
 extension/kura-extension-chrome.zip
@@ -37,3 +43,5 @@ android/.externalNativeBuild/
 android/.cxx/
 android/**/*.so
 android/app/build/
+android/app/src/main/res/mipmap-*/ic_launcher.png
+android/app/src/main/res/mipmap-*/ic_launcher_foreground.png

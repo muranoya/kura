@@ -101,7 +101,7 @@ fun EntryCreateScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text("エントリのタイプを選択", style = MaterialTheme.typography.titleMedium)
-                EntryType.entries.filter { it != EntryType.PASSKEY }.forEach { type ->
+                EntryType.entries.forEach { type ->
                     Card(
                         onClick = { selectedType = type.value },
                         modifier = Modifier.fillMaxWidth()

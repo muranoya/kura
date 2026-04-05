@@ -5,7 +5,6 @@ export const ENTRY_TYPE_LABELS: Record<string, string> = {
   ssh_key: 'SSHキー',
   secure_note: 'セキュアノート',
   credit_card: 'クレジットカード',
-  passkey: 'PassKey',
   password: 'パスワード',
   software_license: 'ソフトウェアライセンス',
 }
@@ -31,6 +30,7 @@ export const STORAGE_KEYS = {
   APP_SETTINGS: 'appSettings',
   LAST_SYNC_TIME: 'lastSyncTime',
   SORT_CONFIG: 'entrySortConfig',
+  ENTRY_TYPE_FILTER: 'entryTypeFilter',
 }
 
 // Password generation defaults

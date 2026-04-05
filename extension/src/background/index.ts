@@ -81,6 +81,17 @@ let unlocked = false
 let popupConnected = false
 let decryptedS3Config: S3Config | null = null
 
+function updateExtensionIcon(isUnlocked: boolean) {
+  const prefix = isUnlocked ? 'unlocked' : 'locked'
+  chrome.action.setIcon({
+    path: {
+      16: `icons/${prefix}-16.png`,
+      48: `icons/${prefix}-48.png`,
+      128: `icons/${prefix}-128.png`,
+    },
+  })
+}
+
 // WASM 初期化関数
 async function initWasm() {
   if (wasmInitialized) return
@@ -137,6 +148,7 @@ self.addEventListener('activate', (event: Event) => {
   ;(event as unknown as { waitUntil(p: Promise<unknown>): void }).waitUntil(
     initWasm().then(() => {
       setupAlarms()
+      updateExtensionIcon(false)
     }),
   )
 })
@@ -152,6 +164,7 @@ function normalizeEntry(raw: Record<string, unknown>): Record<string, unknown> {
     id: raw.id,
     entryType: raw.entry_type,
     name: raw.name,
+    subtitle: raw.subtitle ?? null,
     isFavorite: raw.is_favorite ?? false,
     createdAt: raw.created_at ?? 0,
     updatedAt: raw.updated_at ?? 0,
@@ -340,6 +353,7 @@ async function handleMessage(
             }
           }
           unlocked = true
+          updateExtensionIcon(true)
           // ポップアップが閉じている場合のみオートロック alarm を設定
           if (!popupConnected) {
             const settings = await loadSettings()
@@ -391,6 +405,7 @@ async function handleMessage(
             }
           }
           unlocked = true
+          updateExtensionIcon(true)
           // ポップアップが閉じている場合のみオートロック alarm を設定
           if (!popupConnected) {
             const settings = await loadSettings()
@@ -414,6 +429,7 @@ async function handleMessage(
           const vaultBytes = vault.api_lock(DEFAULT_VAULT_ID)
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
           unlocked = false
+          updateExtensionIcon(false)
           decryptedS3Config = null
           chrome.alarms.clear('autolock')
           chrome.alarms.clear('autosync')
@@ -470,6 +486,7 @@ async function handleMessage(
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, null)
           await autoSync()
           unlocked = true
+          updateExtensionIcon(true)
           if (!popupConnected) {
             const settings = await loadSettings()
             if (settings.autolockMinutes > 0) {
@@ -997,6 +1014,7 @@ async function handleAutolockAlarm() {
     const vaultBytes = vault.api_lock(DEFAULT_VAULT_ID)
     await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
     unlocked = false
+    updateExtensionIcon(false)
     decryptedS3Config = null
   } catch (err) {
     console.error('[SW] Autolock failed:', err)

@@ -20,6 +20,7 @@ pub struct EntryRow {
     pub id: String,
     pub entry_type: String,
     pub name: String,
+    pub subtitle: Option<String>,
     pub is_favorite: bool,
     pub created_at: i64,
     pub updated_at: i64,

@@ -13,7 +13,6 @@ fun entryTypeColor(entryType: String): Color = when (entryType) {
     "ssh_key" -> Color(0xFF059669)
     "secure_note" -> Color(0xFFD97706)
     "credit_card" -> Color(0xFFE11D48)
-    "passkey" -> Color(0xFF0891B2)
     "password" -> Color(0xFF8B5CF6)
     "software_license" -> Color(0xFF0D9488)
     else -> Color(0xFF64748B)
@@ -27,7 +26,6 @@ fun EntryTypeIcon(entryType: String, modifier: Modifier = Modifier, tint: Color 
         "ssh_key" -> Icons.Default.Terminal
         "secure_note" -> Icons.Default.Description
         "credit_card" -> Icons.Default.CreditCard
-        "passkey" -> Icons.Default.Fingerprint
         "password" -> Icons.Default.Lock
         "software_license" -> Icons.Default.Key
         else -> Icons.Default.Lock
@@ -41,7 +39,6 @@ fun entryTypeDisplayName(type: String): String = when (type) {
     "ssh_key" -> "SSHキー"
     "secure_note" -> "セキュアノート"
     "credit_card" -> "クレジットカード"
-    "passkey" -> "Passkey"
     "password" -> "パスワード"
     "software_license" -> "ソフトウェアライセンス"
     else -> type

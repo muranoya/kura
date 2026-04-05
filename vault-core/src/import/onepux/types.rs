@@ -55,6 +55,8 @@ pub struct OnePuxItem {
     #[serde(default, rename = "categoryUuid")]
     pub category_uuid: String,
     #[serde(default)]
+    pub state: Option<String>,
+    #[serde(default)]
     pub overview: OnePuxOverview,
     #[serde(default)]
     pub details: OnePuxDetails,
@@ -113,6 +115,8 @@ pub struct OnePuxSection {
 #[derive(Debug, Deserialize)]
 pub struct OnePuxSectionField {
     #[serde(default)]
+    pub id: Option<String>,
+    #[serde(default)]
     pub title: Option<String>,
     #[serde(default)]
     pub value: serde_json::Value,
@@ -158,12 +162,15 @@ pub struct ParsedItem {
     pub has_attachments: bool,
     pub attachment_file_name: Option<String>,
     pub is_favorite: bool,
+    pub is_archived: bool,
+    pub is_trashed: bool,
     pub created_at: i64,
     pub updated_at: i64,
 }
 
 #[derive(Debug, Clone)]
 pub struct ParsedField {
+    pub field_id: Option<String>,
     pub section_title: Option<String>,
     pub field_title: String,
     pub value: ParsedFieldValue,

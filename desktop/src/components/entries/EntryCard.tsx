@@ -11,7 +11,6 @@ import {
   Trash2,
 } from 'lucide-react'
 import type { EntryRow } from '../../shared/types'
-import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Card } from '../ui/card'
 
@@ -37,28 +36,14 @@ const getEntryIcon = (type: string) => {
   }
 }
 
-// タイプラベル取得
-const getTypeLabel = (type: string): string => {
-  const labels: Record<string, string> = {
-    login: 'ログイン',
-    bank: '銀行口座',
-    ssh_key: 'SSH キー',
-    secure_note: 'セキュアノート',
-    credit_card: 'クレジットカード',
-    passkey: 'PassKey',
-    password: 'パスワード',
-    software_license: 'ソフトウェアライセンス',
-  }
-  return labels[type] || type
-}
 
 // Normal variant (EntryList用)
 interface EntryCardNormalProps {
   variant: 'normal'
   entry: EntryRow
+  isSelected?: boolean
   onClick: (id: string) => void
   onFavorite: (id: string, current: boolean) => void
-  onDelete: (id: string) => void
 }
 
 // Trash variant (Trash用)
@@ -75,7 +60,11 @@ export default function EntryCard(props: EntryCardProps) {
   if (props.variant === 'normal') {
     return (
       <Card
-        className="p-3 hover:border-accent/50 transition-colors cursor-pointer group"
+        className={`p-3 transition-colors cursor-pointer group ${
+          props.isSelected
+            ? 'border-accent bg-accent-subtle'
+            : 'hover:border-accent/50'
+        }`}
         onClick={() => props.onClick(props.entry.id)}
       >
         <div className="flex items-center justify-between gap-3">
@@ -88,11 +77,11 @@ export default function EntryCard(props: EntryCardProps) {
               <h3 className="text-sm font-semibold text-text-primary truncate">
                 {props.entry.name}
               </h3>
-              <div className="flex items-center gap-2 mt-1">
-                <Badge variant="muted" className="text-xs">
-                  {getTypeLabel(props.entry.entryType)}
-                </Badge>
-              </div>
+              {props.entry.subtitle && (
+                <p className="text-xs text-text-muted truncate mt-0.5">
+                  {props.entry.subtitle}
+                </p>
+              )}
             </div>
           </div>
 
@@ -114,18 +103,6 @@ export default function EntryCard(props: EntryCardProps) {
               />
             </button>
 
-            {/* 削除ボタン */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation()
-                props.onDelete(props.entry.id)
-              }}
-              className="text-danger hover:text-danger gap-1"
-            >
-              <Trash2 size={16} />
-            </Button>
           </div>
         </div>
       </Card>
@@ -172,4 +149,4 @@ export default function EntryCard(props: EntryCardProps) {
 }
 
 // ヘルパー関数をエクスポート（他で使う場合）
-export { getEntryIcon, getTypeLabel }
+export { getEntryIcon }

@@ -112,6 +112,7 @@ fn convert_item(item: &OnePuxItem, vault_name: &str, _has_files_dir: bool) -> Pa
                     continue;
                 }
                 fields.push(ParsedField {
+                    field_id: field.id.clone(),
                     section_title: section.title.clone(),
                     field_title,
                     value: parsed,
@@ -144,6 +145,8 @@ fn convert_item(item: &OnePuxItem, vault_name: &str, _has_files_dir: bool) -> Pa
         has_attachments,
         attachment_file_name,
         is_favorite: item.fav_index.map(|i| i > 0).unwrap_or(false),
+        is_archived: item.state.as_deref() == Some("archived"),
+        is_trashed: item.state.as_deref() == Some("trashed"),
         created_at: item.created_at,
         updated_at: item.updated_at,
     }
@@ -261,6 +264,39 @@ mod tests {
                             "notesPlain": "Secret note content",
                             "sections": []
                         }
+                    },
+                    {
+                        "uuid": "item3",
+                        "state": "archived",
+                        "createdAt": 1700000000,
+                        "updatedAt": 1700000000,
+                        "categoryUuid": "001",
+                        "overview": {
+                            "title": "Archived Login",
+                            "tags": []
+                        },
+                        "details": {
+                            "loginFields": [
+                                {"designation": "username", "value": "old@example.com"},
+                                {"designation": "password", "value": "oldpass"}
+                            ],
+                            "sections": []
+                        }
+                    },
+                    {
+                        "uuid": "item4",
+                        "state": "trashed",
+                        "createdAt": 1700000000,
+                        "updatedAt": 1700000000,
+                        "categoryUuid": "001",
+                        "overview": {
+                            "title": "Trashed Login",
+                            "tags": []
+                        },
+                        "details": {
+                            "loginFields": [],
+                            "sections": []
+                        }
                     }]
                 }]
             }]
@@ -282,7 +318,7 @@ mod tests {
     fn test_parse_1pux_basic() {
         let bytes = make_test_1pux();
         let items = parse_1pux(&bytes).unwrap();
-        assert_eq!(items.len(), 2);
+        assert_eq!(items.len(), 4);
 
         let login = &items[0];
         assert_eq!(login.title, "Example Login");
@@ -291,6 +327,8 @@ mod tests {
         assert_eq!(login.password.as_deref(), Some("secret123"));
         assert_eq!(login.url.as_deref(), Some("https://example.com"));
         assert!(login.is_favorite);
+        assert!(!login.is_archived);
+        assert!(!login.is_trashed);
         assert_eq!(login.tags, vec!["work"]);
         assert_eq!(login.fields.len(), 1);
         assert!(matches!(login.fields[0].value, ParsedFieldValue::Email(_)));
@@ -299,6 +337,18 @@ mod tests {
         assert_eq!(note.title, "My Note");
         assert_eq!(note.category_uuid, "004");
         assert_eq!(note.notes.as_deref(), Some("Secret note content"));
+        assert!(!note.is_archived);
+        assert!(!note.is_trashed);
+
+        let archived = &items[2];
+        assert_eq!(archived.title, "Archived Login");
+        assert!(archived.is_archived);
+        assert!(!archived.is_trashed);
+
+        let trashed = &items[3];
+        assert_eq!(trashed.title, "Trashed Login");
+        assert!(!trashed.is_archived);
+        assert!(trashed.is_trashed);
     }
 
     #[test]

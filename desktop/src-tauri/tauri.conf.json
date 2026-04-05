@@ -19,15 +19,25 @@
         "minHeight": 600
       }
     ],
+    "enableGTKAppId": true,
     "security": {
       "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:"
     },
     "trayIcon": {
-      "iconPath": "icons/icon.png",
+      "iconPath": "icons/locked.png",
       "iconAsTemplate": true,
       "menuOnLeftClick": false,
       "tooltip": "kura"
     }
+  },
+  "bundle": {
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
   },
   "plugins": {}
 }

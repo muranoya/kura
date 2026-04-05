@@ -71,6 +71,7 @@ dependencies {
     // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.7.0")
 
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
@@ -83,6 +84,9 @@ dependencies {
 
     // Biometric
     implementation("androidx.biometric:biometric:1.1.0")
+
+    // Markdown
+    implementation("org.commonmark:commonmark:0.24.0")
 
     // AWS SDK for Kotlin (S3)
     implementation("aws.sdk.kotlin:s3:1.5.56")

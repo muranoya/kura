@@ -12,7 +12,6 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 import type { EntryRow } from '../../../shared/types'
-import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Card } from '../ui/card'
 
@@ -46,7 +45,6 @@ const getTypeLabel = (type: string): string => {
     ssh_key: 'SSH キー',
     secure_note: 'セキュアノート',
     credit_card: 'クレジットカード',
-    passkey: 'PassKey',
     password: 'パスワード',
     software_license: 'ソフトウェアライセンス',
   }
@@ -60,7 +58,6 @@ interface EntryCardNormalProps {
   onClick: (id: string) => void
   onFavorite: (id: string, current: boolean) => void
   isSelected?: boolean
-  compact?: boolean
 }
 
 // Trash variant (Trash用)
@@ -75,43 +72,35 @@ type EntryCardProps = EntryCardNormalProps | EntryCardTrashProps
 
 export default function EntryCard(props: EntryCardProps) {
   if (props.variant === 'normal') {
-    const isCompact = props.compact || false
     const isSelected = props.isSelected || false
-    const paddingClass = isCompact ? 'px-3 py-2' : 'p-3'
-    const iconSize = isCompact ? 16 : 20
-    const iconContainerSize = isCompact ? 'w-7 h-7' : 'w-8 h-8'
     const selectedClass = isSelected
       ? 'bg-accent-subtle border-l-2 border-accent'
       : 'hover:border-accent/50'
 
     return (
       <Card
-        className={`${paddingClass} ${selectedClass} transition-colors cursor-pointer group`}
+        className={`px-3 py-2 ${selectedClass} transition-colors cursor-pointer group`}
         onClick={() => props.onClick(props.entry.id)}
       >
         <div className="flex items-center justify-between gap-3">
           {/* 左側: アイコン + 名前 */}
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div
-              className={`flex-shrink-0 ${iconContainerSize} rounded-lg bg-accent/10 flex items-center justify-center text-accent`}
+              className="flex-shrink-0 w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center text-accent"
             >
               {React.cloneElement(
                 getEntryIcon(props.entry.entryType) as React.ReactElement<{ size: number }>,
-                { size: iconSize },
+                { size: 16 },
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <h3
-                className={`${isCompact ? 'text-sm' : 'text-sm'} font-semibold text-text-primary truncate`}
-              >
+              <h3 className="text-sm font-semibold text-text-primary truncate">
                 {props.entry.name}
               </h3>
-              {!isCompact && (
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge variant="muted" className="text-sm">
-                    {getTypeLabel(props.entry.entryType)}
-                  </Badge>
-                </div>
+              {props.entry.subtitle && (
+                <p className="text-xs text-text-muted truncate mt-0.5">
+                  {props.entry.subtitle}
+                </p>
               )}
             </div>
           </div>
@@ -129,7 +118,7 @@ export default function EntryCard(props: EntryCardProps) {
               title={props.entry.isFavorite ? 'お気に入い解除' : 'お気に入い'}
             >
               <Star
-                size={isCompact ? 14 : 18}
+                size={14}
                 className={props.entry.isFavorite ? 'fill-accent text-accent' : 'text-text-muted'}
               />
             </button>

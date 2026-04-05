@@ -53,7 +53,7 @@ export default function EntryCreate() {
               })),
             )
           : undefined
-      const id = await commands.createEntry(
+      await commands.createEntry(
         entryType,
         name,
         typedValueJson,
@@ -67,7 +67,7 @@ export default function EntryCreate() {
       await commands.writeVaultFile(vaultBytes)
       commands.syncVaultIfConfigured().catch((e) => console.warn('Sync failed:', e))
 
-      navigate(`/entries/${id}`)
+      navigate('/entries')
     } catch (err) {
       pushError(`アイテム作成失敗: ${err}`)
     } finally {

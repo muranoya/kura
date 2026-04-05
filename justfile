@@ -17,8 +17,15 @@ EMULATOR := ANDROID_HOME / "emulator/emulator"
 # デフォルトレシピ
 default: help
 
+# Desktop app - Generate icons from SVG
+@_desktop-icons:
+	echo "🎨 Generating desktop icons..."
+	cd {{DESKTOP_DIR}} && pnpm install --silent
+	bash assets/icons/convert2png.sh
+	cd {{DESKTOP_DIR}} && pnpm tauri icon ../assets/icons/locked_icon.svg
+
 # Desktop app - Development (Tauri with hot reload)
-@dev-desktop:
+@dev-desktop: _desktop-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🚀 Starting desktop app in development mode..."
@@ -33,7 +40,7 @@ default: help
 	cd {{DESKTOP_DIR}} && pnpm tauri dev --config src-tauri/tauri.conf.dev.json
 
 # Desktop app (Tauri)
-@release-desktop:
+@release-desktop: _desktop-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building desktop app (Tauri)..."
@@ -51,8 +58,13 @@ default: help
 	echo "✅ Desktop build completed!"
 	echo "  - Output: {{DESKTOP_DIR}}/src-tauri/target/release/"
 
+# Extension - Generate icons from SVG
+@_extension-icons:
+	echo "🎨 Generating extension icons..."
+	bash assets/icons/convert2png.sh
+
 # Browser extension - Chrome
-@release-extension-chrome:
+@release-extension-chrome: _extension-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building Chrome extension..."
@@ -75,7 +87,7 @@ default: help
 	echo "  - Package: {{EXTENSION_DIR}}/kura-extension-chrome.zip"
 
 # Browser extension - Firefox
-@release-extension-firefox:
+@release-extension-firefox: _extension-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building Firefox extension..."
@@ -98,7 +110,7 @@ default: help
 	echo "  - Package: {{EXTENSION_DIR}}/kura-extension-firefox.zip"
 
 # Browser extension - Development (HMR付き)
-@dev-extension:
+@dev-extension: _extension-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🚀 Starting extension in development mode..."
@@ -113,8 +125,13 @@ default: help
 	echo "🔌 Starting extension dev server..."
 	cd {{EXTENSION_DIR}} && pnpm run dev
 
+# Android app - Generate icons from SVG
+@_android-icons:
+	echo "🎨 Generating Android icons..."
+	bash assets/icons/convert2png.sh
+
 # Android app - Build native libraries (Rust → .so)
-@build-android-jni:
+@build-android-jni: _android-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🦀 Building vault_jni native libraries for Android..."

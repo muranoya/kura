@@ -9,6 +9,8 @@ pub struct MappedEntry {
     pub data: EntryData,
     pub is_favorite: bool,
     pub tags: Vec<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 /// Category info for UI display.
@@ -75,11 +77,15 @@ pub fn map_item(item: &ParsedItem, target_entry_type: &str) -> MappedEntry {
         data,
         is_favorite: item.is_favorite,
         tags: item.tags.clone(),
+        created_at: item.created_at,
+        updated_at: item.updated_at,
     }
 }
 
 fn map_to_login(item: &ParsedItem) -> (EntryData, Option<String>) {
-    let extra_fields = build_extra_custom_fields(item, &["username", "password", "url"]);
+    let skip_ids = &["username", "password"];
+    let skip_titles = &["username", "password", "url"];
+    let extra_fields = build_filtered_fields(item, skip_ids, skip_titles);
 
     let mut data = EntryData::new_login(
         item.url.clone(),
@@ -94,16 +100,17 @@ fn map_to_login(item: &ParsedItem) -> (EntryData, Option<String>) {
 }
 
 fn map_to_credit_card(item: &ParsedItem) -> (EntryData, Option<String>) {
-    let cardholder = find_field_value(item, &["cardholder name", "cardholder"]).unwrap_or_default();
-    let number = find_field_value(item, &["card number", "number", "ccnum"]).unwrap_or_default();
-    let expiry = find_field_value(item, &["expiry date", "expiry", "expdate"]).unwrap_or_default();
-    let cvv = find_field_value(item, &["verification number", "cvv"]).unwrap_or_default();
-    let pin = find_field_value(item, &["pin"]).unwrap_or_default();
+    let cardholder = find_field(item, &["cardholder"], &["cardholder name", "cardholder"]).unwrap_or_default();
+    let number = find_field(item, &["ccnum"], &["card number", "number", "ccnum"]).unwrap_or_default();
+    let expiry = find_field(item, &["expiry"], &["expiry date", "expiry", "expdate"]).unwrap_or_default();
+    let cvv = find_field(item, &["cvv"], &["verification number", "cvv"]).unwrap_or_default();
+    let pin = find_field(item, &["pin"], &["pin"]).unwrap_or_default();
 
-    let skip = ["cardholder name", "cardholder", "card number", "number", "ccnum",
-                 "expiry date", "expiry", "expdate", "verification number", "cvv", "pin",
-                 "type", "valid from"];
-    let extra_fields = build_filtered_custom_fields(item, &skip);
+    let skip_ids = &["cardholder", "ccnum", "expiry", "cvv", "pin", "type", "validFrom"];
+    let skip_titles = &["cardholder name", "cardholder", "card number", "number", "ccnum",
+                         "expiry date", "expiry", "expdate", "verification number", "cvv", "pin",
+                         "type", "valid from"];
+    let extra_fields = build_filtered_fields(item, skip_ids, skip_titles);
 
     let mut data = EntryData::new_credit_card(cardholder, number, expiry, cvv, pin, build_notes(item));
     if !extra_fields.is_empty() {
@@ -113,22 +120,8 @@ fn map_to_credit_card(item: &ParsedItem) -> (EntryData, Option<String>) {
 }
 
 fn map_to_secure_note(item: &ParsedItem) -> (EntryData, Option<String>) {
-    let category_info = get_category_info(&item.category_uuid);
-
-    let content = if category_info.is_direct_mapping {
-        // Direct SecureNote: use notesPlain as content
-        item.notes.clone().unwrap_or_default()
-    } else {
-        // Indirect: build structured content
-        build_secure_note_content(item, &category_info.category_name)
-    };
-
-    let notes = if category_info.is_direct_mapping {
-        None
-    } else {
-        // For indirect mapping, notesPlain goes to notes field
-        item.notes.clone()
-    };
+    let content = item.notes.clone().unwrap_or_default();
+    let notes: Option<String> = None;
 
     let custom_fields = build_all_custom_fields(item);
 
@@ -155,11 +148,13 @@ fn map_to_secure_note(item: &ParsedItem) -> (EntryData, Option<String>) {
 
 fn map_to_password(item: &ParsedItem) -> (EntryData, Option<String>) {
     let password = item.password.clone()
-        .or_else(|| find_field_value(item, &["password", "ssn"]))
+        .or_else(|| find_field(item, &["password"], &["password", "ssn"]))
         .unwrap_or_default();
     let username = item.username.clone().unwrap_or_default();
 
-    let extra_fields = build_extra_custom_fields(item, &["password", "username", "ssn"]);
+    let skip_ids = &["password", "username"];
+    let skip_titles = &["password", "username", "ssn"];
+    let extra_fields = build_filtered_fields(item, skip_ids, skip_titles);
 
     let mut data = EntryData::new_password(username, password, build_notes(item));
     if !extra_fields.is_empty() {
@@ -169,11 +164,15 @@ fn map_to_password(item: &ParsedItem) -> (EntryData, Option<String>) {
 }
 
 fn map_to_software_license(item: &ParsedItem) -> (EntryData, Option<String>) {
-    let license_key = find_field_value(item, &["license key", "reg code", "product key", "key"])
+    let license_key_titles = [
+        "license key", "reg code", "product key", "key",
+        "ライセンスキー", "登録コード", "プロダクトキー",
+    ];
+    let license_key = find_field(item, &["reg_code"], &license_key_titles)
         .unwrap_or_default();
 
-    let skip = ["license key", "reg code", "product key", "key"];
-    let extra_fields = build_filtered_custom_fields(item, &skip);
+    let skip_ids = &["reg_code"];
+    let extra_fields = build_filtered_fields(item, skip_ids, &license_key_titles);
 
     let mut data = EntryData::new_software_license(license_key, build_notes(item));
     if !extra_fields.is_empty() {
@@ -183,17 +182,18 @@ fn map_to_software_license(item: &ParsedItem) -> (EntryData, Option<String>) {
 }
 
 fn map_to_bank(item: &ParsedItem) -> (EntryData, Option<String>) {
-    let bank_name = find_field_value(item, &["bank name", "bank"]).unwrap_or_default();
-    let account_holder = find_field_value(item, &["owner", "name on account", "account holder"]).unwrap_or_default();
-    let branch_code = find_field_value(item, &["routing number", "branch code", "sort code"]).unwrap_or_default();
-    let account_type = find_field_value(item, &["type", "account type"]).unwrap_or_default();
-    let account_number = find_field_value(item, &["account number"]).unwrap_or_default();
-    let pin = find_field_value(item, &["pin"]).unwrap_or_default();
+    let bank_name = find_field(item, &["bankName"], &["bank name", "bank"]).unwrap_or_default();
+    let account_holder = find_field(item, &["owner"], &["owner", "name on account", "account holder"]).unwrap_or_default();
+    let branch_code = find_field(item, &["routingNo"], &["routing number", "branch code", "sort code"]).unwrap_or_default();
+    let account_type = find_field(item, &["accountType"], &["type", "account type"]).unwrap_or_default();
+    let account_number = find_field(item, &["accountNo"], &["account number"]).unwrap_or_default();
+    let pin = find_field(item, &["PIN"], &["pin"]).unwrap_or_default();
 
-    let skip = ["bank name", "bank", "owner", "name on account", "account holder",
-                 "routing number", "branch code", "sort code", "type", "account type",
-                 "account number", "pin"];
-    let extra_fields = build_filtered_custom_fields(item, &skip);
+    let skip_ids = &["bankName", "owner", "routingNo", "accountType", "accountNo", "PIN"];
+    let skip_titles = &["bank name", "bank", "owner", "name on account", "account holder",
+                         "routing number", "branch code", "sort code", "type", "account type",
+                         "account number", "pin"];
+    let extra_fields = build_filtered_fields(item, skip_ids, skip_titles);
 
     let mut data = EntryData::new_bank(bank_name, account_holder, branch_code, account_type, account_number, pin, build_notes(item));
     if !extra_fields.is_empty() {
@@ -203,12 +203,13 @@ fn map_to_bank(item: &ParsedItem) -> (EntryData, Option<String>) {
 }
 
 fn map_to_ssh_key(item: &ParsedItem) -> (EntryData, Option<String>) {
-    let private_key = find_field_value(item, &["private key"])
+    let private_key = find_field(item, &["privateKey"], &["private key"])
         .or_else(|| find_concealed_field(item))
         .unwrap_or_default();
 
-    let skip = ["private key"];
-    let extra_fields = build_filtered_custom_fields(item, &skip);
+    let skip_ids = &["privateKey"];
+    let skip_titles = &["private key"];
+    let extra_fields = build_filtered_fields(item, skip_ids, skip_titles);
 
     let mut data = EntryData::new_ssh_key(private_key, build_notes(item));
     if !extra_fields.is_empty() {
@@ -225,7 +226,24 @@ fn build_notes(item: &ParsedItem) -> Option<String> {
     item.notes.clone()
 }
 
-fn find_field_value(item: &ParsedItem, names: &[&str]) -> Option<String> {
+/// Search by field ID first, then fall back to title matching.
+fn find_field(item: &ParsedItem, ids: &[&str], title_fallbacks: &[&str]) -> Option<String> {
+    // Primary: match by 1Password field ID (locale-independent)
+    for field in &item.fields {
+        if let Some(ref fid) = field.field_id {
+            if ids.iter().any(|id| fid == id) {
+                let val = field.value.to_string_value();
+                if !val.is_empty() {
+                    return Some(val);
+                }
+            }
+        }
+    }
+    // Fallback: match by title (case-insensitive)
+    find_field_by_title(item, title_fallbacks)
+}
+
+fn find_field_by_title(item: &ParsedItem, names: &[&str]) -> Option<String> {
     for field in &item.fields {
         let title_lower = field.field_title.to_lowercase();
         for name in names {
@@ -263,15 +281,19 @@ fn build_all_custom_fields(item: &ParsedItem) -> Vec<CustomField> {
     }).collect()
 }
 
-fn build_extra_custom_fields(item: &ParsedItem, skip_typed: &[&str]) -> Vec<CustomField> {
-    build_filtered_custom_fields(item, skip_typed)
-}
-
-fn build_filtered_custom_fields(item: &ParsedItem, skip_names: &[&str]) -> Vec<CustomField> {
+/// Filter out fields that match known IDs or title fallbacks, returning the rest as custom fields.
+fn build_filtered_fields(item: &ParsedItem, skip_ids: &[&str], skip_titles: &[&str]) -> Vec<CustomField> {
     item.fields.iter()
         .filter(|f| {
+            // Skip if field ID matches
+            if let Some(ref fid) = f.field_id {
+                if skip_ids.iter().any(|id| fid == id) {
+                    return false;
+                }
+            }
+            // Skip if title matches (case-insensitive)
             let title_lower = f.field_title.to_lowercase();
-            !skip_names.iter().any(|s| title_lower == *s)
+            !skip_titles.iter().any(|s| title_lower == *s)
         })
         .map(|f| {
             CustomField {
@@ -282,28 +304,6 @@ fn build_filtered_custom_fields(item: &ParsedItem, skip_names: &[&str]) -> Vec<C
             }
         })
         .collect()
-}
-
-fn build_secure_note_content(item: &ParsedItem, category_name: &str) -> String {
-    let mut content = format!("[1Password: {}]\n", category_name);
-
-    // Group fields by section
-    let mut current_section: Option<&str> = None;
-    for field in &item.fields {
-        let section = field.section_title.as_deref();
-        if section != current_section {
-            if let Some(s) = section {
-                content.push_str(&format!("\n--- {} ---\n", s));
-            }
-            current_section = section;
-        }
-        let value = field.value.to_string_value();
-        if !value.is_empty() {
-            content.push_str(&format!("{}: {}\n", field.field_title, value));
-        }
-    }
-
-    content
 }
 
 #[cfg(test)]
@@ -325,6 +325,7 @@ mod tests {
             tags: vec!["work".into()],
             fields: vec![
                 ParsedField {
+                    field_id: Some("extra_email".into()),
                     section_title: Some("Extra".into()),
                     field_title: "Recovery Email".into(),
                     value: ParsedFieldValue::Email("recovery@example.com".into()),
@@ -333,6 +334,8 @@ mod tests {
             has_attachments: false,
             attachment_file_name: None,
             is_favorite: true,
+            is_archived: false,
+            is_trashed: false,
             created_at: 1700000000,
             updated_at: 1700000000,
         }
@@ -374,11 +377,13 @@ mod tests {
             tags: vec![],
             fields: vec![
                 ParsedField {
+                    field_id: Some("firstname".into()),
                     section_title: Some("Name".into()),
                     field_title: "first name".into(),
                     value: ParsedFieldValue::Text("John".into()),
                 },
                 ParsedField {
+                    field_id: Some("lastname".into()),
                     section_title: Some("Name".into()),
                     field_title: "last name".into(),
                     value: ParsedFieldValue::Text("Doe".into()),
@@ -387,6 +392,8 @@ mod tests {
             has_attachments: false,
             attachment_file_name: None,
             is_favorite: false,
+            is_archived: false,
+            is_trashed: false,
             created_at: 1700000000,
             updated_at: 1700000000,
         };
@@ -395,15 +402,93 @@ mod tests {
         assert_eq!(mapped.entry_type, "secure_note");
 
         let content = mapped.data.typed_value["content"].as_str().unwrap();
-        assert!(content.contains("[1Password: Identity]"));
-        assert!(content.contains("first name: John"));
+        assert_eq!(content, "Original notes");
 
-        // notes should be preserved separately
-        assert_eq!(mapped.data.notes.as_deref(), Some("Original notes"));
+        // notes should be None (content has the notes)
+        assert!(mapped.data.notes.is_none());
 
         // Fields also in custom_fields
         let cf = mapped.data.custom_fields.as_ref().unwrap();
         assert_eq!(cf.len(), 2);
+    }
+
+    #[test]
+    fn test_map_bank_with_japanese_titles() {
+        let item = ParsedItem {
+            uuid: "bank-uuid".into(),
+            title: "ソニー銀行".into(),
+            category_uuid: "101".into(),
+            vault_name: "Personal".into(),
+            url: None,
+            urls: vec![],
+            username: None,
+            password: None,
+            notes: None,
+            tags: vec![],
+            fields: vec![
+                ParsedField {
+                    field_id: Some("bankName".into()),
+                    section_title: Some("".into()),
+                    field_title: "銀行名".into(),
+                    value: ParsedFieldValue::Text("ソニー銀行".into()),
+                },
+                ParsedField {
+                    field_id: Some("owner".into()),
+                    section_title: Some("".into()),
+                    field_title: "口座名義".into(),
+                    value: ParsedFieldValue::Text("山田太郎".into()),
+                },
+                ParsedField {
+                    field_id: Some("accountType".into()),
+                    section_title: Some("".into()),
+                    field_title: "種類".into(),
+                    value: ParsedFieldValue::Text("savings".into()),
+                },
+                ParsedField {
+                    field_id: Some("routingNo".into()),
+                    section_title: Some("".into()),
+                    field_title: "銀行支店コード".into(),
+                    value: ParsedFieldValue::Text("001".into()),
+                },
+                ParsedField {
+                    field_id: Some("accountNo".into()),
+                    section_title: Some("".into()),
+                    field_title: "口座番号".into(),
+                    value: ParsedFieldValue::Text("5880798".into()),
+                },
+                // User-added custom field (UUID-like ID)
+                ParsedField {
+                    field_id: Some("ormiknn2oth6tueuf2vj2ab354".into()),
+                    section_title: Some("".into()),
+                    field_title: "銀行支店名".into(),
+                    value: ParsedFieldValue::Text("本店営業部".into()),
+                },
+            ],
+            has_attachments: false,
+            attachment_file_name: None,
+            is_favorite: false,
+            is_archived: false,
+            is_trashed: false,
+            created_at: 1728902631,
+            updated_at: 1728902706,
+        };
+
+        let mapped = map_item(&item, "bank");
+        assert_eq!(mapped.entry_type, "bank");
+        assert_eq!(mapped.name, "ソニー銀行");
+
+        let tv = &mapped.data.typed_value;
+        assert_eq!(tv["bank_name"], "ソニー銀行");
+        assert_eq!(tv["account_holder"], "山田太郎");
+        assert_eq!(tv["account_type"], "savings");
+        assert_eq!(tv["branch_code"], "001");
+        assert_eq!(tv["account_number"], "5880798");
+
+        // User-added field should be in custom_fields
+        let cf = mapped.data.custom_fields.as_ref().unwrap();
+        assert_eq!(cf.len(), 1);
+        assert_eq!(cf[0].name, "銀行支店名");
+        assert_eq!(cf[0].value, "本店営業部");
     }
 
     #[test]

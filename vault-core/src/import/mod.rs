@@ -54,6 +54,7 @@ pub struct ImportPreviewItem {
     pub duplicates: Vec<DuplicateCandidate>,
     pub default_action: ImportAction,
     pub has_attachments: bool,
+    pub is_archived: bool,
     pub tags: Vec<String>,
     pub field_count: usize,
 }
@@ -65,6 +66,7 @@ pub struct ImportPreviewStats {
     pub duplicate_count: usize,
     pub attachment_warning_count: usize,
     pub indirect_mapping_count: usize,
+    pub archived_count: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -253,6 +255,12 @@ fn create_entry_from_parsed(
         label_ids,
     )?;
 
+    // Overwrite timestamps with original 1pux values
+    if let Some(ve) = unlocked.contents.entries.get_mut(&entry.id) {
+        ve.created_at = mapped.created_at;
+        ve.updated_at = mapped.updated_at;
+    }
+
     // Set favorite if needed
     if mapped.is_favorite {
         unlocked.set_favorite(&entry.id, true)?;
@@ -274,6 +282,12 @@ fn overwrite_entry_from_parsed(
 
     unlocked.update_entry(existing_id, mapped.name, mapped.data)?;
     unlocked.set_entry_labels(existing_id, label_ids)?;
+
+    // Overwrite timestamps with original 1pux values
+    if let Some(ve) = unlocked.contents.entries.get_mut(existing_id) {
+        ve.created_at = mapped.created_at;
+        ve.updated_at = mapped.updated_at;
+    }
 
     if mapped.is_favorite {
         unlocked.set_favorite(existing_id, true)?;

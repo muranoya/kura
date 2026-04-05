@@ -81,10 +81,6 @@ object VaultBridge {
     external fun generateTotpFromValue(value: String): String
     external fun parseTotpPeriod(value: String): Long
 
-    // Import
-    external fun import1puxPreview(vaultId: String, fileBytes: ByteArray): String
-    external fun import1puxExecute(vaultId: String, fileBytes: ByteArray, actionsJson: String): String
-
     // Sync
     external fun mergeRemoteVault(vaultId: String, remoteBytes: ByteArray, remoteEtag: String)
     external fun updateEtag(vaultId: String, etag: String)

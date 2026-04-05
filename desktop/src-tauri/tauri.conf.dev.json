@@ -20,11 +20,12 @@
         "devtools": true
       }
     ],
+    "enableGTKAppId": true,
     "security": {
       "csp": null
     },
     "trayIcon": {
-      "iconPath": "icons/icon.png",
+      "iconPath": "icons/locked.png",
       "iconAsTemplate": true,
       "menuOnLeftClick": false,
       "tooltip": "kura"

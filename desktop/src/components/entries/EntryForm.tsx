@@ -259,7 +259,7 @@ export default function EntryForm({
             </div>
             <div className="space-y-1">
               <UILabel htmlFor="account_type" className="text-xs">
-                種類
+                口座種別
               </UILabel>
               <Input
                 id="account_type"

@@ -143,7 +143,7 @@ fun EntryListScreen(
                         label = { Text("全て") }
                     )
                 }
-                items(EntryType.entries.filter { it != EntryType.PASSKEY }) { type ->
+                items(EntryType.entries) { type ->
                     FilterChip(
                         selected = selectedType == type.value,
                         onClick = {
@@ -166,8 +166,7 @@ fun EntryListScreen(
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    contentPadding = PaddingValues(horizontal = 16.dp)
                 ) {
                     items(entries, key = { it.id }) { entry ->
                         EntryCard(
@@ -182,6 +181,10 @@ fun EntryListScreen(
                                 }
                             },
                             onDelete = { deleteTargetId = entry.id }
+                        )
+                        HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
                     }
                 }

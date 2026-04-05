@@ -132,19 +132,25 @@ mod tests {
 
         assert_eq!(locked.vault_file.schema_version, CURRENT_SCHEMA_VERSION);
         assert!(locked.etag.is_none());
+        assert!(!locked.vault_file.meta.vault_uuid.is_empty());
+        assert!(uuid::Uuid::parse_str(&locked.vault_file.meta.vault_uuid).is_ok());
         assert!(!locked.vault_file.meta.encrypted_dek_master.is_empty());
         assert!(!locked.vault_file.meta.encrypted_dek_recovery.is_empty());
         assert!(!locked.vault_file.encrypted_vault.is_empty());
     }
 
     #[test]
-    fn test_create_new_each_call_produces_different_dek() {
+    fn test_create_new_each_call_produces_different_dek_and_uuid() {
         let locked1 = LockedVault::create_new(PASSWORD).unwrap();
         let locked2 = LockedVault::create_new(PASSWORD).unwrap();
 
         assert_ne!(
             locked1.vault_file.meta.encrypted_dek_master,
             locked2.vault_file.meta.encrypted_dek_master,
+        );
+        assert_ne!(
+            locked1.vault_file.meta.vault_uuid,
+            locked2.vault_file.meta.vault_uuid,
         );
     }
 
@@ -270,5 +276,27 @@ mod tests {
         assert_eq!(unlocked_again.contents.entries.len(), 1);
         let entry = &unlocked_again.contents.entries["test-id"];
         assert_eq!(entry.name, "my note");
+    }
+
+    #[test]
+    fn test_vault_uuid_preserved_through_lock_unlock() {
+        let locked = LockedVault::create_new(PASSWORD).unwrap();
+        let original_uuid = locked.vault_file.meta.vault_uuid.clone();
+
+        let unlocked = locked.unlock(PASSWORD).unwrap();
+        assert_eq!(unlocked.meta.vault_uuid, original_uuid);
+
+        let locked_again = unlocked.lock().unwrap();
+        assert_eq!(locked_again.vault_file.meta.vault_uuid, original_uuid);
+    }
+
+    #[test]
+    fn test_vault_uuid_preserved_through_serialization() {
+        let locked = LockedVault::create_new(PASSWORD).unwrap();
+        let original_uuid = locked.vault_file.meta.vault_uuid.clone();
+
+        let bytes = locked.to_vault_bytes().unwrap();
+        let reopened = LockedVault::open(bytes, None).unwrap();
+        assert_eq!(reopened.vault_file.meta.vault_uuid, original_uuid);
     }
 }

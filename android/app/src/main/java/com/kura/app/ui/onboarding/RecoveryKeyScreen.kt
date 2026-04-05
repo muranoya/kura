@@ -39,15 +39,6 @@ fun RecoveryKeyScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
-                Text(
-                    "リカバリーキーを安全な場所に保管してください。マスターパスワードを忘れた場合に使用できます。",
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer
-                )
-            }
-
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
@@ -94,7 +85,7 @@ fun RecoveryKeyScreen(
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("保管しました")
+                Text("完了")
             }
         }
     }

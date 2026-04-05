@@ -143,13 +143,6 @@ fun EntryForm(
                         maxLines = 8,
                         singleLine = false
                     )
-                    SectionDivider()
-                    PasswordField(
-                        value = typedValues["passphrase"] ?: "",
-                        onValueChange = { onTypedValueChange("passphrase", it) },
-                        label = "パスフレーズ",
-                        onCopy = onCopyToClipboard
-                    )
                 }
                 "secure_note" -> {
                     FlatTextField(
@@ -484,10 +477,10 @@ private fun FlatTextField(
 
 private fun sectionTitle(entryType: String): String = when (entryType) {
     "login" -> "ログイン情報"
-    "bank" -> "銀行口座情報"
-    "ssh_key" -> "SSHキー情報"
+    "bank" -> "銀行口座"
+    "ssh_key" -> "SSH キー"
     "secure_note" -> "ノート"
-    "credit_card" -> "クレジットカード情報"
+    "credit_card" -> "クレジットカード"
     "password" -> "パスワード情報"
     "software_license" -> "ライセンス情報"
     else -> "基本情報"

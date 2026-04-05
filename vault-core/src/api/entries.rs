@@ -4,6 +4,20 @@ use serde_json::Value;
 
 use super::{VaultManager, EntryRow, EntryDetail};
 
+/// エントリタイプに応じてサブタイトルを抽出する
+fn extract_subtitle(entry_type: &str, typed_value: &Value) -> Option<String> {
+    let key = match entry_type {
+        "login" | "password" => "username",
+        "bank" => "bank_name",
+        "credit_card" => "cardholder",
+        _ => return None,
+    };
+    typed_value.get(key)
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+}
+
 impl VaultManager {
     /// エントリ一覧（フィルター付き）
     pub fn api_list_entries(
@@ -49,14 +63,18 @@ impl VaultManager {
         let entries = unlocked.list_entries(&filter)
             .map_err(|e| format!("Failed to list entries: {}", e))?;
 
-        Ok(entries.into_iter().map(|entry| EntryRow {
-            id: entry.id,
-            entry_type: entry.entry_type,
-            name: entry.name,
-            is_favorite: entry.is_favorite,
-            created_at: entry.created_at,
-            updated_at: entry.updated_at,
-            deleted_at: entry.deleted_at,
+        Ok(entries.into_iter().map(|entry| {
+            let subtitle = extract_subtitle(&entry.entry_type, &entry.data.typed_value);
+            EntryRow {
+                id: entry.id,
+                entry_type: entry.entry_type,
+                name: entry.name,
+                subtitle,
+                is_favorite: entry.is_favorite,
+                created_at: entry.created_at,
+                updated_at: entry.updated_at,
+                deleted_at: entry.deleted_at,
+            }
         }).collect())
     }
 

@@ -1,5 +1,8 @@
 use vault_core::{LockedVault, EntryData};
 
+#[cfg(any(feature = "desktop", feature = "android", feature = "wasm"))]
+use vault_core::api::VaultManager;
+
 #[test]
 fn test_vault_create_unlock_lock_cycle() {
     let master_password = "test_password_123";
@@ -402,6 +405,46 @@ fn test_delete_label_affects_all_entries_with_label() {
         .expect("Entry 3 not found");
     assert_eq!(entry3_after.labels.len(), 1, "Entry 3 should still have 1 label");
     assert_eq!(entry3_after.labels[0], other_label.id, "Entry 3 should still have other_label");
+}
+
+#[test]
+#[cfg(any(feature = "desktop", feature = "android", feature = "wasm"))]
+fn test_merge_rejects_vault_uuid_mismatch() {
+    let password = "password";
+
+    // Vault A を作成してアイテムを追加
+    let manager = VaultManager::new();
+    let _recovery = manager.api_create_new_vault(password.to_string()).unwrap();
+    manager.api_unlock(password.to_string()).unwrap();
+
+    // Vault B を別に作成（UUIDが異なる）
+    let other_locked = LockedVault::create_new(password).unwrap();
+    let other_bytes = other_locked.to_vault_bytes().unwrap();
+
+    // Vault AのセッションにVault Bのバイト列をマージしようとする → UUID不一致でエラー
+    let result = manager.api_merge_remote_vault(other_bytes, "etag-1".to_string());
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.contains("Vault UUID mismatch"), "Error should mention UUID mismatch, got: {}", err);
+}
+
+#[test]
+#[cfg(any(feature = "desktop", feature = "android", feature = "wasm"))]
+fn test_merge_accepts_same_vault_uuid() {
+    let password = "password";
+
+    // Vault を作成
+    let locked = LockedVault::create_new(password).unwrap();
+    let vault_bytes = locked.to_vault_bytes().unwrap();
+
+    // 同じvaultをマネージャーにロード
+    let manager = VaultManager::new();
+    manager.api_load_vault(vault_bytes.clone(), "etag-1".to_string()).unwrap();
+    manager.api_unlock(password.to_string()).unwrap();
+
+    // 同じvaultのバイト列をマージ → UUID一致なので成功
+    let result = manager.api_merge_remote_vault(vault_bytes, "etag-2".to_string());
+    assert!(result.is_ok());
 }
 
 #[test]

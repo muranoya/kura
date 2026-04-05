@@ -37,6 +37,10 @@ export async function isUnlocked(): Promise<boolean> {
   return invoke<boolean>('is_unlocked', { vaultId })
 }
 
+export async function setTrayIcon(isLocked: boolean): Promise<void> {
+  return invoke<void>('set_tray_icon', { isLocked })
+}
+
 // ============================================================================
 // Entries
 // ============================================================================

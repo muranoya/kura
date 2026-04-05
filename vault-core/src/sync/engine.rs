@@ -74,13 +74,20 @@ pub async fn sync_with_storage(
                 return Ok(SyncOutcome { new_etag });
             }
             Some((remote_bytes, remote_etag)) => {
-                // リモート存在 → 復号してマージ
+                // リモート存在 → UUID検証 → 復号してマージ
                 let remote_contents = {
                     let remote_vault_file = VaultFile::from_bytes(&remote_bytes)
                         .map_err(|e| format!("Failed to parse remote vault: {}", e))?;
                     let session = vault_session.lock().map_err(|_| "Session lock poisoned".to_string())?;
                     match session.as_ref() {
                         Some(SessionState::Unlocked(u)) => {
+                            // Vault UUIDの一致を検証
+                            if remote_vault_file.meta.vault_uuid != u.meta.vault_uuid {
+                                return Err(format!(
+                                    "Vault UUID mismatch: local={}, remote={}",
+                                    u.meta.vault_uuid, remote_vault_file.meta.vault_uuid
+                                ));
+                            }
                             crypto::encryption::decrypt_vault(
                                 &remote_vault_file.encrypted_vault,
                                 &u.dek,

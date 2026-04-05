@@ -52,6 +52,9 @@ pub enum VaultError {
 
     #[error("Unsupported schema version: {0}")]
     UnsupportedSchemaVersion(u32),
+
+    #[error("Vault UUID mismatch: local={local}, remote={remote}")]
+    VaultUuidMismatch { local: String, remote: String },
 }
 
 pub type Result<T> = std::result::Result<T, VaultError>;

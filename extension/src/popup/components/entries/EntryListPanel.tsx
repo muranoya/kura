@@ -46,6 +46,8 @@ const ENTRY_TYPES: Array<{ value: string; label: string }> = [
   { value: 'ssh_key', label: 'SSH キー' },
   { value: 'secure_note', label: 'セキュアノート' },
   { value: 'credit_card', label: 'クレジットカード' },
+  { value: 'password', label: 'パスワード' },
+  { value: 'software_license', label: 'ソフトウェアライセンス' },
 ]
 
 export default function EntryListPanel({

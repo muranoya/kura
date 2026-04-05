@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, Copy } from 'lucide-react'
+import { Check, Copy } from 'lucide-react'
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { PageHeader } from '../../components/layout/PageHeader'
@@ -58,14 +58,6 @@ export default function RecoveryKey() {
       <PageHeader title="リカバリーキー" showBackButton={false} />
 
       <div className="p-4 space-y-4">
-        {/* 警告 */}
-        <div className="p-3 rounded-md bg-danger/10 border border-danger/20 flex gap-3">
-          <AlertTriangle size={16} className="text-danger flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-danger">
-            このキーを失うと復旧不可能です。紙に書き写して安全な場所に保管してください。
-          </p>
-        </div>
-
         {/* リカバリーキー表示 */}
         <Card>
           <CardHeader className="px-3 py-2">

@@ -30,6 +30,7 @@ pub fn generate_preview(
     let mut duplicate_count = 0;
     let mut attachment_warning_count = 0;
     let mut indirect_mapping_count = 0;
+    let mut archived_count = 0;
 
     for parsed in parsed_items {
         let cat_info = get_category_info(&parsed.category_uuid);
@@ -37,7 +38,11 @@ pub fn generate_preview(
 
         let duplicates = detect_duplicates(parsed, &target_type, &existing);
 
-        let default_action = if duplicates.iter().any(|d| d.confidence == DuplicateConfidence::High) {
+        let is_archived = parsed.is_archived || parsed.is_trashed;
+
+        let default_action = if is_archived {
+            ImportAction::Skip
+        } else if duplicates.iter().any(|d| d.confidence == DuplicateConfidence::High) {
             ImportAction::Skip
         } else {
             ImportAction::Import
@@ -51,6 +56,9 @@ pub fn generate_preview(
         }
         if !cat_info.is_direct_mapping {
             indirect_mapping_count += 1;
+        }
+        if is_archived {
+            archived_count += 1;
         }
 
         *type_counts.entry(target_type.clone()).or_insert(0) += 1;
@@ -69,6 +77,7 @@ pub fn generate_preview(
             duplicates,
             default_action,
             has_attachments: parsed.has_attachments,
+            is_archived,
             tags: parsed.tags.clone(),
             field_count: parsed.fields.len(),
         });
@@ -84,6 +93,7 @@ pub fn generate_preview(
             duplicate_count,
             attachment_warning_count,
             indirect_mapping_count,
+            archived_count,
         },
         items,
         source_account_name: account_name,

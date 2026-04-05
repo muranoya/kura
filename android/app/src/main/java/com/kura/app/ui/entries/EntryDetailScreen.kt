@@ -41,6 +41,7 @@ import com.kura.app.data.model.Entry
 import com.kura.app.data.model.Label
 import com.kura.app.ui.components.ConfirmDialog
 import com.kura.app.ui.components.LargeTextDialog
+import com.kura.app.ui.components.MarkdownText
 import com.kura.app.ui.components.EntryTypeIcon
 import com.kura.app.ui.components.entryTypeDisplayName
 import com.kura.app.viewmodel.AppViewModel
@@ -197,7 +198,7 @@ fun EntryDetailScreen(
                         // Typed fields section - ordered per entry type, show all fields
                         val orderedFields = typedFieldsForType(e.entryType)
                         if (orderedFields.isNotEmpty()) {
-                            DetailSection(title = "基本情報") {
+                            DetailSection(title = sectionHeaderForType(e.entryType)) {
                                 orderedFields.forEachIndexed { index, key ->
                                     val rawValue = typedValue[key]
                                     val strValue = when (rawValue) {
@@ -212,16 +213,31 @@ fun EntryDetailScreen(
                                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                                         )
                                     }
-                                    val isSecret = key in listOf("password", "pin", "passphrase", "cvv", "private_key")
-                                    DetailField(
-                                        label = fieldDisplayName(key),
-                                        value = strValue,
-                                        isSecret = isSecret,
-                                        isEmpty = isEmpty,
-                                        isUrl = key == "url",
-                                        context = context,
-                                        isMultiLine = key == "private_key" || key == "content"
-                                    )
+                                    if (e.entryType == "secure_note" && key == "content") {
+                                        if (isEmpty) {
+                                            DetailField(
+                                                label = fieldDisplayName(key),
+                                                value = "",
+                                                isEmpty = true,
+                                                context = context
+                                            )
+                                        } else {
+                                            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                                                MarkdownText(text = strValue)
+                                            }
+                                        }
+                                    } else {
+                                        val isSecret = key in listOf("password", "pin", "cvv", "private_key", "number")
+                                        DetailField(
+                                            label = fieldDisplayName(key),
+                                            value = strValue,
+                                            isSecret = isSecret,
+                                            isEmpty = isEmpty,
+                                            isUrl = key == "url",
+                                            context = context,
+                                            isMultiLine = key == "private_key" || key == "content"
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -641,6 +657,17 @@ private fun TotpCountdownCircle(
     }
 }
 
+fun sectionHeaderForType(entryType: String): String = when (entryType) {
+    "login" -> "ログイン情報"
+    "bank" -> "銀行口座"
+    "credit_card" -> "クレジットカード"
+    "ssh_key" -> "SSH キー"
+    "secure_note" -> "ノート"
+    "password" -> "パスワード情報"
+    "software_license" -> "ライセンス情報"
+    else -> "基本情報"
+}
+
 fun typedFieldsForType(entryType: String): List<String> = when (entryType) {
     "login" -> listOf("username", "password", "url")
     "bank" -> listOf("bank_name", "branch_code", "account_type", "account_holder", "account_number", "pin")
@@ -663,7 +690,6 @@ fun fieldDisplayName(key: String): String = when (key) {
     "account_number" -> "口座番号"
     "pin" -> "PIN"
     "private_key" -> "秘密鍵"
-    "passphrase" -> "パスフレーズ"
     "content" -> "内容"
     "cardholder" -> "カード名義"
     "number" -> "カード番号"
