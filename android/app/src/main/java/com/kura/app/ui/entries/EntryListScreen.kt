@@ -60,7 +60,6 @@ fun EntryListScreen(
 
     fun loadEntries() {
         scope.launch {
-            loading = true
             try {
                 entries = appViewModel.repository.listEntries(
                     searchQuery = searchQuery.ifBlank { null },

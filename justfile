@@ -63,11 +63,11 @@ default: help
 	echo "🎨 Generating extension icons..."
 	bash assets/icons/convert2png.sh
 
-# Browser extension - Chrome
-@release-extension-chrome: _extension-icons
+# Browser extension (Chrome + Firefox)
+@release-extension: _extension-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo "🔨 Building Chrome extension..."
+	echo "🔨 Building browser extensions (Chrome + Firefox)..."
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo ""
 	echo "🦀 Building WASM package from vault-core..."
@@ -76,38 +76,21 @@ default: help
 	echo "📥 Installing dependencies..."
 	cd {{EXTENSION_DIR}} && pnpm install
 	echo ""
-	echo "🏗️  Building extension..."
+	echo "🏗️  Building Chrome extension..."
 	cd {{EXTENSION_DIR}} && pnpm run build
 	echo ""
-	echo "📦 Packaging extension..."
+	echo "📦 Packaging Chrome extension..."
 	cd {{EXTENSION_DIR}}/dist && zip -r ../kura-extension-chrome.zip .
-	echo ""
-	echo "✅ Chrome extension build completed!"
-	echo "  - Output: {{EXTENSION_DIR}}/dist/"
-	echo "  - Package: {{EXTENSION_DIR}}/kura-extension-chrome.zip"
-
-# Browser extension - Firefox
-@release-extension-firefox: _extension-icons
-	echo ""
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo "🔨 Building Firefox extension..."
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo ""
-	echo "🦀 Building WASM package from vault-core..."
-	wasm-pack build {{EXTENSION_DIR}}/wasm-bridge --target bundler --out-dir ../wasm
-	echo ""
-	echo "📥 Installing dependencies..."
-	cd {{EXTENSION_DIR}} && pnpm install
 	echo ""
 	echo "🏗️  Building Firefox extension..."
 	cd {{EXTENSION_DIR}} && pnpm run build:firefox
 	echo ""
-	echo "📦 Packaging extension..."
+	echo "📦 Packaging Firefox extension..."
 	cd {{EXTENSION_DIR}}/dist && zip -r ../kura-extension-firefox.zip .
 	echo ""
-	echo "✅ Firefox extension build completed!"
-	echo "  - Output: {{EXTENSION_DIR}}/dist/"
-	echo "  - Package: {{EXTENSION_DIR}}/kura-extension-firefox.zip"
+	echo "✅ Extension build completed!"
+	echo "  - Chrome:  {{EXTENSION_DIR}}/kura-extension-chrome.zip"
+	echo "  - Firefox: {{EXTENSION_DIR}}/kura-extension-firefox.zip"
 
 # Browser extension - Development (HMR付き)
 @dev-extension: _extension-icons
@@ -251,8 +234,7 @@ default: help
 	echo "╚━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╝"
 	just release-android
 	just release-desktop
-	just release-extension-chrome
-	just release-extension-firefox
+	just release-extension
 	echo ""
 	echo "╔━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╗"
 	echo "║                  🎉 All releases completed!                ║"
@@ -424,8 +406,7 @@ default: help
 	echo ""
 	echo "  🔌 Extension:"
 	echo "    just dev-extension            - Start extension in dev mode (HMR)"
-	echo "    just release-extension-chrome - Build Chrome extension"
-	echo "    just release-extension-firefox - Build Firefox extension"
+	echo "    just release-extension        - Build Chrome & Firefox extensions"
 	echo ""
 	echo "  🧪 Test:"
 	echo "    just test-vault-core      - Run vault-core tests"

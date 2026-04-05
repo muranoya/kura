@@ -63,7 +63,6 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
   }
 
   const loadEntriesWithSort = async (sort: SortConfig) => {
-    setLoading(true)
     setError(null)
     try {
       const result = await commands.listEntries({
@@ -73,9 +72,9 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
         sortOrder: sort.order,
       })
       setEntries(result)
+      setLoading(false)
     } catch (err) {
       setError(String(err) || 'Failed to load entries')
-    } finally {
       setLoading(false)
     }
   }
@@ -109,7 +108,6 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
   }, [])
 
   const loadEntries = useCallback(async () => {
-    setLoading(true)
     setError(null)
     try {
       const result = await commands.listEntries({
@@ -119,9 +117,9 @@ export default function EntryList({ isFavorites = false }: EntryListProps) {
         sortOrder: sortConfig.order,
       })
       setEntries(result)
+      setLoading(false)
     } catch (err) {
       setError(String(err) || 'Failed to load entries')
-    } finally {
       setLoading(false)
     }
   }, [isFavorites, selectedLabelId, sortConfig])

@@ -17,6 +17,15 @@ const DEFAULT_SORT: SortConfig = { field: 'created_at', order: 'desc' }
 // ページ遷移後もスクロール位置を保持するためモジュールレベルで管理
 const scrollPositions = new Map<string, number>()
 
+/** エントリリストの内容が実質的に変わったかを判定する */
+function entriesChanged(prev: EntryRow[], next: EntryRow[]): boolean {
+  if (prev.length !== next.length) return true
+  for (let i = 0; i < prev.length; i++) {
+    if (prev[i].id !== next[i].id || prev[i].updatedAt !== next[i].updatedAt || prev[i].isFavorite !== next[i].isFavorite || prev[i].deletedAt !== next[i].deletedAt) return true
+  }
+  return false
+}
+
 interface EntryListProps {
   onlyFavorites?: boolean
   labelId?: string
@@ -76,11 +85,15 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
     saveToStorage(STORAGE_KEYS.SORT_CONFIG, config)
   }, [])
 
+  const initialLoadDone = useRef(false)
+
   const loadEntries = useCallback(async () => {
     void syncVersion // trigger reload on sync
     if (!sortLoaded || !typeFilterLoaded) return
+    const isInitialLoad = !initialLoadDone.current
     try {
-      setLoading(true)
+      // 初回のみローディング表示、同期リロード時はバックグラウンドで取得
+      if (isInitialLoad) setLoading(true)
       const data = await commands.listEntries({
         onlyFavorites,
         searchQuery: searchQuery || undefined,
@@ -89,11 +102,15 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
         sortField: sortConfig.field,
         sortOrder: sortConfig.order,
       })
-      setEntries(data)
+      // データが変わった場合のみstateを更新（不要な再描画を防ぐ）
+      setEntries((prev: EntryRow[]) => (entriesChanged(prev, data) ? data : prev))
     } catch (err) {
       setError(`アイテム読み込み失敗: ${err}`)
     } finally {
-      setLoading(false)
+      if (isInitialLoad) {
+        setLoading(false)
+        initialLoadDone.current = true
+      }
     }
   }, [
     onlyFavorites,

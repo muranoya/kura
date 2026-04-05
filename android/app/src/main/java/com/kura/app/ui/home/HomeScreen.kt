@@ -80,7 +80,6 @@ fun HomeScreen(
 
     fun loadData() {
         scope.launch {
-            loading = true
             try {
                 allEntries = appViewModel.repository.listEntries(
                     entryType = selectedType,
