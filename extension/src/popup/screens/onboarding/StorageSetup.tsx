@@ -71,8 +71,7 @@ export default function StorageSetup() {
         transferString: transferString.trim(),
       })
       if (!response.success) {
-        const errorMsg =
-          'error' in response ? response.error : '転送コードの復号に失敗しました'
+        const errorMsg = 'error' in response ? response.error : '転送コードの復号に失敗しました'
         throw new Error(errorMsg)
       }
       if (!('configJson' in response) || !response.configJson) {

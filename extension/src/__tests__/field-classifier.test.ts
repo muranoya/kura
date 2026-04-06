@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  computeScores,
   type FieldSignals,
   type FieldType,
   type SkipCheckInput,
-  computeScores,
   shouldSkipField,
 } from '../content/field-classifier'
 
@@ -214,9 +214,7 @@ describe('computeScores', () => {
     })
 
     it('label text and text signals stack (both weight 4)', () => {
-      const scores = computeScores(
-        signals({ textSignals: 'Password', labelText: 'Password' }),
-      )
+      const scores = computeScores(signals({ textSignals: 'Password', labelText: 'Password' }))
       expect(scores.get('password')).toBe(8) // 4 + 4
     })
   })
@@ -255,16 +253,12 @@ describe('computeScores', () => {
 
   describe('combined signals and disambiguation', () => {
     it('autocomplete + type stacks: username', () => {
-      const scores = computeScores(
-        signals({ autocomplete: 'username', inputType: 'email' }),
-      )
+      const scores = computeScores(signals({ autocomplete: 'username', inputType: 'email' }))
       expect(scores.get('username')).toBe(18) // 10 + 8
     })
 
     it('password type + new_password name: new_password wins', () => {
-      const match = bestMatch(
-        signals({ inputType: 'password', nameId: 'new_password' }),
-      )
+      const match = bestMatch(signals({ inputType: 'password', nameId: 'new_password' }))
       expect(match?.type).toBe('new_password')
       // new_password: type(6) + name(6) = 12
       // password: type(8) = 8

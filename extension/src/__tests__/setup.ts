@@ -1,3 +1,5 @@
+import { vi } from 'vitest'
+
 // Global mocks for Chrome Extension APIs
 // These are needed for background script tests that reference chrome.*
 

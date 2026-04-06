@@ -44,7 +44,15 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
     } finally {
       setLoading(false)
     }
-  }, [length, includeLowercase, includeUppercase, includeNumbers, includeSymbols1, includeSymbols2, includeSymbols3])
+  }, [
+    length,
+    includeLowercase,
+    includeUppercase,
+    includeNumbers,
+    includeSymbols1,
+    includeSymbols2,
+    includeSymbols3,
+  ])
 
   // 初期パスワード生成と設定変更時に自動生成
   useEffect(() => {
@@ -248,14 +256,16 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
               </button>
               {showCharOptions && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
-                  {([
-                    [includeLowercase, setIncludeLowercase, 'a-z'],
-                    [includeUppercase, setIncludeUppercase, 'A-Z'],
-                    [includeNumbers, setIncludeNumbers, '0-9'],
-                    [includeSymbols1, setIncludeSymbols1, '!@#$%^&*'],
-                    [includeSymbols2, setIncludeSymbols2, '()[]{}+='],
-                    [includeSymbols3, setIncludeSymbols3, '`<>\'"\\|'],
-                  ] as [boolean, React.Dispatch<React.SetStateAction<boolean>>, string][]).map(([checked, setter, label]) => (
+                  {(
+                    [
+                      [includeLowercase, setIncludeLowercase, 'a-z'],
+                      [includeUppercase, setIncludeUppercase, 'A-Z'],
+                      [includeNumbers, setIncludeNumbers, '0-9'],
+                      [includeSymbols1, setIncludeSymbols1, '!@#$%^&*'],
+                      [includeSymbols2, setIncludeSymbols2, '()[]{}+='],
+                      [includeSymbols3, setIncludeSymbols3, '`<>\'"\\|'],
+                    ] as [boolean, React.Dispatch<React.SetStateAction<boolean>>, string][]
+                  ).map(([checked, setter, label]) => (
                     <button
                       key={label}
                       type="button"

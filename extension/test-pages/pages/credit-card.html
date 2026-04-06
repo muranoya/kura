@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Credit Card - Autofill Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.25rem; }
+    nav { margin-bottom: 24px; }
+    nav a { color: #2563eb; }
+    label { display: block; margin-bottom: 4px; font-weight: 500; }
+    input { display: block; width: 100%; padding: 8px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .row { display: flex; gap: 12px; }
+    .row > div { flex: 1; }
+    #result { margin-top: 24px; padding: 12px; background: #f3f4f6; border-radius: 4px; white-space: pre-wrap; display: none; }
+    .expected { margin: 24px 0; padding: 12px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.9rem; }
+    .expected summary { font-weight: 600; cursor: pointer; }
+    .expected ul { margin: 8px 0 0; padding-left: 20px; }
+    .expected li { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <nav><a href="/">&larr; Test Pages Index</a></nav>
+  <h1>Credit Card Form</h1>
+  <p>Should be detected as <code>CREDIT_CARD</code>. All 4 fields should be filled (with 30ms delay).</p>
+
+  <details class="expected" open>
+    <summary>Expected Behavior</summary>
+    <ul>
+      <li>Form type: <code>CREDIT_CARD</code></li>
+      <li>Focus any credit card field → dropdown appears with credit card entries</li>
+      <li>Select entry → all 4 fields filled: cc-name, cc-number, cc-exp, cc-csc (30ms delay between fields)</li>
+    </ul>
+  </details>
+
+  <form id="cc-form" method="POST" action="#">
+    <label for="cc-name">Cardholder Name</label>
+    <input type="text" id="cc-name" name="cc-name" autocomplete="cc-name" placeholder="John Doe">
+
+    <label for="cc-number">Card Number</label>
+    <input type="text" id="cc-number" name="cc-number" autocomplete="cc-number" inputmode="numeric" placeholder="4111 1111 1111 1111">
+
+    <div class="row">
+      <div>
+        <label for="cc-exp">Expiry</label>
+        <input type="text" id="cc-exp" name="cc-exp" autocomplete="cc-exp" placeholder="MM/YY">
+      </div>
+      <div>
+        <label for="cc-csc">CVC</label>
+        <input type="text" id="cc-csc" name="cc-csc" autocomplete="cc-csc" inputmode="numeric" placeholder="123">
+      </div>
+    </div>
+
+    <button type="submit">Pay</button>
+  </form>
+
+  <pre id="result"></pre>
+
+  <script>
+    document.getElementById('cc-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const data = {
+        name: document.getElementById('cc-name').value,
+        number: document.getElementById('cc-number').value,
+        expiry: document.getElementById('cc-exp').value,
+        cvc: document.getElementById('cc-csc').value,
+      };
+      const result = document.getElementById('result');
+      result.style.display = 'block';
+      result.textContent = 'Submitted:\n' + Object.entries(data).map(([k, v]) => '  ' + k + ': ' + v).join('\n');
+    });
+  </script>
+</body>
+</html>

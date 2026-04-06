@@ -55,7 +55,9 @@ export default function TotpCustomFieldDisplay({ label, value }: TotpCustomField
   return (
     <div
       className={`flex items-center gap-1.5 px-2 py-1.5 rounded transition-colors border-l-2 ${
-        totpCode ? 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80 border-transparent' : 'opacity-50 border-transparent'
+        totpCode
+          ? 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80 border-transparent'
+          : 'opacity-50 border-transparent'
       } ${copied ? '!bg-accent-subtle !border-accent' : ''}`}
       onClick={handleCopy}
       role={totpCode ? 'button' : undefined}

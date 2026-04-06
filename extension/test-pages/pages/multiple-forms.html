@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multiple Forms - Autofill Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.25rem; }
+    nav { margin-bottom: 24px; }
+    nav a { color: #2563eb; }
+    label { display: block; margin-bottom: 4px; font-weight: 500; }
+    input { display: block; width: 100%; padding: 8px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .section { padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 24px; }
+    .section h2 { font-size: 1rem; margin-top: 0; }
+    #result { margin-top: 24px; padding: 12px; background: #f3f4f6; border-radius: 4px; white-space: pre-wrap; display: none; }
+    .expected { margin: 24px 0; padding: 12px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.9rem; }
+    .expected summary { font-weight: 600; cursor: pointer; }
+    .expected ul { margin: 8px 0 0; padding-left: 20px; }
+    .expected li { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <nav><a href="/">&larr; Test Pages Index</a></nav>
+  <h1>Multiple Forms</h1>
+  <p>Only the login form should show autofill candidates. The search form should not.</p>
+
+  <details class="expected" open>
+    <summary>Expected Behavior</summary>
+    <ul>
+      <li>Search form: <code>type="search"</code> input is skipped → <strong>no</strong> autofill dropdown</li>
+      <li>Login form: detected as <code>LOGIN</code> → dropdown appears on focus</li>
+      <li>Focus search input → nothing happens</li>
+      <li>Focus username/password → dropdown appears with matching entries</li>
+    </ul>
+  </details>
+
+  <div class="section">
+    <h2>Search</h2>
+    <form id="search-form" action="#">
+      <label for="search">Search</label>
+      <input type="search" id="search" name="q" placeholder="Search...">
+      <button type="submit">Search</button>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Login</h2>
+    <form id="login-form" method="POST" action="#">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" autocomplete="username" placeholder="user@example.com">
+
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" placeholder="Password">
+
+      <button type="submit">Log in</button>
+    </form>
+  </div>
+
+  <pre id="result"></pre>
+
+  <script>
+    document.getElementById('search-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const result = document.getElementById('result');
+      result.style.display = 'block';
+      result.textContent = 'Search submitted:\n  q: ' + document.getElementById('search').value;
+    });
+
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const result = document.getElementById('result');
+      result.style.display = 'block';
+      result.textContent = 'Login submitted:\n  username: ' + document.getElementById('username').value + '\n  password: ' + document.getElementById('password').value;
+    });
+  </script>
+</body>
+</html>

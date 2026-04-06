@@ -58,9 +58,12 @@ export type Message =
   | {
       type: 'GENERATE_PASSWORD'
       length: number
+      includeLowercase: boolean
       includeUppercase: boolean
       includeNumbers: boolean
-      includeSymbols: boolean
+      includeSymbols1: boolean
+      includeSymbols2: boolean
+      includeSymbols3: boolean
     }
   | { type: 'GENERATE_TOTP'; secret: string }
   | { type: 'GENERATE_TOTP_FROM_VALUE'; value: string }

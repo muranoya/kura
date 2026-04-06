@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autocomplete Attributes - Autofill Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 560px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.25rem; }
+    nav { margin-bottom: 24px; }
+    nav a { color: #2563eb; }
+    .field { padding: 12px; border: 1px solid #e5e7eb; border-radius: 4px; margin-bottom: 12px; }
+    .field label { display: block; margin-bottom: 4px; font-weight: 500; }
+    .field code { display: block; font-size: 0.8rem; color: #6b7280; margin-bottom: 4px; }
+    input { display: block; width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    h2 { font-size: 1rem; margin-top: 24px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
+    .expected { margin: 24px 0; padding: 12px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.9rem; }
+    .expected summary { font-weight: 600; cursor: pointer; }
+    .expected ul { margin: 8px 0 0; padding-left: 20px; }
+    .expected li { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <nav><a href="/">&larr; Test Pages Index</a></nav>
+  <h1>Autocomplete Attribute Variations</h1>
+  <p>Each field has a specific <code>autocomplete</code> attribute. Verify correct <code>FieldType</code> classification.</p>
+
+  <details class="expected" open>
+    <summary>Expected Behavior</summary>
+    <ul>
+      <li>This page tests <strong>field classification</strong>, not full form flow</li>
+      <li><code>autocomplete="username"</code> → username field</li>
+      <li><code>autocomplete="current-password"</code> → password field</li>
+      <li><code>autocomplete="new-password"</code> → new_password field</li>
+      <li><code>autocomplete="one-time-code"</code> → TOTP field</li>
+      <li><code>autocomplete="cc-name/cc-number/cc-exp/cc-csc"</code> → credit card fields</li>
+      <li>Each field should show dropdown when focused (if matching entries exist)</li>
+    </ul>
+  </details>
+
+  <h2>Login Fields</h2>
+
+  <div class="field">
+    <code>autocomplete="username"</code>
+    <label for="f-username">Username</label>
+    <input type="text" id="f-username" autocomplete="username" placeholder="username">
+  </div>
+
+  <div class="field">
+    <code>autocomplete="current-password"</code>
+    <label for="f-current-pw">Current Password</label>
+    <input type="password" id="f-current-pw" autocomplete="current-password" placeholder="current password">
+  </div>
+
+  <div class="field">
+    <code>autocomplete="new-password"</code>
+    <label for="f-new-pw">New Password</label>
+    <input type="password" id="f-new-pw" autocomplete="new-password" placeholder="new password">
+  </div>
+
+  <h2>OTP</h2>
+
+  <div class="field">
+    <code>autocomplete="one-time-code"</code>
+    <label for="f-otp">One-Time Code</label>
+    <input type="text" id="f-otp" autocomplete="one-time-code" inputmode="numeric" placeholder="123456">
+  </div>
+
+  <h2>Credit Card Fields</h2>
+
+  <div class="field">
+    <code>autocomplete="cc-name"</code>
+    <label for="f-cc-name">Cardholder Name</label>
+    <input type="text" id="f-cc-name" autocomplete="cc-name" placeholder="John Doe">
+  </div>
+
+  <div class="field">
+    <code>autocomplete="cc-number"</code>
+    <label for="f-cc-number">Card Number</label>
+    <input type="text" id="f-cc-number" autocomplete="cc-number" inputmode="numeric" placeholder="4111 1111 1111 1111">
+  </div>
+
+  <div class="field">
+    <code>autocomplete="cc-exp"</code>
+    <label for="f-cc-exp">Expiry</label>
+    <input type="text" id="f-cc-exp" autocomplete="cc-exp" placeholder="MM/YY">
+  </div>
+
+  <div class="field">
+    <code>autocomplete="cc-csc"</code>
+    <label for="f-cc-csc">CVC/CSC</label>
+    <input type="text" id="f-cc-csc" autocomplete="cc-csc" inputmode="numeric" placeholder="123">
+  </div>
+</body>
+</html>

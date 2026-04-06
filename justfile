@@ -297,6 +297,46 @@ default: help
 	docker compose -f docker-compose.test.yml down -v
 	echo "✅ desktop tests passed!"
 
+# Extension - Start manual autofill test environment (fixture + MinIO + test pages)
+test-manual-autofill:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	echo ""
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "🧪 Starting autofill manual test environment..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	echo "🦀 Generating vault fixture..."
+	cargo test -p vault_core --test generate_test_vault -- --ignored
+	echo ""
+	echo "🐳 Starting MinIO..."
+	docker compose -f docker-compose.test.yml up -d --wait minio
+	echo ""
+	echo "🪣 Creating bucket..."
+	docker compose -f docker-compose.test.yml run --rm createbuckets
+	echo ""
+	echo "📦 Seeding vault data..."
+	docker compose -f docker-compose.test.yml run --rm seedvault
+	echo ""
+	echo "✅ Environment ready!"
+	echo ""
+	echo "  Master Password: kura-test"
+	echo ""
+	echo "  Transfer Config (設定転送文字列):"
+	echo "  $(cat {{EXTENSION_DIR}}/test-pages/fixtures/transfer-config.txt)"
+	echo ""
+	echo "  拡張機能のオンボーディングで「設定を転送」を選び、"
+	echo "  上記の文字列とマスターパスワード kura-test を入力してください。"
+	echo ""
+	echo "🌐 Starting test page server..."
+	cd {{EXTENSION_DIR}} && npx tsx test-pages/server.ts
+
+# Extension - Stop manual autofill test environment
+@test-manual-autofill-stop:
+	echo "🛑 Stopping MinIO..."
+	docker compose -f docker-compose.test.yml down
+	echo "✅ Test environment stopped."
+
 # 全テスト実行
 @test-all:
 	just test-vault-core
@@ -443,6 +483,8 @@ default: help
 	echo "    just test-android         - Run Android tests"
 	echo "    just test-desktop         - Run desktop tests (frontend + integration)"
 	echo "    just test-all             - Run all tests"
+	echo "    just test-manual-autofill      - Start autofill manual test environment"
+	echo "    just test-manual-autofill-stop - Stop autofill test environment"
 	echo ""
 	echo "  🔍 Check (Lint & Format):"
 	echo "    just check-vault-core     - Lint & format check for vault-core"

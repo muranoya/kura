@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>React Login - Autofill Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.25rem; }
+    nav { margin-bottom: 24px; }
+    nav a { color: #2563eb; }
+    label { display: block; margin-bottom: 4px; font-weight: 500; }
+    input { display: block; width: 100%; padding: 8px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .state-display { margin-top: 24px; padding: 12px; background: #fef3c7; border-radius: 4px; }
+    .result { margin-top: 12px; padding: 12px; background: #f3f4f6; border-radius: 4px; white-space: pre-wrap; }
+    .expected { margin: 24px 0; padding: 12px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.9rem; }
+    .expected summary { font-weight: 600; cursor: pointer; }
+    .expected ul { margin: 8px 0 0; padding-left: 20px; }
+    .expected li { margin-bottom: 4px; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@19",
+      "react/": "https://esm.sh/react@19/",
+      "react-dom/client": "https://esm.sh/react-dom@19/client",
+      "htm": "https://esm.sh/htm@3"
+    }
+  }
+  </script>
+</head>
+<body>
+  <nav><a href="/">&larr; Test Pages Index</a></nav>
+  <h1>React Controlled Input Login</h1>
+  <p>React controlled inputs. Check that <code>onChange</code> fires and state updates correctly.</p>
+
+  <details class="expected" open>
+    <summary>Expected Behavior</summary>
+    <ul>
+      <li>Form type: <code>LOGIN</code></li>
+      <li>Focus username field → dropdown appears with matching entries</li>
+      <li>Select entry → username and password both filled</li>
+      <li><strong>React State</strong> display must update to show filled values (verifies input/change events are picked up by React)</li>
+    </ul>
+  </details>
+
+  <div id="root"></div>
+
+  <script type="module">
+    import { useState, createElement } from 'react'
+    import { createRoot } from 'react-dom/client'
+    import htm from 'htm'
+
+    const html = htm.bind(createElement)
+
+    function LoginForm() {
+      const [username, setUsername] = useState('')
+      const [password, setPassword] = useState('')
+      const [submitted, setSubmitted] = useState(null)
+
+      const handleSubmit = (e) => {
+        e.preventDefault()
+        setSubmitted({ username, password })
+      }
+
+      return html`
+        <div>
+          <form onSubmit=${handleSubmit}>
+            <label htmlFor="username">Username</label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              autoComplete="username"
+              placeholder="user@example.com"
+              value=${username}
+              onChange=${(e) => setUsername(e.target.value)}
+            />
+
+            <label htmlFor="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              autoComplete="current-password"
+              placeholder="Password"
+              value=${password}
+              onChange=${(e) => setPassword(e.target.value)}
+            />
+
+            <button type="submit">Log in</button>
+          </form>
+
+          <div class="state-display">
+            <strong>React State:</strong><br />
+            username: "${username}"<br />
+            password: "${password}"
+          </div>
+
+          ${submitted && html`
+            <pre class="result">${'Submitted:\n  username: ' + submitted.username + '\n  password: ' + submitted.password}</pre>
+          `}
+        </div>
+      `
+    }
+
+    const root = createRoot(document.getElementById('root'))
+    root.render(html`<${LoginForm} />`)
+  </script>
+</body>
+</html>

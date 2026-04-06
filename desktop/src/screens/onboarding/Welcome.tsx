@@ -114,9 +114,7 @@ export default function Welcome() {
       <Dialog open={showTerms} onOpenChange={setShowTerms}>
         <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>
-              {lang === 'ja' ? '利用規約' : 'Terms of Service'}
-            </DialogTitle>
+            <DialogTitle>{lang === 'ja' ? '利用規約' : 'Terms of Service'}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 max-h-[60vh] overflow-y-auto pr-4">
             <div className="py-2">
@@ -127,9 +125,7 @@ export default function Welcome() {
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="secondary">
-                {lang === 'ja' ? '閉じる' : 'Close'}
-              </Button>
+              <Button variant="secondary">{lang === 'ja' ? '閉じる' : 'Close'}</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>

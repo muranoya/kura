@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  type VaultApi,
   cleanupPendingFlow,
   handleAutofillMessage,
   initAutofill,
+  type VaultApi,
 } from '../background/autofill'
 
 // ========== Test helpers ==========
@@ -110,9 +110,9 @@ describe('handleAutofillMessage', () => {
       url: 'https://example.com',
       username: 'totp@example.com',
       typed_value: { username: 'totp@example.com', password: 'totppwd' },
-      custom_fields: [
+      custom_fields: JSON.stringify([
         { field_type: 'totp', value: 'otpauth://totp/test?secret=ABCDEF' },
-      ],
+      ]),
     },
     {
       id: 'entry-cc',
@@ -382,7 +382,10 @@ describe('handleAutofillMessage', () => {
           url: 'https://www.example.com/password',
         },
         sender(100),
-      )) as { success: boolean; pendingFlow: { entryId: string; username: string; password: string } }
+      )) as {
+        success: boolean
+        pendingFlow: { entryId: string; username: string; password: string }
+      }
 
       expect(queryResult.success).toBe(true)
       expect(queryResult.pendingFlow).not.toBeNull()

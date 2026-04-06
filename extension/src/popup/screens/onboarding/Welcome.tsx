@@ -25,7 +25,9 @@ const termsMarkdownComponents = {
     <p className="text-xs text-text-primary mb-1.5 leading-relaxed">{children}</p>
   ),
   ul: ({ children }: { children?: ReactNode }) => (
-    <ul className="list-disc list-inside text-xs text-text-primary mb-1.5 space-y-0.5">{children}</ul>
+    <ul className="list-disc list-inside text-xs text-text-primary mb-1.5 space-y-0.5">
+      {children}
+    </ul>
   ),
   li: ({ children }: { children?: ReactNode }) => (
     <li className="text-xs text-text-primary">{children}</li>

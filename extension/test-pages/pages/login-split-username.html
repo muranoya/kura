@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Split Login: Username - Autofill Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.25rem; }
+    nav { margin-bottom: 24px; }
+    nav a { color: #2563eb; }
+    label { display: block; margin-bottom: 4px; font-weight: 500; }
+    input { display: block; width: 100%; padding: 8px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .step-indicator { color: #6b7280; margin-bottom: 16px; }
+    .expected { margin: 24px 0; padding: 12px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.9rem; }
+    .expected summary { font-weight: 600; cursor: pointer; }
+    .expected ul { margin: 8px 0 0; padding-left: 20px; }
+    .expected li { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <nav><a href="/">&larr; Test Pages Index</a></nav>
+  <h1>Split Login: Username</h1>
+  <p class="step-indicator">Step 1 of 2</p>
+  <p>Enter your username first, then proceed to the password page.</p>
+
+  <details class="expected" open>
+    <summary>Expected Behavior</summary>
+    <ul>
+      <li>Form type: <code>LOGIN_USERNAME</code></li>
+      <li>Focus username field → dropdown appears with matching entries</li>
+      <li>Select entry → username filled, pending flow stored in Service Worker</li>
+      <li>Submit → navigates to <code>login-split-password.html</code></li>
+    </ul>
+  </details>
+
+  <form id="username-form" method="POST" action="#">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" autocomplete="username" placeholder="user@example.com">
+
+    <button type="submit">Next</button>
+  </form>
+
+  <script>
+    document.getElementById('username-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      sessionStorage.setItem('split-login-username', username);
+      window.location.href = 'login-split-password.html';
+    });
+  </script>
+</body>
+</html>

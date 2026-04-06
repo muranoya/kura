@@ -54,9 +54,7 @@ pub fn encrypt_transfer(password: &str, plaintext: &[u8]) -> Result<String> {
 pub fn decrypt_transfer(password: &str, transfer_string: &str) -> Result<Vec<u8>> {
     let payload = transfer_string
         .strip_prefix(TRANSFER_PREFIX)
-        .ok_or_else(|| {
-            VaultError::DecryptionError("Invalid transfer string prefix".to_string())
-        })?;
+        .ok_or_else(|| VaultError::DecryptionError("Invalid transfer string prefix".to_string()))?;
 
     let engine = base64::engine::general_purpose::STANDARD;
     let buf = engine

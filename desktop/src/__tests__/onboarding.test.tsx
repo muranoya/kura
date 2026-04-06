@@ -76,6 +76,7 @@ describe('Welcome', () => {
     const user = userEvent.setup()
     renderOnboarding('/')
 
+    await user.click(screen.getByRole('checkbox'))
     await user.click(screen.getByRole('button', { name: '始める' }))
 
     expect(screen.getByText('ストレージ設定')).toBeInTheDocument()
@@ -390,6 +391,7 @@ describe('Full onboarding flow - new vault', () => {
     renderOnboarding('/')
 
     // Step 1: Welcome -> Start
+    await user.click(screen.getByRole('checkbox'))
     await user.click(screen.getByRole('button', { name: '始める' }))
     expect(screen.getByText('ストレージ設定')).toBeInTheDocument()
 
@@ -440,6 +442,7 @@ describe('Full onboarding flow - existing vault', () => {
     renderOnboarding('/')
 
     // Step 1: Welcome -> Start
+    await user.click(screen.getByRole('checkbox'))
     await user.click(screen.getByRole('button', { name: '始める' }))
 
     // Step 2: Fill storage form

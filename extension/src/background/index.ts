@@ -187,7 +187,9 @@ setupAlarms()
 
 // Autofill の初期化（vault はプロキシ経由でlazy参照）
 initAutofill(
-  new Proxy({} as WasmApi, { get: (_target, prop) => (vault as Record<string | symbol, unknown>)[prop] }),
+  new Proxy({} as WasmApi, {
+    get: (_target, prop) => (vault as unknown as Record<string | symbol, unknown>)[prop],
+  }),
   () => unlocked,
 )
 

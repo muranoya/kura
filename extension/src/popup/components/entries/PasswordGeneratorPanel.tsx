@@ -44,7 +44,15 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
     } finally {
       setLoading(false)
     }
-  }, [length, includeLowercase, includeUppercase, includeNumbers, includeSymbols1, includeSymbols2, includeSymbols3])
+  }, [
+    length,
+    includeLowercase,
+    includeUppercase,
+    includeNumbers,
+    includeSymbols1,
+    includeSymbols2,
+    includeSymbols3,
+  ])
 
   // 初期パスワード生成と設定変更時に自動生成
   useEffect(() => {
@@ -75,10 +83,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           onChange={(e) => setIncludeLowercase(e.target.checked)}
           className={`${checkboxSize} rounded border-border`}
         />
-        <label
-          htmlFor={`lowercase-${prefix}`}
-          className="text-sm text-text-primary cursor-pointer"
-        >
+        <label htmlFor={`lowercase-${prefix}`} className="text-sm text-text-primary cursor-pointer">
           小文字 (a-z)
         </label>
       </div>
@@ -91,10 +96,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           onChange={(e) => setIncludeUppercase(e.target.checked)}
           className={`${checkboxSize} rounded border-border`}
         />
-        <label
-          htmlFor={`uppercase-${prefix}`}
-          className="text-sm text-text-primary cursor-pointer"
-        >
+        <label htmlFor={`uppercase-${prefix}`} className="text-sm text-text-primary cursor-pointer">
           大文字 (A-Z)
         </label>
       </div>
@@ -107,10 +109,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           onChange={(e) => setIncludeNumbers(e.target.checked)}
           className={`${checkboxSize} rounded border-border`}
         />
-        <label
-          htmlFor={`numbers-${prefix}`}
-          className="text-sm text-text-primary cursor-pointer"
-        >
+        <label htmlFor={`numbers-${prefix}`} className="text-sm text-text-primary cursor-pointer">
           数字 (0-9)
         </label>
       </div>
@@ -123,10 +122,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           onChange={(e) => setIncludeSymbols1(e.target.checked)}
           className={`${checkboxSize} rounded border-border`}
         />
-        <label
-          htmlFor={`symbols1-${prefix}`}
-          className="text-sm text-text-primary cursor-pointer"
-        >
+        <label htmlFor={`symbols1-${prefix}`} className="text-sm text-text-primary cursor-pointer">
           {'記号 (!@#$%^&*-_.)'}
         </label>
       </div>
@@ -139,10 +135,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           onChange={(e) => setIncludeSymbols2(e.target.checked)}
           className={`${checkboxSize} rounded border-border`}
         />
-        <label
-          htmlFor={`symbols2-${prefix}`}
-          className="text-sm text-text-primary cursor-pointer"
-        >
+        <label htmlFor={`symbols2-${prefix}`} className="text-sm text-text-primary cursor-pointer">
           {'記号 (()[]{}+=~/)'}
         </label>
       </div>
@@ -155,10 +148,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           onChange={(e) => setIncludeSymbols3(e.target.checked)}
           className={`${checkboxSize} rounded border-border`}
         />
-        <label
-          htmlFor={`symbols3-${prefix}`}
-          className="text-sm text-text-primary cursor-pointer"
-        >
+        <label htmlFor={`symbols3-${prefix}`} className="text-sm text-text-primary cursor-pointer">
           {'記号 (`<>\'"\\|;,:)'}
         </label>
       </div>
@@ -246,14 +236,16 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
               </button>
               {showCharOptions && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
-                  {([
-                    [includeLowercase, setIncludeLowercase, 'a-z'],
-                    [includeUppercase, setIncludeUppercase, 'A-Z'],
-                    [includeNumbers, setIncludeNumbers, '0-9'],
-                    [includeSymbols1, setIncludeSymbols1, '!@#$%^&*'],
-                    [includeSymbols2, setIncludeSymbols2, '()[]{}+='],
-                    [includeSymbols3, setIncludeSymbols3, '`<>\'"\\|'],
-                  ] as [boolean, React.Dispatch<React.SetStateAction<boolean>>, string][]).map(([checked, setter, label]) => (
+                  {(
+                    [
+                      [includeLowercase, setIncludeLowercase, 'a-z'],
+                      [includeUppercase, setIncludeUppercase, 'A-Z'],
+                      [includeNumbers, setIncludeNumbers, '0-9'],
+                      [includeSymbols1, setIncludeSymbols1, '!@#$%^&*'],
+                      [includeSymbols2, setIncludeSymbols2, '()[]{}+='],
+                      [includeSymbols3, setIncludeSymbols3, '`<>\'"\\|'],
+                    ] as [boolean, React.Dispatch<React.SetStateAction<boolean>>, string][]
+                  ).map(([checked, setter, label]) => (
                     <button
                       key={label}
                       type="button"

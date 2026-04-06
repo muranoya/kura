@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autofill Test Pages</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e5e7eb; }
+    th { background: #f9fafb; font-size: 0.85rem; color: #6b7280; text-transform: uppercase; }
+    td a { color: #2563eb; }
+    .info { padding: 12px; background: #eff6ff; border-radius: 4px; margin-bottom: 24px; font-size: 0.9rem; }
+    code { background: #f3f4f6; padding: 2px 4px; border-radius: 2px; font-size: 0.85em; }
+  </style>
+</head>
+<body>
+  <h1>Autofill Test Pages</h1>
+  <div class="info">
+    <strong>Master password:</strong> <code>kura-test</code><br>
+    <strong>Transfer Config:</strong>
+    <code id="transfer-config" style="word-break: break-all; display: block; margin-top: 4px; cursor: pointer;" title="Click to copy"></code>
+    <small style="color: #6b7280;">拡張機能の「設定を転送」に貼り付け + マスターパスワード <code>kura-test</code> を入力</small>
+  </div>
+
+  <script>
+    fetch('/fixtures/transfer-config.txt')
+      .then(r => r.text())
+      .then(text => {
+        const el = document.getElementById('transfer-config');
+        el.textContent = text.trim();
+        el.addEventListener('click', () => {
+          navigator.clipboard.writeText(text.trim());
+          el.title = 'Copied!';
+          setTimeout(() => { el.title = 'Click to copy'; }, 1500);
+        });
+      });
+  </script>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Page</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="/pages/login-standard.html">Standard Login</a></td>
+        <td><code>&lt;form&gt;</code> with username + password</td>
+      </tr>
+      <tr>
+        <td><a href="/pages/login-formless.html">Formless SPA Login</a></td>
+        <td>No <code>&lt;form&gt;</code>, inputs inside <code>&lt;div&gt;</code></td>
+      </tr>
+      <tr>
+        <td><a href="/pages/login-split-username.html">Split Login</a></td>
+        <td>Username page → Password page (2-step flow)</td>
+      </tr>
+      <tr>
+        <td><a href="/pages/login-react.html">React Login</a></td>
+        <td>React controlled inputs with state display</td>
+      </tr>
+      <tr>
+        <td><a href="/pages/registration.html">Registration</a></td>
+        <td>username + email + new-password + confirm</td>
+      </tr>
+      <tr>
+        <td><a href="/pages/password-change.html">Password Change</a></td>
+        <td>current-password + new-password + confirm</td>
+      </tr>
+      <tr>
+        <td><a href="/pages/totp.html">TOTP</a></td>
+        <td>Single OTP input with <code>autocomplete="one-time-code"</code></td>
+      </tr>
+      <tr>
+        <td><a href="/pages/credit-card.html">Credit Card</a></td>
+        <td>cc-name + cc-number + cc-exp + cc-csc</td>
+      </tr>
+      <tr>
+        <td><a href="/pages/multiple-forms.html">Multiple Forms</a></td>
+        <td>Search form + Login form on same page</td>
+      </tr>
+      <tr>
+        <td><a href="/pages/nested-inputs.html">Nested Inputs</a></td>
+        <td>4-level deep <code>&lt;div&gt;</code> nesting, no <code>&lt;form&gt;</code></td>
+      </tr>
+      <tr>
+        <td><a href="/pages/autocomplete-attrs.html">Autocomplete Attributes</a></td>
+        <td>All HTML5 autocomplete values for field classification</td>
+      </tr>
+      <tr>
+        <td><a href="/pages/shadow-dom.html">Shadow DOM</a></td>
+        <td>Inputs inside Open Shadow Root (Web Component)</td>
+      </tr>
+      <tr>
+        <td><a href="/pages/hidden-fields.html">Hidden Fields</a></td>
+        <td>Mix of visible + hidden fields (display:none, visibility, opacity, zero-size)</td>
+      </tr>
+      <tr>
+        <td><a href="/pages/http-warning.html">HTTP Warning</a></td>
+        <td>Login form served over HTTP (warning banner test)</td>
+      </tr>
+      <tr>
+        <td><a href="/pages/iframe-login.html">iframe Login</a></td>
+        <td>Login form inside a same-origin <code>&lt;iframe&gt;</code></td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>

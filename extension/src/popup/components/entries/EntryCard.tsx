@@ -6,7 +6,6 @@ import {
   Lock,
   RotateCw,
   ScrollText,
-
   Terminal,
   Trash2,
 } from 'lucide-react'
@@ -74,8 +73,9 @@ export default function EntryCard(props: EntryCardProps) {
     const isSelected = props.isSelected || false
 
     return (
-      <div
-        className={`px-3 py-1.5 transition-colors cursor-pointer group ${
+      <button
+        type="button"
+        className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer group ${
           isSelected
             ? 'bg-accent-subtle border-l-2 border-l-accent'
             : 'border-l-2 border-l-transparent hover:bg-bg-elevated'
@@ -101,7 +101,7 @@ export default function EntryCard(props: EntryCardProps) {
             </div>
           </div>
         </div>
-      </div>
+      </button>
     )
   }
 

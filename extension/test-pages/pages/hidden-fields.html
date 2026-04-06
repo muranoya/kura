@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hidden Fields - Autofill Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 560px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.25rem; }
+    nav { margin-bottom: 24px; }
+    nav a { color: #2563eb; }
+    label { display: block; margin-bottom: 4px; font-weight: 500; }
+    input:not([type="hidden"]) { display: block; width: 100%; padding: 8px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .hidden-section { margin-top: 24px; padding: 16px; border: 2px dashed #ef4444; border-radius: 8px; }
+    .hidden-section h2 { font-size: 1rem; margin-top: 0; color: #ef4444; }
+    .hidden-note { font-size: 0.8rem; color: #6b7280; margin-bottom: 8px; }
+    #result { margin-top: 24px; padding: 12px; background: #f3f4f6; border-radius: 4px; white-space: pre-wrap; display: none; }
+    .expected { margin: 24px 0; padding: 12px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.9rem; }
+    .expected summary { font-weight: 600; cursor: pointer; }
+    .expected ul { margin: 8px 0 0; padding-left: 20px; }
+    .expected li { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <nav><a href="/">&larr; Test Pages Index</a></nav>
+  <h1>Hidden Fields</h1>
+  <p>Visible fields should be detected. Hidden fields should be excluded from autofill.</p>
+
+  <details class="expected" open>
+    <summary>Expected Behavior</summary>
+    <ul>
+      <li>Form type: <code>LOGIN</code> (visible fields only)</li>
+      <li>Only username and password (visible) fields detected</li>
+      <li>5 hidden fields should all be <strong>IGNORED</strong>: display:none, visibility:hidden, opacity:0, zero-size, type="hidden"</li>
+      <li>Dropdown appears only on the two visible fields</li>
+    </ul>
+  </details>
+
+  <form id="form" method="POST" action="#">
+    <h2 style="font-size: 1rem;">Visible Fields (should be detected)</h2>
+
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" autocomplete="username" placeholder="user@example.com">
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" autocomplete="current-password" placeholder="Password">
+
+    <div class="hidden-section">
+      <h2>Hidden Fields (should be excluded)</h2>
+
+      <div class="hidden-note">display: none</div>
+      <input type="text" name="hidden-display-none" style="display: none" value="hidden1">
+
+      <div class="hidden-note">visibility: hidden</div>
+      <input type="text" name="hidden-visibility" style="visibility: hidden; height: 32px;" value="hidden2">
+
+      <div class="hidden-note">opacity: 0</div>
+      <input type="text" name="hidden-opacity" style="opacity: 0; height: 32px;" value="hidden3">
+
+      <div class="hidden-note">width: 0; height: 0; overflow: hidden</div>
+      <input type="text" name="hidden-zero-size" style="width: 0; height: 0; overflow: hidden; border: none; padding: 0;" value="hidden4">
+
+      <div class="hidden-note">type="hidden"</div>
+      <input type="hidden" name="csrf-token" value="abc123">
+    </div>
+
+    <button type="submit" style="margin-top: 16px;">Log in</button>
+  </form>
+
+  <pre id="result"></pre>
+
+  <script>
+    document.getElementById('form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const result = document.getElementById('result');
+      result.style.display = 'block';
+      result.textContent = 'Submitted:\n  username: ' + document.getElementById('username').value + '\n  password: ' + document.getElementById('password').value;
+    });
+  </script>
+</body>
+</html>

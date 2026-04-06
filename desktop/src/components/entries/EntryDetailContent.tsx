@@ -46,7 +46,9 @@ function FieldDisplay({
   return (
     <div
       className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors border-l-2 ${
-        isEmpty ? 'opacity-50 border-transparent' : 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80 border-transparent'
+        isEmpty
+          ? 'opacity-50 border-transparent'
+          : 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80 border-transparent'
       } ${copied ? '!bg-accent-subtle !border-accent' : ''}`}
       onClick={handleClick}
       role={isEmpty ? undefined : 'button'}

@@ -158,9 +158,10 @@ function getTotpForUrl(url: string): TotpResult | null {
     try {
       const result = vaultApi.api_get_entry(DEFAULT_VAULT_ID, candidate.entryId)
       const raw = JSON.parse(result)
-      const customFields = raw.custom_fields as
-        | Array<{ field_type: string; value: string }>
-        | null
+      const customFieldsRaw = raw.custom_fields
+      const customFields = (
+        typeof customFieldsRaw === 'string' ? JSON.parse(customFieldsRaw) : customFieldsRaw
+      ) as Array<{ field_type: string; value: string }> | null
       if (!customFields) continue
 
       const totpField = customFields.find((f) => f.field_type === 'totp')
@@ -215,14 +216,12 @@ interface PendingLoginFlow {
 const pendingLoginFlows = new Map<number, PendingLoginFlow>()
 const PENDING_FLOW_TIMEOUT_MS = 5 * 60 * 1000
 
-function storePendingLoginFlow(
-  tabId: number,
-  domain: string,
-  entryId: string,
-  username: string,
-) {
+function storePendingLoginFlow(tabId: number, domain: string, entryId: string, username: string) {
   pendingLoginFlows.set(tabId, { domain, entryId, username, timestamp: Date.now() })
-  console.log(LOG_PREFIX, `storePendingLoginFlow: tabId=${tabId}, domain=${domain}, entryId=${entryId}`)
+  console.log(
+    LOG_PREFIX,
+    `storePendingLoginFlow: tabId=${tabId}, domain=${domain}, entryId=${entryId}`,
+  )
 }
 
 function queryPendingLoginFlow(

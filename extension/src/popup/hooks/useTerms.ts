@@ -1,5 +1,5 @@
-import termsJa from '../assets/legal/terms_ja.md?raw'
 import termsEn from '../assets/legal/terms_en.md?raw'
+import termsJa from '../assets/legal/terms_ja.md?raw'
 
 const termsMap: Record<string, string> = { ja: termsJa, en: termsEn }
 

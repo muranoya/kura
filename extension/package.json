@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "check": "biome check .",
     "fix": "biome check --write .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:manual": "npx tsx test-pages/server.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1022.0",

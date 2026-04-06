@@ -123,6 +123,7 @@
   border-radius: 8px 8px 0 0;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: different context from .kura-dropdown-locked .kura-item-icon svg */
 .kura-dropdown-warning svg {
   flex-shrink: 0;
 }

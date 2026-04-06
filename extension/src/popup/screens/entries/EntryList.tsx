@@ -7,7 +7,6 @@ import {
   Pencil,
   Plus,
   Search,
-
   Star,
   Trash2,
   X,
@@ -133,7 +132,7 @@ export default function EntryList() {
         if (saved) setSelectedId(saved)
       })
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initialSelectedId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelectEntry = (id: string | null) => {
     setSelectedId(id)
@@ -339,7 +338,6 @@ export default function EntryList() {
                 entry={entry}
                 isSelected={selectedId === entry.id}
                 onClick={(id) => handleSelectEntry(id)}
-
               />
             )}
           />
@@ -414,7 +412,9 @@ function PaneFieldDisplay({
   return (
     <div
       className={`flex items-center gap-1.5 px-2 py-1.5 rounded transition-colors border-l-2 ${
-        isEmpty ? 'opacity-50 border-transparent' : 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80 border-transparent'
+        isEmpty
+          ? 'opacity-50 border-transparent'
+          : 'cursor-pointer hover:bg-bg-elevated active:bg-bg-elevated/80 border-transparent'
       } ${copied ? '!bg-accent-subtle !border-accent' : ''}`}
       onClick={handleClick}
       role={isEmpty ? undefined : 'button'}

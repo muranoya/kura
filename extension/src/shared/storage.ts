@@ -38,16 +38,17 @@ export async function clearStorage(): Promise<void> {
 // Firefox では chrome.storage.session がエイリアスされていないことがあるため
 // browser.storage.session にフォールバックする
 
-// biome-ignore lint/suspicious/noExplicitAny: browser namespace may not exist in type definitions
+const globalWithBrowser = globalThis as unknown as {
+  browser?: { storage?: { session?: chrome.storage.StorageArea } }
+}
 const sessionStorageArea: chrome.storage.StorageArea | undefined =
-  chrome?.storage?.session ??
-  (globalThis as any).browser?.storage?.session
+  chrome?.storage?.session ?? globalWithBrowser.browser?.storage?.session
 
 console.log(
   '[SessionStorage] init: chrome.storage.session?',
   !!chrome?.storage?.session,
   'browser.storage.session?',
-  !!(globalThis as any).browser?.storage?.session,
+  !!globalWithBrowser.browser?.storage?.session,
   'resolved?',
   !!sessionStorageArea,
 )

@@ -6,7 +6,6 @@ import {
   Lock,
   RotateCw,
   ScrollText,
-
   Terminal,
   Trash2,
 } from 'lucide-react'
@@ -41,7 +40,6 @@ interface EntryCardNormalProps {
   entry: EntryRow
   isSelected?: boolean
   onClick: (id: string) => void
-
 }
 
 // Trash variant (Trash用)
@@ -57,8 +55,9 @@ type EntryCardProps = EntryCardNormalProps | EntryCardTrashProps
 export default function EntryCard(props: EntryCardProps) {
   if (props.variant === 'normal') {
     return (
-      <div
-        className={`px-3 py-2 transition-colors cursor-pointer group ${
+      <button
+        type="button"
+        className={`w-full text-left px-3 py-2 transition-colors cursor-pointer group ${
           props.isSelected
             ? 'bg-accent-subtle border-l-2 border-l-accent'
             : 'border-l-2 border-l-transparent hover:bg-bg-elevated'
@@ -81,7 +80,7 @@ export default function EntryCard(props: EntryCardProps) {
             </div>
           </div>
         </div>
-      </div>
+      </button>
     )
   }
 

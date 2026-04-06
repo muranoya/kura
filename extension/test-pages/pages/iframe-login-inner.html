@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login (inside iframe)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 16px; }
+    label { display: block; margin-bottom: 4px; font-weight: 500; }
+    input { display: block; width: 100%; padding: 8px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    #result { margin-top: 16px; padding: 12px; background: #f3f4f6; border-radius: 4px; white-space: pre-wrap; display: none; }
+  </style>
+</head>
+<body>
+  <form id="login-form" method="POST" action="#">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" autocomplete="username" placeholder="user@example.com">
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" autocomplete="current-password" placeholder="Password">
+
+    <button type="submit">Log in</button>
+  </form>
+
+  <pre id="result"></pre>
+
+  <script>
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const result = document.getElementById('result');
+      result.style.display = 'block';
+      result.textContent = 'Submitted:\n  username: ' + username + '\n  password: ' + password;
+    });
+  </script>
+</body>
+</html>

@@ -21,7 +21,13 @@ const scrollPositions = new Map<string, number>()
 function entriesChanged(prev: EntryRow[], next: EntryRow[]): boolean {
   if (prev.length !== next.length) return true
   for (let i = 0; i < prev.length; i++) {
-    if (prev[i].id !== next[i].id || prev[i].updatedAt !== next[i].updatedAt || prev[i].isFavorite !== next[i].isFavorite || prev[i].deletedAt !== next[i].deletedAt) return true
+    if (
+      prev[i].id !== next[i].id ||
+      prev[i].updatedAt !== next[i].updatedAt ||
+      prev[i].isFavorite !== next[i].isFavorite ||
+      prev[i].deletedAt !== next[i].deletedAt
+    )
+      return true
   }
   return false
 }
@@ -308,7 +314,6 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
                   saveScrollPosition()
                   setSelectedId(id)
                 }}
-
               />
             )}
           />

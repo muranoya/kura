@@ -24,7 +24,7 @@ function ensureShadowHost(): ShadowRoot {
   shadowHost.id = CONTAINER_ID
   shadowHost.setAttribute(
     'style',
-    'all: initial !important; position: fixed !important; z-index: 2147483647 !important;',
+    'all: initial !important; position: fixed !important; top: 0 !important; left: 0 !important; z-index: 2147483647 !important;',
   )
   document.body.appendChild(shadowHost)
 

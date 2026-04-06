@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nested Inputs - Autofill Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 560px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.25rem; }
+    nav { margin-bottom: 24px; }
+    nav a { color: #2563eb; }
+    label { display: block; margin-bottom: 4px; font-weight: 500; }
+    input { display: block; width: 100%; padding: 8px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .level { padding: 12px; border: 2px dashed; border-radius: 8px; margin-bottom: 8px; }
+    .level-1 { border-color: #ef4444; background: rgba(239, 68, 68, 0.05); }
+    .level-2 { border-color: #f59e0b; background: rgba(245, 158, 11, 0.05); }
+    .level-3 { border-color: #10b981; background: rgba(16, 185, 129, 0.05); }
+    .level-4 { border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); }
+    .level-label { font-size: 0.75rem; color: #6b7280; margin-bottom: 8px; }
+    #result { margin-top: 24px; padding: 12px; background: #f3f4f6; border-radius: 4px; white-space: pre-wrap; display: none; }
+    .expected { margin: 24px 0; padding: 12px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.9rem; }
+    .expected summary { font-weight: 600; cursor: pointer; }
+    .expected ul { margin: 8px 0 0; padding-left: 20px; }
+    .expected li { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <nav><a href="/">&larr; Test Pages Index</a></nav>
+  <h1>Deeply Nested Inputs</h1>
+  <p>4 levels of nested <code>&lt;div&gt;</code> with no <code>&lt;form&gt;</code>. Tests form container detection.</p>
+
+  <details class="expected" open>
+    <summary>Expected Behavior</summary>
+    <ul>
+      <li>Form type: <code>LOGIN</code> (<code>&lt;form&gt;</code> なし・4階層ネストでも親コンテナ走査で検出)</li>
+      <li>Focus username field → dropdown appears with matching entries</li>
+      <li>Select entry → username and password both filled</li>
+    </ul>
+  </details>
+
+  <div class="level level-1">
+    <div class="level-label">Level 1</div>
+    <div class="level level-2">
+      <div class="level-label">Level 2</div>
+      <div class="level level-3">
+        <div class="level-label">Level 3</div>
+        <div class="level level-4">
+          <div class="level-label">Level 4</div>
+
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" autocomplete="username" placeholder="user@example.com">
+
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" autocomplete="current-password" placeholder="Password">
+
+          <button id="login-btn">Log in</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <pre id="result"></pre>
+
+  <script>
+    document.getElementById('login-btn').addEventListener('click', function() {
+      const result = document.getElementById('result');
+      result.style.display = 'block';
+      result.textContent = 'Submitted:\n  username: ' + document.getElementById('username').value + '\n  password: ' + document.getElementById('password').value;
+    });
+  </script>
+</body>
+</html>

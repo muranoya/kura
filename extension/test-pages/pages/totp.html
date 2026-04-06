@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TOTP - Autofill Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.25rem; }
+    nav { margin-bottom: 24px; }
+    nav a { color: #2563eb; }
+    label { display: block; margin-bottom: 4px; font-weight: 500; }
+    input { display: block; width: 100%; padding: 8px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 1.5rem; text-align: center; letter-spacing: 0.5em; }
+    button { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    #result { margin-top: 24px; padding: 12px; background: #f3f4f6; border-radius: 4px; white-space: pre-wrap; display: none; }
+    .expected { margin: 24px 0; padding: 12px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.9rem; }
+    .expected summary { font-weight: 600; cursor: pointer; }
+    .expected ul { margin: 8px 0 0; padding-left: 20px; }
+    .expected li { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <nav><a href="/">&larr; Test Pages Index</a></nav>
+  <h1>TOTP Verification</h1>
+  <p>Should be detected as <code>TOTP</code>. Auto-fill should occur without dropdown.</p>
+
+  <details class="expected" open>
+    <summary>Expected Behavior</summary>
+    <ul>
+      <li>Form type: <code>TOTP</code></li>
+      <li>Focus field → TOTP entry for this domain があれば dropdown <strong>なし</strong> で自動入力</li>
+      <li>User selection not needed (no dropdown shown)</li>
+      <li>6-digit code should appear in the input</li>
+    </ul>
+  </details>
+
+  <form id="totp-form" method="POST" action="#">
+    <label for="totp">Enter 6-digit verification code</label>
+    <input type="text" id="totp" name="totp" autocomplete="one-time-code" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="000000">
+
+    <button type="submit">Verify</button>
+  </form>
+
+  <pre id="result"></pre>
+
+  <script>
+    document.getElementById('totp-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const code = document.getElementById('totp').value;
+      const result = document.getElementById('result');
+      result.style.display = 'block';
+      result.textContent = 'Submitted:\n  code: ' + code;
+    });
+  </script>
+</body>
+</html>

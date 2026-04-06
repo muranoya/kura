@@ -96,9 +96,7 @@ export interface PendingFlowResult {
   password: string
 }
 
-export async function queryPendingFlow(
-  url: string,
-): Promise<PendingFlowResult | null> {
+export async function queryPendingFlow(url: string): Promise<PendingFlowResult | null> {
   const response = await sendMessage({ type: 'AUTOFILL_PENDING_FLOW_QUERY', url })
   if (response.success && 'pendingFlow' in response && response.pendingFlow) {
     return response.pendingFlow as PendingFlowResult

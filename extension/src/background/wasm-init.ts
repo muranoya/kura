@@ -2,14 +2,15 @@
 // vite-plugin-wasm の top-level await を回避するため、
 // wasm_bridge_bg.js のバインディングを直接使用し、WASM を fetch で初期化する
 
+// @ts-expect-error WASM bindings have no declaration file
 import * as bg from '../../wasm/wasm_bridge_bg.js'
 
 // wasm_bridge_bg.js のインポートオブジェクトを構築
 function buildImports() {
-  const imports: Record<string, unknown> = {}
+  const imports: Record<string, WebAssembly.ImportValue> = {}
   for (const [key, value] of Object.entries(bg)) {
     if (key.startsWith('__wbg_') || key.startsWith('__wbindgen_')) {
-      imports[key] = value
+      imports[key] = value as WebAssembly.ImportValue
     }
   }
   return { './wasm_bridge_bg.js': imports }

@@ -101,7 +101,10 @@ async function handleInputFocus(input: HTMLInputElement) {
     if (totpResult) {
       const totpField = form.fields.find((f) => f.type === 'totp')
       if (totpField && isVisible(totpField.element)) {
-        console.log(LOG_PREFIX, `handleInputFocus: auto-filling TOTP code from ${totpResult.totpEntryName}`)
+        console.log(
+          LOG_PREFIX,
+          `handleInputFocus: auto-filling TOTP code from ${totpResult.totpEntryName}`,
+        )
         fillField(totpField.element, totpResult.totpCode)
       }
     } else {
@@ -134,9 +137,14 @@ async function handleInputFocus(input: HTMLInputElement) {
       return
     }
 
-    showDropdown(input, creditCards, (candidate) => {
-      onCandidateSelected(candidate, form)
-    }, window.location.protocol)
+    showDropdown(
+      input,
+      creditCards,
+      (candidate) => {
+        onCandidateSelected(candidate, form)
+      },
+      window.location.protocol,
+    )
     return
   }
 
@@ -161,9 +169,14 @@ async function handleInputFocus(input: HTMLInputElement) {
   }
 
   // Show dropdown anchored to the focused input
-  showDropdown(input, candidates, (candidate) => {
-    onCandidateSelected(candidate, form)
-  }, window.location.protocol)
+  showDropdown(
+    input,
+    candidates,
+    (candidate) => {
+      onCandidateSelected(candidate, form)
+    },
+    window.location.protocol,
+  )
 }
 
 async function onCandidateSelected(candidate: AutofillCredentialCandidate, form: DetectedForm) {

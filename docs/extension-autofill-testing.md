@@ -1,4 +1,4 @@
-<!-- doc-status: partial -->
+<!-- doc-status: implemented -->
 
 # ブラウザ拡張機能 オートフィル テスト戦略
 
@@ -56,17 +56,15 @@
 
 ## 3. 手動テスト環境
 
-> **未実装（将来対応予定）**
-
 ### 3.1 概要
 
-`extension/test-pages/` にテスト用HTMLページ群とローカルサーバを配置する。開発者がブラウザで開いて拡張機能の動作を目視確認する。
+テスト用HTMLページ群をローカルサーバで配信し、MinIO（S3互換サーバ）にテスト用vaultを配置する。拡張機能は通常のS3接続フローでMinIOに接続するため、拡張機能側に特殊なテスト用コードは一切不要。
 
-### 3.2 テストサーバ構成
+### 3.2 構成
 
 ```
 extension/test-pages/
-  server.ts              # 簡易HTTPSサーバ（Node.js）
+  server.ts              # テストページ配信用HTTPサーバ（Node.js）
   index.html             # テストページ一覧（インデックス）
   pages/
     login-standard.html       # 標準ログインフォーム
@@ -84,11 +82,107 @@ extension/test-pages/
     shadow-dom.html           # Web Component内のinput（Open Shadow DOM）
     hidden-fields.html        # visibility: hidden等の非表示フィールド混在
     http-warning.html         # HTTP経由アクセス用（警告バナー確認）
+
+vault-core/tests/generate_test_vault.rs       # テスト用フィクスチャ生成
+extension/test-pages/fixtures/vault.json      # 生成された暗号化済みvault
+extension/test-pages/fixtures/transfer-config.txt  # 設定転送用暗号化文字列
 ```
 
-起動コマンド: `pnpm test:manual` → ローカルサーバ起動
+### 3.3 テストデータ（vault.jsonフィクスチャ）
 
-### 3.3 各テストページの検証項目
+#### 生成方法
+
+vault-coreのAPIを使ったRust統合テストとしてフィクスチャ生成スクリプトを実装する。vault-coreから生成することで、暗号化フォーマットやスキーマの変更に自動的に追従できる。
+
+```bash
+# フィクスチャの生成（必要な時だけ実行）
+cargo test -p vault_core --test generate_test_vault -- --ignored
+```
+
+- `#[ignore]` 属性を付与し、通常の `cargo test` では実行されない
+- 出力先: `extension/test-pages/fixtures/vault.json`
+- マスターパスワード: `kura-test`（ドキュメントに明記）
+
+#### テストエントリの内容
+
+| エントリ名 | タイプ | URL | 用途 |
+|-----------|--------|-----|------|
+| Test Login 1 | login | `http://localhost:PORT/*` | 標準ログイン、候補複数表示の確認 |
+| Test Login 2 | login | `http://localhost:PORT/*` | 同上（複数候補） |
+| TOTP Login | login | `http://localhost:PORT/*` | TOTPカスタムフィールド付き |
+| Test Credit Card | credit_card | — | クレジットカードフォーム用 |
+| Other Site Login | login | `https://other-site.example.com` | マッチしないエントリ（表示されないことの確認） |
+
+#### メンテナンス方針
+
+- テストエントリの追加・変更は `generate_test_vault.rs` を編集して再生成する
+- 生成されたフィクスチャ `vault.json` はgitにコミットする（再生成環境がなくても手動テストを実行可能にするため）
+- vault-coreのAPI変更でフィクスチャ生成が壊れた場合、`generate_test_vault.rs` のコンパイルエラーとして検知できる
+
+### 3.4 S3互換ストレージ（MinIO）
+
+拡張機能は `@aws-sdk/client-s3` を使用しており、S3プロトコル（Sigv4署名、XMLレスポンス等）の完全な互換性が必要。自前のモックS3サーバは信頼性・メンテナンスの面でリスクが高いため、MinIOを使用する。
+
+既存の `docker-compose.test.yml` を再利用し、テスト用vaultのシード処理を追加する。
+
+```bash
+# MinIO起動 + テスト用vault配置
+docker compose -f docker-compose.test.yml up -d --wait minio
+docker compose -f docker-compose.test.yml run --rm createbuckets
+# vault.jsonフィクスチャをMinIOにアップロード
+docker compose -f docker-compose.test.yml run --rm seedvault
+```
+
+**拡張機能のS3設定**（初回のみ）:
+
+設定転送機能を使って一括設定する。`just test-manual-autofill` 実行時に表示される転送文字列を、拡張機能のオンボーディング画面「設定を転送」に貼り付け、マスターパスワード `kura-test` を入力する。
+
+転送文字列はフィクスチャ生成時に `extension/test-pages/fixtures/transfer-config.txt` にも保存される。
+
+設定内容:
+
+| 項目 | 値 |
+|------|-----|
+| Endpoint | `http://localhost:9000` |
+| Bucket | `kura-test` |
+| Key | `vault.json` |
+| Region | `ap-northeast-1` |
+| Access Key | `minioadmin` |
+| Secret Key | `minioadmin` |
+| マスターパスワード | `kura-test` |
+
+### 3.5 開発者ワークフロー
+
+```bash
+# 1. 全環境の起動（フィクスチャ生成 + MinIO + テストページサーバ）
+just test-manual-autofill
+
+# 2. ブラウザで拡張機能をロードし、S3設定を入力（初回のみ）
+#    マスターパスワード: kura-test
+
+# 3. テストページを開いて動作確認
+#    http://localhost:3333/
+
+# 4. 終了時
+just test-manual-autofill-stop
+```
+
+個別に実行する場合:
+
+```bash
+# フィクスチャの生成のみ（エントリ変更時）
+cargo test -p vault_core --test generate_test_vault -- --ignored
+
+# MinIO + テストデータの起動のみ
+docker compose -f docker-compose.test.yml up -d --wait minio
+docker compose -f docker-compose.test.yml run --rm createbuckets
+docker compose -f docker-compose.test.yml run --rm seedvault
+
+# テストページサーバの起動のみ
+cd extension && pnpm test:manual
+```
+
+### 3.6 各テストページの検証項目
 
 #### 標準ログインフォーム (`login-standard.html`)
 - `<form>` 内に `username` + `password` フィールド
@@ -163,9 +257,26 @@ extension/test-pages/
 - ドロップダウン上部に「このページは暗号化されていません」警告バナーが表示される
 - バナーがドロップダウンのレイアウトを崩さない
 
-### 3.4 機能追加時のテストページ追加ガイドライン
+### 3.7 手動テストチェックリスト
 
-- **新しいフォームタイプに対応** → 対応するテストページを `pages/` に追加、`index.html` のリストを更新
+機能追加・変更後に以下を確認する:
+
+- [ ] 全テストページでドロップダウンが正しく表示される
+- [ ] キーボードナビゲーション（↑↓、Enter、Escape、Tab）が動作する
+- [ ] 候補選択で正しいフィールドに値が入力される
+- [ ] Vault ロック状態でロックUIが表示される
+- [ ] ロックUI からポップアップを開ける
+- [ ] HTTPページで警告バナーが表示される
+- [ ] 分割ログインフローが動作する（ページ遷移をまたいで）
+- [ ] TOTPの自動入力が動作する（ドロップダウンなし）
+- [ ] クレジットカードの全フィールドが入力される
+- [ ] React controlled input で値がstateに反映される
+- [ ] 非表示フィールドが無視される
+- [ ] 複数フォームのページで正しいフォームのみ検出される
+
+### 3.8 機能追加時のテストページ追加ガイドライン
+
+- **新しいフォームタイプに対応** → 対応するテストページを `pages/` に追加、`index.html` のリストを更新、`generate_test_vault.rs` にテストエントリを追加
 - **新しいフレームワーク対応** → フレームワーク固有のテストページを追加（例: `login-vue.html`）
 - **エッジケースの修正** → 再現するテストページを追加（既存ページへの追記でも可）
 - **新しいUI要素** → 該当するテストページに検証項目を追加
