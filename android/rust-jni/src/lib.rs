@@ -492,6 +492,40 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_regenerateRecoveryKe
 }
 
 // ============================================================================
+// Transfer Config (VaultManager不要)
+// ============================================================================
+
+#[no_mangle]
+pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_encryptTransferConfig(
+    mut env: JNIEnv,
+    _class: JClass,
+    password: JString,
+    config_json: JString,
+) -> jstring {
+    let pw = get_string(&mut env, &password);
+    let cj = get_string(&mut env, &config_json);
+    match api_encrypt_transfer_config(pw, cj) {
+        Ok(result) => env.new_string(result).unwrap().into_raw(),
+        Err(e) => throw_err(&mut env, &e),
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_decryptTransferConfig(
+    mut env: JNIEnv,
+    _class: JClass,
+    password: JString,
+    transfer_string: JString,
+) -> jstring {
+    let pw = get_string(&mut env, &password);
+    let ts = get_string(&mut env, &transfer_string);
+    match api_decrypt_transfer_config(pw, ts) {
+        Ok(result) => env.new_string(result).unwrap().into_raw(),
+        Err(e) => throw_err(&mut env, &e),
+    }
+}
+
+// ============================================================================
 // Utility Functions
 // ============================================================================
 
@@ -500,15 +534,21 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_generatePassword(
     mut env: JNIEnv,
     _class: JClass,
     length: jint,
+    lowercase: jboolean,
     uppercase: jboolean,
     numbers: jboolean,
-    symbols: jboolean,
+    symbols1: jboolean,
+    symbols2: jboolean,
+    symbols3: jboolean,
 ) -> jstring {
     match api_generate_password(
         length,
+        lowercase != JNI_FALSE,
         uppercase != JNI_FALSE,
         numbers != JNI_FALSE,
-        symbols != JNI_FALSE,
+        symbols1 != JNI_FALSE,
+        symbols2 != JNI_FALSE,
+        symbols3 != JNI_FALSE,
     ) {
         Ok(pw) => env.new_string(pw).unwrap().into_raw(),
         Err(e) => throw_err(&mut env, &e),

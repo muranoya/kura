@@ -194,21 +194,38 @@ export async function decryptConfig(password: string, encryptedB64: string): Pro
   return invoke<string>('decrypt_config', { vaultId, password, encryptedB64 })
 }
 
+export async function encryptTransferConfig(password: string, configJson: string): Promise<string> {
+  return invoke<string>('encrypt_transfer_config', { password, configJson })
+}
+
+export async function decryptTransferConfig(
+  password: string,
+  transferString: string,
+): Promise<string> {
+  return invoke<string>('decrypt_transfer_config', { password, transferString })
+}
+
 // ============================================================================
 // Utils
 // ============================================================================
 
 export async function generatePassword(
   length = 16,
+  includeLowercase = true,
   includeUppercase = true,
   includeNumbers = true,
-  includeSymbols = true,
+  includeSymbols1 = true,
+  includeSymbols2 = true,
+  includeSymbols3 = true,
 ): Promise<string> {
   return invoke<string>('generate_password', {
     length,
+    includeLowercase,
     includeUppercase,
     includeNumbers,
-    includeSymbols,
+    includeSymbols1,
+    includeSymbols2,
+    includeSymbols3,
   })
 }
 

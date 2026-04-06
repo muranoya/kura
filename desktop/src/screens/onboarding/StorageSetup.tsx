@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { downloadVault } from '../../commands'
+import { decryptTransferConfig, downloadVault } from '../../commands'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
-import { Card, CardContent } from '../../components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { PasswordInput } from '../../components/ui/password-input'
@@ -18,6 +18,9 @@ export default function StorageSetup() {
   const [endpoint, setEndpoint] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [showTransfer, setShowTransfer] = useState(false)
+  const [transferString, setTransferString] = useState('')
+  const [transferPassword, setTransferPassword] = useState('')
 
   useEffect(() => {
     const pendingJson = sessionStorage.getItem('pendingS3Config')
@@ -71,16 +74,101 @@ export default function StorageSetup() {
     }
   }
 
+  const handleTransferImport = async () => {
+    if (!transferString.trim() || !transferPassword) return
+    setIsLoading(true)
+    setError('')
+    try {
+      const configJson = await decryptTransferConfig(transferPassword, transferString.trim())
+      const config = JSON.parse(configJson)
+      setRegion(config.region ?? '')
+      setBucket(config.bucket ?? '')
+      setKey(config.key ?? 'vault.json')
+      setAccessKeyId(config.accessKeyId ?? '')
+      setSecretAccessKey(config.secretAccessKey ?? '')
+      setEndpoint(config.endpoint ?? '')
+      setShowTransfer(false)
+      setTransferString('')
+      setTransferPassword('')
+    } catch (err) {
+      setError(
+        `転送コードの復号に失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+      )
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-bg-base">
       <PageHeader title="ストレージ設定" subtitle="S3互換のクラウドストレージを設定します" />
 
-      <div className="max-w-2xl mx-auto p-6">
+      <div className="max-w-2xl mx-auto p-6 space-y-6">
         {/* エラーメッセージ */}
         {error && (
-          <div className="mb-6 p-4 rounded-md bg-danger/10 border border-danger/20">
+          <div className="p-4 rounded-md bg-danger/10 border border-danger/20">
             <p className="text-sm text-danger">{error}</p>
           </div>
+        )}
+
+        {/* 転送インポート */}
+        {showTransfer ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>別の端末から設定を転送</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-text-muted">
+                設定済みの端末で生成した転送コードと転送パスワードを入力してください。
+              </p>
+              <div>
+                <Label htmlFor="transfer-string">転送コード</Label>
+                <textarea
+                  id="transfer-string"
+                  value={transferString}
+                  onChange={(e) => setTransferString(e.target.value)}
+                  placeholder="kura-config-v1$..."
+                  className="w-full min-h-[100px] mt-1.5 rounded-md border border-border bg-input-bg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary resize-y"
+                  disabled={isLoading}
+                />
+              </div>
+              <div>
+                <Label htmlFor="transfer-password">転送パスワード</Label>
+                <PasswordInput
+                  id="transfer-password"
+                  value={transferPassword}
+                  onChange={(e) => setTransferPassword(e.target.value)}
+                  disabled={isLoading}
+                  placeholder="転送コード生成時に設定したパスワード"
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setShowTransfer(false)
+                    setError('')
+                  }}
+                  disabled={isLoading}
+                  className="flex-1"
+                >
+                  キャンセル
+                </Button>
+                <Button
+                  onClick={handleTransferImport}
+                  disabled={isLoading || !transferString.trim() || !transferPassword}
+                  className="flex-1"
+                  isLoading={isLoading}
+                >
+                  設定を読み込む
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Button variant="secondary" onClick={() => setShowTransfer(true)} className="w-full">
+            別の端末から設定を転送
+          </Button>
         )}
 
         <Card>

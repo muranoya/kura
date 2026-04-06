@@ -54,3 +54,54 @@ export async function requestOpenPopup(): Promise<boolean> {
   const response = await sendMessage({ type: 'AUTOFILL_OPEN_POPUP' })
   return response.success
 }
+
+export async function requestTotp(
+  url: string,
+): Promise<{ totpCode: string; totpEntryName: string } | null> {
+  const response = await sendMessage({ type: 'AUTOFILL_GET_TOTP', url })
+  if (response.success && 'totpCode' in response && response.totpCode) {
+    return {
+      totpCode: response.totpCode as string,
+      totpEntryName: (response as Record<string, unknown>).totpEntryName as string,
+    }
+  }
+  return null
+}
+
+export async function requestCreditCards(): Promise<AutofillCredentialCandidate[]> {
+  const response = await sendMessage({ type: 'AUTOFILL_GET_CREDIT_CARDS' })
+  if (response.success && 'creditCards' in response) {
+    return (response.creditCards as AutofillCredentialCandidate[]) || []
+  }
+  return []
+}
+
+export async function storePendingFlow(
+  entryId: string,
+  username: string,
+  url: string,
+): Promise<boolean> {
+  const response = await sendMessage({
+    type: 'AUTOFILL_PENDING_FLOW_STORE',
+    entryId,
+    username,
+    url,
+  })
+  return response.success
+}
+
+export interface PendingFlowResult {
+  entryId: string
+  username: string
+  password: string
+}
+
+export async function queryPendingFlow(
+  url: string,
+): Promise<PendingFlowResult | null> {
+  const response = await sendMessage({ type: 'AUTOFILL_PENDING_FLOW_QUERY', url })
+  if (response.success && 'pendingFlow' in response && response.pendingFlow) {
+    return response.pendingFlow as PendingFlowResult
+  }
+  return null
+}

@@ -46,3 +46,4 @@ android/**/*.so
 android/app/build/
 android/app/src/main/res/mipmap-*/ic_launcher.png
 android/app/src/main/res/mipmap-*/ic_launcher_foreground.png
+android/app/src/main/assets/legal/

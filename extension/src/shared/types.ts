@@ -107,4 +107,8 @@ export interface AutofillCredentialCandidate {
 export interface AutofillFillData {
   username: string | null
   password: string | null
+  ccNumber?: string | null
+  ccExp?: string | null
+  ccCvc?: string | null
+  ccName?: string | null
 }

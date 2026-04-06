@@ -3,12 +3,14 @@ mod labels;
 mod security;
 mod session;
 mod sync;
+mod transfer;
 mod utils;
 
 #[cfg(any(feature = "desktop", feature = "android"))]
 mod import;
 
 pub use sync::parse_s3_config;
+pub use transfer::*;
 pub use utils::*;
 
 use crate::sync::engine::SessionState;

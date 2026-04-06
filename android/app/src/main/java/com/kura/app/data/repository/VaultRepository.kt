@@ -187,16 +187,31 @@ class VaultRepository(private val context: Context) {
     }
 
     // ========================================================================
+    // Transfer Config
+    // ========================================================================
+
+    suspend fun encryptTransferConfig(password: String, configJson: String): String = withContext(Dispatchers.IO) {
+        VaultBridge.encryptTransferConfig(password, configJson)
+    }
+
+    suspend fun decryptTransferConfig(password: String, transferString: String): String = withContext(Dispatchers.IO) {
+        VaultBridge.decryptTransferConfig(password, transferString)
+    }
+
+    // ========================================================================
     // Utilities
     // ========================================================================
 
     suspend fun generatePassword(
         length: Int = 16,
+        lowercase: Boolean = true,
         uppercase: Boolean = true,
         numbers: Boolean = true,
-        symbols: Boolean = true
+        symbols1: Boolean = true,
+        symbols2: Boolean = true,
+        symbols3: Boolean = true
     ): String = withContext(Dispatchers.IO) {
-        VaultBridge.generatePassword(length, uppercase, numbers, symbols)
+        VaultBridge.generatePassword(length, lowercase, uppercase, numbers, symbols1, symbols2, symbols3)
     }
 
     suspend fun generateTotp(secret: String, digits: Int = 6, period: Int = 30): String = withContext(Dispatchers.IO) {

@@ -168,16 +168,22 @@ export async function setEntryLabels(entryId: string, labelIds: string[]): Promi
 // Password & TOTP
 export async function generatePassword(
   length = 16,
+  includeLowercase = true,
   includeUppercase = true,
   includeNumbers = true,
-  includeSymbols = true,
+  includeSymbols1 = true,
+  includeSymbols2 = true,
+  includeSymbols3 = true,
 ): Promise<string> {
   const res = await sendMessage({
     type: 'GENERATE_PASSWORD',
     length,
+    includeLowercase,
     includeUppercase,
     includeNumbers,
-    includeSymbols,
+    includeSymbols1,
+    includeSymbols2,
+    includeSymbols3,
   })
   if (!res.success) throw new Error(field<'error', string>(res, 'error'))
   return field<'password', string>(res, 'password') ?? ''

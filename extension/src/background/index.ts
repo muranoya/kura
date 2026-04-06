@@ -11,7 +11,13 @@ import {
   saveToStorage,
 } from '../shared/storage'
 import type { S3Config } from '../shared/types'
-import { handleAutofillMessage, initAutofill, onVaultLocked, onVaultUnlocked } from './autofill'
+import {
+  cleanupPendingFlow,
+  handleAutofillMessage,
+  initAutofill,
+  onVaultLocked,
+  onVaultUnlocked,
+} from './autofill'
 import { initWasmManual } from './wasm-init'
 
 /** WASM API surface for Service Worker */
@@ -67,9 +73,12 @@ interface WasmApi {
   api_set_entry_labels(vaultId: string, entryId: string, labelIds: string[]): void
   api_generate_password(
     length: number,
+    includeLowercase: boolean,
     includeUppercase: boolean,
     includeNumbers: boolean,
-    includeSymbols: boolean,
+    includeSymbols1: boolean,
+    includeSymbols2: boolean,
+    includeSymbols3: boolean,
   ): string
   api_generate_totp_default(secret: string): string
   api_generate_totp_from_value(value: string): string
@@ -79,6 +88,8 @@ interface WasmApi {
   api_regenerate_recovery_key(vaultId: string, password: string): string
   api_encrypt_config(vaultId: string, password: string, plaintext: string): string
   api_decrypt_config(vaultId: string, password: string, encryptedB64: string): string
+  api_encrypt_transfer_config(password: string, configJson: string): string
+  api_decrypt_transfer_config(password: string, transferString: string): string
   [key: string]: unknown
 }
 
@@ -179,6 +190,11 @@ initAutofill(
   new Proxy({} as WasmApi, { get: (_target, prop) => (vault as Record<string | symbol, unknown>)[prop] }),
   () => unlocked,
 )
+
+// Clean up pending login flows when a tab is closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  cleanupPendingFlow(tabId)
+})
 
 // ========== ヘルパー関数 ==========
 
@@ -875,9 +891,12 @@ async function handleMessage(
         try {
           const password = vault.api_generate_password(
             message.length ?? 16,
+            message.includeLowercase ?? true,
             message.includeUppercase ?? true,
             message.includeNumbers ?? true,
-            message.includeSymbols ?? true,
+            message.includeSymbols1 ?? true,
+            message.includeSymbols2 ?? true,
+            message.includeSymbols3 ?? true,
           )
           sendResponse({ success: true, password })
         } catch (err) {
@@ -1092,6 +1111,32 @@ async function handleMessage(
             }
           }
           sendResponse({ success: true })
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      case 'DECRYPT_TRANSFER_CONFIG': {
+        try {
+          const configJson = vault.api_decrypt_transfer_config(
+            message.password,
+            message.transferString,
+          )
+          sendResponse({ success: true, configJson })
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      case 'ENCRYPT_TRANSFER_CONFIG': {
+        try {
+          const transferString = vault.api_encrypt_transfer_config(
+            message.password,
+            message.configJson,
+          )
+          sendResponse({ success: true, transferString })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }

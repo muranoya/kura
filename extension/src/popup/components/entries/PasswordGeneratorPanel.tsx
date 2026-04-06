@@ -1,4 +1,4 @@
-import { Check, Copy, RefreshCw } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Copy, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import * as commands from '../../commands'
 import { Input } from '../ui/input'
@@ -16,9 +16,13 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
 
   // 設定
   const [length, setLength] = useState(16)
+  const [includeLowercase, setIncludeLowercase] = useState(true)
   const [includeUppercase, setIncludeUppercase] = useState(true)
   const [includeNumbers, setIncludeNumbers] = useState(true)
-  const [includeSymbols, setIncludeSymbols] = useState(true)
+  const [includeSymbols1, setIncludeSymbols1] = useState(true)
+  const [includeSymbols2, setIncludeSymbols2] = useState(true)
+  const [includeSymbols3, setIncludeSymbols3] = useState(true)
+  const [showCharOptions, setShowCharOptions] = useState(false)
 
   // パスワード生成関数
   const handleGenerate = useCallback(async () => {
@@ -26,9 +30,12 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
     try {
       const generated = await commands.generatePassword(
         length,
+        includeLowercase,
         includeUppercase,
         includeNumbers,
-        includeSymbols,
+        includeSymbols1,
+        includeSymbols2,
+        includeSymbols3,
       )
       setPassword(generated)
       setCopied(false)
@@ -37,7 +44,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
     } finally {
       setLoading(false)
     }
-  }, [length, includeUppercase, includeNumbers, includeSymbols])
+  }, [length, includeLowercase, includeUppercase, includeNumbers, includeSymbols1, includeSymbols2, includeSymbols3])
 
   // 初期パスワード生成と設定変更時に自動生成
   useEffect(() => {
@@ -57,6 +64,106 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
   const wrapperClass = isInline
     ? 'border border-accent/30 rounded-md p-3 space-y-3 bg-bg-surface'
     : ''
+
+  const checkboxes = (prefix: string, checkboxSize: string) => (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <input
+          id={`lowercase-${prefix}`}
+          type="checkbox"
+          checked={includeLowercase}
+          onChange={(e) => setIncludeLowercase(e.target.checked)}
+          className={`${checkboxSize} rounded border-border`}
+        />
+        <label
+          htmlFor={`lowercase-${prefix}`}
+          className="text-sm text-text-primary cursor-pointer"
+        >
+          小文字 (a-z)
+        </label>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          id={`uppercase-${prefix}`}
+          type="checkbox"
+          checked={includeUppercase}
+          onChange={(e) => setIncludeUppercase(e.target.checked)}
+          className={`${checkboxSize} rounded border-border`}
+        />
+        <label
+          htmlFor={`uppercase-${prefix}`}
+          className="text-sm text-text-primary cursor-pointer"
+        >
+          大文字 (A-Z)
+        </label>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          id={`numbers-${prefix}`}
+          type="checkbox"
+          checked={includeNumbers}
+          onChange={(e) => setIncludeNumbers(e.target.checked)}
+          className={`${checkboxSize} rounded border-border`}
+        />
+        <label
+          htmlFor={`numbers-${prefix}`}
+          className="text-sm text-text-primary cursor-pointer"
+        >
+          数字 (0-9)
+        </label>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          id={`symbols1-${prefix}`}
+          type="checkbox"
+          checked={includeSymbols1}
+          onChange={(e) => setIncludeSymbols1(e.target.checked)}
+          className={`${checkboxSize} rounded border-border`}
+        />
+        <label
+          htmlFor={`symbols1-${prefix}`}
+          className="text-sm text-text-primary cursor-pointer"
+        >
+          {'記号 (!@#$%^&*-_.)'}
+        </label>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          id={`symbols2-${prefix}`}
+          type="checkbox"
+          checked={includeSymbols2}
+          onChange={(e) => setIncludeSymbols2(e.target.checked)}
+          className={`${checkboxSize} rounded border-border`}
+        />
+        <label
+          htmlFor={`symbols2-${prefix}`}
+          className="text-sm text-text-primary cursor-pointer"
+        >
+          {'記号 (()[]{}+=~/)'}
+        </label>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          id={`symbols3-${prefix}`}
+          type="checkbox"
+          checked={includeSymbols3}
+          onChange={(e) => setIncludeSymbols3(e.target.checked)}
+          className={`${checkboxSize} rounded border-border`}
+        />
+        <label
+          htmlFor={`symbols3-${prefix}`}
+          className="text-sm text-text-primary cursor-pointer"
+        >
+          {'記号 (`<>\'"\\|;,:)'}
+        </label>
+      </div>
+    </div>
+  )
 
   return (
     <div className={containerClass}>
@@ -109,11 +216,11 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           {/* 設定（コンパクト版） */}
           <div className="space-y-2">
             <div className="space-y-1">
-              <UILabel htmlFor={`length-${isInline ? 'inline' : 'screen'}`} className="text-sm">
+              <UILabel htmlFor="length-inline" className="text-sm">
                 長さ: {length}
               </UILabel>
               <Input
-                id={`length-${isInline ? 'inline' : 'screen'}`}
+                id="length-inline"
                 type="range"
                 min="1"
                 max="128"
@@ -128,54 +235,40 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
               </div>
             </div>
 
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <input
-                  id={`uppercase-${isInline ? 'inline' : 'screen'}`}
-                  type="checkbox"
-                  checked={includeUppercase}
-                  onChange={(e) => setIncludeUppercase(e.target.checked)}
-                  className="w-3 h-3 rounded border-border"
-                />
-                <label
-                  htmlFor={`uppercase-${isInline ? 'inline' : 'screen'}`}
-                  className="text-sm text-text-primary cursor-pointer"
-                >
-                  大文字 (A-Z)
-                </label>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  id={`numbers-${isInline ? 'inline' : 'screen'}`}
-                  type="checkbox"
-                  checked={includeNumbers}
-                  onChange={(e) => setIncludeNumbers(e.target.checked)}
-                  className="w-3 h-3 rounded border-border"
-                />
-                <label
-                  htmlFor={`numbers-${isInline ? 'inline' : 'screen'}`}
-                  className="text-sm text-text-primary cursor-pointer"
-                >
-                  数字 (0-9)
-                </label>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  id={`symbols-${isInline ? 'inline' : 'screen'}`}
-                  type="checkbox"
-                  checked={includeSymbols}
-                  onChange={(e) => setIncludeSymbols(e.target.checked)}
-                  className="w-3 h-3 rounded border-border"
-                />
-                <label
-                  htmlFor={`symbols-${isInline ? 'inline' : 'screen'}`}
-                  className="text-sm text-text-primary cursor-pointer"
-                >
-                  特殊文字 (!@#$%...)
-                </label>
-              </div>
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowCharOptions(!showCharOptions)}
+                className="flex items-center gap-1 text-xs text-text-secondary hover:text-text-primary transition-colors"
+              >
+                {showCharOptions ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                文字種の設定
+              </button>
+              {showCharOptions && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {([
+                    [includeLowercase, setIncludeLowercase, 'a-z'],
+                    [includeUppercase, setIncludeUppercase, 'A-Z'],
+                    [includeNumbers, setIncludeNumbers, '0-9'],
+                    [includeSymbols1, setIncludeSymbols1, '!@#$%^&*'],
+                    [includeSymbols2, setIncludeSymbols2, '()[]{}+='],
+                    [includeSymbols3, setIncludeSymbols3, '`<>\'"\\|'],
+                  ] as [boolean, React.Dispatch<React.SetStateAction<boolean>>, string][]).map(([checked, setter, label]) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => setter(!checked)}
+                      className={`px-2 py-0.5 rounded-full text-xs border transition-colors ${
+                        checked
+                          ? 'bg-accent text-white border-accent'
+                          : 'bg-transparent text-text-secondary border-border hover:border-text-muted'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -250,46 +343,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    id="uppercase"
-                    type="checkbox"
-                    checked={includeUppercase}
-                    onChange={(e) => setIncludeUppercase(e.target.checked)}
-                    className="w-4 h-4 rounded border-border"
-                  />
-                  <label htmlFor="uppercase" className="text-sm text-text-primary cursor-pointer">
-                    大文字 (A-Z)
-                  </label>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    id="numbers"
-                    type="checkbox"
-                    checked={includeNumbers}
-                    onChange={(e) => setIncludeNumbers(e.target.checked)}
-                    className="w-4 h-4 rounded border-border"
-                  />
-                  <label htmlFor="numbers" className="text-sm text-text-primary cursor-pointer">
-                    数字 (0-9)
-                  </label>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    id="symbols"
-                    type="checkbox"
-                    checked={includeSymbols}
-                    onChange={(e) => setIncludeSymbols(e.target.checked)}
-                    className="w-4 h-4 rounded border-border"
-                  />
-                  <label htmlFor="symbols" className="text-sm text-text-primary cursor-pointer">
-                    特殊文字 (!@#$%...)
-                  </label>
-                </div>
-              </div>
+              {checkboxes('screen', 'w-4 h-4')}
             </div>
           </section>
         </div>

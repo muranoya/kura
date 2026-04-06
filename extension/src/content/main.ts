@@ -5,7 +5,15 @@ import type { AutofillCredentialCandidate } from '../shared/types'
 import { hideDropdown, showDropdown, showLockedDropdown } from './dropdown'
 import { fillField, fillFields } from './filler'
 import { type DetectedForm, detectForm, isVisible } from './form-detector'
-import { getCredentials, requestFillData, requestOpenPopup } from './messaging'
+import {
+  getCredentials,
+  queryPendingFlow,
+  requestCreditCards,
+  requestFillData,
+  requestOpenPopup,
+  requestTotp,
+  storePendingFlow,
+} from './messaging'
 
 const LOG_PREFIX = '[kura:autofill:cs]'
 
@@ -85,8 +93,54 @@ async function handleInputFocus(input: HTMLInputElement) {
     `handleInputFocus: detected form type=${form.formType}, fields=${form.fields.map((f) => f.type).join(',')}`,
   )
 
-  // Request credential candidates from Service Worker
   const url = window.location.href
+
+  // === TOTP: auto-fill without dropdown ===
+  if (form.formType === 'TOTP') {
+    const totpResult = await requestTotp(url)
+    if (totpResult) {
+      const totpField = form.fields.find((f) => f.type === 'totp')
+      if (totpField && isVisible(totpField.element)) {
+        console.log(LOG_PREFIX, `handleInputFocus: auto-filling TOTP code from ${totpResult.totpEntryName}`)
+        fillField(totpField.element, totpResult.totpCode)
+      }
+    } else {
+      console.log(LOG_PREFIX, 'handleInputFocus: no TOTP entry found for this URL')
+    }
+    return
+  }
+
+  // === Split login: check for pending flow on LOGIN_PASSWORD ===
+  if (form.formType === 'LOGIN_PASSWORD') {
+    const pending = await queryPendingFlow(url)
+    if (pending?.password) {
+      const passwordField = form.fields.find((f) => f.type === 'password')
+      if (passwordField && isVisible(passwordField.element)) {
+        console.log(LOG_PREFIX, 'handleInputFocus: auto-filling password from pending login flow')
+        fillField(passwordField.element, pending.password)
+        return
+      }
+    }
+    // Fall through to normal dropdown flow
+  }
+
+  // === Credit card: fetch credit card entries instead of login entries ===
+  if (form.formType === 'CREDIT_CARD') {
+    const creditCards = await requestCreditCards()
+    console.log(LOG_PREFIX, `handleInputFocus: ${creditCards.length} credit card entries`)
+
+    if (creditCards.length === 0) {
+      hideDropdown()
+      return
+    }
+
+    showDropdown(input, creditCards, (candidate) => {
+      onCandidateSelected(candidate, form)
+    }, window.location.protocol)
+    return
+  }
+
+  // === Login, Registration, Password Change, Login_Username, Login_Password ===
   const result = await getCredentials(url)
 
   if (result.status === 'locked') {
@@ -109,7 +163,7 @@ async function handleInputFocus(input: HTMLInputElement) {
   // Show dropdown anchored to the focused input
   showDropdown(input, candidates, (candidate) => {
     onCandidateSelected(candidate, form)
-  })
+  }, window.location.protocol)
 }
 
 async function onCandidateSelected(candidate: AutofillCredentialCandidate, form: DetectedForm) {
@@ -132,7 +186,7 @@ async function onCandidateSelected(candidate: AutofillCredentialCandidate, form:
     `onCandidateSelected: formType=${form.formType}, usernameField=${!!usernameField}, passwordField=${!!passwordField}`,
   )
 
-  // For LOGIN_USERNAME forms, only fill username
+  // For LOGIN_USERNAME forms, only fill username and store pending flow
   if (
     form.formType === 'LOGIN_USERNAME' &&
     usernameField &&
@@ -140,6 +194,7 @@ async function onCandidateSelected(candidate: AutofillCredentialCandidate, form:
     isVisible(usernameField.element)
   ) {
     fillField(usernameField.element, fillData.username)
+    await storePendingFlow(candidate.entryId, fillData.username, window.location.href)
     return
   }
 
@@ -154,7 +209,46 @@ async function onCandidateSelected(candidate: AutofillCredentialCandidate, form:
     return
   }
 
-  // For LOGIN forms, fill both fields with delay between
+  // For PASSWORD_CHANGE forms, only fill the current password field (not new_password)
+  if (form.formType === 'PASSWORD_CHANGE') {
+    if (passwordField && fillData.password && isVisible(passwordField.element)) {
+      fillField(passwordField.element, fillData.password)
+    }
+    return
+  }
+
+  // For CREDIT_CARD forms, fill all credit card fields
+  if (form.formType === 'CREDIT_CARD') {
+    const ccFields: Array<{ element: HTMLInputElement; value: string }> = []
+
+    const ccNumber = form.fields.find((f) => f.type === 'cc_number')
+    if (ccNumber && fillData.ccNumber && isVisible(ccNumber.element)) {
+      ccFields.push({ element: ccNumber.element, value: fillData.ccNumber })
+    }
+
+    const ccExp = form.fields.find((f) => f.type === 'cc_exp')
+    if (ccExp && fillData.ccExp && isVisible(ccExp.element)) {
+      ccFields.push({ element: ccExp.element, value: fillData.ccExp })
+    }
+
+    const ccCvc = form.fields.find((f) => f.type === 'cc_cvc')
+    if (ccCvc && fillData.ccCvc && isVisible(ccCvc.element)) {
+      ccFields.push({ element: ccCvc.element, value: fillData.ccCvc })
+    }
+
+    const ccName = form.fields.find((f) => f.type === 'cc_name')
+    if (ccName && fillData.ccName && isVisible(ccName.element)) {
+      ccFields.push({ element: ccName.element, value: fillData.ccName })
+    }
+
+    if (ccFields.length > 0) {
+      console.log(LOG_PREFIX, `onCandidateSelected: filling ${ccFields.length} credit card fields`)
+      await fillFields(ccFields)
+    }
+    return
+  }
+
+  // For LOGIN / REGISTRATION forms, fill both fields with delay between
   const toFill: Array<{ element: HTMLInputElement; value: string }> = []
 
   if (usernameField && fillData.username && isVisible(usernameField.element)) {

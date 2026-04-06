@@ -95,3 +95,12 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
+
+tasks.register<Copy>("copyLegalAssets") {
+    from("${rootProject.projectDir}/../assets/legal")
+    into("${projectDir}/src/main/assets/legal")
+}
+
+tasks.named("preBuild") {
+    dependsOn("copyLegalAssets")
+}

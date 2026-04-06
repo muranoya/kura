@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.kura.app.viewmodel.AppViewModel
 import kotlinx.coroutines.launch
@@ -30,6 +31,9 @@ fun StorageSetupScreen(
     var endpoint by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+    var showTransfer by remember { mutableStateOf(false) }
+    var transferString by remember { mutableStateOf("") }
+    var transferPassword by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     Scaffold(
@@ -67,6 +71,90 @@ fun StorageSetupScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
+            }
+
+            // Transfer import section
+            if (showTransfer) {
+                Card {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            "別の端末から設定を転送",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Text(
+                            "設定済みの端末で生成した転送コードと転送パスワードを入力してください。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedTextField(
+                            value = transferString,
+                            onValueChange = { transferString = it },
+                            label = { Text("転送コード") },
+                            placeholder = { Text("kura-config-v1\$...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 3,
+                            maxLines = 5,
+                            enabled = !isLoading
+                        )
+                        OutlinedTextField(
+                            value = transferPassword,
+                            onValueChange = { transferPassword = it },
+                            label = { Text("転送パスワード") },
+                            placeholder = { Text("転送コード生成時に設定したパスワード") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            enabled = !isLoading
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedButton(
+                                onClick = { showTransfer = false; error = "" },
+                                modifier = Modifier.weight(1f),
+                                enabled = !isLoading
+                            ) { Text("キャンセル") }
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        isLoading = true
+                                        error = ""
+                                        try {
+                                            val configJson = appViewModel.repository.decryptTransferConfig(
+                                                transferPassword, transferString.trim()
+                                            )
+                                            val config = Json.parseToJsonElement(configJson).jsonObject
+                                            region = config["region"]?.jsonPrimitive?.content ?: ""
+                                            bucket = config["bucket"]?.jsonPrimitive?.content ?: ""
+                                            key = config["key"]?.jsonPrimitive?.content ?: "vault.json"
+                                            accessKeyId = config["accessKeyId"]?.jsonPrimitive?.content ?: ""
+                                            secretAccessKey = config["secretAccessKey"]?.jsonPrimitive?.content ?: ""
+                                            endpoint = config["endpoint"]?.jsonPrimitive?.content ?: ""
+                                            showTransfer = false
+                                            transferString = ""
+                                            transferPassword = ""
+                                        } catch (e: Exception) {
+                                            error = "転送コードの復号に失敗しました: ${e.message ?: e.toString()}"
+                                        } finally {
+                                            isLoading = false
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                enabled = !isLoading && transferString.isNotBlank() && transferPassword.isNotEmpty()
+                            ) {
+                                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                else Text("設定を読み込む")
+                            }
+                        }
+                    }
+                }
+            } else {
+                OutlinedButton(
+                    onClick = { showTransfer = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("別の端末から設定を転送") }
             }
 
             OutlinedTextField(

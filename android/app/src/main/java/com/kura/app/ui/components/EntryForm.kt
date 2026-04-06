@@ -39,7 +39,7 @@ fun EntryForm(
     labels: List<Label>,
     selectedLabelIds: Set<String>,
     onLabelToggle: (String) -> Unit,
-    onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean) -> String)? = null,
+    onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean) -> String)? = null,
     onCopyToClipboard: ((String) -> Unit)? = null,
     onCreateLabel: (suspend (String) -> Label)? = null,
     modifier: Modifier = Modifier
@@ -220,7 +220,8 @@ fun EntryForm(
         // Custom fields section
         CustomFieldsSection(
             customFields = customFields,
-            onCustomFieldsChange = onCustomFieldsChange
+            onCustomFieldsChange = onCustomFieldsChange,
+            onGeneratePassword = onGeneratePassword
         )
 
         // Notes section
@@ -328,7 +329,8 @@ fun EntryForm(
 @Composable
 private fun CustomFieldsSection(
     customFields: List<CustomField>,
-    onCustomFieldsChange: (List<CustomField>) -> Unit
+    onCustomFieldsChange: (List<CustomField>) -> Unit,
+    onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean) -> String)? = null
 ) {
     var showTypeSelector by remember { mutableStateOf(false) }
 
@@ -371,7 +373,8 @@ private fun CustomFieldsSection(
                         newList[index + 1] = temp
                         onCustomFieldsChange(newList)
                     }
-                } else null
+                } else null,
+                onGeneratePassword = onGeneratePassword
             )
         }
         if (customFields.isNotEmpty()) SectionDivider()
@@ -427,7 +430,7 @@ private fun CustomFieldsSection(
         } else {
             TextButton(
                 onClick = { showTypeSelector = true },
-                modifier = Modifier.padding(horizontal = 8.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(4.dp))
@@ -512,7 +515,7 @@ fun PasswordField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
-    onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean) -> String)? = null,
+    onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean) -> String)? = null,
     onCopy: ((String) -> Unit)? = null
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -575,10 +578,13 @@ fun CustomFieldEditor(
     canMoveUp: Boolean = false,
     canMoveDown: Boolean = false,
     onMoveUp: (() -> Unit)? = null,
-    onMoveDown: (() -> Unit)? = null
+    onMoveDown: (() -> Unit)? = null,
+    onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean) -> String)? = null
 ) {
     val isSecret = field.fieldType == "password" || field.fieldType == "totp"
     var isValueFocused by remember { mutableStateOf(false) }
+    var showGenerator by remember { mutableStateOf(false) }
+    val showGenerateButton = field.fieldType == "password" && onGeneratePassword != null
 
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         // Row 1: Field name + type badge (read-only) + delete
@@ -652,6 +658,13 @@ fun CustomFieldEditor(
             singleLine = true,
             placeholder = { Text(if (field.fieldType == "totp") "otpauth:// URI または Base32 シークレット" else "値") },
             visualTransformation = if (!isValueFocused && isSecret) PasswordVisualTransformation() else VisualTransformation.None,
+            trailingIcon = if (showGenerateButton) {
+                {
+                    IconButton(onClick = { showGenerator = !showGenerator }) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = "生成")
+                    }
+                }
+            } else null,
             colors = TextFieldDefaults.colors(
                 unfocusedContainerColor = Color.Transparent,
                 focusedContainerColor = Color.Transparent,
@@ -659,5 +672,23 @@ fun CustomFieldEditor(
                 focusedIndicatorColor = Color.Transparent
             )
         )
+
+        if (showGenerator && onGeneratePassword != null) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                PasswordGeneratorPanel(
+                    onGenerate = onGeneratePassword,
+                    onCopy = {},
+                    onUse = { generated ->
+                        onFieldChange(field.copy(value = generated))
+                        showGenerator = false
+                    },
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+        }
     }
 }

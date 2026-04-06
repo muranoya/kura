@@ -13,6 +13,17 @@ let isUnlocked: () => boolean = () => false
 export interface VaultApi {
   api_list_login_urls(vaultId: string): string
   api_get_entry(vaultId: string, id: string): string
+  api_list_entries(
+    vaultId: string,
+    searchQuery: string | null,
+    type: string | null,
+    labelId: string | null,
+    includeTrash: boolean,
+    onlyFavorites: boolean,
+    sortField: string | null,
+    sortOrder: string | null,
+  ): string
+  api_generate_totp_from_value(value: string): string
 }
 
 /** Initialize autofill module with references to vault state */
@@ -108,14 +119,140 @@ function getFillData(entryId: string): AutofillFillData | null {
     }
     if (!typedValue) return null
 
+    const tv = typedValue as Record<string, unknown>
+    const entryType = raw.entry_type as string | undefined
+
+    if (entryType === 'credit_card') {
+      return {
+        username: null,
+        password: null,
+        ccNumber: (tv.number as string) ?? null,
+        ccExp: (tv.expiry as string) ?? null,
+        ccCvc: (tv.cvv as string) ?? null,
+        ccName: (tv.cardholder as string) ?? null,
+      }
+    }
+
     return {
-      username: ((typedValue as Record<string, unknown>).username as string) ?? null,
-      password: ((typedValue as Record<string, unknown>).password as string) ?? null,
+      username: (tv.username as string) ?? null,
+      password: (tv.password as string) ?? null,
     }
   } catch (e) {
     console.error(LOG_PREFIX, 'getFillData: error:', e)
     return null
   }
+}
+
+// ========== TOTP matching ==========
+
+interface TotpResult {
+  totpCode: string
+  totpEntryName: string
+}
+
+function getTotpForUrl(url: string): TotpResult | null {
+  if (!vaultApi || !isUnlocked()) return null
+
+  const candidates = getCredentialsForUrl(url)
+  for (const candidate of candidates) {
+    try {
+      const result = vaultApi.api_get_entry(DEFAULT_VAULT_ID, candidate.entryId)
+      const raw = JSON.parse(result)
+      const customFields = raw.custom_fields as
+        | Array<{ field_type: string; value: string }>
+        | null
+      if (!customFields) continue
+
+      const totpField = customFields.find((f) => f.field_type === 'totp')
+      if (!totpField?.value) continue
+
+      const code = vaultApi.api_generate_totp_from_value(totpField.value)
+      return { totpCode: code, totpEntryName: candidate.name }
+    } catch (e) {
+      console.error(LOG_PREFIX, `getTotpForUrl: error for entry ${candidate.entryId}:`, e)
+    }
+  }
+  return null
+}
+
+// ========== Credit card matching ==========
+
+function getCreditCards(): AutofillCredentialCandidate[] {
+  if (!vaultApi || !isUnlocked()) return []
+
+  try {
+    const result = vaultApi.api_list_entries(
+      DEFAULT_VAULT_ID,
+      null,
+      'credit_card',
+      null,
+      false,
+      false,
+      null,
+      null,
+    )
+    const entries: Array<{ id: string; name: string; subtitle: string | null }> = JSON.parse(result)
+    return entries.map((e) => ({
+      entryId: e.id,
+      name: e.name,
+      username: e.subtitle,
+    }))
+  } catch (e) {
+    console.error(LOG_PREFIX, 'getCreditCards: error:', e)
+    return []
+  }
+}
+
+// ========== Pending login flow (split login) ==========
+
+interface PendingLoginFlow {
+  domain: string
+  entryId: string
+  username: string
+  timestamp: number
+}
+
+const pendingLoginFlows = new Map<number, PendingLoginFlow>()
+const PENDING_FLOW_TIMEOUT_MS = 5 * 60 * 1000
+
+function storePendingLoginFlow(
+  tabId: number,
+  domain: string,
+  entryId: string,
+  username: string,
+) {
+  pendingLoginFlows.set(tabId, { domain, entryId, username, timestamp: Date.now() })
+  console.log(LOG_PREFIX, `storePendingLoginFlow: tabId=${tabId}, domain=${domain}, entryId=${entryId}`)
+}
+
+function queryPendingLoginFlow(
+  tabId: number,
+  domain: string,
+): { entryId: string; username: string } | null {
+  const flow = pendingLoginFlows.get(tabId)
+  if (!flow) return null
+
+  if (Date.now() - flow.timestamp > PENDING_FLOW_TIMEOUT_MS) {
+    console.log(LOG_PREFIX, `queryPendingLoginFlow: flow expired for tabId=${tabId}`)
+    pendingLoginFlows.delete(tabId)
+    return null
+  }
+
+  if (flow.domain !== domain) {
+    console.log(
+      LOG_PREFIX,
+      `queryPendingLoginFlow: domain mismatch for tabId=${tabId}: flow=${flow.domain}, query=${domain}`,
+    )
+    return null
+  }
+
+  pendingLoginFlows.delete(tabId)
+  console.log(LOG_PREFIX, `queryPendingLoginFlow: consumed flow for tabId=${tabId}`)
+  return { entryId: flow.entryId, username: flow.username }
+}
+
+export function cleanupPendingFlow(tabId: number) {
+  pendingLoginFlows.delete(tabId)
 }
 
 // ========== Vault state notifications to content scripts ==========
@@ -196,6 +333,105 @@ export async function handleAutofillMessage(
       }
       console.log(LOG_PREFIX, `AUTOFILL_FILL_REQUEST: returning fill data for ${entryId}`)
       sendResponse({ success: true, fillData })
+      break
+    }
+
+    case 'AUTOFILL_GET_TOTP': {
+      if (!isUnlocked()) {
+        sendResponse({ success: false, error: 'Vault not unlocked' })
+        break
+      }
+      const totpUrl = message.url as string
+      if (!totpUrl) {
+        sendResponse({ success: false, error: 'URL required' })
+        break
+      }
+      const totpResult = getTotpForUrl(totpUrl)
+      if (totpResult) {
+        console.log(LOG_PREFIX, `AUTOFILL_GET_TOTP: found TOTP for ${totpUrl}`)
+        sendResponse({ success: true, ...totpResult })
+      } else {
+        console.log(LOG_PREFIX, `AUTOFILL_GET_TOTP: no TOTP found for ${totpUrl}`)
+        sendResponse({ success: true, totpCode: null })
+      }
+      break
+    }
+
+    case 'AUTOFILL_GET_CREDIT_CARDS': {
+      if (!isUnlocked()) {
+        sendResponse({ success: false, error: 'Vault not unlocked' })
+        break
+      }
+      const creditCards = getCreditCards()
+      console.log(LOG_PREFIX, `AUTOFILL_GET_CREDIT_CARDS: returning ${creditCards.length} cards`)
+      sendResponse({ success: true, creditCards })
+      break
+    }
+
+    case 'AUTOFILL_PENDING_FLOW_STORE': {
+      const storeTabId = _sender.tab?.id
+      if (!storeTabId) {
+        sendResponse({ success: false, error: 'No tab ID' })
+        break
+      }
+      const storeUrl = message.url as string
+      if (!storeUrl) {
+        sendResponse({ success: false, error: 'URL required' })
+        break
+      }
+      let storeDomain: string
+      try {
+        storeDomain = extractETldPlus1(new URL(storeUrl).hostname)
+      } catch {
+        sendResponse({ success: false, error: 'Invalid URL' })
+        break
+      }
+      storePendingLoginFlow(
+        storeTabId,
+        storeDomain,
+        message.entryId as string,
+        (message.username as string) || '',
+      )
+      sendResponse({ success: true })
+      break
+    }
+
+    case 'AUTOFILL_PENDING_FLOW_QUERY': {
+      const queryTabId = _sender.tab?.id
+      if (!queryTabId) {
+        sendResponse({ success: false, error: 'No tab ID' })
+        break
+      }
+      const queryUrl = message.url as string
+      if (!queryUrl) {
+        sendResponse({ success: false, error: 'URL required' })
+        break
+      }
+      if (!isUnlocked()) {
+        sendResponse({ success: true, pendingFlow: null })
+        break
+      }
+      let queryDomain: string
+      try {
+        queryDomain = extractETldPlus1(new URL(queryUrl).hostname)
+      } catch {
+        sendResponse({ success: true, pendingFlow: null })
+        break
+      }
+      const flow = queryPendingLoginFlow(queryTabId, queryDomain)
+      if (flow) {
+        const flowFillData = getFillData(flow.entryId)
+        sendResponse({
+          success: true,
+          pendingFlow: {
+            entryId: flow.entryId,
+            username: flow.username,
+            password: flowFillData?.password || '',
+          },
+        })
+      } else {
+        sendResponse({ success: true, pendingFlow: null })
+      }
       break
     }
 

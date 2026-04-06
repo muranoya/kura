@@ -15,6 +15,7 @@ let onSelectCallback: ((candidate: AutofillCredentialCandidate) => void) | null 
 let blurTimeout: ReturnType<typeof setTimeout> | null = null
 let lockedMode = false
 let onUnlockCallback: (() => void) | null = null
+let currentPageProtocol: string | null = null
 
 function ensureShadowHost(): ShadowRoot {
   if (shadowRoot) return shadowRoot
@@ -49,6 +50,16 @@ function positionDropdown(anchor: HTMLInputElement) {
 function renderItems() {
   if (!dropdownEl) return
   dropdownEl.innerHTML = ''
+
+  // HTTP warning banner
+  if (currentPageProtocol === 'http:') {
+    const warning = document.createElement('div')
+    warning.className = 'kura-dropdown-warning'
+    warning.innerHTML =
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
+      '<span>このページは暗号化されていません</span>'
+    dropdownEl.appendChild(warning)
+  }
 
   for (let i = 0; i < currentCandidates.length; i++) {
     const candidate = currentCandidates[i]
@@ -192,6 +203,7 @@ export function showDropdown(
   anchor: HTMLInputElement,
   candidates: AutofillCredentialCandidate[],
   onSelect: (candidate: AutofillCredentialCandidate) => void,
+  pageProtocol?: string,
 ) {
   if (candidates.length === 0) {
     hideDropdown()
@@ -203,6 +215,7 @@ export function showDropdown(
   currentCandidates = candidates.slice(0, MAX_VISIBLE)
   selectedIndex = -1
   onSelectCallback = onSelect
+  currentPageProtocol = pageProtocol || null
 
   // Remove existing dropdown
   if (dropdownEl) {
@@ -248,6 +261,7 @@ export function hideDropdown() {
   onSelectCallback = null
   lockedMode = false
   onUnlockCallback = null
+  currentPageProtocol = null
 }
 
 export function isDropdownVisible(): boolean {

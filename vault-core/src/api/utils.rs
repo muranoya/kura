@@ -6,9 +6,12 @@ use crate::totp::{
 /// パスワード生成
 pub fn api_generate_password(
     length: i32,
+    include_lowercase: bool,
     include_uppercase: bool,
     include_numbers: bool,
-    include_symbols: bool,
+    include_symbols1: bool,
+    include_symbols2: bool,
+    include_symbols3: bool,
 ) -> Result<String, String> {
     let length = length
         .try_into()
@@ -16,9 +19,12 @@ pub fn api_generate_password(
 
     let options = PasswordOptions {
         length,
+        include_lowercase,
         include_uppercase,
         include_numbers,
-        include_symbols,
+        include_symbols1,
+        include_symbols2,
+        include_symbols3,
     };
 
     generate_password(&options).map_err(|e| format!("Failed to generate password: {}", e))

@@ -166,12 +166,6 @@ export function detectForm(focusedInput: HTMLInputElement): DetectedForm | null 
   console.log(LOG_PREFIX, `detectForm: formType=${formType}`)
   if (!formType) return null
 
-  // MVP: only handle login-related forms
-  if (!['LOGIN', 'LOGIN_USERNAME', 'LOGIN_PASSWORD'].includes(formType)) {
-    console.log(LOG_PREFIX, `detectForm: formType ${formType} not supported in MVP`)
-    return null
-  }
-
   return {
     formType,
     fields: classifications,

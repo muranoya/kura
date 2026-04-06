@@ -328,6 +328,24 @@ pub fn api_decrypt_config(
     with_manager(&vault_id, |m| m.api_decrypt_config(password, encrypted_b64)).map_err(to_js_err)
 }
 
+/// S3設定を転送用に暗号化（VaultManager不要）
+#[wasm_bindgen]
+pub fn api_encrypt_transfer_config(
+    password: String,
+    config_json: String,
+) -> Result<String, JsValue> {
+    vault_core::api::api_encrypt_transfer_config(password, config_json).map_err(to_js_err)
+}
+
+/// 転送用暗号化文字列を復号（VaultManager不要）
+#[wasm_bindgen]
+pub fn api_decrypt_transfer_config(
+    password: String,
+    transfer_string: String,
+) -> Result<String, JsValue> {
+    vault_core::api::api_decrypt_transfer_config(password, transfer_string).map_err(to_js_err)
+}
+
 // ============================================================================
 // ユーティリティAPI
 // ============================================================================
@@ -335,15 +353,21 @@ pub fn api_decrypt_config(
 #[wasm_bindgen]
 pub fn api_generate_password(
     length: i32,
+    include_lowercase: bool,
     include_uppercase: bool,
     include_numbers: bool,
-    include_symbols: bool,
+    include_symbols1: bool,
+    include_symbols2: bool,
+    include_symbols3: bool,
 ) -> Result<String, JsValue> {
     vault_core::api::api_generate_password(
         length,
+        include_lowercase,
         include_uppercase,
         include_numbers,
-        include_symbols,
+        include_symbols1,
+        include_symbols2,
+        include_symbols3,
     )
     .map_err(to_js_err)
 }

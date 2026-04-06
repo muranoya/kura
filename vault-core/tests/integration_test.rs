@@ -233,9 +233,12 @@ fn test_entry_deletion_and_restoration() {
 fn test_password_generation() {
     let options = vault_core::PasswordOptions {
         length: 20,
+        include_lowercase: true,
         include_uppercase: true,
         include_numbers: true,
-        include_symbols: false,
+        include_symbols1: false,
+        include_symbols2: false,
+        include_symbols3: false,
     };
 
     let password = vault_core::generate_password(&options).expect("Failed to generate password");

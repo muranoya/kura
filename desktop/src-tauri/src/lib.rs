@@ -50,6 +50,8 @@ pub fn run() {
             commands::security::regenerate_recovery_key,
             commands::security::encrypt_config,
             commands::security::decrypt_config,
+            commands::security::encrypt_transfer_config,
+            commands::security::decrypt_transfer_config,
             // Utils
             commands::utils::generate_password,
             commands::utils::generate_totp,

@@ -139,8 +139,8 @@ fun EntryCreateScreen(
                     onLabelToggle = { id ->
                         selectedLabelIds = if (id in selectedLabelIds) selectedLabelIds - id else selectedLabelIds + id
                     },
-                    onGeneratePassword = { len, up, num, sym ->
-                        appViewModel.repository.generatePassword(len, up, num, sym)
+                    onGeneratePassword = { len, lower, upper, num, sym1, sym2, sym3 ->
+                        appViewModel.repository.generatePassword(len, lower, upper, num, sym1, sym2, sym3)
                     },
                     onCopyToClipboard = { text ->
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

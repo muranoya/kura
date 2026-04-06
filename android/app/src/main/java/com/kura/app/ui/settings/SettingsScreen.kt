@@ -41,6 +41,7 @@ fun SettingsScreen(
     var recoveryKeyValue by remember { mutableStateOf("") }
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showBiometricEnrollDialog by remember { mutableStateOf(false) }
+    var showTransferDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -173,6 +174,23 @@ fun SettingsScreen(
                         }
                     )
                 }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Transfer section
+            Text("端末間転送", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Card(onClick = { showTransferDialog = true }, modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    headlineContent = { Text("設定を別端末に転送") },
+                    supportingContent = { Text("S3設定を暗号化した転送コードを生成") },
+                    leadingContent = { Icon(Icons.Default.PhoneAndroid, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -343,6 +361,14 @@ fun SettingsScreen(
         )
     }
 
+    // Transfer config dialog
+    if (showTransferDialog) {
+        TransferConfigDialog(
+            appViewModel = appViewModel,
+            onDismiss = { showTransferDialog = false }
+        )
+    }
+
     // Logout dialog
     if (showLogoutDialog) {
         ConfirmDialog(
@@ -477,5 +503,98 @@ fun SinglePasswordDialog(
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("キャンセル") } }
+    )
+}
+
+@Composable
+fun TransferConfigDialog(
+    appViewModel: AppViewModel,
+    onDismiss: () -> Unit
+) {
+    var password by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    var transferString by remember { mutableStateOf("") }
+    var copied by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("設定を別端末に転送") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (transferString.isNotEmpty()) {
+                    Text(
+                        "転送コードが生成されました。別の端末のセットアップ時にこのコードと転送パスワードを入力してください。",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                        Text(
+                            transferString,
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("transfer_config", transferString))
+                            copied = true
+                            scope.launch { delay(2000); copied = false }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(if (copied) Icons.Default.Check else Icons.Default.ContentCopy, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (copied) "コピーしました" else "転送コードをコピー")
+                    }
+                } else {
+                    Text(
+                        "転送パスワードで暗号化した転送コードを生成します。受信側にこのパスワードを共有してください。",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    if (error.isNotEmpty()) {
+                        Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                    OutlinedTextField(
+                        value = password, onValueChange = { password = it; error = "" },
+                        label = { Text("転送パスワード") },
+                        placeholder = { Text("受信側に共有するパスワードを設定") },
+                        singleLine = true, visualTransformation = PasswordVisualTransformation()
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (transferString.isNotEmpty()) {
+                Button(onClick = onDismiss) { Text("閉じる") }
+            } else {
+                Button(
+                    onClick = {
+                        if (password.isBlank()) { error = "パスワードを入力してください"; return@Button }
+                        scope.launch {
+                            isLoading = true
+                            try {
+                                val configJson = appViewModel.preferences.s3ConfigFlow.first()
+                                    ?: throw IllegalStateException("S3設定が見つかりません")
+                                transferString = appViewModel.repository.encryptTransferConfig(password, configJson)
+                            } catch (e: Exception) {
+                                error = "転送コードの生成に失敗しました: ${e.message}"
+                            } finally { isLoading = false }
+                        }
+                    },
+                    enabled = !isLoading
+                ) {
+                    if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    else Text("生成")
+                }
+            }
+        },
+        dismissButton = {
+            if (transferString.isEmpty()) {
+                TextButton(onClick = onDismiss) { Text("キャンセル") }
+            }
+        }
     )
 }

@@ -68,12 +68,19 @@ object VaultBridge {
     external fun rotateDek(vaultId: String, password: String): String
     external fun regenerateRecoveryKey(vaultId: String, password: String): String
 
+    // Transfer config (no vaultId needed)
+    external fun encryptTransferConfig(password: String, configJson: String): String
+    external fun decryptTransferConfig(password: String, transferString: String): String
+
     // Utilities (no vaultId needed)
     external fun generatePassword(
         length: Int,
+        lowercase: Boolean,
         uppercase: Boolean,
         numbers: Boolean,
-        symbols: Boolean
+        symbols1: Boolean,
+        symbols2: Boolean,
+        symbols3: Boolean
     ): String
 
     external fun generateTotp(secret: String, digits: Int, period: Int): String

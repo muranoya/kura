@@ -2,7 +2,6 @@ package com.kura.app.ui.home
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -49,10 +48,7 @@ fun HomeScreen(
 
     // Search state
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    var searchActive by remember { mutableStateOf(false) }
-    var searchResults by remember { mutableStateOf<List<EntryRow>>(emptyList()) }
-    var searchSelectedType by rememberSaveable { mutableStateOf<String?>(null) }
-    var searchSelectedLabelId by rememberSaveable { mutableStateOf<String?>(null) }
+    var debouncedSearchQuery by remember { mutableStateOf("") }
 
     // Sort state
     var sortField by remember { mutableStateOf("created_at") }
@@ -82,6 +78,7 @@ fun HomeScreen(
         scope.launch {
             try {
                 allEntries = appViewModel.repository.listEntries(
+                    searchQuery = debouncedSearchQuery.ifBlank { null },
                     entryType = selectedType,
                     labelId = selectedLabelId,
                     onlyFavorites = showFavoritesOnly,
@@ -128,21 +125,14 @@ fun HomeScreen(
     }
 
     // Search debounce
-    LaunchedEffect(searchQuery, searchSelectedType, searchSelectedLabelId) {
+    LaunchedEffect(searchQuery) {
         delay(300)
-        if (searchQuery.isNotBlank() || searchSelectedType != null || searchSelectedLabelId != null) {
-            try {
-                searchResults = appViewModel.repository.listEntries(
-                    searchQuery = searchQuery.ifBlank { null },
-                    entryType = searchSelectedType,
-                    labelId = searchSelectedLabelId,
-                    sortField = sortField,
-                    sortOrder = sortOrder
-                )
-            } catch (_: Exception) { }
-        } else {
-            searchResults = emptyList()
-        }
+        debouncedSearchQuery = searchQuery
+    }
+
+    // Reload when search query changes (after debounce)
+    LaunchedEffect(debouncedSearchQuery) {
+        if (!loading) loadData()
     }
 
     val displayEntries = allEntries
@@ -264,116 +254,6 @@ fun HomeScreen(
                 }
             }
         },
-        bottomBar = {
-            SearchBar(
-                inputField = {
-                    SearchBarDefaults.InputField(
-                        query = searchQuery,
-                        onQueryChange = { searchQuery = it },
-                        onSearch = { },
-                        expanded = searchActive,
-                        onExpandedChange = { searchActive = it },
-                        placeholder = { Text("アイテムを検索...") },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { searchQuery = ""; searchSelectedType = null; searchSelectedLabelId = null }) {
-                                    Icon(Icons.Default.Close, contentDescription = "クリア")
-                                }
-                            }
-                        }
-                    )
-                },
-                expanded = searchActive,
-                onExpandedChange = { searchActive = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(if (!searchActive) Modifier.padding(start = 16.dp, end = 16.dp).navigationBarsPadding() else Modifier),
-                windowInsets = if (!searchActive) WindowInsets(0) else WindowInsets.statusBars,
-            ) {
-                // Search expanded content
-                Column {
-                    // Filter chips in search
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        item {
-                            FilterChip(
-                                selected = searchSelectedType == null,
-                                onClick = { searchSelectedType = null },
-                                label = { Text("全て") }
-                            )
-                        }
-                        items(EntryType.entries) { type ->
-                            FilterChip(
-                                selected = searchSelectedType == type.value,
-                                onClick = { searchSelectedType = if (searchSelectedType == type.value) null else type.value },
-                                label = { Text(type.displayName) }
-                            )
-                        }
-                    }
-
-                    // Label filter chips in search
-                    if (labels.isNotEmpty()) {
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            item {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.Label,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            items(labels, key = { it.id }) { label ->
-                                FilterChip(
-                                    selected = searchSelectedLabelId == label.id,
-                                    onClick = {
-                                        searchSelectedLabelId = if (searchSelectedLabelId == label.id) null else label.id
-                                    },
-                                    label = { Text(label.name) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                    )
-                                )
-                            }
-                        }
-                    }
-
-                    // Search results
-                    val results = if (searchQuery.isNotBlank() || searchSelectedType != null || searchSelectedLabelId != null) searchResults else allEntries
-                    LazyColumn(
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(results, key = { it.id }) { entry ->
-                            EntryCard(
-                                entry = entry,
-                                onClick = {
-                                    onEntryClick(entry.id)
-                                    searchActive = false
-                                }
-                            )
-                        }
-                        if (results.isEmpty()) {
-                            item {
-                                Box(
-                                    modifier = Modifier.fillMaxWidth().padding(32.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("アイテムが見つかりません", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
     ) { padding ->
         if (loading) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
@@ -385,7 +265,12 @@ fun HomeScreen(
                 onRefresh = {
                     isRefreshing = true
                     scope.launch {
-                        performSync()
+                        try {
+                            appViewModel.backgroundSync()
+                            val ts = appViewModel.repository.getLastSyncTime()
+                            if (ts > 0) lastSyncTime = ts
+                        } catch (_: Exception) { }
+                        loadData()
                         isRefreshing = false
                     }
                 },
@@ -394,6 +279,8 @@ fun HomeScreen(
                 Column(modifier = Modifier.fillMaxSize()) {
                     // Sticky header
                     StickyHeaderContent(
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { searchQuery = it },
                         selectedType = selectedType,
                         onTypeSelected = {
                             selectedType = it
@@ -410,7 +297,7 @@ fun HomeScreen(
                     // Entry list
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 80.dp)
+                        contentPadding = PaddingValues(bottom = 16.dp)
                     ) {
                         if (displayEntries.isEmpty()) {
                             item {
@@ -551,6 +438,8 @@ fun SortBottomSheet(
 
 @Composable
 private fun StickyHeaderContent(
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
     selectedType: String?,
     onTypeSelected: (String?) -> Unit,
     labels: List<Label>,
@@ -559,6 +448,32 @@ private fun StickyHeaderContent(
 ) {
     var labelDropdownExpanded by remember { mutableStateOf(false) }
     val selectedLabelName = labels.find { it.id == selectedLabelId }?.name
+
+    Column {
+        // Inline search field
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = onSearchQueryChange,
+            placeholder = { Text("アイテムを検索...") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { onSearchQueryChange("") }) {
+                        Icon(Icons.Default.Close, contentDescription = "クリア")
+                    }
+                }
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        )
 
     Row(
         modifier = Modifier
@@ -694,6 +609,7 @@ private fun StickyHeaderContent(
                 )
             }
         }
+    }
     }
 }
 

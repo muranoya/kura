@@ -77,6 +77,10 @@ export type Message =
   | { type: 'GET_SYNC_CONFLICTS' }
   | { type: 'RESOLVE_SYNC_CONFLICTS'; resolutions: Record<string, 'local' | 'remote'> }
 
+  // Transfer
+  | { type: 'DECRYPT_TRANSFER_CONFIG'; password: string; transferString: string }
+  | { type: 'ENCRYPT_TRANSFER_CONFIG'; password: string; configJson: string }
+
   // Settings
   | { type: 'GET_SETTINGS' }
   | { type: 'SAVE_SETTINGS'; settings: Record<string, unknown> }
@@ -85,6 +89,10 @@ export type Message =
   // Autofill (Content Script → Service Worker)
   | { type: 'AUTOFILL_GET_CREDENTIALS'; url: string }
   | { type: 'AUTOFILL_FILL_REQUEST'; entryId: string }
+  | { type: 'AUTOFILL_GET_TOTP'; url: string }
+  | { type: 'AUTOFILL_GET_CREDIT_CARDS' }
+  | { type: 'AUTOFILL_PENDING_FLOW_STORE'; entryId: string; username: string; url: string }
+  | { type: 'AUTOFILL_PENDING_FLOW_QUERY'; url: string }
 
 export type MessageResponse =
   // Common
@@ -131,6 +139,12 @@ export type MessageResponse =
       conflict?: boolean
     })
 
+  // Transfer responses
+  | ({ success: true } & {
+      configJson?: string
+      transferString?: string
+    })
+
   // Settings responses
   | ({ success: true } & {
       settings?: Record<string, unknown>
@@ -140,6 +154,10 @@ export type MessageResponse =
   | ({ success: true } & {
       credentials?: AutofillCredentialCandidate[]
       fillData?: AutofillFillData
+      totpCode?: string
+      totpEntryName?: string
+      creditCards?: AutofillCredentialCandidate[]
+      pendingFlow?: { entryId: string; username: string; password: string } | null
     })
 
 export function sendMessage<T extends Message>(

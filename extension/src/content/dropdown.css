@@ -109,3 +109,24 @@
   font-weight: 600;
   color: #4f46e5;
 }
+
+.kura-dropdown-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #fef3c7;
+  border-bottom: 1px solid #fbbf24;
+  color: #92400e;
+  font-size: 12px;
+  line-height: 1.4;
+  border-radius: 8px 8px 0 0;
+}
+
+.kura-dropdown-warning svg {
+  flex-shrink: 0;
+}
+
+.kura-dropdown-warning + .kura-dropdown-item:first-of-type {
+  border-radius: 0;
+}

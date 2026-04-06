@@ -69,3 +69,27 @@ pub async fn decrypt_config(
         .await
         .map_err(|e| format!("Task error: {}", e))?
 }
+
+#[tauri::command]
+pub async fn encrypt_transfer_config(
+    password: String,
+    config_json: String,
+) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || {
+        vault_core::api::api_encrypt_transfer_config(password, config_json)
+    })
+    .await
+    .map_err(|e| format!("Task error: {}", e))?
+}
+
+#[tauri::command]
+pub async fn decrypt_transfer_config(
+    password: String,
+    transfer_string: String,
+) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || {
+        vault_core::api::api_decrypt_transfer_config(password, transfer_string)
+    })
+    .await
+    .map_err(|e| format!("Task error: {}", e))?
+}
