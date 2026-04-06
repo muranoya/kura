@@ -22,34 +22,51 @@ const SKIP_SELECTORS = ['input[type="search"]', 'input[role="searchbox"]']
 
 const SKIP_ATTR_PATTERNS = [/search/i, /query/i, /keyword/i]
 
-function shouldSkip(input: HTMLInputElement): boolean {
-  for (const sel of SKIP_SELECTORS) {
-    if (input.matches(sel)) return true
-  }
-  const ariaLabel = input.getAttribute('aria-label') || ''
-  const name = input.name || ''
+const SKIP_INPUT_TYPES = new Set([
+  'hidden',
+  'submit',
+  'button',
+  'reset',
+  'image',
+  'file',
+  'checkbox',
+  'radio',
+  'range',
+  'color',
+])
+
+export interface SkipCheckInput {
+  type: string
+  name: string
+  ariaLabel: string
+  matchesSearchSelector: boolean
+}
+
+export function shouldSkipField(input: SkipCheckInput): boolean {
+  if (input.matchesSearchSelector) return true
   for (const pattern of SKIP_ATTR_PATTERNS) {
-    if (pattern.test(ariaLabel) || pattern.test(name)) return true
+    if (pattern.test(input.ariaLabel) || pattern.test(input.name)) return true
   }
-  // Skip hidden/non-interactive types
-  const type = input.type.toLowerCase()
-  if (
-    [
-      'hidden',
-      'submit',
-      'button',
-      'reset',
-      'image',
-      'file',
-      'checkbox',
-      'radio',
-      'range',
-      'color',
-    ].includes(type)
-  ) {
+  if (SKIP_INPUT_TYPES.has(input.type.toLowerCase())) {
     return true
   }
   return false
+}
+
+function shouldSkip(input: HTMLInputElement): boolean {
+  let matchesSearchSelector = false
+  for (const sel of SKIP_SELECTORS) {
+    if (input.matches(sel)) {
+      matchesSearchSelector = true
+      break
+    }
+  }
+  return shouldSkipField({
+    type: input.type,
+    name: input.name || '',
+    ariaLabel: input.getAttribute('aria-label') || '',
+    matchesSearchSelector,
+  })
 }
 
 // ========== Signal definitions ==========
@@ -153,38 +170,42 @@ function getTextSignals(input: HTMLInputElement): string {
 
 // ========== Scoring ==========
 
-function scoreField(input: HTMLInputElement): Map<FieldType, number> {
+export interface FieldSignals {
+  autocomplete: string
+  inputType: string
+  nameId: string
+  textSignals: string
+  labelText: string
+  urlPath: string
+}
+
+export function computeScores(signals: FieldSignals): Map<FieldType, number> {
   const scores = new Map<FieldType, number>()
-  const autocomplete = getAutocompleteValue(input)
-  const inputType = input.type.toLowerCase()
-  const nameId = `${input.name} ${input.id}`.toLowerCase()
-  const textSignals = getTextSignals(input)
-  const labelText = getAssociatedLabelText(input)
 
   for (const [fieldType, def] of Object.entries(SIGNAL_DEFS) as [FieldType, SignalDef][]) {
     let score = 0
 
     // 1. autocomplete attribute (weight: 10)
-    if (autocomplete && def.autocomplete.includes(autocomplete)) {
+    if (signals.autocomplete && def.autocomplete.includes(signals.autocomplete)) {
       score += WEIGHT_AUTOCOMPLETE
     }
 
     // 2. type attribute (weight: 8)
-    if (def.typeHints.includes(inputType)) {
+    if (def.typeHints.includes(signals.inputType)) {
       // For password type, distinguish between password and new_password
-      if (inputType === 'password' && fieldType === 'password') {
+      if (signals.inputType === 'password' && fieldType === 'password') {
         score += WEIGHT_TYPE
-      } else if (inputType === 'password' && fieldType === 'new_password') {
+      } else if (signals.inputType === 'password' && fieldType === 'new_password') {
         // new_password gets lower type score — it needs additional signals to win
         score += WEIGHT_TYPE - 2
-      } else if (inputType !== 'password') {
+      } else if (signals.inputType !== 'password') {
         score += WEIGHT_TYPE
       }
     }
 
     // 3. name/id patterns (weight: 6)
     for (const pattern of def.nameIdPatterns) {
-      if (pattern.test(nameId)) {
+      if (pattern.test(signals.nameId)) {
         score += WEIGHT_NAME_ID
         break
       }
@@ -192,16 +213,16 @@ function scoreField(input: HTMLInputElement): Map<FieldType, number> {
 
     // 4. aria-label / placeholder / title (weight: 4)
     for (const pattern of def.labelPatterns) {
-      if (pattern.test(textSignals)) {
+      if (pattern.test(signals.textSignals)) {
         score += WEIGHT_ARIA_LABEL_PLACEHOLDER
         break
       }
     }
 
     // 5. Associated <label> text (weight: 4)
-    if (labelText) {
+    if (signals.labelText) {
       for (const pattern of def.labelPatterns) {
-        if (pattern.test(labelText)) {
+        if (pattern.test(signals.labelText)) {
           score += WEIGHT_LABEL
           break
         }
@@ -214,16 +235,26 @@ function scoreField(input: HTMLInputElement): Map<FieldType, number> {
   }
 
   // 6. URL context (weight: 2) — tiebreaker only
-  const path = window.location.pathname.toLowerCase()
-  if (/\/(login|signin|auth)/.test(path)) {
+  if (/\/(login|signin|auth)/.test(signals.urlPath)) {
     addScore(scores, 'username', WEIGHT_URL)
     addScore(scores, 'password', WEIGHT_URL)
-  } else if (/\/(register|signup)/.test(path)) {
+  } else if (/\/(register|signup)/.test(signals.urlPath)) {
     addScore(scores, 'username', WEIGHT_URL)
     addScore(scores, 'new_password', WEIGHT_URL)
   }
 
   return scores
+}
+
+function scoreField(input: HTMLInputElement): Map<FieldType, number> {
+  return computeScores({
+    autocomplete: getAutocompleteValue(input),
+    inputType: input.type.toLowerCase(),
+    nameId: `${input.name} ${input.id}`.toLowerCase(),
+    textSignals: getTextSignals(input),
+    labelText: getAssociatedLabelText(input),
+    urlPath: window.location.pathname.toLowerCase(),
+  })
 }
 
 function addScore(scores: Map<FieldType, number>, type: FieldType, amount: number) {

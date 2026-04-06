@@ -272,10 +272,12 @@ default: help
 	cargo test --manifest-path {{VAULT_CORE_DIR}}/Cargo.toml
 	echo "✅ vault-core tests passed!"
 
-# extension のテスト（wasm-bridge）
+# extension のテスト（wasm-bridge + TypeScript）
 @test-extension:
 	echo "🧪 Testing extension (wasm-bridge)..."
 	cargo test --manifest-path {{EXTENSION_DIR}}/wasm-bridge/Cargo.toml
+	echo "🧪 Testing extension (TypeScript)..."
+	cd {{EXTENSION_DIR}} && pnpm install --silent && pnpm test
 	echo "✅ extension tests passed!"
 
 # Android のテスト

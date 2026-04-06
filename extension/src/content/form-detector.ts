@@ -66,7 +66,7 @@ function collectInputs(container: HTMLElement): HTMLInputElement[] {
 
 // ========== Form type classification (Section 3.2) ==========
 
-function classifyFormType(fields: FieldClassification[]): FormType | null {
+export function classifyFormType(fields: FieldClassification[]): FormType | null {
   const hasType = (t: FieldType) => fields.some((f) => f.type === t)
   const countType = (t: FieldType) => fields.filter((f) => f.type === t).length
 
