@@ -68,6 +68,9 @@ export type Message =
   | { type: 'GENERATE_TOTP'; secret: string }
   | { type: 'GENERATE_TOTP_FROM_VALUE'; value: string }
 
+  // Version
+  | { type: 'GET_VERSION' }
+
   // Security
   | { type: 'CHANGE_MASTER_PASSWORD'; oldPassword: string; newPassword: string }
   | { type: 'ROTATE_DEK'; password: string }
@@ -96,6 +99,16 @@ export type Message =
   | { type: 'AUTOFILL_GET_CREDIT_CARDS' }
   | { type: 'AUTOFILL_PENDING_FLOW_STORE'; entryId: string; username: string; url: string }
   | { type: 'AUTOFILL_PENDING_FLOW_QUERY'; url: string }
+
+  // Autofill: Credential Capture
+  | { type: 'AUTOFILL_START_CAPTURE' }
+  | {
+      type: 'AUTOFILL_SAVE_CAPTURED'
+      url: string
+      name: string | null
+      username: string | null
+      password: string
+    }
 
 export type MessageResponse =
   // Common

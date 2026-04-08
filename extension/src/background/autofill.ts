@@ -24,13 +24,32 @@ export interface VaultApi {
     sortOrder: string | null,
   ): string
   api_generate_totp_from_value(value: string): string
+  api_create_entry(
+    vaultId: string,
+    entryType: string,
+    name: string,
+    notes: string | null,
+    typedValue: string,
+    labelIds: string[],
+    customFields: string | null,
+  ): string
 }
 
+let saveLocallyFn: (() => Promise<void>) | null = null
+let autoSyncFn: (() => Promise<void>) | null = null
+
 /** Initialize autofill module with references to vault state */
-export function initAutofill(api: VaultApi, unlockedFn: () => boolean) {
+export function initAutofill(
+  api: VaultApi,
+  unlockedFn: () => boolean,
+  saveLocally: () => Promise<void>,
+  autoSync: () => Promise<void>,
+) {
   console.log(LOG_PREFIX, 'Initializing autofill module')
   vaultApi = api
   isUnlocked = unlockedFn
+  saveLocallyFn = saveLocally
+  autoSyncFn = autoSync
 }
 
 // ========== Credential matching ==========
@@ -430,6 +449,80 @@ export async function handleAutofillMessage(
         })
       } else {
         sendResponse({ success: true, pendingFlow: null })
+      }
+      break
+    }
+
+    case 'AUTOFILL_START_CAPTURE': {
+      // Forward to active tab's content script
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const activeTab = tabs[0]
+        if (activeTab?.id) {
+          chrome.tabs
+            .sendMessage(activeTab.id, { type: 'AUTOFILL_START_CAPTURE' })
+            .then(() => sendResponse({ success: true }))
+            .catch((e) => {
+              console.warn(LOG_PREFIX, 'AUTOFILL_START_CAPTURE: failed to forward:', e)
+              sendResponse({ success: false, error: String(e) })
+            })
+        } else {
+          sendResponse({ success: false, error: 'No active tab' })
+        }
+      })
+      return true // Keep message channel open for async response
+    }
+
+    case 'AUTOFILL_SAVE_CAPTURED': {
+      if (!isUnlocked() || !vaultApi || !saveLocallyFn || !autoSyncFn) {
+        sendResponse({ success: false, error: 'Vault not unlocked' })
+        break
+      }
+      const syncFn = autoSyncFn
+      const captureUrl = message.url as string
+      const captureName = (message.name as string | null) ?? null
+      const captureUsername = (message.username as string | null) ?? null
+      const capturePassword = message.password as string
+      if (!captureUrl || !capturePassword) {
+        sendResponse({ success: false, error: 'URL and password required' })
+        break
+      }
+      try {
+        let entryName: string
+        if (captureName?.trim()) {
+          entryName = captureName.trim()
+        } else {
+          try {
+            entryName = new URL(captureUrl).hostname
+          } catch {
+            entryName = captureUrl
+          }
+        }
+
+        const typedValue = JSON.stringify({
+          url: captureUrl,
+          username: captureUsername,
+          password: capturePassword,
+          totp: null,
+        })
+        const entryId = vaultApi.api_create_entry(
+          DEFAULT_VAULT_ID,
+          'login',
+          entryName,
+          null,
+          typedValue,
+          [],
+          null,
+        )
+        saveLocallyFn()
+          .then(() => {
+            syncFn().catch((e) => console.error(LOG_PREFIX, 'Sync failed:', e))
+          })
+          .catch((e) => console.error(LOG_PREFIX, 'Save failed:', e))
+        console.log(LOG_PREFIX, `AUTOFILL_SAVE_CAPTURED: created entry ${entryId} for ${entryName}`)
+        sendResponse({ success: true, entryId })
+      } catch (e) {
+        console.error(LOG_PREFIX, 'AUTOFILL_SAVE_CAPTURED: error:', e)
+        sendResponse({ success: false, error: String(e) })
       }
       break
     }

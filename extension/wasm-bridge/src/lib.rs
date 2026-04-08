@@ -391,3 +391,8 @@ pub fn api_generate_totp_from_value(value: String) -> Result<String, JsValue> {
 pub fn api_parse_totp_period(value: String) -> u32 {
     vault_core::api::api_parse_totp_period(value) as u32
 }
+
+#[wasm_bindgen]
+pub fn api_get_version() -> String {
+    vault_core::api::api_get_version()
+}

@@ -42,6 +42,7 @@ const AUTOLOCK_OPTIONS = [
 
 export default function Settings() {
   const pushError = usePushError()
+  const [version, setVersion] = useState('...')
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
   const [storageConfig, setStorageConfig] = useState<Record<string, string> | null>(null)
   const [storageLoading, setStorageLoading] = useState(true)
@@ -73,6 +74,7 @@ export default function Settings() {
     }
     loadStorageConfig()
     loadSettings()
+    commands.getVersion().then((v) => setVersion(`v${v}`))
   }, [])
 
   const saveSettings = async (updates: Partial<AppSettings>) => {
@@ -425,7 +427,7 @@ export default function Settings() {
           <CardContent className="px-3 pb-3 pt-2 space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm text-text-muted">バージョン</p>
-              <p className="text-sm text-text-primary">v0.1.0</p>
+              <p className="text-sm text-text-primary">{version}</p>
             </div>
             <div className="flex items-center justify-between">
               <p className="text-sm text-text-muted">リポジトリ</p>

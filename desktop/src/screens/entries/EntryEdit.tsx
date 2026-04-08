@@ -52,17 +52,14 @@ export default function EntryEdit() {
     setSaving(true)
     try {
       const typedValueJson = JSON.stringify(typedValue)
-      const customFieldsJson =
-        customFields.length > 0
-          ? JSON.stringify(
-              customFields.map((f) => ({
-                id: f.id,
-                name: f.name,
-                field_type: f.fieldType,
-                value: f.value,
-              })),
-            )
-          : undefined
+      const customFieldsJson = JSON.stringify(
+        customFields.map((f) => ({
+          id: f.id,
+          name: f.name,
+          field_type: f.fieldType,
+          value: f.value,
+        })),
+      )
       await commands.updateEntry(
         id as string,
         name,

@@ -96,8 +96,8 @@ const SIGNAL_DEFS: Record<FieldType, SignalDef> = {
   new_password: {
     autocomplete: ['new-password'],
     typeHints: ['password'],
-    nameIdPatterns: [/^(new.?pass|confirm.?pass|retype)/i],
-    labelPatterns: [/\b(new\s*password|confirm\s*password|新しいパスワード|パスワード.?確認)\b/i],
+    nameIdPatterns: [/^(new.?pass|confirm.?pass)/i],
+    labelPatterns: [/\b(new\s*password|confirm\s*password|新しいパスワード|パスワード確認)\b/i],
   },
   totp: {
     autocomplete: ['one-time-code'],
@@ -149,9 +149,11 @@ function getAutocompleteValue(input: HTMLInputElement): string {
 }
 
 function getAssociatedLabelText(input: HTMLInputElement): string {
+  // Use getRootNode() to search within shadow roots as well as the main document
+  const rootNode = input.getRootNode() as Document | ShadowRoot
   // Try <label for="...">
   if (input.id) {
-    const label = document.querySelector(`label[for="${CSS.escape(input.id)}"]`)
+    const label = rootNode.querySelector(`label[for="${CSS.escape(input.id)}"]`)
     if (label) return label.textContent || ''
   }
   // Try parent <label>
@@ -192,15 +194,7 @@ export function computeScores(signals: FieldSignals): Map<FieldType, number> {
 
     // 2. type attribute (weight: 8)
     if (def.typeHints.includes(signals.inputType)) {
-      // For password type, distinguish between password and new_password
-      if (signals.inputType === 'password' && fieldType === 'password') {
-        score += WEIGHT_TYPE
-      } else if (signals.inputType === 'password' && fieldType === 'new_password') {
-        // new_password gets lower type score — it needs additional signals to win
-        score += WEIGHT_TYPE - 2
-      } else if (signals.inputType !== 'password') {
-        score += WEIGHT_TYPE
-      }
+      score += WEIGHT_TYPE
     }
 
     // 3. name/id patterns (weight: 6)
@@ -235,12 +229,9 @@ export function computeScores(signals: FieldSignals): Map<FieldType, number> {
   }
 
   // 6. URL context (weight: 2) — tiebreaker only
-  if (/\/(login|signin|auth)/.test(signals.urlPath)) {
+  if (/\/(login|signin|auth|register|signup)/.test(signals.urlPath)) {
     addScore(scores, 'username', WEIGHT_URL)
     addScore(scores, 'password', WEIGHT_URL)
-  } else if (/\/(register|signup)/.test(signals.urlPath)) {
-    addScore(scores, 'username', WEIGHT_URL)
-    addScore(scores, 'new_password', WEIGHT_URL)
   }
 
   return scores

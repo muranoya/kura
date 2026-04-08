@@ -75,7 +75,8 @@ fun TrashScreen(
                             scope.launch {
                                 try {
                                     appViewModel.repository.restoreEntry(entry.id)
-                                    appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
+                                    appViewModel.repository.saveLocally()
+                                    scope.launch { try { appViewModel.repository.syncInBackground(appViewModel.preferences.s3ConfigFlow.first()) } catch (_: Exception) { } }
                                     loadEntries()
                                 } catch (_: Exception) { }
                             }
@@ -97,7 +98,8 @@ fun TrashScreen(
                 scope.launch {
                     try {
                         appViewModel.repository.purgeEntry(targetId)
-                        appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
+                        appViewModel.repository.saveLocally()
+                        scope.launch { try { appViewModel.repository.syncInBackground(appViewModel.preferences.s3ConfigFlow.first()) } catch (_: Exception) { } }
                         loadEntries()
                     } catch (_: Exception) { }
                     purgeTargetId = null

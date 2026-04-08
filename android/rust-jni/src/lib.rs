@@ -607,6 +607,19 @@ pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_parseTotpPeriod(
 }
 
 // ============================================================================
+// Version
+// ============================================================================
+
+#[no_mangle]
+pub extern "system" fn Java_com_kura_app_bridge_VaultBridge_getVersion(
+    mut env: JNIEnv,
+    _class: JClass,
+) -> jstring {
+    let version = api_get_version();
+    env.new_string(version).unwrap().into_raw()
+}
+
+// ============================================================================
 // Sync Operations
 // ============================================================================
 

@@ -84,27 +84,6 @@ AndroidManifest.xml
 - メインアプリでアンロック済みなら、AutofillServiceでも即座にvaultにアクセスできる
 - IPC不要、vault二重ロードなし
 
-### Manifest登録
-
-```xml
-<service
-    android:name=".autofill.KuraAutofillService"
-    android:exported="true"
-    android:permission="android.permission.BIND_AUTOFILL_SERVICE">
-    <intent-filter>
-        <action android:name="android.service.autofill.AutofillService" />
-    </intent-filter>
-    <meta-data
-        android:name="android.autofill"
-        android:resource="@xml/autofill_service_configuration" />
-</service>
-
-<activity
-    android:name=".autofill.AutofillAuthActivity"
-    android:exported="false"
-    android:theme="@style/Theme.Kura" />
-```
-
 ### サービス有効化
 
 ユーザーはAndroidの「設定 > パスワードとアカウント > 自動入力サービス」からkuraを選択する必要がある。kuraの設定画面から直接この設定画面を開くショートカットを提供する。

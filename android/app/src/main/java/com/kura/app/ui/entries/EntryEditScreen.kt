@@ -84,9 +84,7 @@ fun EntryEditScreen(
                                         val tvJson = buildJsonObject {
                                             typedValues.forEach { (k, v) -> put(k, v) }
                                         }.toString()
-                                        val cfJson = if (customFields.isNotEmpty()) {
-                                            Json.encodeToString(kotlinx.serialization.builtins.ListSerializer(CustomField.serializer()), customFields)
-                                        } else null
+                                        val cfJson = Json.encodeToString(kotlinx.serialization.builtins.ListSerializer(CustomField.serializer()), customFields)
                                         appViewModel.repository.updateEntry(
                                             id = entryId,
                                             name = name,
@@ -95,7 +93,8 @@ fun EntryEditScreen(
                                             labelIds = selectedLabelIds.toList(),
                                             customFieldsJson = cfJson
                                         )
-                                        appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
+                                        appViewModel.repository.saveLocally()
+                                        scope.launch { try { appViewModel.repository.syncInBackground(appViewModel.preferences.s3ConfigFlow.first()) } catch (_: Exception) { } }
                                         onSaved()
                                     } catch (e: Exception) {
                                         error = "更新に失敗しました: ${e.message}"

@@ -175,6 +175,8 @@ fun EntryListScreen(
                                 scope.launch {
                                     try {
                                         appViewModel.repository.setFavorite(entry.id, isFav)
+                                        appViewModel.repository.saveLocally()
+                                        scope.launch { try { appViewModel.repository.syncInBackground(appViewModel.preferences.s3ConfigFlow.first()) } catch (_: Exception) { } }
                                         loadEntries()
                                     } catch (_: Exception) { }
                                 }
@@ -201,7 +203,8 @@ fun EntryListScreen(
                 scope.launch {
                     try {
                         appViewModel.repository.deleteEntry(targetId)
-                        appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
+                        appViewModel.repository.saveLocally()
+                        scope.launch { try { appViewModel.repository.syncInBackground(appViewModel.preferences.s3ConfigFlow.first()) } catch (_: Exception) { } }
                         loadEntries()
                     } catch (_: Exception) { }
                     deleteTargetId = null

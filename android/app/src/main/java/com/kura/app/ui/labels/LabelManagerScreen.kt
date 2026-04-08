@@ -166,7 +166,8 @@ fun LabelManagerScreen(
                         scope.launch {
                             try {
                                 appViewModel.repository.createLabel(newLabelName)
-                                appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
+                                appViewModel.repository.saveLocally()
+                                scope.launch { try { appViewModel.repository.syncInBackground(appViewModel.preferences.s3ConfigFlow.first()) } catch (_: Exception) { } }
                                 newLabelName = ""
                                 showCreateDialog = false
                                 loadLabels()
@@ -198,7 +199,8 @@ fun LabelManagerScreen(
                         scope.launch {
                             try {
                                 appViewModel.repository.renameLabel(label.id, editName)
-                                appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
+                                appViewModel.repository.saveLocally()
+                                scope.launch { try { appViewModel.repository.syncInBackground(appViewModel.preferences.s3ConfigFlow.first()) } catch (_: Exception) { } }
                                 editingLabel = null
                                 loadLabels()
                             } catch (_: Exception) { }
@@ -221,7 +223,8 @@ fun LabelManagerScreen(
                 scope.launch {
                     try {
                         appViewModel.repository.deleteLabel(targetId)
-                        appViewModel.repository.saveAndSync(appViewModel.preferences.s3ConfigFlow.first())
+                        appViewModel.repository.saveLocally()
+                        scope.launch { try { appViewModel.repository.syncInBackground(appViewModel.preferences.s3ConfigFlow.first()) } catch (_: Exception) { } }
                         loadLabels()
                     } catch (_: Exception) { }
                     deleteTargetId = null

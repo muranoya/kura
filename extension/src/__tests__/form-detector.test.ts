@@ -21,18 +21,6 @@ describe('classifyFormType', () => {
     expect(classifyFormType([field('password')])).toBe('LOGIN_PASSWORD')
   })
 
-  it('REGISTRATION: username + new_password + another field (>= 3 fields)', () => {
-    expect(
-      classifyFormType([field('username'), field('new_password'), field('new_password')]),
-    ).toBe('REGISTRATION')
-  })
-
-  it('PASSWORD_CHANGE: password + 2 new_passwords', () => {
-    expect(
-      classifyFormType([field('password'), field('new_password'), field('new_password')]),
-    ).toBe('PASSWORD_CHANGE')
-  })
-
   it('TOTP: single totp field', () => {
     expect(classifyFormType([field('totp')])).toBe('TOTP')
   })
@@ -51,6 +39,32 @@ describe('classifyFormType', () => {
     ).toBe('CREDIT_CARD')
   })
 
+  // new_password does not trigger any form type on its own
+  it('returns null for new_password only', () => {
+    expect(classifyFormType([field('new_password')])).toBeNull()
+  })
+
+  it('LOGIN_USERNAME: username + new_password (new_password ignored)', () => {
+    expect(classifyFormType([field('username'), field('new_password')])).toBe('LOGIN_USERNAME')
+  })
+
+  // Credit card individual fields
+  it('CREDIT_CARD: cc_name alone', () => {
+    expect(classifyFormType([field('cc_name')])).toBe('CREDIT_CARD')
+  })
+
+  it('CREDIT_CARD: cc_exp alone', () => {
+    expect(classifyFormType([field('cc_exp')])).toBe('CREDIT_CARD')
+  })
+
+  it('CREDIT_CARD: cc_cvc alone', () => {
+    expect(classifyFormType([field('cc_cvc')])).toBe('CREDIT_CARD')
+  })
+
+  it('CREDIT_CARD: cc_exp + cc_cvc without cc_number', () => {
+    expect(classifyFormType([field('cc_exp'), field('cc_cvc')])).toBe('CREDIT_CARD')
+  })
+
   // Edge cases
   it('returns null for empty fields', () => {
     expect(classifyFormType([])).toBeNull()
@@ -60,7 +74,7 @@ describe('classifyFormType', () => {
     expect(classifyFormType([field('totp'), field('totp'), field('totp')])).toBeNull()
   })
 
-  it('LOGIN_USERNAME: username with no password or new_password', () => {
+  it('LOGIN_USERNAME: multiple usernames with no password', () => {
     expect(classifyFormType([field('username'), field('username')])).toBe('LOGIN_USERNAME')
   })
 
@@ -74,6 +88,23 @@ describe('classifyFormType', () => {
     expect(classifyFormType([field('password'), field('password')])).toBe('LOGIN_PASSWORD')
   })
 
+  it('LOGIN: username + multiple passwords', () => {
+    expect(classifyFormType([field('username'), field('password'), field('password')])).toBe(
+      'LOGIN',
+    )
+  })
+
+  it('LOGIN: username + password + extra fields', () => {
+    expect(
+      classifyFormType([
+        field('username'),
+        field('password'),
+        field('password'),
+        field('password'),
+      ]),
+    ).toBe('LOGIN')
+  })
+
   // Priority tests
   it('CREDIT_CARD takes priority over LOGIN when cc_number present', () => {
     expect(classifyFormType([field('username'), field('password'), field('cc_number')])).toBe(
@@ -83,29 +114,5 @@ describe('classifyFormType', () => {
 
   it('TOTP takes priority when totp field present and <= 2 fields', () => {
     expect(classifyFormType([field('totp'), field('password')])).toBe('TOTP')
-  })
-
-  it('PASSWORD_CHANGE takes priority over LOGIN when conditions met', () => {
-    expect(
-      classifyFormType([
-        field('username'),
-        field('password'),
-        field('new_password'),
-        field('new_password'),
-      ]),
-    ).toBe('PASSWORD_CHANGE')
-  })
-
-  it('REGISTRATION requires new_password to distinguish from LOGIN', () => {
-    // username + password + password (3 fields, but no new_password) -> LOGIN
-    expect(classifyFormType([field('username'), field('password'), field('password')])).toBe(
-      'LOGIN',
-    )
-  })
-
-  it('REGISTRATION: username + password + new_password (>= 3 fields, has new_password)', () => {
-    expect(classifyFormType([field('username'), field('password'), field('new_password')])).toBe(
-      'REGISTRATION',
-    )
   })
 })

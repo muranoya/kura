@@ -39,6 +39,13 @@
     }
   },
   "files": {
-    "includes": ["**", "!**/dist", "!**/wasm", "!**/wasm-bridge", "!**/test-pages"]
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/wasm",
+      "!**/wasm-bridge",
+      "!**/test-pages",
+      "!**/*.generated.ts"
+    ]
   }
 }

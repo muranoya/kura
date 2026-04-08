@@ -1,6 +1,6 @@
 use vault_core::api::{
     api_generate_password, api_generate_totp, api_generate_totp_default,
-    api_generate_totp_from_value, api_parse_totp_period,
+    api_generate_totp_from_value, api_get_version, api_parse_totp_period,
 };
 
 #[tauri::command]
@@ -42,4 +42,9 @@ pub fn generate_totp_from_value(value: String) -> Result<String, String> {
 #[tauri::command]
 pub fn parse_totp_period(value: String) -> u64 {
     api_parse_totp_period(value)
+}
+
+#[tauri::command]
+pub fn get_version() -> String {
+    api_get_version()
 }

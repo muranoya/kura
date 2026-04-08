@@ -2,6 +2,7 @@
 // Handles form detection, credential suggestion, and field filling
 
 import type { AutofillCredentialCandidate } from '../shared/types'
+import { isCaptureActive, onVaultLockedDuringCapture, startCaptureMode } from './capture'
 import { hideDropdown, showDropdown, showLockedDropdown } from './dropdown'
 import { fillField, fillFields } from './filler'
 import { type DetectedForm, detectForm, isVisible } from './form-detector'
@@ -41,10 +42,16 @@ function onVaultMessage(message: { type?: string }) {
   if (message.type === 'AUTOFILL_VAULT_LOCKED') {
     console.log(LOG_PREFIX, 'Vault locked notification received')
     hideDropdown()
+    onVaultLockedDuringCapture()
   }
   if (message.type === 'AUTOFILL_VAULT_UNLOCKED') {
     console.log(LOG_PREFIX, 'Vault unlocked notification received')
     hideDropdown()
+  }
+  if (message.type === 'AUTOFILL_START_CAPTURE') {
+    console.log(LOG_PREFIX, 'Starting capture mode')
+    hideDropdown()
+    startCaptureMode()
   }
   // Never return true — this listener does not send responses
 }
@@ -53,7 +60,10 @@ function onVaultMessage(message: { type?: string }) {
 let focusDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 function onFocus(e: Event) {
-  const target = e.target
+  if (isCaptureActive()) return
+
+  // Use composedPath to get the actual target across shadow DOM boundaries
+  const target = e.composedPath()[0]
   if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLTextAreaElement)) {
     return
   }
@@ -222,14 +232,6 @@ async function onCandidateSelected(candidate: AutofillCredentialCandidate, form:
     return
   }
 
-  // For PASSWORD_CHANGE forms, only fill the current password field (not new_password)
-  if (form.formType === 'PASSWORD_CHANGE') {
-    if (passwordField && fillData.password && isVisible(passwordField.element)) {
-      fillField(passwordField.element, fillData.password)
-    }
-    return
-  }
-
   // For CREDIT_CARD forms, fill all credit card fields
   if (form.formType === 'CREDIT_CARD') {
     const ccFields: Array<{ element: HTMLInputElement; value: string }> = []
@@ -261,7 +263,7 @@ async function onCandidateSelected(candidate: AutofillCredentialCandidate, form:
     return
   }
 
-  // For LOGIN / REGISTRATION forms, fill both fields with delay between
+  // For LOGIN forms, fill both fields with delay between
   const toFill: Array<{ element: HTMLInputElement; value: string }> = []
 
   if (usernameField && fillData.username && isVisible(usernameField.element)) {

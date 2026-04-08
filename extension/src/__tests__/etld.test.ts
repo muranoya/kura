@@ -54,6 +54,41 @@ describe('extractETldPlus1', () => {
   it('returns two-part hostname as-is', () => {
     expect(extractETldPlus1('example.com')).toBe('example.com')
   })
+
+  // PSL-specific cases
+  it('handles wildcard rule: *.ck (example.ck is a public suffix)', () => {
+    // *.ck means example.ck is a public suffix, so sub.example.ck → eTLD+1 = sub.example.ck
+    expect(extractETldPlus1('sub.example.ck')).toBe('sub.example.ck')
+    // With 4 labels, the eTLD+1 correctly strips the outermost label
+    expect(extractETldPlus1('a.sub.example.ck')).toBe('sub.example.ck')
+  })
+
+  it('handles exception rule: !www.ck', () => {
+    // !www.ck is an exception — www.ck itself is NOT a public suffix
+    // So www.ck is an eTLD+1
+    expect(extractETldPlus1('www.ck')).toBe('www.ck')
+  })
+
+  it('handles s3.amazonaws.com as public suffix', () => {
+    // s3.amazonaws.com is explicitly in PSL, so mybucket.s3.amazonaws.com → eTLD+1
+    expect(extractETldPlus1('mybucket.s3.amazonaws.com')).toBe('mybucket.s3.amazonaws.com')
+  })
+
+  it('handles cloudfront.net', () => {
+    expect(extractETldPlus1('d111111abcdef8.cloudfront.net')).toBe('d111111abcdef8.cloudfront.net')
+  })
+
+  it('handles appspot.com', () => {
+    expect(extractETldPlus1('myapp.appspot.com')).toBe('myapp.appspot.com')
+  })
+
+  it('returns public suffix itself when hostname is a TLD', () => {
+    expect(extractETldPlus1('com')).toBe('com')
+  })
+
+  it('handles org.uk', () => {
+    expect(extractETldPlus1('www.example.org.uk')).toBe('example.org.uk')
+  })
 })
 
 describe('isSameETldPlus1', () => {

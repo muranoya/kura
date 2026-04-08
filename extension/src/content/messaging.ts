@@ -103,3 +103,25 @@ export async function queryPendingFlow(url: string): Promise<PendingFlowResult |
   }
   return null
 }
+
+export async function saveCapturedCredential(
+  url: string,
+  name: string | null,
+  username: string | null,
+  password: string,
+): Promise<{ success: boolean; error?: string; entryId?: string }> {
+  const response = await sendMessage({
+    type: 'AUTOFILL_SAVE_CAPTURED',
+    url,
+    name,
+    username,
+    password,
+  } as Record<string, unknown>)
+  if (response.success) {
+    return {
+      success: true,
+      entryId: (response as unknown as Record<string, unknown>).entryId as string,
+    }
+  }
+  return { success: false, error: (response as unknown as Record<string, unknown>).error as string }
+}

@@ -108,9 +108,10 @@ describe('computeScores', () => {
       expect(scores.get('password')).toBeGreaterThanOrEqual(10)
     })
 
-    it('new-password autocomplete', () => {
+    it('new-password autocomplete scores as new_password', () => {
       const scores = computeScores(signals({ autocomplete: 'new-password' }))
       expect(scores.get('new_password')).toBeGreaterThanOrEqual(10)
+      expect(scores.has('password')).toBe(false)
     })
 
     it('one-time-code autocomplete', () => {
@@ -140,10 +141,10 @@ describe('computeScores', () => {
   })
 
   describe('type attribute signal (weight: 8)', () => {
-    it('password type gives password higher score than new_password', () => {
+    it('password type scores for both password and new_password', () => {
       const scores = computeScores(signals({ inputType: 'password' }))
       expect(scores.get('password')).toBe(8)
-      expect(scores.get('new_password')).toBe(6) // 8 - 2
+      expect(scores.get('new_password')).toBe(8)
     })
 
     it('email type scores for username', () => {
@@ -220,7 +221,6 @@ describe('computeScores', () => {
   })
 
   describe('URL context (weight: 2)', () => {
-    // Use inputType that doesn't match any typeHints to isolate URL signal
     it('/login path adds score to username and password', () => {
       const scores = computeScores(signals({ inputType: 'date', urlPath: '/login' }))
       expect(scores.get('username')).toBe(2)
@@ -233,16 +233,16 @@ describe('computeScores', () => {
       expect(scores.get('password')).toBe(2)
     })
 
-    it('/register path adds score to username and new_password', () => {
+    it('/register path adds score to username and password', () => {
       const scores = computeScores(signals({ inputType: 'date', urlPath: '/register' }))
       expect(scores.get('username')).toBe(2)
-      expect(scores.get('new_password')).toBe(2)
+      expect(scores.get('password')).toBe(2)
     })
 
-    it('/signup path adds score to username and new_password', () => {
+    it('/signup path adds score to username and password', () => {
       const scores = computeScores(signals({ inputType: 'date', urlPath: '/signup' }))
       expect(scores.get('username')).toBe(2)
-      expect(scores.get('new_password')).toBe(2)
+      expect(scores.get('password')).toBe(2)
     })
 
     it('unrelated path adds no score', () => {
@@ -257,15 +257,7 @@ describe('computeScores', () => {
       expect(scores.get('username')).toBe(18) // 10 + 8
     })
 
-    it('password type + new_password name: new_password wins', () => {
-      const match = bestMatch(signals({ inputType: 'password', nameId: 'new_password' }))
-      expect(match?.type).toBe('new_password')
-      // new_password: type(6) + name(6) = 12
-      // password: type(8) = 8
-      expect(match?.score).toBe(12)
-    })
-
-    it('password type only: password wins over new_password', () => {
+    it('password type only: password detected', () => {
       const match = bestMatch(signals({ inputType: 'password' }))
       expect(match?.type).toBe('password')
       expect(match?.score).toBe(8)

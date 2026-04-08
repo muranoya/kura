@@ -4,14 +4,7 @@ import { classifyField, type FieldClassification, type FieldType } from './field
 
 const LOG_PREFIX = '[kura:autofill:fd]'
 
-export type FormType =
-  | 'LOGIN'
-  | 'LOGIN_USERNAME'
-  | 'LOGIN_PASSWORD'
-  | 'REGISTRATION'
-  | 'PASSWORD_CHANGE'
-  | 'TOTP'
-  | 'CREDIT_CARD'
+export type FormType = 'LOGIN' | 'LOGIN_USERNAME' | 'LOGIN_PASSWORD' | 'TOTP' | 'CREDIT_CARD'
 
 export interface DetectedForm {
   formType: FormType
@@ -45,10 +38,13 @@ function findFormContainer(input: HTMLInputElement): HTMLElement {
   if (form) return form
 
   // Walk up to find a reasonable container (3-4 levels)
+  // Crosses shadow DOM boundaries via ShadowRoot → host element
   let container: HTMLElement = input
   for (let i = 0; i < 4; i++) {
     if (container.parentElement && container.parentElement !== document.body) {
       container = container.parentElement
+    } else if (container.parentNode instanceof ShadowRoot) {
+      container = container.parentNode.host as HTMLElement
     } else {
       break
     }
@@ -57,11 +53,27 @@ function findFormContainer(input: HTMLInputElement): HTMLElement {
 }
 
 /**
- * Collect all visible <input> elements within a container.
+ * Collect all visible <input> elements within a container,
+ * piercing open shadow roots recursively.
  */
 function collectInputs(container: HTMLElement): HTMLInputElement[] {
-  const inputs = Array.from(container.querySelectorAll<HTMLInputElement>('input'))
-  return inputs.filter(isVisible)
+  const results: HTMLInputElement[] = []
+  collectInputsRecursive(container, results)
+  return results.filter(isVisible)
+}
+
+function collectInputsRecursive(
+  root: HTMLElement | ShadowRoot,
+  results: HTMLInputElement[],
+) {
+  for (const input of root.querySelectorAll<HTMLInputElement>('input')) {
+    results.push(input)
+  }
+  for (const el of root.querySelectorAll('*')) {
+    if (el.shadowRoot) {
+      collectInputsRecursive(el.shadowRoot, results)
+    }
+  }
 }
 
 // ========== Form type classification (Section 3.2) ==========
@@ -72,31 +84,18 @@ export function classifyFormType(fields: FieldClassification[]): FormType | null
 
   const hasUsername = hasType('username')
   const passwordCount = countType('password')
-  const newPasswordCount = countType('new_password')
   const hasTotp = hasType('totp')
-  const hasCcNumber = hasType('cc_number')
+  const hasAnyCc =
+    hasType('cc_number') || hasType('cc_name') || hasType('cc_exp') || hasType('cc_cvc')
 
   // TOTP: single short numeric input
   if (hasTotp && fields.length <= 2) {
     return 'TOTP'
   }
 
-  // CREDIT_CARD: cc_number + cc_exp + cc_cvc
-  if (hasCcNumber) {
+  // CREDIT_CARD: any cc_* field present
+  if (hasAnyCc) {
     return 'CREDIT_CARD'
-  }
-
-  // PASSWORD_CHANGE: 1 password + 2 new-passwords
-  if (passwordCount >= 1 && newPasswordCount >= 2) {
-    return 'PASSWORD_CHANGE'
-  }
-
-  // REGISTRATION: username + email + at least 1 password-like field
-  if (hasUsername && passwordCount + newPasswordCount >= 1 && fields.length >= 3) {
-    // Heuristic: if there are new-password fields, likely registration
-    if (newPasswordCount >= 1) {
-      return 'REGISTRATION'
-    }
   }
 
   // LOGIN: username + password
@@ -105,12 +104,12 @@ export function classifyFormType(fields: FieldClassification[]): FormType | null
   }
 
   // LOGIN_USERNAME: username only, no password
-  if (hasUsername && passwordCount === 0 && newPasswordCount === 0) {
+  if (hasUsername && passwordCount === 0) {
     return 'LOGIN_USERNAME'
   }
 
   // LOGIN_PASSWORD: password only, no username
-  if (!hasUsername && passwordCount >= 1 && newPasswordCount === 0) {
+  if (!hasUsername && passwordCount >= 1) {
     return 'LOGIN_PASSWORD'
   }
 

@@ -245,6 +245,10 @@ export async function parseTotpPeriod(value: string): Promise<number> {
   return invoke<number>('parse_totp_period', { value })
 }
 
+export async function getVersion(): Promise<string> {
+  return invoke<string>('get_version', {})
+}
+
 // ============================================================================
 // Sync
 // ============================================================================

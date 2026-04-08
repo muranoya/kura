@@ -328,9 +328,12 @@ class VaultRepository(private val context: Context) {
     // Combined helpers
     // ========================================================================
 
-    suspend fun saveAndSync(s3ConfigJson: String?) {
+    suspend fun saveLocally() {
         val vaultBytes = getVaultBytes()
         writeVaultFile(vaultBytes)
+    }
+
+    suspend fun syncInBackground(s3ConfigJson: String?) {
         if (s3ConfigJson == null) return
         val result = syncVault(s3ConfigJson)
         if (result.synced) {
@@ -338,6 +341,11 @@ class VaultRepository(private val context: Context) {
             val mergedBytes = getVaultBytes()
             writeVaultFile(mergedBytes)
         }
+    }
+
+    suspend fun saveAndSync(s3ConfigJson: String?) {
+        saveLocally()
+        syncInBackground(s3ConfigJson)
     }
 
     suspend fun saveAndPush(s3ConfigJson: String?) {

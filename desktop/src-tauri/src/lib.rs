@@ -58,6 +58,7 @@ pub fn run() {
             commands::utils::generate_totp_default,
             commands::utils::generate_totp_from_value,
             commands::utils::parse_totp_period,
+            commands::utils::get_version,
             // Sync
             commands::sync::sync_vault,
             commands::sync::push_vault,

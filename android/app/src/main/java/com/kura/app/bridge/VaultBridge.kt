@@ -88,6 +88,9 @@ object VaultBridge {
     external fun generateTotpFromValue(value: String): String
     external fun parseTotpPeriod(value: String): Long
 
+    // Version
+    external fun getVersion(): String
+
     // Sync
     external fun mergeRemoteVault(vaultId: String, remoteBytes: ByteArray, remoteEtag: String)
     external fun updateEtag(vaultId: String, etag: String)

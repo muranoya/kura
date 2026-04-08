@@ -74,18 +74,13 @@ fun EntryCard(
                 )
             }
         }
-        if (onFavoriteToggle != null && entry.isFavorite) {
-            IconButton(
-                onClick = { onFavoriteToggle(false) },
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Star,
-                    contentDescription = "お気に入り",
-                    tint = Color(0xFFD97706),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
+        if (entry.isFavorite) {
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = "お気に入り",
+                tint = Color(0xFFD97706),
+                modifier = Modifier.size(18.dp)
+            )
         }
         if (onDelete != null) {
             IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {

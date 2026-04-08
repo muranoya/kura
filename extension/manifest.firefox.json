@@ -22,7 +22,11 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["wasm/wasm_bridge_bg.wasm", "src/content/dropdown.css"],
+      "resources": [
+        "wasm/wasm_bridge_bg.wasm",
+        "src/content/dropdown.css",
+        "src/content/capture.css"
+      ],
       "matches": ["<all_urls>"]
     }
   ],

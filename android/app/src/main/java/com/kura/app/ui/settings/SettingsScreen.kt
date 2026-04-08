@@ -21,11 +21,14 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import com.kura.app.bridge.VaultBridge
+import com.kura.app.data.model.S3Config
 import com.kura.app.ui.components.ConfirmDialog
 import com.kura.app.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,6 +59,16 @@ fun SettingsScreen(
     }
     val biometricEnabled by appViewModel.preferences.biometricEnabledFlow
         .collectAsState(initial = false)
+
+    val s3ConfigJson by appViewModel.preferences.s3ConfigFlow
+        .collectAsState(initial = null)
+    val s3Config = remember(s3ConfigJson) {
+        s3ConfigJson?.let {
+            try {
+                Json.decodeFromString<S3Config>(it)
+            } catch (_: Exception) { null }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -180,6 +193,54 @@ fun SettingsScreen(
             HorizontalDivider()
             Spacer(modifier = Modifier.height(8.dp))
 
+            // ストレージ設定セクション
+            Text("ストレージ設定", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(4.dp))
+
+            if (s3Config != null) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    ListItem(
+                        headlineContent = { Text("バケット") },
+                        supportingContent = { Text(s3Config.bucket) },
+                        leadingContent = { Icon(Icons.Default.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                    )
+                }
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    ListItem(
+                        headlineContent = { Text("リージョン") },
+                        supportingContent = { Text(s3Config.region) },
+                        leadingContent = { Icon(Icons.Default.Public, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                    )
+                }
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    ListItem(
+                        headlineContent = { Text("ファイルパス") },
+                        supportingContent = { Text(s3Config.key) },
+                        leadingContent = { Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                    )
+                }
+                if (!s3Config.endpoint.isNullOrEmpty()) {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        ListItem(
+                            headlineContent = { Text("エンドポイント") },
+                            supportingContent = { Text(s3Config.endpoint!!) },
+                            leadingContent = { Icon(Icons.Default.Link, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                        )
+                    }
+                }
+            } else {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    ListItem(
+                        headlineContent = { Text("ストレージ設定が見つかりません", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        leadingContent = { Icon(Icons.Default.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(8.dp))
+
             // Transfer section
             Text("端末間転送", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(4.dp))
@@ -204,7 +265,7 @@ fun SettingsScreen(
             Card(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
                     headlineContent = { Text("バージョン") },
-                    trailingContent = { Text("v0.1.0", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    trailingContent = { Text("v${VaultBridge.getVersion()}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 )
             }
 

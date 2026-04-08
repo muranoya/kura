@@ -26,6 +26,7 @@ import com.kura.app.data.model.Label
 import com.kura.app.ui.components.EntryCard
 import com.kura.app.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -342,6 +343,8 @@ fun HomeScreen(
                                             scope.launch {
                                                 try {
                                                     appViewModel.repository.setFavorite(entry.id, isFav)
+                                                    appViewModel.repository.saveLocally()
+                                                    scope.launch { try { appViewModel.repository.syncInBackground(appViewModel.preferences.s3ConfigFlow.first()) } catch (_: Exception) { } }
                                                     loadData()
                                                 } catch (_: Exception) { }
                                             }

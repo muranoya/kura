@@ -90,6 +90,7 @@ interface WasmApi {
   api_decrypt_config(vaultId: string, password: string, encryptedB64: string): string
   api_encrypt_transfer_config(password: string, configJson: string): string
   api_decrypt_transfer_config(password: string, transferString: string): string
+  api_get_version(): string
   [key: string]: unknown
 }
 
@@ -191,6 +192,8 @@ initAutofill(
     get: (_target, prop) => (vault as unknown as Record<string | symbol, unknown>)[prop],
   }),
   () => unlocked,
+  saveLocally,
+  autoSync,
 )
 
 // Clean up pending login flows when a tab is closed
@@ -282,6 +285,14 @@ async function syncWithS3(s3Config: S3Config): Promise<void> {
   } finally {
     client.destroy()
   }
+}
+
+/**
+ * ローカルストレージにvaultバイトを保存（S3同期なし）
+ */
+async function saveLocally() {
+  const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
+  await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
 }
 
 /**
@@ -692,7 +703,8 @@ async function handleMessage(
             message.labelIds || [],
             message.customFields ? JSON.stringify(message.customFields) : null,
           )
-          await autoSync()
+          await saveLocally()
+          autoSync().catch((e) => console.error('[SW] Sync failed:', e))
           sendResponse({ success: true, entryId })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -715,7 +727,8 @@ async function handleMessage(
             message.labelIds || [],
             message.customFields ? JSON.stringify(message.customFields) : null,
           )
-          await autoSync()
+          await saveLocally()
+          autoSync().catch((e) => console.error('[SW] Sync failed:', e))
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -730,7 +743,8 @@ async function handleMessage(
         }
         try {
           vault.api_delete_entry(DEFAULT_VAULT_ID, message.id)
-          await autoSync()
+          await saveLocally()
+          autoSync().catch((e) => console.error('[SW] Sync failed:', e))
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -745,7 +759,8 @@ async function handleMessage(
         }
         try {
           vault.api_restore_entry(DEFAULT_VAULT_ID, message.id)
-          await autoSync()
+          await saveLocally()
+          autoSync().catch((e) => console.error('[SW] Sync failed:', e))
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -760,7 +775,8 @@ async function handleMessage(
         }
         try {
           vault.api_purge_entry(DEFAULT_VAULT_ID, message.id)
-          await autoSync()
+          await saveLocally()
+          autoSync().catch((e) => console.error('[SW] Sync failed:', e))
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -775,7 +791,8 @@ async function handleMessage(
         }
         try {
           vault.api_set_favorite(DEFAULT_VAULT_ID, message.id, message.isFavorite)
-          await autoSync()
+          await saveLocally()
+          autoSync().catch((e) => console.error('[SW] Sync failed:', e))
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -834,7 +851,8 @@ async function handleMessage(
         }
         try {
           const labelId = vault.api_create_label(DEFAULT_VAULT_ID, message.name)
-          await autoSync()
+          await saveLocally()
+          autoSync().catch((e) => console.error('[SW] Sync failed:', e))
           sendResponse({ success: true, labelId })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -849,7 +867,8 @@ async function handleMessage(
         }
         try {
           vault.api_delete_label(DEFAULT_VAULT_ID, message.id)
-          await autoSync()
+          await saveLocally()
+          autoSync().catch((e) => console.error('[SW] Sync failed:', e))
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -864,7 +883,8 @@ async function handleMessage(
         }
         try {
           vault.api_rename_label(DEFAULT_VAULT_ID, message.id, message.newName)
-          await autoSync()
+          await saveLocally()
+          autoSync().catch((e) => console.error('[SW] Sync failed:', e))
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -879,7 +899,8 @@ async function handleMessage(
         }
         try {
           vault.api_set_entry_labels(DEFAULT_VAULT_ID, message.entryId, message.labelIds || [])
-          await autoSync()
+          await saveLocally()
+          autoSync().catch((e) => console.error('[SW] Sync failed:', e))
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -922,6 +943,18 @@ async function handleMessage(
           const totp = vault.api_generate_totp_from_value(message.value)
           const period = vault.api_parse_totp_period(message.value)
           sendResponse({ success: true, totp, period })
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      // ========== Version ==========
+
+      case 'GET_VERSION': {
+        try {
+          const version = vault.api_get_version()
+          sendResponse({ success: true, version })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }

@@ -1,6 +1,7 @@
 import {
   Check,
   Copy,
+  Crosshair,
   Eye,
   EyeOff,
   Maximize2,
@@ -17,6 +18,7 @@ import ReactMarkdown from 'react-markdown'
 import { useLocation, useNavigate } from 'react-router-dom'
 import remarkGfm from 'remark-gfm'
 import { STORAGE_KEYS } from '../../../shared/constants'
+import { sendMessage } from '../../../shared/messages'
 import { getFromStorage, removeFromStorage, saveToStorage } from '../../../shared/storage'
 import type { Entry, EntryRow, EntryType, SortConfig } from '../../../shared/types'
 import * as commands from '../../commands'
@@ -109,6 +111,7 @@ export default function EntryList() {
     try {
       const result = await commands.listEntries({
         onlyFavorites,
+        searchQuery: searchQuery || undefined,
         labelId: selectedLabelId,
         sortField: sort.field,
         sortOrder: sort.order,
@@ -172,6 +175,7 @@ export default function EntryList() {
     try {
       const result = await commands.listEntries({
         onlyFavorites,
+        searchQuery: searchQuery || undefined,
         labelId: selectedLabelId,
         sortField: sortConfig.field,
         sortOrder: sortConfig.order,
@@ -182,7 +186,7 @@ export default function EntryList() {
       setError(String(err) || 'Failed to load entries')
       setLoading(false)
     }
-  }, [onlyFavorites, selectedLabelId, sortConfig])
+  }, [onlyFavorites, searchQuery, selectedLabelId, sortConfig])
 
   useEffect(() => {
     loadEntries()
@@ -222,10 +226,8 @@ export default function EntryList() {
   }, [selectedId])
 
   const filteredEntries = useMemo(() => {
-    return entries
-      .filter((e) => !selectedType || e.entryType === selectedType)
-      .filter((e) => !searchQuery || e.name.toLowerCase().includes(searchQuery.toLowerCase()))
-  }, [entries, selectedType, searchQuery])
+    return entries.filter((e) => !selectedType || e.entryType === selectedType)
+  }, [entries, selectedType])
 
   const handleDelete = async (id: string) => {
     if (confirm('このエントリを削除しますか？')) {
@@ -285,6 +287,20 @@ export default function EntryList() {
             </button>
           )}
         </div>
+
+        {/* キャプチャボタン */}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            sendMessage({ type: 'AUTOFILL_START_CAPTURE' }).catch(() => {})
+            window.close()
+          }}
+          className="gap-1 text-sm flex-shrink-0"
+          title="このページのクレデンシャルを保存"
+        >
+          <Crosshair size={14} />
+        </Button>
 
         {/* 新規追加ボタン */}
         <Button

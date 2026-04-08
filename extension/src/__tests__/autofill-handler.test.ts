@@ -55,6 +55,17 @@ function createMockVaultApi(entries: MockEntry[]): VaultApi {
       },
     ),
     api_generate_totp_from_value: vi.fn((_value: string) => '123456'),
+    api_create_entry: vi.fn(
+      (
+        _vaultId: string,
+        _entryType: string,
+        _name: string,
+        _notes: string | null,
+        _typedValue: string,
+        _labelIds: string[],
+        _customFields: string | null,
+      ) => 'new-entry-id',
+    ),
   }
 }
 
@@ -110,9 +121,7 @@ describe('handleAutofillMessage', () => {
       url: 'https://example.com',
       username: 'totp@example.com',
       typed_value: { username: 'totp@example.com', password: 'totppwd' },
-      custom_fields: JSON.stringify([
-        { field_type: 'totp', value: 'otpauth://totp/test?secret=ABCDEF' },
-      ]),
+      custom_fields: [{ field_type: 'totp', value: 'otpauth://totp/test?secret=ABCDEF' }],
     },
     {
       id: 'entry-cc',
@@ -134,7 +143,12 @@ describe('handleAutofillMessage', () => {
   beforeEach(() => {
     unlocked = true
     mockApi = createMockVaultApi(testEntries)
-    initAutofill(mockApi, () => unlocked)
+    initAutofill(
+      mockApi,
+      () => unlocked,
+      async () => {},
+      async () => {},
+    )
   })
 
   // ========== AUTOFILL_GET_CREDENTIALS ==========
@@ -278,7 +292,12 @@ describe('handleAutofillMessage', () => {
           >,
         },
       ]
-      initAutofill(createMockVaultApi(entries), () => true)
+      initAutofill(
+        createMockVaultApi(entries),
+        () => true,
+        async () => {},
+        async () => {},
+      )
 
       const result = (await callHandler({
         type: 'AUTOFILL_FILL_REQUEST',

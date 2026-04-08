@@ -1,0 +1,247 @@
+/* Capture mode overlay styles — rendered inside Shadow DOM */
+
+:host {
+  all: initial;
+}
+
+/* Floating toolbar (top-right) */
+.kura-capture-toolbar {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  display: block;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 12px 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  color: #1e293b;
+  width: 280px;
+  z-index: 2147483647;
+}
+
+.kura-capture-title {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: #4f46e5;
+}
+
+.kura-capture-desc {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.kura-capture-name-row {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.kura-capture-name-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.kura-capture-name-input {
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1e293b;
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+.kura-capture-name-input:focus {
+  outline: none;
+  border-color: #4f46e5;
+  background: #fff;
+}
+
+.kura-capture-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.kura-capture-tag {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: #94a3b8;
+  padding: 2px 0;
+}
+
+.kura-capture-tag > span {
+  display: inline;
+}
+
+.kura-capture-tag-set {
+  color: #1e293b;
+  font-weight: 500;
+}
+
+.kura-capture-tag-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  padding: 0;
+  border: none;
+  background: #e2e8f0;
+  color: #64748b;
+  border-radius: 50%;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.kura-capture-tag-clear:hover {
+  background: #cbd5e1;
+  color: #1e293b;
+}
+
+.kura-capture-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.kura-capture-btn {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: inherit;
+}
+
+.kura-capture-btn-save {
+  background: #4f46e5;
+  color: #fff;
+  border-color: #4f46e5;
+}
+
+.kura-capture-btn-save:hover:not(:disabled) {
+  background: #4338ca;
+}
+
+.kura-capture-btn-save:disabled {
+  background: #a5b4fc;
+  border-color: #a5b4fc;
+  cursor: not-allowed;
+}
+
+.kura-capture-btn-cancel {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+
+.kura-capture-btn-cancel:hover {
+  background: #f1f5f9;
+}
+
+/* Role selection popover */
+.kura-capture-popover {
+  position: fixed;
+  display: block;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  z-index: 2147483647;
+  min-width: 140px;
+}
+
+.kura-capture-popover-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: #1e293b;
+  cursor: pointer;
+  border-radius: 4px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.kura-capture-popover-btn:hover {
+  background: #f0f4ff;
+  color: #4f46e5;
+}
+
+.kura-capture-popover-divider {
+  display: block;
+  height: 1px;
+  background: #e2e8f0;
+  margin: 4px 0;
+}
+
+.kura-capture-popover-btn-secondary {
+  color: #64748b;
+  font-size: 12px;
+}
+
+/* Toast notification */
+.kura-capture-toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: block;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 2147483647;
+  animation: kura-toast-in 0.2s ease-out;
+  white-space: nowrap;
+}
+
+.kura-capture-toast-success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.kura-capture-toast-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+@keyframes kura-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}

@@ -16,7 +16,9 @@ fn generate_test_vault_fixture() {
 
     // Create new vault and unlock
     let locked = LockedVault::create_new(master_password).expect("Failed to create vault");
-    let mut unlocked = locked.unlock(master_password).expect("Failed to unlock vault");
+    let mut unlocked = locked
+        .unlock(master_password)
+        .expect("Failed to unlock vault");
 
     // Entry 1: Test Login 1
     unlocked
@@ -107,8 +109,8 @@ fn generate_test_vault_fixture() {
     let vault_bytes = locked.to_vault_bytes().expect("Failed to serialize vault");
 
     // Write to fixture file
-    let output_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../extension/test-pages/fixtures/vault.json");
+    let output_path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../extension/test-pages/fixtures/vault.json");
     std::fs::create_dir_all(output_path.parent().unwrap())
         .expect("Failed to create fixtures directory");
     std::fs::write(&output_path, vault_bytes).expect("Failed to write vault.json fixture");
@@ -117,8 +119,8 @@ fn generate_test_vault_fixture() {
 
     // Generate transfer config string for easy setup
     let config_json = r#"{"region":"ap-northeast-1","bucket":"kura-test","key":"vault.json","accessKeyId":"minioadmin","secretAccessKey":"minioadmin","endpoint":"http://localhost:9000"}"#;
-    let transfer_string =
-        encrypt_transfer(master_password, config_json.as_bytes()).expect("Failed to encrypt transfer config");
+    let transfer_string = encrypt_transfer(master_password, config_json.as_bytes())
+        .expect("Failed to encrypt transfer config");
 
     let transfer_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../extension/test-pages/fixtures/transfer-config.txt");

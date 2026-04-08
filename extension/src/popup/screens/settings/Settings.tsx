@@ -35,6 +35,7 @@ export default function Settings() {
   const navigate = useNavigate()
   const pushError = usePushError()
   const [storageConfig, setStorageConfig] = useState<Record<string, string> | null>(null)
+  const [version, setVersion] = useState('...')
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
   // Auto-lock settings
@@ -93,6 +94,7 @@ export default function Settings() {
   useEffect(() => {
     loadStorageConfig()
     loadSettings()
+    commands.getVersion().then((v) => setVersion(`v${v}`))
   }, [loadStorageConfig, loadSettings])
 
   const handleAutolockChange = async (value: string) => {
@@ -348,7 +350,7 @@ export default function Settings() {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-sm">
               <p className="text-text-muted">バージョン</p>
-              <p className="text-text-primary">v0.1.0</p>
+              <p className="text-text-primary">{version}</p>
             </div>
             <div className="flex items-center justify-between text-sm">
               <p className="text-text-muted">リポジトリ</p>

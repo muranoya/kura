@@ -6,8 +6,10 @@
   "packageManager": "pnpm@10.30.1",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "build:firefox": "vite build --config vite.config.firefox.ts",
+    "build": "npx tsx scripts/generate-etld.ts && vite build",
+    "build:firefox": "npx tsx scripts/generate-etld.ts && vite build --config vite.config.firefox.ts",
+    "generate-etld": "npx tsx scripts/generate-etld.ts",
+    "update-psl": "npx tsx scripts/update-psl.ts",
     "preview": "vite preview",
     "check": "biome check .",
     "fix": "biome check --write .",
