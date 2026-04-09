@@ -93,7 +93,7 @@ export type Message =
   | { type: 'CLIPBOARD_COPIED' }
 
   // Autofill (Content Script → Service Worker)
-  | { type: 'AUTOFILL_GET_CREDENTIALS'; url: string }
+  | { type: 'AUTOFILL_GET_CREDENTIALS'; url: string; strictSubdomain?: boolean }
   | { type: 'AUTOFILL_FILL_REQUEST'; entryId: string }
   | { type: 'AUTOFILL_GET_TOTP'; url: string }
   | { type: 'AUTOFILL_GET_CREDIT_CARDS' }

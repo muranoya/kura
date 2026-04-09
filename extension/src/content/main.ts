@@ -1,6 +1,7 @@
 // Content Script entry point — injected on-demand when vault is unlocked
 // Handles form detection, credential suggestion, and field filling
 
+import { SITE_PATTERNS } from '../shared/patterns-data.generated'
 import type { AutofillCredentialCandidate } from '../shared/types'
 import { isCaptureActive, onVaultLockedDuringCapture, startCaptureMode } from './capture'
 import { hideDropdown, showDropdown, showLockedDropdown } from './dropdown'
@@ -15,6 +16,8 @@ import {
   requestTotp,
   storePendingFlow,
 } from './messaging'
+import { detectFormByPattern } from './pattern-detector'
+import { findMatchingPattern } from './pattern-matcher'
 
 const LOG_PREFIX = '[kura:autofill:cs]'
 
@@ -90,8 +93,29 @@ async function handleInputFocus(input: HTMLInputElement) {
     return
   }
 
-  // Detect form around the focused input
-  const form = detectForm(input)
+  // Try pattern-based detection first, then fall back to heuristic
+  let form: DetectedForm | null = null
+  let strictSubdomain = false
+
+  const hostname = window.location.hostname
+  const matchedPattern = findMatchingPattern(SITE_PATTERNS, hostname)
+
+  if (matchedPattern) {
+    console.log(LOG_PREFIX, `handleInputFocus: pattern found for ${hostname}`)
+    const patternResult = await detectFormByPattern(input, matchedPattern)
+    if (patternResult) {
+      form = patternResult.form
+      strictSubdomain = patternResult.strictSubdomain
+    } else {
+      // Pattern has no forms or none matched — fall back to heuristic
+      // strict_subdomain from the pattern still applies even with heuristic detection
+      strictSubdomain = matchedPattern.match.strict_subdomain ?? false
+      form = detectForm(input)
+    }
+  } else {
+    form = detectForm(input)
+  }
+
   if (!form) {
     console.log(LOG_PREFIX, 'handleInputFocus: no form detected')
     hideDropdown()
@@ -159,7 +183,7 @@ async function handleInputFocus(input: HTMLInputElement) {
   }
 
   // === Login, Registration, Password Change, Login_Username, Login_Password ===
-  const result = await getCredentials(url)
+  const result = await getCredentials(url, strictSubdomain)
 
   if (result.status === 'locked') {
     console.log(LOG_PREFIX, 'handleInputFocus: vault is locked, showing locked dropdown')

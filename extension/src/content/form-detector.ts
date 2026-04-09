@@ -62,10 +62,7 @@ function collectInputs(container: HTMLElement): HTMLInputElement[] {
   return results.filter(isVisible)
 }
 
-function collectInputsRecursive(
-  root: HTMLElement | ShadowRoot,
-  results: HTMLInputElement[],
-) {
+function collectInputsRecursive(root: HTMLElement | ShadowRoot, results: HTMLInputElement[]) {
   for (const input of root.querySelectorAll<HTMLInputElement>('input')) {
     results.push(input)
   }

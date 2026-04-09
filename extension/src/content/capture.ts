@@ -145,7 +145,7 @@ function createTag(
     clearBtn.addEventListener('click', (e) => {
       e.preventDefault()
       e.stopPropagation()
-      onClear()
+      onClear?.()
     })
     tag.appendChild(clearBtn)
   }

@@ -218,6 +218,56 @@ describe('handleAutofillMessage', () => {
       expect(result.credentials).toEqual([])
     })
 
+    it('uses strict subdomain matching when strictSubdomain is true', async () => {
+      const result = (await callHandler({
+        type: 'AUTOFILL_GET_CREDENTIALS',
+        url: 'https://www.example.com/page',
+        strictSubdomain: true,
+      })) as { success: boolean; credentials: Array<{ entryId: string }> }
+
+      expect(result.success).toBe(true)
+      const ids = result.credentials.map((c) => c.entryId)
+      // Only entries with exact hostname "www.example.com" should match
+      // None of the test entries have "www.example.com" as their hostname
+      expect(ids).not.toContain('entry-1') // example.com
+      expect(ids).not.toContain('entry-2') // login.example.com
+      expect(ids).not.toContain('entry-3') // other.com
+    })
+
+    it('strict subdomain matches exact hostname', async () => {
+      const result = (await callHandler({
+        type: 'AUTOFILL_GET_CREDENTIALS',
+        url: 'https://example.com/page',
+        strictSubdomain: true,
+      })) as { success: boolean; credentials: Array<{ entryId: string }> }
+
+      expect(result.success).toBe(true)
+      const ids = result.credentials.map((c) => c.entryId)
+      // entry-1 has url "https://example.com" → hostname "example.com" → matches
+      expect(ids).toContain('entry-1')
+      // entry-4 has url "example.com/login" → hostname "example.com" → matches
+      expect(ids).toContain('entry-4')
+      // entry-totp has url "https://example.com" → hostname "example.com" → matches
+      expect(ids).toContain('entry-totp')
+      // entry-2 has url "https://login.example.com/auth" → hostname "login.example.com" → NO match
+      expect(ids).not.toContain('entry-2')
+    })
+
+    it('defaults to eTLD+1 matching when strictSubdomain is not set', async () => {
+      const result = (await callHandler({
+        type: 'AUTOFILL_GET_CREDENTIALS',
+        url: 'https://login.example.com/page',
+      })) as { success: boolean; credentials: Array<{ entryId: string }> }
+
+      expect(result.success).toBe(true)
+      const ids = result.credentials.map((c) => c.entryId)
+      // eTLD+1 match: all example.com entries match
+      expect(ids).toContain('entry-1')
+      expect(ids).toContain('entry-2')
+      expect(ids).toContain('entry-4')
+      expect(ids).toContain('entry-totp')
+    })
+
     it('does not include passwords in candidates', async () => {
       const result = (await callHandler({
         type: 'AUTOFILL_GET_CREDENTIALS',

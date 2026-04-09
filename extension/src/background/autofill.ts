@@ -61,7 +61,10 @@ interface RawAutofillCandidate {
   username: string | null
 }
 
-function getCredentialsForUrl(url: string): AutofillCredentialCandidate[] {
+function getCredentialsForUrl(
+  url: string,
+  strictSubdomain?: boolean,
+): AutofillCredentialCandidate[] {
   if (!vaultApi || !isUnlocked()) {
     console.log(LOG_PREFIX, 'getCredentialsForUrl: vault not ready or locked')
     return []
@@ -78,7 +81,7 @@ function getCredentialsForUrl(url: string): AutofillCredentialCandidate[] {
   const pageETld = extractETldPlus1(pageHostname)
   console.log(
     LOG_PREFIX,
-    `getCredentialsForUrl: url=${url}, hostname=${pageHostname}, eTLD+1=${pageETld}`,
+    `getCredentialsForUrl: url=${url}, hostname=${pageHostname}, eTLD+1=${pageETld}, strictSubdomain=${!!strictSubdomain}`,
   )
 
   // Fetch all login entries with their URLs (no passwords)
@@ -103,12 +106,21 @@ function getCredentialsForUrl(url: string): AutofillCredentialCandidate[] {
       continue
     }
 
-    const entryETld = extractETldPlus1(entryHostname)
+    let matched: boolean
+    if (strictSubdomain) {
+      // Exact hostname match when strict_subdomain is enabled
+      matched = pageHostname.toLowerCase() === entryHostname.toLowerCase()
+    } else {
+      // Default: eTLD+1 match
+      const entryETld = extractETldPlus1(entryHostname)
+      matched = pageETld === entryETld
+    }
+
     console.log(
       LOG_PREFIX,
-      `getCredentialsForUrl: entry "${entry.name}" url=${entry.url} eTLD+1=${entryETld} match=${pageETld === entryETld}`,
+      `getCredentialsForUrl: entry "${entry.name}" url=${entry.url} hostname=${entryHostname} match=${matched}`,
     )
-    if (pageETld === entryETld) {
+    if (matched) {
       candidates.push({
         entryId: entry.id,
         name: entry.name,
@@ -325,7 +337,8 @@ export async function handleAutofillMessage(
         sendResponse({ success: false, error: 'URL required' })
         break
       }
-      const credentials = getCredentialsForUrl(url)
+      const strictSubdomain = message.strictSubdomain as boolean | undefined
+      const credentials = getCredentialsForUrl(url, strictSubdomain)
       console.log(
         LOG_PREFIX,
         `AUTOFILL_GET_CREDENTIALS: returning ${credentials.length} credentials`,

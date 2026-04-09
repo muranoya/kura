@@ -198,8 +198,8 @@ describe('computeScores', () => {
     })
 
     it('placeholder "認証コード" scores for totp', () => {
-      const scores = computeScores(signals({ textSignals: '認証コード' }))
-      expect(scores.get('totp')).toBeGreaterThanOrEqual(4)
+      const scores = computeScores(signals({ inputType: 'number', textSignals: '認証コード' }))
+      expect(scores.get('totp')).toBeGreaterThanOrEqual(8)
     })
   })
 
@@ -271,8 +271,31 @@ describe('computeScores', () => {
     it('text type with email name: username detected', () => {
       const match = bestMatch(signals({ inputType: 'text', nameId: 'email' }))
       expect(match?.type).toBe('username')
-      // type(8) + name(6) = 14
-      expect(match?.score).toBe(14)
+      // name(6) = 6 (type="text" is too generic, no type score)
+      expect(match?.score).toBe(6)
+    })
+
+    it('bare text input: no classification', () => {
+      const scores = computeScores(signals({ inputType: 'text' }))
+      expect(scores.get('username')).toBeUndefined()
+      expect(scores.get('totp')).toBeUndefined()
+    })
+
+    it('text input with username name pattern: still classified as username', () => {
+      const match = bestMatch(signals({ inputType: 'text', nameId: 'username' }))
+      expect(match?.type).toBe('username')
+      expect(match?.score).toBe(6)
+    })
+
+    it('generic text input with non-login name is not classified', () => {
+      const scores = computeScores(signals({ inputType: 'text', nameId: 'competitionname' }))
+      expect(scores.get('username')).toBeUndefined()
+    })
+
+    it('text input with otp name: still classified as totp', () => {
+      const match = bestMatch(signals({ inputType: 'text', nameId: 'otp_code' }))
+      expect(match?.type).toBe('totp')
+      expect(match?.score).toBe(6)
     })
 
     it('full login field: autocomplete + type + name + placeholder + label', () => {

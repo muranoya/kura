@@ -81,7 +81,7 @@ interface SignalDef {
 const SIGNAL_DEFS: Record<FieldType, SignalDef> = {
   username: {
     autocomplete: ['username'],
-    typeHints: ['email', 'tel', 'text'],
+    typeHints: ['email', 'tel'],
     nameIdPatterns: [/^(user|email|login|account|phone|id)/i],
     labelPatterns: [
       /\b(user\s?name|email|log\s?in|account|ユーザー|メール|アカウント|ログイン)\b/i,
@@ -101,7 +101,7 @@ const SIGNAL_DEFS: Record<FieldType, SignalDef> = {
   },
   totp: {
     autocomplete: ['one-time-code'],
-    typeHints: ['text', 'number', 'tel'],
+    typeHints: ['number', 'tel'],
     nameIdPatterns: [/^(otp|totp|code|token|verify|mfa|2fa)/i],
     labelPatterns: [/\b(otp|verification\s*code|認証コード|確認コード)\b/i],
   },

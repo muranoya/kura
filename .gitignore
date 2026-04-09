@@ -24,11 +24,13 @@ desktop/src-tauri/icons/ios/
 # Extension
 extension/dist/
 extension/src/shared/etld-data.generated.ts
+extension/src/shared/patterns-data.generated.ts
 extension/public/icons/
 extension/wasm/
 extension/kura-extension-firefox.zip
 extension/kura-extension-chrome.zip
 extension/*.xpi
+extension/test-pages/fixtures/
 
 # WASM build output
 extension/public/wasm/

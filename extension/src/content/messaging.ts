@@ -31,8 +31,11 @@ function sendMessage(message: Record<string, unknown>): Promise<Response> {
   })
 }
 
-export async function getCredentials(url: string): Promise<GetCredentialsResult> {
-  const response = await sendMessage({ type: 'AUTOFILL_GET_CREDENTIALS', url })
+export async function getCredentials(
+  url: string,
+  strictSubdomain?: boolean,
+): Promise<GetCredentialsResult> {
+  const response = await sendMessage({ type: 'AUTOFILL_GET_CREDENTIALS', url, strictSubdomain })
   if (response.success && 'credentials' in response) {
     return { status: 'ok', credentials: response.credentials || [] }
   }

@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "SitePattern",
+  "description": "Site-specific form detection pattern for kura autofill",
+  "type": "object",
+  "required": ["description", "match"],
+  "additionalProperties": false,
+  "properties": {
+    "description": {
+      "type": "string",
+      "description": "Why this pattern is needed"
+    },
+    "match": {
+      "type": "object",
+      "required": ["type", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["domain", "domain_suffix"]
+        },
+        "value": {
+          "type": "string"
+        },
+        "strict_subdomain": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "disabled": {
+      "type": "boolean",
+      "default": false
+    },
+    "forms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "fields"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Form identifier for debugging and logging"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["login", "login_username", "login_password", "totp", "credit_card"]
+          },
+          "condition": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "url_path": {
+                "type": "string",
+                "description": "Regex pattern to match against URL pathname"
+              },
+              "element_exists": {
+                "type": "string",
+                "description": "CSS selector — condition is true if element exists in DOM"
+              },
+              "element_not_exists": {
+                "type": "string",
+                "description": "CSS selector — condition is true if element does NOT exist in DOM"
+              }
+            }
+          },
+          "wait_for": {
+            "type": "object",
+            "required": ["selector"],
+            "additionalProperties": false,
+            "properties": {
+              "selector": {
+                "type": "string",
+                "description": "CSS selector to wait for before detection"
+              },
+              "timeout_ms": {
+                "type": "number",
+                "default": 5000
+              }
+            }
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": false,
+            "patternProperties": {
+              "^(username|password|totp|cc_number|cc_exp|cc_cvc|cc_name)$": {
+                "type": "object",
+                "required": ["selector"],
+                "additionalProperties": false,
+                "properties": {
+                  "selector": {
+                    "type": "string",
+                    "description": "CSS selector for the field"
+                  },
+                  "fallback_selectors": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Fallback CSS selectors tried in order if primary fails"
+                  }
+                }
+              }
+            }
+          },
+          "skip_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "CSS selectors for fields to exclude from detection"
+          }
+        }
+      }
+    }
+  }
+}
