@@ -1,4 +1,4 @@
-import { Check, Copy, ExternalLink, Tags, Trash2 } from 'lucide-react'
+import { Check, Code2, Copy, ExternalLink, Tags, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DEFAULT_SETTINGS } from '../../../shared/constants'
@@ -338,6 +338,26 @@ export default function Settings() {
           ) : (
             <p className="text-text-muted text-sm">ストレージ設定が見つかりません</p>
           )}
+        </section>
+
+        <Separator className="my-3" />
+
+        {/* 開発者 */}
+        <section>
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+            開発者
+          </h2>
+          <div className="space-y-1.5">
+            <Button
+              variant="secondary"
+              onClick={() => navigate('/settings/dev-mode')}
+              className="w-full text-sm justify-start gap-2"
+              size="sm"
+            >
+              <Code2 size={14} />
+              開発者モード
+            </Button>
+          </div>
         </section>
 
         <Separator className="my-3" />

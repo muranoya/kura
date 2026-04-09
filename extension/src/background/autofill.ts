@@ -207,6 +207,29 @@ function getTotpForUrl(url: string): TotpResult | null {
   return null
 }
 
+function getTotpForEntry(entryId: string): TotpResult | null {
+  if (!vaultApi || !isUnlocked()) return null
+
+  try {
+    const result = vaultApi.api_get_entry(DEFAULT_VAULT_ID, entryId)
+    const raw = JSON.parse(result)
+    const customFieldsRaw = raw.custom_fields
+    const customFields = (
+      typeof customFieldsRaw === 'string' ? JSON.parse(customFieldsRaw) : customFieldsRaw
+    ) as Array<{ field_type: string; value: string }> | null
+    if (!customFields) return null
+
+    const totpField = customFields.find((f) => f.field_type === 'totp')
+    if (!totpField?.value) return null
+
+    const code = vaultApi.api_generate_totp_from_value(totpField.value)
+    return { totpCode: code, totpEntryName: raw.name || '' }
+  } catch (e) {
+    console.error(LOG_PREFIX, `getTotpForEntry: error for entry ${entryId}:`, e)
+    return null
+  }
+}
+
 // ========== Credit card matching ==========
 
 function getCreditCards(): AutofillCredentialCandidate[] {
@@ -276,8 +299,9 @@ function queryPendingLoginFlow(
     return null
   }
 
-  pendingLoginFlows.delete(tabId)
-  console.log(LOG_PREFIX, `queryPendingLoginFlow: consumed flow for tabId=${tabId}`)
+  // Do not delete the flow — it remains available for the TOTP step.
+  // Cleanup is handled by timeout (5 min) or tab close.
+  console.log(LOG_PREFIX, `queryPendingLoginFlow: returning flow for tabId=${tabId}`)
   return { entryId: flow.entryId, username: flow.username }
 }
 
@@ -372,17 +396,31 @@ export async function handleAutofillMessage(
         sendResponse({ success: false, error: 'Vault not unlocked' })
         break
       }
+      const totpEntryId = message.entryId as string | undefined
       const totpUrl = message.url as string
-      if (!totpUrl) {
-        sendResponse({ success: false, error: 'URL required' })
-        break
+
+      // If entryId is provided, get TOTP from that specific entry (split login flow)
+      let totpResult: TotpResult | null = null
+      if (totpEntryId) {
+        totpResult = getTotpForEntry(totpEntryId)
+        console.log(
+          LOG_PREFIX,
+          `AUTOFILL_GET_TOTP: entryId=${totpEntryId}, found=${!!totpResult}`,
+        )
       }
-      const totpResult = getTotpForUrl(totpUrl)
+
+      // Fall back to URL-based search
+      if (!totpResult && totpUrl) {
+        totpResult = getTotpForUrl(totpUrl)
+        console.log(
+          LOG_PREFIX,
+          `AUTOFILL_GET_TOTP: url=${totpUrl}, found=${!!totpResult}`,
+        )
+      }
+
       if (totpResult) {
-        console.log(LOG_PREFIX, `AUTOFILL_GET_TOTP: found TOTP for ${totpUrl}`)
         sendResponse({ success: true, ...totpResult })
       } else {
-        console.log(LOG_PREFIX, `AUTOFILL_GET_TOTP: no TOTP found for ${totpUrl}`)
         sendResponse({ success: true, totpCode: null })
       }
       break

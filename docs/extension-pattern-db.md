@@ -1,4 +1,4 @@
-<!-- doc-status: partial -->
+<!-- doc-status: implemented -->
 # ブラウザ拡張パターンDB 仕様書
 
 サイト固有のフォーム検出ルールをJSONで管理するシステム。ヒューリスティック検出（参照: [extension-autofill.md](extension-autofill.md)）では対応できないサイトに対して、セレクタベースのフォーム定義を提供する。
@@ -265,9 +265,9 @@ extension/patterns/
 
 ## 7. 開発者モード（パターンテスト）
 
-> **未実装（将来対応予定）**
+> **実装済み**
 
-拡張機能のオプションページに開発者モードを用意し、パターン作成・検証を支援する。
+拡張機能のポップアップ設定画面から開発者モードにアクセスでき、パターン作成・検証を支援する。
 
 **機能：**
 
@@ -278,4 +278,10 @@ extension/patterns/
   - パターンDBのセレクタが実際のDOMに一致しているか
   - 入力を実行せずにドライランで確認できるモード
 
-**セキュリティ上の注意：** 開発者モードは拡張機能のオプションページからのみ有効化できる。通常の利用時は無効であり、カスタムパターンはメモリ上にのみ保持してvaultには保存しない。
+**セキュリティ上の注意：** 開発者モードはポップアップの設定画面からのみ有効化できる。通常の利用時は無効であり、カスタムパターンはメモリ上にのみ保持してvaultには保存しない。
+
+**実装:**
+- `extension/src/popup/screens/settings/DevMode.tsx` — 開発者モードUI（トグル、パターン読み込み、デバッグパネル）
+- `extension/src/shared/dev-mode.ts` — 開発者モード状態管理（`chrome.storage.session`ベース）
+- `extension/src/content/dev-mode-bridge.ts` — Content Scriptのパターンオーバーライドとドライラン処理
+- `extension/src/content/debug-collector.ts` — デバッグレポート収集（パターンマッチング + ヒューリスティック結果）

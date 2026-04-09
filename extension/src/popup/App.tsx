@@ -17,6 +17,7 @@ import RecoveryKey from './screens/onboarding/RecoveryKey'
 import StorageSetup from './screens/onboarding/StorageSetup'
 import UnlockExistingVault from './screens/onboarding/UnlockExistingVault'
 import Welcome from './screens/onboarding/Welcome'
+import DevMode from './screens/settings/DevMode'
 import Settings from './screens/settings/Settings'
 
 type AppState = 'loading' | 'onboarding' | 'locked' | 'unlocked'
@@ -145,6 +146,7 @@ function AppContent() {
               <Route path="/labels" element={<LabelManager />} />
               <Route path="/password-generator" element={<PasswordGenerator />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/settings/dev-mode" element={<DevMode />} />
 
               {/* Detail routes without BottomNav */}
               <Route path="/entries/create" element={<EntryCreate />} />

@@ -1,2 +1,2 @@
 # kura ProGuard rules
--keep class com.kura.app.bridge.VaultBridge { *; }
+-keep class net.meshpeak.kura.bridge.VaultBridge { *; }

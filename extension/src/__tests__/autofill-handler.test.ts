@@ -463,7 +463,7 @@ describe('handleAutofillMessage', () => {
       expect(queryResult.pendingFlow.password).toBe('secret123')
     })
 
-    it('consumes pending flow on query (second query returns null)', async () => {
+    it('pending flow is non-destructive (available for TOTP step after password step)', async () => {
       await callHandler(
         {
           type: 'AUTOFILL_PENDING_FLOW_STORE',
@@ -474,20 +474,25 @@ describe('handleAutofillMessage', () => {
         sender(200),
       )
 
-      // First query - consumes
-      await callHandler(
+      // First query (password step)
+      const firstResult = (await callHandler(
         { type: 'AUTOFILL_PENDING_FLOW_QUERY', url: 'https://example.com' },
         sender(200),
-      )
+      )) as { success: boolean; pendingFlow: { entryId: string } }
 
-      // Second query - null
-      const result = (await callHandler(
+      expect(firstResult.success).toBe(true)
+      expect(firstResult.pendingFlow).not.toBeNull()
+      expect(firstResult.pendingFlow.entryId).toBe('entry-1')
+
+      // Second query (TOTP step) — flow remains available
+      const secondResult = (await callHandler(
         { type: 'AUTOFILL_PENDING_FLOW_QUERY', url: 'https://example.com' },
         sender(200),
-      )) as { success: boolean; pendingFlow: null }
+      )) as { success: boolean; pendingFlow: { entryId: string } }
 
-      expect(result.success).toBe(true)
-      expect(result.pendingFlow).toBeNull()
+      expect(secondResult.success).toBe(true)
+      expect(secondResult.pendingFlow).not.toBeNull()
+      expect(secondResult.pendingFlow.entryId).toBe('entry-1')
     })
 
     it('returns null for different domain', async () => {

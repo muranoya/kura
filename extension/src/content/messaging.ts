@@ -60,8 +60,9 @@ export async function requestOpenPopup(): Promise<boolean> {
 
 export async function requestTotp(
   url: string,
+  entryId?: string,
 ): Promise<{ totpCode: string; totpEntryName: string } | null> {
-  const response = await sendMessage({ type: 'AUTOFILL_GET_TOTP', url })
+  const response = await sendMessage({ type: 'AUTOFILL_GET_TOTP', url, entryId })
   if (response.success && 'totpCode' in response && response.totpCode) {
     return {
       totpCode: response.totpCode as string,

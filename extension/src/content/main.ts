@@ -1,9 +1,9 @@
 // Content Script entry point — injected on-demand when vault is unlocked
 // Handles form detection, credential suggestion, and field filling
 
-import { SITE_PATTERNS } from '../shared/patterns-data.generated'
 import type { AutofillCredentialCandidate } from '../shared/types'
 import { isCaptureActive, onVaultLockedDuringCapture, startCaptureMode } from './capture'
+import { getEffectivePatterns, handleDevModeMessage, initDevMode } from './dev-mode-bridge'
 import { hideDropdown, showDropdown, showLockedDropdown } from './dropdown'
 import { fillField, fillFields } from './filler'
 import { type DetectedForm, detectForm, isVisible } from './form-detector'
@@ -31,6 +31,9 @@ if (!(window as unknown as Record<string, boolean>).__kura_autofill_initialized)
 }
 
 function init() {
+  // Initialize developer mode bridge (loads custom patterns if any)
+  initDevMode()
+
   // Listen for focus events on input fields (capture phase)
   // This handles static pages, SPAs, and dynamically added forms
   document.addEventListener('focus', onFocus, true)
@@ -41,22 +44,33 @@ function init() {
   chrome.runtime.onMessage.addListener(onVaultMessage)
 }
 
-function onVaultMessage(message: { type?: string }) {
+function onVaultMessage(
+  message: { type?: string },
+  _sender: chrome.runtime.MessageSender,
+  sendResponse: (response: unknown) => void,
+): boolean | void {
   if (message.type === 'AUTOFILL_VAULT_LOCKED') {
     console.log(LOG_PREFIX, 'Vault locked notification received')
     hideDropdown()
     onVaultLockedDuringCapture()
+    return
   }
   if (message.type === 'AUTOFILL_VAULT_UNLOCKED') {
     console.log(LOG_PREFIX, 'Vault unlocked notification received')
     hideDropdown()
+    return
   }
   if (message.type === 'AUTOFILL_START_CAPTURE') {
     console.log(LOG_PREFIX, 'Starting capture mode')
     hideDropdown()
     startCaptureMode()
+    return
   }
-  // Never return true — this listener does not send responses
+
+  // Developer mode messages
+  if (message.type?.startsWith('DEV_MODE_')) {
+    return handleDevModeMessage(message, sendResponse)
+  }
 }
 
 // Debounce focus events to avoid rapid re-detection
@@ -98,7 +112,7 @@ async function handleInputFocus(input: HTMLInputElement) {
   let strictSubdomain = false
 
   const hostname = window.location.hostname
-  const matchedPattern = findMatchingPattern(SITE_PATTERNS, hostname)
+  const matchedPattern = findMatchingPattern(getEffectivePatterns(), hostname)
 
   if (matchedPattern) {
     console.log(LOG_PREFIX, `handleInputFocus: pattern found for ${hostname}`)
@@ -131,7 +145,20 @@ async function handleInputFocus(input: HTMLInputElement) {
 
   // === TOTP: auto-fill without dropdown ===
   if (form.formType === 'TOTP') {
-    const totpResult = await requestTotp(url)
+    // Check pending flow first (split login: use the same entry selected in username step)
+    const pending = await queryPendingFlow(url)
+    let totpResult: { totpCode: string; totpEntryName: string } | null = null
+
+    if (pending) {
+      console.log(LOG_PREFIX, `handleInputFocus: checking TOTP from pending flow entry ${pending.entryId}`)
+      totpResult = await requestTotp(url, pending.entryId)
+    }
+
+    // Fall back to URL-based search
+    if (!totpResult) {
+      totpResult = await requestTotp(url)
+    }
+
     if (totpResult) {
       const totpField = form.fields.find((f) => f.type === 'totp')
       if (totpField && isVisible(totpField.element)) {

@@ -46,7 +46,7 @@
 
   "browser_specific_settings": {
     "gecko": {
-      "id": "kura@muraoka.dev",
+      "id": "kura@meshpeak.net",
       "strict_min_version": "112.0",
       "data_collection_permissions": {
         "required": ["none"],

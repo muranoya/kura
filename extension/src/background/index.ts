@@ -421,6 +421,11 @@ async function handleMessage(
       }
     }
 
+    // Delegate developer mode messages
+    if (typeof message.type === 'string' && message.type.startsWith('DEV_MODE_')) {
+      return handleDevModeMessageInBackground(message, _sender, sendResponse)
+    }
+
     // Delegate autofill messages to the autofill module
     if (typeof message.type === 'string' && message.type.startsWith('AUTOFILL_')) {
       return handleAutofillMessage(message, _sender, sendResponse)
@@ -1250,6 +1255,54 @@ async function handleClipboardClearAlarm() {
     }
   } catch (err) {
     console.error('[SW] Clipboard clear failed:', err)
+  }
+}
+
+// ========== Developer mode message handling ==========
+
+async function handleDevModeMessageInBackground(
+  // biome-ignore lint/suspicious/noExplicitAny: message shape varies by type
+  message: Record<string, any>,
+  _sender: chrome.runtime.MessageSender,
+  // biome-ignore lint/suspicious/noExplicitAny: response shape varies
+  sendResponse: (response?: any) => void,
+) {
+  switch (message.type) {
+    case 'DEV_MODE_PATTERNS_UPDATED':
+    case 'DEV_MODE_DISABLED': {
+      // Broadcast to all tabs
+      const tabs = await chrome.tabs.query({})
+      for (const tab of tabs) {
+        if (tab.id) {
+          chrome.tabs.sendMessage(tab.id, { type: message.type }).catch(() => {
+            // Content script may not be loaded in this tab — ignore
+          })
+        }
+      }
+      sendResponse({ success: true })
+      break
+    }
+
+    case 'DEV_MODE_DRY_RUN_TAB': {
+      const tabId = message.tabId as number | undefined
+      if (!tabId) {
+        sendResponse({ success: false, error: 'tabId required' })
+        break
+      }
+      try {
+        const response = await chrome.tabs.sendMessage(tabId, { type: 'DEV_MODE_DRY_RUN' })
+        sendResponse(response)
+      } catch (e) {
+        sendResponse({
+          success: false,
+          error: `Failed to reach content script in tab ${tabId}: ${e}`,
+        })
+      }
+      break
+    }
+
+    default:
+      sendResponse({ success: false, error: `Unknown dev mode message: ${message.type}` })
   }
 }
 

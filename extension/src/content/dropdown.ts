@@ -3,7 +3,6 @@
 import type { AutofillCredentialCandidate } from '../shared/types'
 
 const CONTAINER_ID = 'kura-autofill-dropdown'
-const MAX_VISIBLE = 5
 
 let shadowHost: HTMLElement | null = null
 let shadowRoot: ShadowRoot | null = null
@@ -16,6 +15,8 @@ let blurTimeout: ReturnType<typeof setTimeout> | null = null
 let lockedMode = false
 let onUnlockCallback: (() => void) | null = null
 let currentPageProtocol: string | null = null
+let lastAnchorRect: { top: number; left: number } | null = null
+const SCROLL_HIDE_THRESHOLD = 100
 
 function ensureShadowHost(): ShadowRoot {
   if (shadowRoot) return shadowRoot
@@ -180,12 +181,30 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
-// ========== Scroll/resize handler ==========
+// ========== Scroll/resize handlers ==========
 
-function handleScrollResize() {
-  if (currentAnchor) {
-    positionDropdown(currentAnchor)
+function handleScroll() {
+  if (!currentAnchor) return
+
+  const rect = currentAnchor.getBoundingClientRect()
+  if (lastAnchorRect) {
+    const dy = Math.abs(rect.top - lastAnchorRect.top)
+    const dx = Math.abs(rect.left - lastAnchorRect.left)
+    if (dy > SCROLL_HIDE_THRESHOLD || dx > SCROLL_HIDE_THRESHOLD) {
+      hideDropdown()
+      return
+    }
   }
+
+  lastAnchorRect = { top: rect.top, left: rect.left }
+  positionDropdown(currentAnchor)
+}
+
+function handleResize() {
+  if (!currentAnchor) return
+  positionDropdown(currentAnchor)
+  const rect = currentAnchor.getBoundingClientRect()
+  lastAnchorRect = { top: rect.top, left: rect.left }
 }
 
 // ========== Blur handler ==========
@@ -212,7 +231,7 @@ export function showDropdown(
 
   const root = ensureShadowHost()
   currentAnchor = anchor
-  currentCandidates = candidates.slice(0, MAX_VISIBLE)
+  currentCandidates = candidates
   selectedIndex = -1
   onSelectCallback = onSelect
   currentPageProtocol = pageProtocol || null
@@ -229,11 +248,15 @@ export function showDropdown(
   renderItems()
   positionDropdown(anchor)
 
+  // Track initial anchor position for scroll-hide detection
+  const rect = anchor.getBoundingClientRect()
+  lastAnchorRect = { top: rect.top, left: rect.left }
+
   // Event listeners
   anchor.addEventListener('keydown', handleKeydown)
   anchor.addEventListener('blur', handleAnchorBlur)
-  window.addEventListener('scroll', handleScrollResize, true)
-  window.addEventListener('resize', handleScrollResize)
+  window.addEventListener('scroll', handleScroll, true)
+  window.addEventListener('resize', handleResize)
 }
 
 export function hideDropdown() {
@@ -247,8 +270,8 @@ export function hideDropdown() {
     currentAnchor.removeEventListener('blur', handleAnchorBlur)
   }
 
-  window.removeEventListener('scroll', handleScrollResize, true)
-  window.removeEventListener('resize', handleScrollResize)
+  window.removeEventListener('scroll', handleScroll, true)
+  window.removeEventListener('resize', handleResize)
 
   if (dropdownEl) {
     dropdownEl.remove()
@@ -262,6 +285,7 @@ export function hideDropdown() {
   lockedMode = false
   onUnlockCallback = null
   currentPageProtocol = null
+  lastAnchorRect = null
 }
 
 export function isDropdownVisible(): boolean {
@@ -336,8 +360,11 @@ export function showLockedDropdown(anchor: HTMLInputElement, onUnlockClick: () =
 
   positionDropdown(anchor)
 
+  const rect = anchor.getBoundingClientRect()
+  lastAnchorRect = { top: rect.top, left: rect.left }
+
   anchor.addEventListener('keydown', handleKeydown)
   anchor.addEventListener('blur', handleAnchorBlur)
-  window.addEventListener('scroll', handleScrollResize, true)
-  window.addEventListener('resize', handleScrollResize)
+  window.addEventListener('scroll', handleScroll, true)
+  window.addEventListener('resize', handleResize)
 }
