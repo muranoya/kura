@@ -19,7 +19,6 @@
         "minHeight": 600
       }
     ],
-    "enableGTKAppId": true,
     "security": {
       "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:"
     },
@@ -37,7 +36,9 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "category": "Utility",
+    "shortDescription": "Password manager"
   },
   "plugins": {}
 }

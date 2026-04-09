@@ -39,24 +39,53 @@ default: help
 	echo ""
 	cd {{DESKTOP_DIR}} && pnpm tauri dev --config src-tauri/tauri.conf.dev.json
 
-# Desktop app (Tauri)
-@release-desktop: _desktop-icons
+# Desktop app - Linux (AppImage)
+@release-desktop-linux: _desktop-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo "🔨 Building desktop app (Tauri)..."
+	echo "🔨 Building desktop app for Linux (AppImage)..."
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo ""
 	echo "📥 Installing dependencies..."
 	cd {{DESKTOP_DIR}} && pnpm install
 	echo ""
-	echo "🏗️  Building frontend assets..."
-	cd {{DESKTOP_DIR}} && pnpm run build
+	echo "🖥️  Building AppImage..."
+	cd {{DESKTOP_DIR}} && pnpm tauri build --bundles appimage
 	echo ""
-	echo "🖥️  Building native desktop application..."
-	cd {{DESKTOP_DIR}} && pnpm run tauri build
+	echo "✅ Linux build completed!"
+	echo "  - Output: {{DESKTOP_DIR}}/src-tauri/target/release/bundle/appimage/"
+
+# Desktop app - macOS (DMG)
+@release-desktop-macos: _desktop-icons
 	echo ""
-	echo "✅ Desktop build completed!"
-	echo "  - Output: {{DESKTOP_DIR}}/src-tauri/target/release/"
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "🔨 Building desktop app for macOS (DMG)..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	echo "📥 Installing dependencies..."
+	cd {{DESKTOP_DIR}} && pnpm install
+	echo ""
+	echo "🖥️  Building DMG..."
+	cd {{DESKTOP_DIR}} && pnpm tauri build --bundles dmg
+	echo ""
+	echo "✅ macOS build completed!"
+	echo "  - Output: {{DESKTOP_DIR}}/src-tauri/target/release/bundle/dmg/"
+
+# Desktop app - Windows (NSIS installer)
+@release-desktop-windows: _desktop-icons
+	echo ""
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "🔨 Building desktop app for Windows (NSIS)..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	echo "📥 Installing dependencies..."
+	cd {{DESKTOP_DIR}} && pnpm install
+	echo ""
+	echo "🖥️  Building NSIS installer..."
+	cd {{DESKTOP_DIR}} && pnpm tauri build --bundles nsis
+	echo ""
+	echo "✅ Windows build completed!"
+	echo "  - Output: {{DESKTOP_DIR}}/src-tauri/target/release/bundle/nsis/"
 
 # Extension - Generate icons from SVG
 @_extension-icons:
@@ -259,7 +288,7 @@ default: help
 	echo "║              Extension, and other clients              ║"
 	echo "╚━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╝"
 	just release-android
-	just release-desktop
+	just release-desktop-linux
 	just release-extension
 	echo ""
 	echo "╔━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╗"
@@ -469,8 +498,10 @@ test-manual-autofill:
 	echo "    just run-android-device        - Build & install on USB device"
 	echo ""
 	echo "  🖥️  Desktop:"
-	echo "    just dev-desktop          - Start desktop app in dev mode (hot reload)"
-	echo "    just release-desktop      - Build desktop app (Tauri release)"
+	echo "    just dev-desktop              - Start desktop app in dev mode (hot reload)"
+	echo "    just release-desktop-linux    - Build Linux AppImage"
+	echo "    just release-desktop-macos    - Build macOS DMG"
+	echo "    just release-desktop-windows  - Build Windows NSIS installer"
 	echo ""
 	echo "  🔌 Extension:"
 	echo "    just dev-extension            - Start extension in dev mode (HMR)"
