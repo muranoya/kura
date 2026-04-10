@@ -40,7 +40,6 @@ impl EntryState {
 pub struct MergeResult {
     pub merged_entries: HashMap<String, VaultEntry>,
     pub merged_labels: HashMap<String, LabelValue>,
-    pub gc_purged_count: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -85,7 +84,6 @@ pub fn auto_merge(local: &VaultContents, remote: &VaultContents) -> Result<Merge
     Ok(MergeResult {
         merged_entries,
         merged_labels,
-        gc_purged_count: 0,
     })
 }
 

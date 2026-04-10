@@ -1,4 +1,5 @@
 use crate::error::Result;
+use zeroize::Zeroize;
 
 /// Password generation options
 #[derive(Debug, Clone)]
@@ -54,6 +55,8 @@ pub fn generate_password(options: &PasswordOptions) -> Result<String> {
         charset.extend_from_slice(SYMBOLS3);
     }
 
+    // Intentionally returns empty string when no character types are selected.
+    // The caller (UI) is responsible for ensuring at least one type is enabled.
     if charset.is_empty() {
         return Ok(String::new());
     }
@@ -105,7 +108,8 @@ pub fn generate_password(options: &PasswordOptions) -> Result<String> {
         password_bytes.swap(i, j);
     }
 
-    let password: String = password_bytes.into_iter().map(|b| b as char).collect();
+    let password: String = password_bytes.iter().map(|&b| b as char).collect();
+    password_bytes.zeroize();
     Ok(password)
 }
 

@@ -32,7 +32,7 @@ object Routes {
     const val WELCOME = "welcome"
     const val STORAGE_SETUP = "storage_setup"
     const val MASTER_PASSWORD = "master_password"
-    const val RECOVERY_KEY = "recovery_key/{recoveryKey}"
+    const val RECOVERY_KEY = "recovery_key"
     const val UNLOCK_EXISTING = "unlock_existing"
 
     // Auth
@@ -51,7 +51,6 @@ object Routes {
     const val PASSWORD_GENERATOR = "password_generator"
     const val SETTINGS = "settings"
 
-    fun recoveryKey(key: String) = "recovery_key/$key"
     fun entryDetail(id: String) = "entries/$id"
     fun entryEdit(id: String) = "entries/$id/edit"
     fun labelEntries(labelId: String) = "labels/$labelId/entries"
@@ -97,20 +96,19 @@ fun OnboardingNavHost(appViewModel: AppViewModel) {
             MasterPasswordScreen(
                 appViewModel = appViewModel,
                 onVaultCreated = { recoveryKey ->
-                    navController.navigate(Routes.recoveryKey(recoveryKey))
+                    appViewModel.pendingRecoveryKey = recoveryKey
+                    navController.navigate(Routes.RECOVERY_KEY)
                 },
                 onBack = { navController.popBackStack() }
             )
         }
-        composable(
-            Routes.RECOVERY_KEY,
-            arguments = listOf(navArgument("recoveryKey") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val recoveryKey = backStackEntry.arguments?.getString("recoveryKey") ?: ""
+        composable(Routes.RECOVERY_KEY) {
+            val recoveryKey = appViewModel.pendingRecoveryKey ?: ""
             RecoveryKeyScreen(
                 recoveryKey = recoveryKey,
                 appViewModel = appViewModel,
                 onComplete = {
+                    appViewModel.pendingRecoveryKey = null
                     appViewModel.setAppState(AppState.UNLOCKED)
                 }
             )

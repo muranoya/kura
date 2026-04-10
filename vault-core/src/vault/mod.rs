@@ -22,7 +22,7 @@ pub struct LockedVault {
 /// Unlocked vault - plaintext JSON in memory with DEK available
 pub struct UnlockedVault {
     pub(crate) meta: VaultMeta,
-    pub contents: VaultContents,
-    pub dek: Dek,
+    pub(crate) contents: VaultContents,
+    pub(crate) dek: Dek,
     pub(crate) etag: Option<String>,
 }

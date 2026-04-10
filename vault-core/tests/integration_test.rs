@@ -8,7 +8,7 @@ fn test_vault_create_unlock_lock_cycle() {
     let master_password = "test_password_123";
 
     // Create new vault
-    let locked = LockedVault::create_new(master_password).expect("Failed to create vault");
+    let (locked, _) = LockedVault::create_new(master_password).expect("Failed to create vault");
 
     // Unlock with correct password
     let mut unlocked = locked
@@ -54,7 +54,7 @@ fn test_vault_wrong_password() {
     let master_password = "correct_password";
     let wrong_password = "wrong_password";
 
-    let locked = LockedVault::create_new(master_password).expect("Failed to create vault");
+    let (locked, _) = LockedVault::create_new(master_password).expect("Failed to create vault");
 
     let result = locked.unlock(wrong_password);
     assert!(result.is_err(), "Should not unlock with wrong password");
@@ -63,7 +63,7 @@ fn test_vault_wrong_password() {
 #[test]
 fn test_entry_encryption_decryption() {
     let master_password = "password";
-    let locked = LockedVault::create_new(master_password).expect("Failed to create vault");
+    let (locked, _) = LockedVault::create_new(master_password).expect("Failed to create vault");
     let mut unlocked = locked.unlock(master_password).expect("Failed to unlock");
 
     // Create sensitive entry
@@ -102,7 +102,7 @@ fn test_entry_encryption_decryption() {
 #[test]
 fn test_multiple_entries_and_labels() {
     let master_password = "password";
-    let locked = LockedVault::create_new(master_password).expect("Failed to create vault");
+    let (locked, _) = LockedVault::create_new(master_password).expect("Failed to create vault");
     let mut unlocked = locked.unlock(master_password).expect("Failed to unlock");
 
     // Create labels
@@ -159,7 +159,7 @@ fn test_multiple_entries_and_labels() {
 #[test]
 fn test_database_serialization() {
     let master_password = "password";
-    let locked = LockedVault::create_new(master_password).expect("Failed to create vault");
+    let (locked, _) = LockedVault::create_new(master_password).expect("Failed to create vault");
     let mut unlocked = locked.unlock(master_password).expect("Failed to unlock");
 
     // Create entry
@@ -182,7 +182,7 @@ fn test_database_serialization() {
 #[test]
 fn test_entry_deletion_and_restoration() {
     let master_password = "password";
-    let locked = LockedVault::create_new(master_password).expect("Failed to create vault");
+    let (locked, _) = LockedVault::create_new(master_password).expect("Failed to create vault");
     let mut unlocked = locked.unlock(master_password).expect("Failed to unlock");
 
     let entry = unlocked
@@ -254,7 +254,7 @@ fn test_change_master_password() {
     let old_password = "old_password";
     let new_password = "new_password";
 
-    let locked = LockedVault::create_new(old_password).expect("Failed to create vault");
+    let (locked, _) = LockedVault::create_new(old_password).expect("Failed to create vault");
     let mut unlocked = locked.unlock(old_password).expect("Failed to unlock");
 
     // Change password
@@ -276,7 +276,7 @@ fn test_change_master_password() {
 #[test]
 fn test_delete_label_removes_label_id_from_entry() {
     let master_password = "password";
-    let locked = LockedVault::create_new(master_password).expect("Failed to create vault");
+    let (locked, _) = LockedVault::create_new(master_password).expect("Failed to create vault");
     let mut unlocked = locked.unlock(master_password).expect("Failed to unlock");
 
     // Create label
@@ -332,7 +332,7 @@ fn test_delete_label_removes_label_id_from_entry() {
 #[test]
 fn test_delete_label_affects_all_entries_with_label() {
     let master_password = "password";
-    let locked = LockedVault::create_new(master_password).expect("Failed to create vault");
+    let (locked, _) = LockedVault::create_new(master_password).expect("Failed to create vault");
     let mut unlocked = locked.unlock(master_password).expect("Failed to unlock");
 
     // Create two labels
@@ -447,7 +447,7 @@ fn test_merge_rejects_vault_uuid_mismatch() {
     manager.api_unlock(password.to_string()).unwrap();
 
     // Vault B を別に作成（UUIDが異なる）
-    let other_locked = LockedVault::create_new(password).unwrap();
+    let (other_locked, _) = LockedVault::create_new(password).unwrap();
     let other_bytes = other_locked.to_vault_bytes().unwrap();
 
     // Vault AのセッションにVault Bのバイト列をマージしようとする → UUID不一致でエラー
@@ -467,7 +467,7 @@ fn test_merge_accepts_same_vault_uuid() {
     let password = "password";
 
     // Vault を作成
-    let locked = LockedVault::create_new(password).unwrap();
+    let (locked, _) = LockedVault::create_new(password).unwrap();
     let vault_bytes = locked.to_vault_bytes().unwrap();
 
     // 同じvaultをマネージャーにロード
@@ -485,7 +485,7 @@ fn test_merge_accepts_same_vault_uuid() {
 #[test]
 fn test_delete_label_not_found_returns_error() {
     let master_password = "password";
-    let locked = LockedVault::create_new(master_password).expect("Failed to create vault");
+    let (locked, _) = LockedVault::create_new(master_password).expect("Failed to create vault");
     let mut unlocked = locked.unlock(master_password).expect("Failed to unlock");
 
     // Try to delete non-existent label

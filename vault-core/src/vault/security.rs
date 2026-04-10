@@ -129,7 +129,7 @@ mod tests {
     const PASSWORD: &str = "test-master-password";
 
     fn create_unlocked_vault() -> UnlockedVault {
-        let locked = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
         locked.unlock(PASSWORD).unwrap()
     }
 

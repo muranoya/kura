@@ -23,6 +23,10 @@ pub struct SyncOutcome {
 ///
 /// `StorageBackend`の実装はアプリ側が提供する。
 /// タイムアウトは`StorageBackend`実装側の責務。
+///
+/// セッションMutexはネットワークI/O中にロックを保持しないよう、意図的に複数回
+/// acquire/releaseしている。これにより長時間のネットワーク操作中も他スレッドから
+/// セッション状態を参照できる。
 pub async fn sync_with_storage(
     storage: &dyn StorageBackend,
     vault_session: &Mutex<Option<SessionState>>,
@@ -124,8 +128,8 @@ pub async fn sync_with_storage(
                         .lock()
                         .map_err(|_| "Session lock poisoned".to_string())?;
                     if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
-                        u.contents.entries = merged_contents.entries.clone();
-                        u.contents.labels = merged_contents.labels.clone();
+                        u.contents.entries = merged_contents.entries;
+                        u.contents.labels = merged_contents.labels;
                         u.set_etag(remote_etag.clone());
                     }
                 }

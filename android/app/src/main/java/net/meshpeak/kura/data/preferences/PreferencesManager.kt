@@ -75,6 +75,10 @@ class PreferencesManager(private val context: Context) {
         context.dataStore.edit { it[AUTOLOCK_MINUTES] = minutes }
     }
 
+    suspend fun saveClipboardClearSeconds(seconds: Int) {
+        context.dataStore.edit { it[CLIPBOARD_CLEAR_SECONDS] = seconds }
+    }
+
     suspend fun saveFilterType(type: String?) {
         context.dataStore.edit {
             if (type != null) it[FILTER_TYPE] = type else it.remove(FILTER_TYPE)

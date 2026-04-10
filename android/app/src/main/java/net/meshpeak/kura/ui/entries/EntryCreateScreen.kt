@@ -7,14 +7,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import net.meshpeak.kura.data.model.CustomField
 import net.meshpeak.kura.data.model.EntryType
 import net.meshpeak.kura.data.model.Label
 import net.meshpeak.kura.ui.components.EntryForm
+import net.meshpeak.kura.util.copyToClipboard
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -38,6 +37,8 @@ fun EntryCreateScreen(
     var error by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val clipboardClearSeconds by appViewModel.preferences.clipboardClearSecondsFlow
+        .collectAsState(initial = 30)
 
     LaunchedEffect(Unit) {
         try { labels = appViewModel.repository.listLabels() } catch (_: Exception) { }
@@ -144,8 +145,7 @@ fun EntryCreateScreen(
                         appViewModel.repository.generatePassword(len, lower, upper, num, sym1, sym2, sym3)
                     },
                     onCopyToClipboard = { text ->
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("kura", text))
+                        copyToClipboard(context, "kura", text, clipboardClearSeconds, scope)
                     },
                     onCreateLabel = { name ->
                         val id = appViewModel.repository.createLabel(name)

@@ -1,7 +1,7 @@
 import { Store } from '@tauri-apps/plugin-store'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { syncVault } from '../../commands'
+import { getS3ConfigSession, syncVault } from '../../commands'
 import { usePushError } from '../../contexts/ErrorContext'
 import { useNotifySynced } from '../../contexts/SyncContext'
 import { STORAGE_KEYS } from '../../shared/constants'
@@ -26,7 +26,7 @@ export default function SyncHeaderActions() {
 
   // Load initial values
   useEffect(() => {
-    setHasConfig(sessionStorage.getItem('decryptedS3Config') !== null)
+    getS3ConfigSession().then((config) => setHasConfig(config !== null))
 
     const loadSyncTime = async () => {
       try {
@@ -76,7 +76,7 @@ export default function SyncHeaderActions() {
   }, [lastSyncTime])
 
   const handleSync = async () => {
-    const configJson = sessionStorage.getItem('decryptedS3Config')
+    const configJson = await getS3ConfigSession()
     if (!configJson) return
 
     setSyncStatus('syncing')

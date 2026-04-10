@@ -42,12 +42,10 @@ export default function MasterPassword() {
         const encrypted = await commands.encryptConfig(password, pendingConfig)
         await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
         sessionStorage.removeItem('pendingS3Config')
-        // 復号済みS3設定をセッションに保持（同期で使用）
-        sessionStorage.setItem('decryptedS3Config', pendingConfig)
+        // 復号済みS3設定をRustプロセスメモリに保持（同期で使用）
+        await commands.setS3ConfigSession(pendingConfig)
       }
-      // Store recovery key in session/context for display on next screen
-      sessionStorage.setItem('recoveryKey', recoveryKey)
-      navigate('/onb/recovery')
+      navigate('/onb/recovery', { state: { recoveryKey } })
     } catch (err) {
       setError(`エラー: ${err}`)
     } finally {

@@ -99,12 +99,25 @@ impl UnlockedVault {
     }
 
     /// Delete entry (soft delete to trash)
+    /// Idempotent: calling on an already soft-deleted entry is a no-op.
     pub fn delete_entry(&mut self, id: &str) -> Result<()> {
         let entry = self
             .contents
             .entries
             .get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
+
+        if entry.purged_at.is_some() {
+            return Err(VaultError::InvalidInput(
+                "Cannot delete a purged entry".to_string(),
+            ));
+        }
+
+        // Already soft-deleted — no-op for idempotency
+        if entry.deleted_at.is_some() {
+            return Ok(());
+        }
+
         let now = crate::get_timestamp();
         entry.deleted_at = Some(now);
         entry.updated_at = now;
@@ -435,6 +448,31 @@ mod tests {
         let mut vault = make_vault();
         let data = make_login_data();
         let result = vault.update_entry("nonexistent", "Name".into(), data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_delete_already_deleted_is_noop() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "Test", 1000);
+
+        vault.delete_entry("e1").unwrap();
+        let first_deleted_at = vault.contents.entries["e1"].deleted_at;
+        let first_updated_at = vault.contents.entries["e1"].updated_at;
+
+        // Second delete should be a no-op
+        vault.delete_entry("e1").unwrap();
+        assert_eq!(vault.contents.entries["e1"].deleted_at, first_deleted_at);
+        assert_eq!(vault.contents.entries["e1"].updated_at, first_updated_at);
+    }
+
+    #[test]
+    fn test_delete_purged_entry_fails() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "Test", 1000);
+        vault.purge_entry("e1").unwrap();
+
+        let result = vault.delete_entry("e1");
         assert!(result.is_err());
     }
 

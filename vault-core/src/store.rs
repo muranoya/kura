@@ -47,6 +47,8 @@ pub struct VaultEntry {
     pub purged_at: Option<i64>,
     pub is_favorite: bool,
     pub label_ids: Vec<String>,
+    /// Stored as `Zeroizing<String>` (raw JSON) for automatic memory zeroization on drop.
+    /// In the domain layer (`EntryData`), this is represented as `serde_json::Value`.
     #[serde(with = "crate::raw_json_serde")]
     pub typed_value: Zeroizing<String>,
     pub notes: Option<String>,

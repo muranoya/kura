@@ -15,7 +15,7 @@ fn generate_test_vault_fixture() {
     let master_password = "kura-test";
 
     // Create new vault and unlock
-    let locked = LockedVault::create_new(master_password).expect("Failed to create vault");
+    let (locked, _) = LockedVault::create_new(master_password).expect("Failed to create vault");
     let mut unlocked = locked
         .unlock(master_password)
         .expect("Failed to unlock vault");

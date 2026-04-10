@@ -40,10 +40,13 @@ pub struct EntryDetail {
     pub updated_at: i64,
     pub deleted_at: Option<i64>,
     pub notes: Option<String>,
-    pub typed_value: String, // JSON文字列
+    /// FFI境界越しに `serde_json::Value` を渡せないため、JSON文字列として返す。
+    /// 永続化層では `Zeroizing<String>` として保持している。
+    pub typed_value: String,
     pub labels: Vec<String>,
+    /// FFI境界越しに構造体の配列を渡せないため、JSON文字列として返す。
     #[serde(default)]
-    pub custom_fields: Option<String>, // JSON文字列
+    pub custom_fields: Option<String>,
 }
 
 /// オートフィル候補データ（パスワードを含まない）
@@ -74,6 +77,10 @@ pub struct SyncApiResult {
 ///
 /// アプリ側で複数のVaultManagerを生成することで、
 /// 複数のvaultを同時にUnlock状態で保持できる。
+///
+/// API層の全メソッドは `Result<T, String>` を返す。これはJNI/WASM/Tauri IPC等の
+/// FFI境界で型付きenumを自然に渡せないための意図的な設計。内部では `VaultError` を
+/// 使用し、API境界で文字列に変換している。
 pub struct VaultManager {
     pub(crate) session: Mutex<Option<SessionState>>,
     pub(crate) last_sync_time: Mutex<Option<i64>>,
@@ -96,4 +103,30 @@ impl Default for VaultManager {
 
 fn unix_now() -> i64 {
     crate::get_timestamp()
+}
+
+impl VaultManager {
+    /// Read-only access to the unlocked vault session.
+    pub(crate) fn with_unlocked<F, T>(&self, f: F) -> Result<T, String>
+    where
+        F: FnOnce(&crate::vault::UnlockedVault) -> Result<T, String>,
+    {
+        let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
+        match session.as_ref() {
+            Some(SessionState::Unlocked(v)) => f(v),
+            _ => Err("Vault not unlocked".to_string()),
+        }
+    }
+
+    /// Mutable access to the unlocked vault session.
+    pub(crate) fn with_unlocked_mut<F, T>(&self, f: F) -> Result<T, String>
+    where
+        F: FnOnce(&mut crate::vault::UnlockedVault) -> Result<T, String>,
+    {
+        let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
+        match session.as_mut() {
+            Some(SessionState::Unlocked(ref mut v)) => f(v),
+            _ => Err("Vault not unlocked".to_string()),
+        }
+    }
 }

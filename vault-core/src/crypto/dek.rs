@@ -3,10 +3,10 @@ use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Data Encryption Key - 32 bytes, automatically zeroized on drop
-#[derive(Clone)]
+/// Clone is intentionally not implemented to prevent uncontrolled copies of key material.
 pub struct Dek {
     bytes: [u8; 32],
 }
@@ -68,9 +68,11 @@ impl Dek {
         let cipher = Aes256Gcm::new_from_slice(kek.as_bytes())
             .map_err(|_| VaultError::EncryptionError("Failed to create cipher".to_string()))?;
 
-        let plaintext = cipher
-            .decrypt(nonce, ciphertext)
-            .map_err(|_| VaultError::DecryptionError("Decryption failed".to_string()))?;
+        let plaintext = Zeroizing::new(
+            cipher
+                .decrypt(nonce, ciphertext)
+                .map_err(|_| VaultError::DecryptionError("Decryption failed".to_string()))?,
+        );
 
         if plaintext.len() != 32 {
             return Err(VaultError::DecryptionError(

@@ -10,7 +10,11 @@ import { PasswordInput } from '../../components/ui/password-input'
 import { STORAGE_KEYS } from '../../shared/constants'
 import { saveToStorage } from '../../shared/storage'
 
-export default function UnlockExistingVault() {
+interface UnlockExistingVaultProps {
+  onUnlocked?: () => void
+}
+
+export default function UnlockExistingVault({ onUnlocked }: UnlockExistingVaultProps) {
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -31,12 +35,12 @@ export default function UnlockExistingVault() {
         const encrypted = await commands.encryptConfig(password, pendingConfig)
         await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
         sessionStorage.removeItem('pendingS3Config')
-        sessionStorage.setItem('decryptedS3Config', pendingConfig)
+        await commands.setS3ConfigSession(pendingConfig)
       }
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
       commands.syncVaultIfConfigured().catch(() => {}) // バックグラウ���ド
-      window.location.reload()
+      onUnlocked?.()
     } catch (_err) {
       setError('パスワードが違います')
       setLoading(false)

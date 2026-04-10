@@ -35,6 +35,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _syncVersion = MutableStateFlow(0)
     val syncVersion: StateFlow<Int> = _syncVersion.asStateFlow()
 
+    /** オンボーディング時にリカバリーキーを一時保持（ナビゲーションURLに露出させない） */
+    var pendingRecoveryKey: String? = null
+
     init {
         initializeApp()
     }
@@ -121,12 +124,4 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun getS3ConfigJson(): String? {
-        var result: String? = null
-        // Synchronous read from flow - used only for simple lookups
-        viewModelScope.launch {
-            result = preferences.s3ConfigFlow.first()
-        }
-        return result
-    }
 }

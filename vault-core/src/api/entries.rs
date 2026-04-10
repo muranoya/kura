@@ -1,5 +1,4 @@
 use crate::models::{EntryFilter, EntryType, SortField, SortOrder};
-use crate::sync::engine::SessionState;
 use serde_json::Value;
 
 use super::{AutofillCandidate, EntryDetail, EntryRow, VaultManager};
@@ -31,90 +30,82 @@ impl VaultManager {
         sort_field: Option<String>,
         sort_order: Option<String>,
     ) -> Result<Vec<EntryRow>, String> {
-        let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-        let unlocked = match session.as_ref() {
-            Some(SessionState::Unlocked(v)) => v,
-            _ => return Err("Vault not unlocked".to_string()),
-        };
+        self.with_unlocked(|unlocked| {
+            let sort_field = sort_field
+                .and_then(|s| SortField::from_str(&s))
+                .unwrap_or_default();
+            let sort_order = sort_order
+                .and_then(|s| SortOrder::from_str(&s))
+                .unwrap_or_default();
 
-        let sort_field = sort_field
-            .and_then(|s| SortField::from_str(&s))
-            .unwrap_or_default();
-        let sort_order = sort_order
-            .and_then(|s| SortOrder::from_str(&s))
-            .unwrap_or_default();
+            let mut filter = EntryFilter::new()
+                .with_trash(include_trash)
+                .with_search(search_query.unwrap_or_default())
+                .with_sort(sort_field, sort_order);
 
-        let mut filter = EntryFilter::new()
-            .with_trash(include_trash)
-            .with_search(search_query.unwrap_or_default())
-            .with_sort(sort_field, sort_order);
+            if let Some(t) = entry_type {
+                filter = filter.with_type(t);
+            }
 
-        if let Some(t) = entry_type {
-            filter = filter.with_type(t);
-        }
+            if let Some(l) = label_id {
+                filter = filter.with_label(l);
+            }
 
-        if let Some(l) = label_id {
-            filter = filter.with_label(l);
-        }
+            if only_favorites {
+                filter = filter.favorites_only();
+            }
 
-        if only_favorites {
-            filter = filter.favorites_only();
-        }
+            let entries = unlocked
+                .list_entries(&filter)
+                .map_err(|e| format!("Failed to list entries: {}", e))?;
 
-        let entries = unlocked
-            .list_entries(&filter)
-            .map_err(|e| format!("Failed to list entries: {}", e))?;
-
-        Ok(entries
-            .into_iter()
-            .map(|entry| {
-                let subtitle = extract_subtitle(&entry.entry_type, &entry.data.typed_value);
-                EntryRow {
-                    id: entry.id,
-                    entry_type: entry.entry_type,
-                    name: entry.name,
-                    subtitle,
-                    is_favorite: entry.is_favorite,
-                    created_at: entry.created_at,
-                    updated_at: entry.updated_at,
-                    deleted_at: entry.deleted_at,
-                }
-            })
-            .collect())
+            Ok(entries
+                .into_iter()
+                .map(|entry| {
+                    let subtitle = extract_subtitle(&entry.entry_type, &entry.data.typed_value);
+                    EntryRow {
+                        id: entry.id,
+                        entry_type: entry.entry_type,
+                        name: entry.name,
+                        subtitle,
+                        is_favorite: entry.is_favorite,
+                        created_at: entry.created_at,
+                        updated_at: entry.updated_at,
+                        deleted_at: entry.deleted_at,
+                    }
+                })
+                .collect())
+        })
     }
 
     /// エントリ詳細（復号済み）
     pub fn api_get_entry(&self, id: String) -> Result<EntryDetail, String> {
-        let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-        let unlocked = match session.as_ref() {
-            Some(SessionState::Unlocked(v)) => v,
-            _ => return Err("Vault not unlocked".to_string()),
-        };
+        self.with_unlocked(|unlocked| {
+            let entry = unlocked
+                .get_entry(&id)
+                .map_err(|e| format!("Failed to get entry: {}", e))?
+                .ok_or_else(|| format!("Entry not found: {}", id))?;
 
-        let entry = unlocked
-            .get_entry(&id)
-            .map_err(|e| format!("Failed to get entry: {}", e))?
-            .ok_or_else(|| format!("Entry not found: {}", id))?;
+            let custom_fields = entry
+                .data
+                .custom_fields
+                .as_ref()
+                .map(|fields| serde_json::to_string(fields).unwrap_or_else(|_| "[]".to_string()));
 
-        let custom_fields = entry
-            .data
-            .custom_fields
-            .as_ref()
-            .map(|fields| serde_json::to_string(fields).unwrap_or_else(|_| "[]".to_string()));
-
-        Ok(EntryDetail {
-            id: entry.id,
-            entry_type: entry.entry_type,
-            name: entry.name,
-            is_favorite: entry.is_favorite,
-            created_at: entry.created_at,
-            updated_at: entry.updated_at,
-            deleted_at: entry.deleted_at,
-            notes: entry.data.notes.clone(),
-            typed_value: serde_json::to_string(&entry.data.typed_value)
-                .unwrap_or_else(|_| "{}".to_string()),
-            labels: entry.labels,
-            custom_fields,
+            Ok(EntryDetail {
+                id: entry.id,
+                entry_type: entry.entry_type,
+                name: entry.name,
+                is_favorite: entry.is_favorite,
+                created_at: entry.created_at,
+                updated_at: entry.updated_at,
+                deleted_at: entry.deleted_at,
+                notes: entry.data.notes.clone(),
+                typed_value: serde_json::to_string(&entry.data.typed_value)
+                    .unwrap_or_else(|_| "{}".to_string()),
+                labels: entry.labels,
+                custom_fields,
+            })
         })
     }
 
@@ -128,8 +119,6 @@ impl VaultManager {
         label_ids: Vec<String>,
         custom_fields_json: Option<String>,
     ) -> Result<String, String> {
-        let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-
         let typed_value: Value = serde_json::from_str(&typed_value_json)
             .map_err(|e| format!("Invalid typed_value JSON: {}", e))?;
 
@@ -153,14 +142,12 @@ impl VaultManager {
             custom_fields,
         };
 
-        if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
+        self.with_unlocked_mut(|unlocked| {
             let entry = unlocked
                 .create_entry(name, entry_type, data, label_ids)
                 .map_err(|e| format!("Failed to create entry: {}", e))?;
             Ok(entry.id)
-        } else {
-            Err("Vault not unlocked".to_string())
-        }
+        })
     }
 
     /// エントリ更新
@@ -173,9 +160,7 @@ impl VaultManager {
         label_ids: Option<Vec<String>>,
         custom_fields_json: Option<String>,
     ) -> Result<(), String> {
-        let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-
-        if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
+        self.with_unlocked_mut(|unlocked| {
             // Get current entry to preserve typed_value if not provided
             let current = unlocked
                 .get_entry(&id)
@@ -198,10 +183,21 @@ impl VaultManager {
                 current.data.custom_fields.clone()
             };
 
+            // Empty string clears notes to None; None preserves existing value
+            let notes = if let Some(n) = notes {
+                if n.is_empty() {
+                    None
+                } else {
+                    Some(n)
+                }
+            } else {
+                current.data.notes.clone()
+            };
+
             let data = crate::models::EntryData {
                 entry_type: current.entry_type,
                 typed_value,
-                notes: notes.or_else(|| current.data.notes.clone()),
+                notes,
                 custom_fields,
             };
 
@@ -216,61 +212,43 @@ impl VaultManager {
             }
 
             Ok(())
-        } else {
-            Err("Vault not unlocked".to_string())
-        }
+        })
     }
 
     /// エントリをゴミ箱へ移動
     pub fn api_delete_entry(&self, id: String) -> Result<(), String> {
-        let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-
-        if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
+        self.with_unlocked_mut(|unlocked| {
             unlocked
                 .delete_entry(&id)
                 .map_err(|e| format!("Failed to delete entry: {}", e))
-        } else {
-            Err("Vault not unlocked".to_string())
-        }
+        })
     }
 
     /// ゴミ箱から復元
     pub fn api_restore_entry(&self, id: String) -> Result<(), String> {
-        let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-
-        if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
+        self.with_unlocked_mut(|unlocked| {
             unlocked
                 .restore_entry(&id)
                 .map_err(|e| format!("Failed to restore entry: {}", e))
-        } else {
-            Err("Vault not unlocked".to_string())
-        }
+        })
     }
 
     /// 完全削除
     pub fn api_purge_entry(&self, id: String) -> Result<(), String> {
-        let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-
-        if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
+        self.with_unlocked_mut(|unlocked| {
             unlocked
                 .purge_entry(&id)
                 .map_err(|e| format!("Failed to purge entry: {}", e))
-        } else {
-            Err("Vault not unlocked".to_string())
-        }
+        })
     }
 
     /// お気に入り設定
     pub fn api_set_favorite(&self, id: String, is_favorite: bool) -> Result<(), String> {
-        let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-
-        if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
+        self.with_unlocked_mut(|unlocked| {
             unlocked
                 .set_favorite(&id, is_favorite)
                 .map_err(|e| format!("Failed to set favorite: {}", e))
-        } else {
-            Err("Vault not unlocked".to_string())
-        }
+        })
     }
 
     /// オートフィル候補検索（ホスト名でマッチング）
@@ -282,44 +260,40 @@ impl VaultManager {
     /// ホスト名リストを渡す設計にすることもできるが、シンプルさのため
     /// 全loginエントリのURL情報を返し、マッチングはJS側に委ねる。
     pub fn api_list_login_urls(&self) -> Result<Vec<AutofillCandidate>, String> {
-        let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-        let unlocked = match session.as_ref() {
-            Some(SessionState::Unlocked(v)) => v,
-            _ => return Err("Vault not unlocked".to_string()),
-        };
+        self.with_unlocked(|unlocked| {
+            let filter = EntryFilter::new().with_type("login".to_string());
 
-        let filter = EntryFilter::new().with_type("login".to_string());
+            let entries = unlocked
+                .list_entries(&filter)
+                .map_err(|e| format!("Failed to list entries: {}", e))?;
 
-        let entries = unlocked
-            .list_entries(&filter)
-            .map_err(|e| format!("Failed to list entries: {}", e))?;
+            Ok(entries
+                .into_iter()
+                .filter_map(|entry| {
+                    let url = entry
+                        .data
+                        .typed_value
+                        .get("url")
+                        .and_then(|v| v.as_str())
+                        .filter(|s| !s.is_empty())
+                        .map(|s| s.to_string())?;
 
-        Ok(entries
-            .into_iter()
-            .filter_map(|entry| {
-                let url = entry
-                    .data
-                    .typed_value
-                    .get("url")
-                    .and_then(|v| v.as_str())
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.to_string())?;
+                    let username = entry
+                        .data
+                        .typed_value
+                        .get("username")
+                        .and_then(|v| v.as_str())
+                        .filter(|s| !s.is_empty())
+                        .map(|s| s.to_string());
 
-                let username = entry
-                    .data
-                    .typed_value
-                    .get("username")
-                    .and_then(|v| v.as_str())
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.to_string());
-
-                Some(AutofillCandidate {
-                    id: entry.id,
-                    name: entry.name,
-                    url,
-                    username,
+                    Some(AutofillCandidate {
+                        id: entry.id,
+                        name: entry.name,
+                        url,
+                        username,
+                    })
                 })
-            })
-            .collect())
+                .collect())
+        })
     }
 }

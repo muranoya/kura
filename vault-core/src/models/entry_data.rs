@@ -49,7 +49,12 @@ pub struct CustomField {
     pub value: String,
 }
 
-/// Encrypted entry data container - automatically zeroized on drop
+/// Entry data container for the API/domain layer - automatically zeroized on drop.
+///
+/// `typed_value` is `serde_json::Value` for ergonomic access in business logic.
+/// In the storage layer (`VaultEntry`), the same data is stored as `Zeroizing<String>`
+/// (raw JSON string) to ensure zeroization during serialization.
+/// Conversion between the two happens in `vault_entry_to_entry`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EntryData {
     #[serde(rename = "type")]

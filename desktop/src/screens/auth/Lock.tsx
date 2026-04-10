@@ -11,7 +11,11 @@ import { Separator } from '../../components/ui/separator'
 import { STORAGE_KEYS } from '../../shared/constants'
 import { clearStorage, getFromStorage } from '../../shared/storage'
 
-export default function LockScreen() {
+interface LockScreenProps {
+  onUnlocked?: () => void
+}
+
+export default function LockScreen({ onUnlocked }: LockScreenProps) {
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -27,14 +31,14 @@ export default function LockScreen() {
     setLoading(true)
     try {
       await commands.unlock(password)
-      // 暗号化されたS3設定を復号してセッションに保持
+      // 暗号化されたS3設定を復号してRustプロセスメモリに保持
       const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
       if (encryptedConfig) {
         const configJson = await commands.decryptConfig(password, encryptedConfig)
-        sessionStorage.setItem('decryptedS3Config', configJson)
+        await commands.setS3ConfigSession(configJson)
       }
       commands.syncVaultIfConfigured().catch(() => {}) // バックグラウンド
-      window.location.reload()
+      onUnlocked?.()
     } catch (err) {
       setError(`ロック解除失敗: ${err}`)
       setLoading(false)

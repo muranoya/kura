@@ -479,12 +479,16 @@ test-manual-autofill:
 	cargo clean
 	echo "  - Desktop..."
 	cd {{DESKTOP_DIR}} && rm -rf dist/ build/ node_modules/
+	rm -f {{DESKTOP_DIR}}/src-tauri/icons/*.png {{DESKTOP_DIR}}/src-tauri/icons/*.ico {{DESKTOP_DIR}}/src-tauri/icons/*.icns
 	echo "  - Extension..."
-	cd {{EXTENSION_DIR}} && rm -rf dist/ build/ node_modules/ wasm/ kura-extension-chrome.zip kura-extension-firefox.zip
+	cd {{EXTENSION_DIR}} && rm -rf dist/ build/ node_modules/ wasm/ public/ test-pages/fixtures/ kura-extension-chrome.zip kura-extension-firefox.zip
+	rm -f {{EXTENSION_DIR}}/*.xpi
+	rm -f {{EXTENSION_DIR}}/src/shared/etld-data.generated.ts {{EXTENSION_DIR}}/src/shared/patterns-data.generated.ts
 	echo "  - Vault-core..."
 	rm -rf {{VAULT_CORE_DIR}}/pkg/
 	echo "  - Android..."
-	cd {{ANDROID_DIR}} && rm -rf app/build/ app/src/main/jniLibs/ .gradle/ build/
+	cd {{ANDROID_DIR}} && rm -rf app/build/ app/src/main/jniLibs/ .gradle/ build/ app/src/main/assets/legal/
+	rm -f {{ANDROID_DIR}}/app/src/main/res/mipmap-*/ic_launcher.png {{ANDROID_DIR}}/app/src/main/res/mipmap-*/ic_launcher_foreground.png
 	echo "✅ Cleanup completed!"
 
 # ヘルプ表示

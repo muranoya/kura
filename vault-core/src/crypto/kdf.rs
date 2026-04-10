@@ -3,7 +3,7 @@ use argon2::{Algorithm, Argon2, Params, Version};
 use zeroize::Zeroize;
 
 /// Key Encryption Key - 32 bytes, automatically zeroized on drop
-#[derive(Clone)]
+/// Clone is intentionally not implemented to prevent uncontrolled copies of key material.
 pub struct Kek {
     bytes: [u8; 32],
 }

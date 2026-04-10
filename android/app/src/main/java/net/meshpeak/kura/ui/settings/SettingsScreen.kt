@@ -1,7 +1,5 @@
 package net.meshpeak.kura.ui.settings
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.widget.Toast
@@ -24,6 +22,7 @@ import androidx.fragment.app.FragmentActivity
 import net.meshpeak.kura.bridge.VaultBridge
 import net.meshpeak.kura.data.model.S3Config
 import net.meshpeak.kura.ui.components.ConfirmDialog
+import net.meshpeak.kura.util.copyToClipboard
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -51,6 +50,10 @@ fun SettingsScreen(
     val autolockMinutes by appViewModel.preferences.autolockMinutesFlow
         .collectAsState(initial = 5)
     var autolockExpanded by remember { mutableStateOf(false) }
+
+    val clipboardClearSeconds by appViewModel.preferences.clipboardClearSecondsFlow
+        .collectAsState(initial = 30)
+    var clipboardClearExpanded by remember { mutableStateOf(false) }
 
     val canUseBiometric = remember {
         BiometricManager.from(context).canAuthenticate(
@@ -153,6 +156,47 @@ fun SettingsScreen(
                                         onClick = {
                                             scope.launch { appViewModel.preferences.saveAutolockMinutes(minutes) }
                                             autolockExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                )
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    headlineContent = { Text("クリップボード自動クリア") },
+                    supportingContent = { Text("コピー後に自動でクリップボードをクリア") },
+                    leadingContent = {
+                        Icon(Icons.Default.ContentPaste, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    },
+                    trailingContent = {
+                        ExposedDropdownMenuBox(
+                            expanded = clipboardClearExpanded,
+                            onExpandedChange = { clipboardClearExpanded = it }
+                        ) {
+                            OutlinedTextField(
+                                value = if (clipboardClearSeconds == 0) "無効" else "${clipboardClearSeconds}秒",
+                                onValueChange = {},
+                                readOnly = true,
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .width(120.dp),
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = clipboardClearExpanded) },
+                                singleLine = true
+                            )
+                            ExposedDropdownMenu(
+                                expanded = clipboardClearExpanded,
+                                onDismissRequest = { clipboardClearExpanded = false }
+                            ) {
+                                listOf(0, 10, 30, 60, 120).forEach { seconds ->
+                                    DropdownMenuItem(
+                                        text = { Text(if (seconds == 0) "無効" else "${seconds}秒") },
+                                        onClick = {
+                                            scope.launch { appViewModel.preferences.saveClipboardClearSeconds(seconds) }
+                                            clipboardClearExpanded = false
                                         }
                                     )
                                 }
@@ -358,8 +402,7 @@ fun SettingsScreen(
                     }
                     OutlinedButton(
                         onClick = {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("recovery_key", recoveryKeyValue))
+                            copyToClipboard(context, "recovery_key", recoveryKeyValue, clipboardClearSeconds, scope)
                             copied = true
                             scope.launch { delay(2000); copied = false }
                         },
@@ -599,8 +642,7 @@ fun TransferConfigDialog(
                     }
                     OutlinedButton(
                         onClick = {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("transfer_config", transferString))
+                            copyToClipboard(context, "transfer_config", transferString, clipboardClearSeconds, scope)
                             copied = true
                             scope.launch { delay(2000); copied = false }
                         },

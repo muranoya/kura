@@ -6,8 +6,10 @@ use crate::store::VaultFile;
 use super::{LockedVault, UnlockedVault, CURRENT_SCHEMA_VERSION};
 
 impl LockedVault {
-    /// Create new vault with master password
-    pub fn create_new(master_password: &str) -> Result<Self> {
+    /// Create new vault with master password, returning the vault and its recovery key.
+    pub fn create_new(
+        master_password: &str,
+    ) -> Result<(Self, crate::crypto::RecoveryKey)> {
         let argon2_params = Argon2Params::default();
         let dek = Dek::generate();
         let recovery_key = crate::crypto::RecoveryKey::generate();
@@ -37,15 +39,18 @@ impl LockedVault {
             encrypted_vault,
         };
 
-        Ok(LockedVault {
-            vault_file,
-            etag: None,
-        })
+        Ok((
+            LockedVault {
+                vault_file,
+                etag: None,
+            },
+            recovery_key,
+        ))
     }
 
     /// Open existing vault from JSON bytes
-    pub fn open(bytes: Vec<u8>, etag: Option<String>) -> Result<Self> {
-        let vault_file = VaultFile::from_bytes(&bytes)?;
+    pub fn open(bytes: impl AsRef<[u8]>, etag: Option<String>) -> Result<Self> {
+        let vault_file = VaultFile::from_bytes(bytes.as_ref())?;
 
         // Validate schema version
         if vault_file.schema_version != CURRENT_SCHEMA_VERSION {
@@ -136,7 +141,7 @@ mod tests {
 
     #[test]
     fn test_create_new_produces_valid_vault() {
-        let locked = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
 
         assert_eq!(locked.vault_file.schema_version, CURRENT_SCHEMA_VERSION);
         assert!(locked.etag.is_none());
@@ -149,8 +154,8 @@ mod tests {
 
     #[test]
     fn test_create_new_each_call_produces_different_dek_and_uuid() {
-        let locked1 = LockedVault::create_new(PASSWORD).unwrap();
-        let locked2 = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked1, _) = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked2, _) = LockedVault::create_new(PASSWORD).unwrap();
 
         assert_ne!(
             locked1.vault_file.meta.encrypted_dek_master,
@@ -164,7 +169,7 @@ mod tests {
 
     #[test]
     fn test_unlock_with_correct_password() {
-        let locked = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
         let unlocked = locked.unlock(PASSWORD).unwrap();
 
         assert!(unlocked.contents.entries.is_empty());
@@ -173,7 +178,7 @@ mod tests {
 
     #[test]
     fn test_unlock_with_wrong_password() {
-        let locked = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
         let result = locked.unlock("wrong-password");
 
         assert!(result.is_err());
@@ -181,7 +186,7 @@ mod tests {
 
     #[test]
     fn test_open_from_serialized_bytes() {
-        let locked = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
         let bytes = locked.to_vault_bytes().unwrap();
 
         let reopened = LockedVault::open(bytes, Some("etag-123".to_string())).unwrap();
@@ -201,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_open_with_unsupported_schema_version() {
-        let locked = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
         let bytes = locked.to_vault_bytes().unwrap();
 
         let mut vault_json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
@@ -217,7 +222,7 @@ mod tests {
 
     #[test]
     fn test_to_vault_bytes_roundtrip() {
-        let locked = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
         let bytes = locked.to_vault_bytes().unwrap();
 
         let parsed: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
@@ -228,27 +233,23 @@ mod tests {
 
     #[test]
     fn test_unlock_with_recovery_key() {
-        let locked = LockedVault::create_new(PASSWORD).unwrap();
-        let mut unlocked = locked.unlock(PASSWORD).unwrap();
-
-        let recovery_key = unlocked.regenerate_recovery_key(PASSWORD).unwrap();
+        let (locked, recovery_key) = LockedVault::create_new(PASSWORD).unwrap();
         let recovery_str = recovery_key.to_display_string();
 
-        let locked_again = unlocked.lock().unwrap();
-        let unlocked_again = locked_again
+        let unlocked = locked
             .unlock_with_recovery_key(&recovery_str)
             .unwrap();
 
-        assert!(unlocked_again.contents.entries.is_empty());
+        assert!(unlocked.contents.entries.is_empty());
     }
 
     #[test]
     fn test_unlock_with_wrong_recovery_key() {
-        let locked = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
 
         // create_new generates a recovery key internally, but we don't have it
         // Using a random recovery key should fail
-        let other_locked = LockedVault::create_new("other-password").unwrap();
+        let (other_locked, _) = LockedVault::create_new("other-password").unwrap();
         let mut other_unlocked = other_locked.unlock("other-password").unwrap();
         let other_recovery = other_unlocked
             .regenerate_recovery_key("other-password")
@@ -265,7 +266,7 @@ mod tests {
 
         use zeroize::Zeroizing;
 
-        let locked = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
         let mut unlocked = locked.unlock(PASSWORD).unwrap();
 
         unlocked.contents.entries.insert(
@@ -295,7 +296,7 @@ mod tests {
 
     #[test]
     fn test_vault_uuid_preserved_through_lock_unlock() {
-        let locked = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
         let original_uuid = locked.vault_file.meta.vault_uuid.clone();
 
         let unlocked = locked.unlock(PASSWORD).unwrap();
@@ -307,7 +308,7 @@ mod tests {
 
     #[test]
     fn test_vault_uuid_preserved_through_serialization() {
-        let locked = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
         let original_uuid = locked.vault_file.meta.vault_uuid.clone();
 
         let bytes = locked.to_vault_bytes().unwrap();

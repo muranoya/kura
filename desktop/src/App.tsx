@@ -80,7 +80,7 @@ function AppContent() {
       try {
         const vaultBytes = await commands.lock()
         await commands.writeVaultFile(vaultBytes)
-        sessionStorage.removeItem('decryptedS3Config')
+        await commands.clearS3ConfigSession()
         setAppState('locked')
       } catch (err) {
         console.error('Auto-lock failed:', err)
@@ -186,8 +186,14 @@ function AppContent() {
             <Route path="/" element={<Welcome />} />
             <Route path="/onb/storage" element={<StorageSetup />} />
             <Route path="/onb/password" element={<MasterPassword />} />
-            <Route path="/onb/recovery" element={<RecoveryKey />} />
-            <Route path="/onb/unlock-existing" element={<UnlockExistingVault />} />
+            <Route
+              path="/onb/recovery"
+              element={<RecoveryKey onComplete={() => setAppState('locked')} />}
+            />
+            <Route
+              path="/onb/unlock-existing"
+              element={<UnlockExistingVault onUnlocked={() => setAppState('unlocked')} />}
+            />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         )}
@@ -195,8 +201,8 @@ function AppContent() {
         {/* Auth */}
         {appState === 'locked' && (
           <>
-            <Route path="/auth/lock" element={<Lock />} />
-            <Route path="/auth/recovery" element={<Recovery />} />
+            <Route path="/auth/lock" element={<Lock onUnlocked={() => setAppState('unlocked')} />} />
+            <Route path="/auth/recovery" element={<Recovery onUnlocked={() => setAppState('unlocked')} />} />
             <Route path="*" element={<Navigate to="/auth/lock" replace />} />
           </>
         )}

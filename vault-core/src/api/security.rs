@@ -53,9 +53,7 @@ impl VaultManager {
 
     /// マスターパスワードの検証（KEK導出→DEK復号を試みる）
     pub fn api_verify_password(&self, password: String) -> Result<(), String> {
-        let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-
-        if let Some(SessionState::Unlocked(ref unlocked)) = session.as_ref() {
+        self.with_unlocked(|unlocked| {
             use base64::Engine;
             let engine = base64::engine::general_purpose::STANDARD;
 
@@ -67,9 +65,7 @@ impl VaultManager {
             crypto::dek::Dek::unwrap(&encrypted_dek_bytes, &kek)
                 .map_err(|_| "Invalid password".to_string())?;
             Ok(())
-        } else {
-            Err("Vault not unlocked".to_string())
-        }
+        })
     }
 
     /// マスターパスワード変更
@@ -78,15 +74,11 @@ impl VaultManager {
         old_password: String,
         new_password: String,
     ) -> Result<(), String> {
-        let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-
-        if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
+        self.with_unlocked_mut(|unlocked| {
             unlocked
                 .change_master_password(&old_password, &new_password)
                 .map_err(|e| format!("Failed to change master password: {}", e))
-        } else {
-            Err("Vault not unlocked".to_string())
-        }
+        })
     }
 
     /// Argon2パラメータアップグレード
@@ -97,8 +89,6 @@ impl VaultManager {
         memory: u32,
         parallelism: u32,
     ) -> Result<String, String> {
-        let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-
         let new_params = crate::models::Argon2Params {
             salt: crate::codec::base32::encode(&rand::random::<[u8; 16]>()),
             iterations,
@@ -106,41 +96,31 @@ impl VaultManager {
             parallelism,
         };
 
-        if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
+        self.with_unlocked_mut(|unlocked| {
             unlocked
                 .upgrade_argon2_params(&password, new_params)
                 .map_err(|e| format!("Failed to upgrade argon2 params: {}", e))
                 .map(|recovery_key| recovery_key.to_display_string())
-        } else {
-            Err("Vault not unlocked".to_string())
-        }
+        })
     }
 
     /// DEK ローテーション（新しいリカバリーキーを返す）
     pub fn api_rotate_dek(&self, password: String) -> Result<String, String> {
-        let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-
-        if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
+        self.with_unlocked_mut(|unlocked| {
             let recovery_key = unlocked
                 .rotate_dek(&password)
                 .map_err(|e| format!("Failed to rotate DEK: {}", e))?;
             Ok(recovery_key.to_display_string())
-        } else {
-            Err("Vault not unlocked".to_string())
-        }
+        })
     }
 
     /// リカバリーキー再発行
     pub fn api_regenerate_recovery_key(&self, password: String) -> Result<String, String> {
-        let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-
-        if let Some(SessionState::Unlocked(ref mut unlocked)) = session.as_mut() {
+        self.with_unlocked_mut(|unlocked| {
             let recovery_key = unlocked
                 .regenerate_recovery_key(&password)
                 .map_err(|e| format!("Failed to regenerate recovery key: {}", e))?;
             Ok(recovery_key.to_display_string())
-        } else {
-            Err("Vault not unlocked".to_string())
-        }
+        })
     }
 }

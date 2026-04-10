@@ -1,7 +1,5 @@
 package net.meshpeak.kura.ui.entries
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -15,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import net.meshpeak.kura.data.model.CustomField
 import net.meshpeak.kura.data.model.Label
 import net.meshpeak.kura.ui.components.EntryForm
+import net.meshpeak.kura.util.copyToClipboard
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -40,6 +39,8 @@ fun EntryEditScreen(
     var error by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val clipboardClearSeconds by appViewModel.preferences.clipboardClearSecondsFlow
+        .collectAsState(initial = 30)
 
     LaunchedEffect(entryId) {
         try {
@@ -143,8 +144,7 @@ fun EntryEditScreen(
                             appViewModel.repository.generatePassword(len, lower, upper, num, sym1, sym2, sym3)
                         },
                         onCopyToClipboard = { text ->
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("kura", text))
+                            copyToClipboard(context, "kura", text, clipboardClearSeconds, scope)
                         },
                         onCreateLabel = { name ->
                             val id = appViewModel.repository.createLabel(name)

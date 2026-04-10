@@ -8,7 +8,11 @@ import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { PasswordInput } from '../../components/ui/password-input'
 
-export default function Recovery() {
+interface RecoveryProps {
+  onUnlocked?: () => void
+}
+
+export default function Recovery({ onUnlocked }: RecoveryProps) {
   const navigate = useNavigate()
   const [recoveryKey, setRecoveryKey] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -30,8 +34,7 @@ export default function Recovery() {
     setLoading(true)
     try {
       await commands.unlockWithRecoveryKey(recoveryKey)
-      // Reload the page so App.tsx reinitializes with unlocked state
-      window.location.reload()
+      onUnlocked?.()
     } catch (err) {
       setError(`復旧失敗: ${err}`)
       setLoading(false)

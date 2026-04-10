@@ -1,4 +1,37 @@
+use std::sync::Mutex;
+
 use super::get_manager;
+
+/// Tauri managed state: holds decrypted S3 config JSON in Rust process memory
+/// instead of WebView's sessionStorage (which is accessible via DevTools).
+pub struct S3ConfigSession(pub Mutex<Option<String>>);
+
+#[tauri::command]
+pub fn set_s3_config_session(
+    state: tauri::State<'_, S3ConfigSession>,
+    config_json: String,
+) -> Result<(), String> {
+    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
+    *guard = Some(config_json);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_s3_config_session(
+    state: tauri::State<'_, S3ConfigSession>,
+) -> Result<Option<String>, String> {
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    Ok(guard.clone())
+}
+
+#[tauri::command]
+pub fn clear_s3_config_session(
+    state: tauri::State<'_, S3ConfigSession>,
+) -> Result<(), String> {
+    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
+    *guard = None;
+    Ok(())
+}
 
 #[tauri::command]
 pub async fn create_vault(vault_id: String, master_password: String) -> Result<String, String> {

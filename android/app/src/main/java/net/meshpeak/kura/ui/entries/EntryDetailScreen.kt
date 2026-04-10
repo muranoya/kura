@@ -1,7 +1,5 @@
 package net.meshpeak.kura.ui.entries
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -44,6 +42,7 @@ import net.meshpeak.kura.ui.components.LargeTextDialog
 import net.meshpeak.kura.ui.components.MarkdownText
 import net.meshpeak.kura.ui.components.EntryTypeIcon
 import net.meshpeak.kura.ui.components.entryTypeDisplayName
+import net.meshpeak.kura.util.copyToClipboard
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -69,6 +68,8 @@ fun EntryDetailScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val clipboardClearSeconds by appViewModel.preferences.clipboardClearSecondsFlow
+        .collectAsState(initial = 30)
 
     LaunchedEffect(entryId) {
         try {
@@ -221,7 +222,8 @@ fun EntryDetailScreen(
                                                 label = fieldDisplayName(key),
                                                 value = "",
                                                 isEmpty = true,
-                                                context = context
+                                                context = context,
+                                                clipboardClearSeconds = clipboardClearSeconds,
                                             )
                                         } else {
                                             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -237,7 +239,8 @@ fun EntryDetailScreen(
                                             isEmpty = isEmpty,
                                             isUrl = key == "url",
                                             context = context,
-                                            isMultiLine = key == "private_key" || key == "content"
+                                            isMultiLine = key == "private_key" || key == "content",
+                                            clipboardClearSeconds = clipboardClearSeconds,
                                         )
                                     }
                                 }
@@ -264,7 +267,8 @@ fun EntryDetailScreen(
                                                 label = field.name,
                                                 value = field.value,
                                                 appViewModel = appViewModel,
-                                                context = context
+                                                context = context,
+                                                clipboardClearSeconds = clipboardClearSeconds,
                                             )
                                         } else {
                                             DetailField(
@@ -272,7 +276,8 @@ fun EntryDetailScreen(
                                                 value = field.value,
                                                 isSecret = field.fieldType == "password",
                                                 isEmpty = field.value.isEmpty(),
-                                                context = context
+                                                context = context,
+                                                clipboardClearSeconds = clipboardClearSeconds,
                                             )
                                         }
                                     }
@@ -396,7 +401,8 @@ fun DetailField(
     context: Context,
     isMultiLine: Boolean = false,
     showLargeText: Boolean = true,
-    copyable: Boolean = true
+    copyable: Boolean = true,
+    clipboardClearSeconds: Int = 30,
 ) {
     var visible by remember { mutableStateOf(!isSecret) }
     var copied by remember { mutableStateOf(false) }
@@ -423,8 +429,7 @@ fun DetailField(
                             context.startActivity(intent)
                         } else {
                             val copyValue = if (isSecret && !visible) value else value
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText(label, copyValue))
+                            copyToClipboard(context, label, copyValue, clipboardClearSeconds, scope)
                             copied = true
                             scope.launch { delay(1500); copied = false }
                         }
@@ -482,8 +487,7 @@ fun DetailField(
             }
             if (isUrl && !isEmpty) {
                 IconButton(onClick = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
+                    copyToClipboard(context, label, value, clipboardClearSeconds, scope)
                     copied = true
                     scope.launch { delay(1500); copied = false }
                 }, modifier = Modifier.size(32.dp)) {
@@ -520,7 +524,8 @@ fun TotpField(
     value: String,
     appViewModel: AppViewModel,
     context: Context,
-    label: String = "TOTP"
+    label: String = "TOTP",
+    clipboardClearSeconds: Int = 30,
 ) {
     var totpCode by remember { mutableStateOf("") }
     var copied by remember { mutableStateOf(false) }
@@ -549,9 +554,7 @@ fun TotpField(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple()
             ) {
-                val clipboard =
-                    context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("totp", totpCode))
+                copyToClipboard(context, "totp", totpCode, clipboardClearSeconds, scope)
                 copied = true
                 scope.launch { delay(1500); copied = false }
             }

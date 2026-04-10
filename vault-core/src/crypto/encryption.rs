@@ -4,13 +4,14 @@ use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
+use zeroize::Zeroizing;
 
 /// Encrypt entire VaultContents with DEK
 /// Returns: base64-encoded [12-byte IV | ciphertext | 16-byte GCM tag]
 pub fn encrypt_vault(contents: &VaultContents, dek: &super::Dek) -> Result<String> {
     use base64::Engine;
 
-    let json_bytes: Vec<u8> = contents.to_bytes()?;
+    let json_bytes: Zeroizing<Vec<u8>> = Zeroizing::new(contents.to_bytes()?);
 
     let iv_bytes: [u8; 12] = rand::random();
     let nonce = Nonce::from_slice(&iv_bytes);
@@ -53,9 +54,11 @@ pub fn decrypt_vault(encrypted_b64: &str, dek: &super::Dek) -> Result<VaultConte
     let cipher = Aes256Gcm::new_from_slice(dek.as_bytes())
         .map_err(|_| VaultError::EncryptionError("Failed to create cipher".to_string()))?;
 
-    let plaintext = cipher
-        .decrypt(nonce, ciphertext)
-        .map_err(|_| VaultError::DecryptionError("Decryption failed".to_string()))?;
+    let plaintext = Zeroizing::new(
+        cipher
+            .decrypt(nonce, ciphertext)
+            .map_err(|_| VaultError::DecryptionError("Decryption failed".to_string()))?,
+    );
 
     VaultContents::from_bytes(&plaintext)
 }

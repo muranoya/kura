@@ -25,15 +25,14 @@ desktop/src-tauri/icons/ios/
 extension/dist/
 extension/src/shared/etld-data.generated.ts
 extension/src/shared/patterns-data.generated.ts
-extension/public/icons/
+extension/public/
 extension/wasm/
 extension/kura-extension-firefox.zip
 extension/kura-extension-chrome.zip
 extension/*.xpi
 extension/test-pages/fixtures/
 
-# WASM build output
-extension/public/wasm/
+# Vault-Core
 vault-core/pkg/
 
 # Android
@@ -50,3 +49,6 @@ android/app/build/
 android/app/src/main/res/mipmap-*/ic_launcher.png
 android/app/src/main/res/mipmap-*/ic_launcher_foreground.png
 android/app/src/main/assets/legal/
+
+# Others
+.playwright-mcp/

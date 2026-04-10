@@ -1,8 +1,5 @@
 package net.meshpeak.kura.ui.onboarding
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -13,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import net.meshpeak.kura.util.copyToClipboard
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -28,6 +26,8 @@ fun RecoveryKeyScreen(
     val context = LocalContext.current
     var copied by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val clipboardClearSeconds by appViewModel.preferences.clipboardClearSecondsFlow
+        .collectAsState(initial = 30)
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("リカバリーキー") }) }
@@ -51,8 +51,7 @@ fun RecoveryKeyScreen(
 
             OutlinedButton(
                 onClick = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("recovery_key", recoveryKey))
+                    copyToClipboard(context, "recovery_key", recoveryKey, clipboardClearSeconds, scope)
                     copied = true
                     scope.launch {
                         delay(2000)

@@ -41,6 +41,19 @@ export async function setTrayIcon(isLocked: boolean): Promise<void> {
   return invoke<void>('set_tray_icon', { isLocked })
 }
 
+// S3 Config Session (stored in Rust process memory, not WebView sessionStorage)
+export async function setS3ConfigSession(configJson: string): Promise<void> {
+  return invoke<void>('set_s3_config_session', { configJson })
+}
+
+export async function getS3ConfigSession(): Promise<string | null> {
+  return invoke<string | null>('get_s3_config_session')
+}
+
+export async function clearS3ConfigSession(): Promise<void> {
+  return invoke<void>('clear_s3_config_session')
+}
+
 // ============================================================================
 // Entries
 // ============================================================================
@@ -271,7 +284,7 @@ export async function pushVault(storageConfig: string): Promise<number> {
 /// 再暗号化操作（マスターパスワード変更・DEKローテーション・リカバリーキー再生成）後専用。
 /// 通常のデータ変更にはsyncVaultIfConfiguredを使用すること。
 export async function pushVaultAndTrack(): Promise<void> {
-  const configJson = sessionStorage.getItem('decryptedS3Config')
+  const configJson = await getS3ConfigSession()
   if (!configJson) throw new Error('S3 config not available (vault locked?)')
   const ts = await pushVault(configJson)
   await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, ts)
@@ -280,7 +293,7 @@ export async function pushVaultAndTrack(): Promise<void> {
 /// S3設定がある場合のみ syncVault を呼び出す（エラーはサイレント無視）
 /// 実際にデータが同期された場合は true を返す
 export async function syncVaultIfConfigured(): Promise<boolean> {
-  const configJson = sessionStorage.getItem('decryptedS3Config')
+  const configJson = await getS3ConfigSession()
   if (!configJson) return false
   try {
     const result = await syncVault(configJson)

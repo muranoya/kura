@@ -1,22 +1,19 @@
 import { CheckCircle2, Copy } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import * as commands from '../../commands'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 
-export default function RecoveryKey() {
-  const navigate = useNavigate()
-  const [recoveryKey, setRecoveryKey] = useState('')
-  const [copied, setCopied] = useState(false)
+interface RecoveryKeyProps {
+  onComplete?: () => void
+}
 
-  useEffect(() => {
-    const key = sessionStorage.getItem('recoveryKey')
-    if (key) {
-      setRecoveryKey(key)
-    }
-  }, [])
+export default function RecoveryKey({ onComplete }: RecoveryKeyProps) {
+  const location = useLocation()
+  const recoveryKey = (location.state as { recoveryKey?: string })?.recoveryKey ?? ''
+  const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(recoveryKey)
@@ -30,10 +27,7 @@ export default function RecoveryKey() {
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
 
-      sessionStorage.removeItem('recoveryKey')
-      navigate('/')
-      // Redirect to lock screen after file is saved
-      window.location.reload()
+      onComplete?.()
     } catch (error) {
       alert(`エラー: ${error}`)
     }

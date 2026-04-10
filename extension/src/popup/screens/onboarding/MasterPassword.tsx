@@ -15,13 +15,15 @@ export default function MasterPassword() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const handleCreate = async () => {
     if (password !== confirmPassword) {
-      alert('パスワードが一致しません')
+      setError('パスワードが一致しません')
       return
     }
 
+    setError('')
     setLoading(true)
     try {
       // オンボーディングドラフトからS3設定を構築
@@ -59,11 +61,10 @@ export default function MasterPassword() {
           state: { recoveryKey: response.recoveryKey, fromOnboarding: true },
         })
       } else {
-        const errorMsg = response?.error || 'Vault作成に失敗しました'
-        alert(errorMsg)
+        setError(response?.error || 'Vault作成に失敗しました')
       }
     } catch (err) {
-      alert(String(err))
+      setError(String(err))
     } finally {
       setLoading(false)
     }
@@ -76,6 +77,12 @@ export default function MasterPassword() {
       <PageHeader title="マスターパスワード設定" showBackButton={true} />
 
       <div className="p-4 space-y-4">
+        {error && (
+          <div className="p-2.5 rounded-md bg-danger/10 border border-danger/20">
+            <p className="text-sm text-danger">{error}</p>
+          </div>
+        )}
+
         <Card>
           <CardHeader className="px-3 py-2">
             <CardTitle className="text-sm font-medium">パスワード設定</CardTitle>

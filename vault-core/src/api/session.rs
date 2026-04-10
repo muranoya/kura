@@ -6,22 +6,8 @@ use super::VaultManager;
 impl VaultManager {
     /// 新規Vaultを作成し、RecoveryKeyを返す
     pub fn api_create_new_vault(&self, master_password: String) -> Result<String, String> {
-        let locked_vault = LockedVault::create_new(&master_password)
+        let (locked_vault, recovery_key) = LockedVault::create_new(&master_password)
             .map_err(|e| format!("Failed to create vault: {}", e))?;
-
-        // Get recovery key by unlocking first
-        let mut unlocked = locked_vault
-            .unlock(&master_password)
-            .map_err(|e| format!("Failed to unlock: {}", e))?;
-
-        // Generate new recovery key
-        let recovery_key = unlocked
-            .regenerate_recovery_key(&master_password)
-            .map_err(|e| format!("Failed to generate recovery key: {}", e))?;
-
-        let locked_vault = unlocked
-            .lock()
-            .map_err(|e| format!("Failed to lock: {}", e))?;
 
         let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
         *session = Some(SessionState::Locked(locked_vault));
@@ -50,6 +36,8 @@ impl VaultManager {
             None => return Err("No vault loaded".to_string()),
         };
 
+        // Clone as backup for rollback on unlock failure.
+        // This copies only ciphertext (encrypted DEK), not plaintext key material.
         let backup = locked.clone();
         match locked.unlock(&master_password) {
             Ok(unlocked) => {
@@ -73,6 +61,8 @@ impl VaultManager {
             None => return Err("No vault loaded".to_string()),
         };
 
+        // Clone as backup for rollback on unlock failure.
+        // This copies only ciphertext (encrypted DEK), not plaintext key material.
         let backup = locked.clone();
         match locked.unlock_with_recovery_key(&recovery_key) {
             Ok(unlocked) => {

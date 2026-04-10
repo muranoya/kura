@@ -1,10 +1,14 @@
 mod commands;
 pub mod storage;
 
+use std::sync::Mutex;
+
+use commands::session::S3ConfigSession;
 use tauri::Manager;
 
 pub fn run() {
     tauri::Builder::default()
+        .manage(S3ConfigSession(Mutex::new(None)))
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_shell::init())
@@ -19,6 +23,10 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // S3 Config Session (in-process memory instead of WebView sessionStorage)
+            commands::session::set_s3_config_session,
+            commands::session::get_s3_config_session,
+            commands::session::clear_s3_config_session,
             // Session
             commands::session::create_vault,
             commands::session::load_vault,
