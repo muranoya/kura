@@ -237,7 +237,7 @@ default: help
 	{{ADB}} -d install -r {{ANDROID_DIR}}/app/build/outputs/apk/debug/app-debug.apk
 	echo ""
 	echo "🚀 Starting app..."
-	{{ADB}} -d shell am start -n com.kura.app/.MainActivity
+	{{ADB}} -d shell am start -n net.meshpeak.kura/.MainActivity
 	echo ""
 	echo "✅ App is running on device! Use '{{ADB}} -d logcat | grep kura' for logs"
 
@@ -275,7 +275,7 @@ default: help
 	{{ADB}} install -r {{ANDROID_DIR}}/app/build/outputs/apk/debug/app-debug.apk
 	echo ""
 	echo "🚀 Starting app..."
-	{{ADB}} shell am start -n com.kura.app/.MainActivity
+	{{ADB}} shell am start -n net.meshpeak.kura/.MainActivity
 	echo ""
 	echo "✅ App is running! Use '{{ADB}} logcat | grep kura' for logs"
 

@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog'
-import { type TermsLang, useTerms } from '../../hooks/useTerms'
+import { useTerms } from '../../hooks/useTerms'
 
 const termsMarkdownComponents = {
   h1: ({ children }: { children?: ReactNode }) => (
@@ -39,10 +39,9 @@ const termsMarkdownComponents = {
 
 export default function Welcome() {
   const navigate = useNavigate()
-  const [lang, setLang] = useState<TermsLang>('ja')
   const [agreed, setAgreed] = useState(false)
   const [showTerms, setShowTerms] = useState(false)
-  const terms = useTerms(lang)
+  const terms = useTerms()
 
   const handleStart = () => {
     navigate('/onb/storage')
@@ -58,33 +57,12 @@ export default function Welcome() {
           </div>
           <h1 className="text-3xl font-bold text-text-primary mb-2">kura</h1>
           <p className="text-sm text-text-secondary">
-            サーバ不要、自分一人のための
-            <br />
-            運用コストゼロのパスワードマネージャー
+            サーバ不要、自分一人のためのパスワードマネージャー
           </p>
         </div>
 
         {/* 利用規約 */}
-        <div className="mb-4 space-y-2">
-          {/* 言語切替 */}
-          <div className="flex items-center justify-center gap-1.5 text-xs">
-            <button
-              type="button"
-              onClick={() => setLang('ja')}
-              className={`px-1.5 py-0.5 rounded ${lang === 'ja' ? 'text-accent font-bold' : 'text-text-tertiary hover:text-text-secondary'}`}
-            >
-              日本語
-            </button>
-            <span className="text-text-tertiary">/</span>
-            <button
-              type="button"
-              onClick={() => setLang('en')}
-              className={`px-1.5 py-0.5 rounded ${lang === 'en' ? 'text-accent font-bold' : 'text-text-tertiary hover:text-text-secondary'}`}
-            >
-              English
-            </button>
-          </div>
-
+        <div className="mb-4">
           {/* 同意チェックボックス */}
           <label className="flex items-center justify-center gap-1.5 cursor-pointer">
             <input
@@ -99,16 +77,16 @@ export default function Welcome() {
                 onClick={() => setShowTerms(true)}
                 className="text-accent hover:underline"
               >
-                {lang === 'ja' ? '利用規約' : 'Terms of Service'}
+                利用規約
               </button>
-              {lang === 'ja' ? 'に同意する' : ' — I agree'}
+              に同意する
             </span>
           </label>
         </div>
 
         {/* CTA */}
         <Button onClick={handleStart} className="w-full text-sm" size="sm" disabled={!agreed}>
-          {lang === 'ja' ? '始める' : 'Get Started'}
+          始める
         </Button>
       </div>
 
@@ -116,9 +94,7 @@ export default function Welcome() {
       <Dialog open={showTerms} onOpenChange={setShowTerms}>
         <DialogContent className="max-w-sm max-h-[80vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="text-sm">
-              {lang === 'ja' ? '利用規約' : 'Terms of Service'}
-            </DialogTitle>
+            <DialogTitle className="text-sm">利用規約</DialogTitle>
           </DialogHeader>
           <div className="flex-1 max-h-[55vh] overflow-y-auto pr-1">
             <div className="py-1">
@@ -130,7 +106,7 @@ export default function Welcome() {
           <DialogFooter>
             <DialogClose asChild>
               <Button variant="secondary" size="sm">
-                {lang === 'ja' ? '閉じる' : 'Close'}
+                閉じる
               </Button>
             </DialogClose>
           </DialogFooter>

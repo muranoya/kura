@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "kura",
   "version": "0.1.0",
-  "description": "サーバ不要、自分一人のための、運用コストゼロのパスワードマネージャー",
+  "description": "サーバ不要、自分一人のためのパスワードマネージャー",
 
   "permissions": ["storage", "alarms", "clipboardWrite", "offscreen", "tabs"],
 

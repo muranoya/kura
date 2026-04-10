@@ -17,14 +17,13 @@ import net.meshpeak.kura.ui.components.MarkdownText
 @Composable
 fun WelcomeScreen(onStart: () -> Unit) {
     val context = LocalContext.current
-    var lang by remember { mutableStateOf("ja") }
     var agreed by remember { mutableStateOf(false) }
     var showTermsDialog by remember { mutableStateOf(false) }
 
-    val termsText by remember(lang) {
+    val termsText by remember {
         derivedStateOf {
             try {
-                context.assets.open("legal/terms_$lang.md").bufferedReader().readText()
+                context.assets.open("legal/terms_ja.md").bufferedReader().readText()
             } catch (_: Exception) {
                 ""
             }
@@ -58,38 +57,12 @@ fun WelcomeScreen(onStart: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(32.dp))
         Text(
-            text = "サーバ不要、自分一人のための、\n運用コストゼロのパスワードマネージャー",
+            text = "サーバ不要、自分一人のための\nパスワードマネージャー",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(24.dp))
-
-        // 言語切替
-        Row(
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(onClick = { lang = "ja" }) {
-                Text(
-                    text = "日本語",
-                    color = if (lang == "ja") MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Text(
-                text = "/",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp)
-            )
-            TextButton(onClick = { lang = "en" }) {
-                Text(
-                    text = "English",
-                    color = if (lang == "en") MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
 
         // 同意チェックボックス
         Row(
@@ -102,12 +75,12 @@ fun WelcomeScreen(onStart: () -> Unit) {
             )
             TextButton(onClick = { showTermsDialog = true }) {
                 Text(
-                    text = if (lang == "ja") "利用規約" else "Terms of Service",
+                    text = "利用規約",
                     color = MaterialTheme.colorScheme.primary
                 )
             }
             Text(
-                text = if (lang == "ja") "に同意する" else " — I agree",
+                text = "に同意する",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -120,7 +93,7 @@ fun WelcomeScreen(onStart: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             enabled = agreed
         ) {
-            Text(if (lang == "ja") "始める" else "Get Started")
+            Text("始める")
         }
     }
 
@@ -130,7 +103,7 @@ fun WelcomeScreen(onStart: () -> Unit) {
             onDismissRequest = { showTermsDialog = false },
             title = {
                 Text(
-                    text = if (lang == "ja") "利用規約" else "Terms of Service",
+                    text = "利用規約",
                     style = MaterialTheme.typography.titleLarge
                 )
             },
@@ -149,7 +122,7 @@ fun WelcomeScreen(onStart: () -> Unit) {
             },
             confirmButton = {
                 TextButton(onClick = { showTermsDialog = false }) {
-                    Text(if (lang == "ja") "閉じる" else "Close")
+                    Text("閉じる")
                 }
             }
         )
