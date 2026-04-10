@@ -2,6 +2,7 @@ package net.meshpeak.kura.ui.navigation
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,7 +22,6 @@ import net.meshpeak.kura.ui.labels.*
 import net.meshpeak.kura.ui.tools.*
 import net.meshpeak.kura.ui.components.SyncDialogState
 import net.meshpeak.kura.ui.components.SyncProgressDialog
-import net.meshpeak.kura.ui.sync.formatRelativeTime
 import net.meshpeak.kura.ui.settings.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -276,7 +276,7 @@ fun MainNavHost(appViewModel: AppViewModel) {
                 )
 
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Label, contentDescription = null) },
+                    icon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null) },
                     label = { Text("ラベル管理") },
                     selected = currentRoute == Routes.LABEL_MANAGER,
                     onClick = {
@@ -421,5 +421,16 @@ fun MainNavHost(appViewModel: AppViewModel) {
                 )
             }
         }
+    }
+}
+
+private fun formatRelativeTime(timestamp: Long): String {
+    val now = System.currentTimeMillis() / 1000
+    val diff = now - timestamp
+    return when {
+        diff < 60 -> "たった今"
+        diff < 3600 -> "${diff / 60}分前"
+        diff < 86400 -> "${diff / 3600}時間前"
+        else -> "${diff / 86400}日前"
     }
 }

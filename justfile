@@ -316,7 +316,7 @@ default: help
 	echo "✅ Android tests passed!"
 
 # Desktop のテスト（フロントエンド + Rust結合テスト）
-@test-desktop:
+@test-desktop: _desktop-icons
 	echo "🧪 Testing desktop (frontend)..."
 	cd {{DESKTOP_DIR}} && pnpm install && pnpm test
 	echo "🧪 Testing desktop (integration with MinIO)..."
@@ -391,7 +391,7 @@ test-manual-autofill:
 	echo "✅ vault-core checks passed!"
 
 # Desktop app - Lint & format check (TypeScript + Biome + Rust)
-@check-desktop:
+@check-desktop: _desktop-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔍 Checking desktop app (lint & format)..."
@@ -479,16 +479,16 @@ test-manual-autofill:
 	cargo clean
 	echo "  - Desktop..."
 	cd {{DESKTOP_DIR}} && rm -rf dist/ build/ node_modules/
-	rm -f {{DESKTOP_DIR}}/src-tauri/icons/*.png {{DESKTOP_DIR}}/src-tauri/icons/*.ico {{DESKTOP_DIR}}/src-tauri/icons/*.icns
+	find {{DESKTOP_DIR}}/src-tauri/icons/ -maxdepth 1 \( -name '*.png' -o -name '*.ico' -o -name '*.icns' \) -delete 2>/dev/null || true
 	echo "  - Extension..."
 	cd {{EXTENSION_DIR}} && rm -rf dist/ build/ node_modules/ wasm/ public/ test-pages/fixtures/ kura-extension-chrome.zip kura-extension-firefox.zip
-	rm -f {{EXTENSION_DIR}}/*.xpi
+	find {{EXTENSION_DIR}}/ -maxdepth 1 -name '*.xpi' -delete 2>/dev/null || true
 	rm -f {{EXTENSION_DIR}}/src/shared/etld-data.generated.ts {{EXTENSION_DIR}}/src/shared/patterns-data.generated.ts
 	echo "  - Vault-core..."
 	rm -rf {{VAULT_CORE_DIR}}/pkg/
 	echo "  - Android..."
 	cd {{ANDROID_DIR}} && rm -rf app/build/ app/src/main/jniLibs/ .gradle/ build/ app/src/main/assets/legal/
-	rm -f {{ANDROID_DIR}}/app/src/main/res/mipmap-*/ic_launcher.png {{ANDROID_DIR}}/app/src/main/res/mipmap-*/ic_launcher_foreground.png
+	find {{ANDROID_DIR}}/app/src/main/res/ -path '*/mipmap-*/ic_launcher.png' -delete -o -path '*/mipmap-*/ic_launcher_foreground.png' -delete 2>/dev/null || true
 	echo "✅ Cleanup completed!"
 
 # ヘルプ表示

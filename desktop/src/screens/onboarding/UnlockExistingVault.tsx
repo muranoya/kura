@@ -45,7 +45,7 @@ export default function UnlockExistingVault({ onUnlocked }: UnlockExistingVaultP
       setError('パスワードが違います')
       setLoading(false)
     }
-  }, [password])
+  }, [password, onUnlocked])
 
   return (
     <div className="min-h-screen bg-bg-base">

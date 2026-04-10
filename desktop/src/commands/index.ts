@@ -161,10 +161,6 @@ export async function renameLabel(id: string, newName: string): Promise<void> {
   return invoke<void>('rename_label', { vaultId, id, newName })
 }
 
-export async function setEntryLabels(entryId: string, labelIds: string[]): Promise<void> {
-  return invoke<void>('set_entry_labels', { vaultId, entryId, labelIds })
-}
-
 // ============================================================================
 // Security
 // ============================================================================
@@ -174,21 +170,6 @@ export async function changeMasterPassword(
   newPassword: string,
 ): Promise<void> {
   return invoke<void>('change_master_password', { vaultId, oldPassword, newPassword })
-}
-
-export async function upgradeArgon2Params(
-  password: string,
-  iterations: number,
-  memory: number,
-  parallelism: number,
-): Promise<string> {
-  return invoke<string>('upgrade_argon2_params', {
-    vaultId,
-    password,
-    iterations,
-    memory,
-    parallelism,
-  })
 }
 
 export async function rotateDek(password: string): Promise<string> {
@@ -246,10 +227,6 @@ export async function generateTotp(secret: string, digits = 6, period = 30): Pro
   return invoke<string>('generate_totp', { secret, digits, period })
 }
 
-export async function generateTotpDefault(secret: string): Promise<string> {
-  return invoke<string>('generate_totp_default', { secret })
-}
-
 export async function generateTotpFromValue(value: string): Promise<string> {
   return invoke<string>('generate_totp_from_value', { value })
 }
@@ -305,10 +282,6 @@ export async function syncVaultIfConfigured(): Promise<boolean> {
     console.warn('Background sync failed:', e)
     return false
   }
-}
-
-export async function getLastSyncTime(): Promise<number | null> {
-  return invoke<number | null>('get_last_sync_time', { vaultId })
 }
 
 export async function downloadVault(storageConfig: string): Promise<boolean> {

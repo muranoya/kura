@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import MasterPassword from '../screens/onboarding/MasterPassword'
 import RecoveryKey from '../screens/onboarding/RecoveryKey'
 import StorageSetup from '../screens/onboarding/StorageSetup'
@@ -22,6 +22,7 @@ vi.mock('../commands', () => ({
   loadVault: vi.fn(),
   encryptConfig: vi.fn(),
   decryptConfig: vi.fn(),
+  setS3ConfigSession: vi.fn(),
 }))
 
 // Mock storage module
@@ -249,12 +250,21 @@ describe('MasterPassword - vault creation', () => {
 // ============================================================================
 
 describe('RecoveryKey', () => {
-  beforeEach(() => {
-    sessionStorage.setItem('recoveryKey', 'test-recovery-key-xyz789')
-  })
+  function renderRecoveryKey(recoveryKey: string) {
+    return render(
+      <MemoryRouter
+        initialEntries={[{ pathname: '/onb/recovery', state: { recoveryKey } }]}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <Routes>
+          <Route path="/onb/recovery" element={<RecoveryKey />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+  }
 
-  it('should display the recovery key from session storage', () => {
-    renderOnboarding('/onb/recovery')
+  it('should display the recovery key from location state', () => {
+    renderRecoveryKey('test-recovery-key-xyz789')
 
     expect(screen.getByText('あなたのリカバリーキー')).toBeInTheDocument()
     expect(screen.getByText('test-recovery-key-xyz789')).toBeInTheDocument()
@@ -272,7 +282,7 @@ describe('RecoveryKey', () => {
     })
 
     const user = userEvent.setup()
-    renderOnboarding('/onb/recovery')
+    renderRecoveryKey('test-recovery-key-xyz789')
 
     await user.click(screen.getByRole('button', { name: '完了' }))
 
@@ -280,7 +290,6 @@ describe('RecoveryKey', () => {
       expect(mockedCommands.getVaultBytes).toHaveBeenCalled()
       expect(mockedCommands.writeVaultFile).toHaveBeenCalledWith([1, 2, 3])
     })
-    expect(sessionStorage.getItem('recoveryKey')).toBeNull()
   })
 })
 

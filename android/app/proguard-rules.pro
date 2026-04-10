@@ -17,3 +17,9 @@
 
 # Keep data model classes used with JSON deserialization
 -keep class net.meshpeak.kura.data.model.** { *; }
+
+# Google Error Prone annotations (compile-time only, used by Tink via AWS SDK)
+-dontwarn com.google.errorprone.annotations.CanIgnoreReturnValue
+-dontwarn com.google.errorprone.annotations.CheckReturnValue
+-dontwarn com.google.errorprone.annotations.Immutable
+-dontwarn com.google.errorprone.annotations.RestrictedApi

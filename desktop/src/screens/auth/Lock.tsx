@@ -43,7 +43,7 @@ export default function LockScreen({ onUnlocked }: LockScreenProps) {
       setError(`ロック解除失敗: ${err}`)
       setLoading(false)
     }
-  }, [password])
+  }, [password, onUnlocked])
 
   const handleLogout = useCallback(() => {
     setShowLogoutDialog(true)

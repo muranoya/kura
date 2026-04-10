@@ -201,8 +201,14 @@ function AppContent() {
         {/* Auth */}
         {appState === 'locked' && (
           <>
-            <Route path="/auth/lock" element={<Lock onUnlocked={() => setAppState('unlocked')} />} />
-            <Route path="/auth/recovery" element={<Recovery onUnlocked={() => setAppState('unlocked')} />} />
+            <Route
+              path="/auth/lock"
+              element={<Lock onUnlocked={() => setAppState('unlocked')} />}
+            />
+            <Route
+              path="/auth/recovery"
+              element={<Recovery onUnlocked={() => setAppState('unlocked')} />}
+            />
             <Route path="*" element={<Navigate to="/auth/lock" replace />} />
           </>
         )}

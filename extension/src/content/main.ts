@@ -48,7 +48,7 @@ function onVaultMessage(
   message: { type?: string },
   _sender: chrome.runtime.MessageSender,
   sendResponse: (response: unknown) => void,
-): boolean | void {
+): boolean | undefined {
   if (message.type === 'AUTOFILL_VAULT_LOCKED') {
     console.log(LOG_PREFIX, 'Vault locked notification received')
     hideDropdown()
@@ -150,7 +150,10 @@ async function handleInputFocus(input: HTMLInputElement) {
     let totpResult: { totpCode: string; totpEntryName: string } | null = null
 
     if (pending) {
-      console.log(LOG_PREFIX, `handleInputFocus: checking TOTP from pending flow entry ${pending.entryId}`)
+      console.log(
+        LOG_PREFIX,
+        `handleInputFocus: checking TOTP from pending flow entry ${pending.entryId}`,
+      )
       totpResult = await requestTotp(url, pending.entryId)
     }
 

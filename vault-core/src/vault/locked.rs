@@ -7,9 +7,7 @@ use super::{LockedVault, UnlockedVault, CURRENT_SCHEMA_VERSION};
 
 impl LockedVault {
     /// Create new vault with master password, returning the vault and its recovery key.
-    pub fn create_new(
-        master_password: &str,
-    ) -> Result<(Self, crate::crypto::RecoveryKey)> {
+    pub fn create_new(master_password: &str) -> Result<(Self, crate::crypto::RecoveryKey)> {
         let argon2_params = Argon2Params::default();
         let dek = Dek::generate();
         let recovery_key = crate::crypto::RecoveryKey::generate();
@@ -236,9 +234,7 @@ mod tests {
         let (locked, recovery_key) = LockedVault::create_new(PASSWORD).unwrap();
         let recovery_str = recovery_key.to_display_string();
 
-        let unlocked = locked
-            .unlock_with_recovery_key(&recovery_str)
-            .unwrap();
+        let unlocked = locked.unlock_with_recovery_key(&recovery_str).unwrap();
 
         assert!(unlocked.contents.entries.is_empty());
     }

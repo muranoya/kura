@@ -293,14 +293,13 @@ class VaultRepository(private val context: Context) {
         throw RuntimeException("Sync failed after maximum retries")
     }
 
-    suspend fun pushVault(configJson: String): Long = withContext(Dispatchers.IO) {
+    suspend fun pushVault(configJson: String): Unit = withContext(Dispatchers.IO) {
         val s3Config = parseS3Config(configJson)
         val client = VaultS3Client(s3Config)
         val vaultBytes = getVaultBytes()
         val etag = getEtag()
         val newEtag = client.upload(vaultBytes, etag)
         updateEtag(newEtag)
-        System.currentTimeMillis() / 1000
     }
 
     suspend fun downloadVault(configJson: String): Boolean = withContext(Dispatchers.IO) {

@@ -7,7 +7,7 @@ import type {
   DevModeFormReport,
 } from '../shared/dev-mode-types'
 import type { SitePattern } from '../shared/pattern-types'
-import { type FieldType, classifyField, computeScores, type FieldSignals } from './field-classifier'
+import { classifyField, computeScores, type FieldSignals } from './field-classifier'
 import { classifyFormType, isVisible } from './form-detector'
 import { evaluateCondition, findMatchingPattern, resolveField } from './pattern-matcher'
 

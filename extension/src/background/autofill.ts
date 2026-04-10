@@ -403,19 +403,13 @@ export async function handleAutofillMessage(
       let totpResult: TotpResult | null = null
       if (totpEntryId) {
         totpResult = getTotpForEntry(totpEntryId)
-        console.log(
-          LOG_PREFIX,
-          `AUTOFILL_GET_TOTP: entryId=${totpEntryId}, found=${!!totpResult}`,
-        )
+        console.log(LOG_PREFIX, `AUTOFILL_GET_TOTP: entryId=${totpEntryId}, found=${!!totpResult}`)
       }
 
       // Fall back to URL-based search
       if (!totpResult && totpUrl) {
         totpResult = getTotpForUrl(totpUrl)
-        console.log(
-          LOG_PREFIX,
-          `AUTOFILL_GET_TOTP: url=${totpUrl}, found=${!!totpResult}`,
-        )
+        console.log(LOG_PREFIX, `AUTOFILL_GET_TOTP: url=${totpUrl}, found=${!!totpResult}`)
       }
 
       if (totpResult) {

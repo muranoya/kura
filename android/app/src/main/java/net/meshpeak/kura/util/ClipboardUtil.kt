@@ -40,7 +40,11 @@ fun copyToClipboard(
     if (clearSeconds > 0) {
         scope.launch {
             delay(clearSeconds * 1000L)
-            clipboard.clearPrimaryClip()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                clipboard.clearPrimaryClip()
+            } else {
+                clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+            }
         }
     }
 }

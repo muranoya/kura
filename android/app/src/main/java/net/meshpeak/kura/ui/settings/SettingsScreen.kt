@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -141,7 +142,7 @@ fun SettingsScreen(
                                 onValueChange = {},
                                 readOnly = true,
                                 modifier = Modifier
-                                    .menuAnchor()
+                                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                                     .width(120.dp),
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = autolockExpanded) },
                                 singleLine = true
@@ -182,7 +183,7 @@ fun SettingsScreen(
                                 onValueChange = {},
                                 readOnly = true,
                                 modifier = Modifier
-                                    .menuAnchor()
+                                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                                     .width(120.dp),
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = clipboardClearExpanded) },
                                 singleLine = true
@@ -335,7 +336,7 @@ fun SettingsScreen(
                     },
                     leadingContent = {
                         Icon(
-                            Icons.Default.Logout,
+                            Icons.AutoMirrored.Filled.Logout,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onErrorContainer
                         )
@@ -469,6 +470,7 @@ fun SettingsScreen(
     if (showTransferDialog) {
         TransferConfigDialog(
             appViewModel = appViewModel,
+            clipboardClearSeconds = clipboardClearSeconds,
             onDismiss = { showTransferDialog = false }
         )
     }
@@ -613,6 +615,7 @@ fun SinglePasswordDialog(
 @Composable
 fun TransferConfigDialog(
     appViewModel: AppViewModel,
+    clipboardClearSeconds: Int,
     onDismiss: () -> Unit
 ) {
     var password by remember { mutableStateOf("") }

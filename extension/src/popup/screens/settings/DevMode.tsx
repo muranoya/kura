@@ -5,10 +5,7 @@ import {
   setDevModePatterns,
   validatePatterns,
 } from '../../../shared/dev-mode'
-import type {
-  DevModeDebugReport,
-  DevModeFieldReport,
-} from '../../../shared/dev-mode-types'
+import type { DevModeDebugReport, DevModeFieldReport } from '../../../shared/dev-mode-types'
 import type { SitePattern } from '../../../shared/pattern-types'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
@@ -44,7 +41,7 @@ export default function DevMode() {
           !t.url.startsWith('chrome://') &&
           !t.url.startsWith('chrome-extension://'),
       )
-      .map((t) => ({ id: t.id!, title: t.title || '', url: t.url || '' }))
+      .map((t) => ({ id: t.id ?? 0, title: t.title || '', url: t.url || '' }))
     setTabs(tabInfos)
     if (tabInfos.length > 0 && !selectedTabId) {
       setSelectedTabId(tabInfos[0].id)
@@ -159,7 +156,12 @@ export default function DevMode() {
                   />
                 </label>
                 {patterns && (
-                  <Button variant="secondary" size="sm" onClick={handleClearPatterns} className="text-xs px-3 py-1.5">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleClearPatterns}
+                    className="text-xs px-3 py-1.5"
+                  >
                     クリア
                   </Button>
                 )}
@@ -174,8 +176,11 @@ export default function DevMode() {
               {patterns && (
                 <div className="rounded bg-accent-subtle p-2 text-xs space-y-0.5">
                   <p className="font-medium text-accent">{patterns.length} 件読み込み済み</p>
-                  {patterns.map((p, i) => (
-                    <p key={`${p.match.value}-${i}`} className="text-text-secondary font-mono">
+                  {patterns.map((p) => (
+                    <p
+                      key={`${p.match.type}-${p.match.value}`}
+                      className="text-text-secondary font-mono"
+                    >
                       {p.match.type}: {p.match.value}
                       {p.match.strict_subdomain ? ' (strict)' : ''}
                     </p>
@@ -264,9 +269,7 @@ function DebugReportView({ report }: { report: DevModeDebugReport }) {
       {report.forms.length === 0 ? (
         <p className="text-xs text-text-muted">フォーム未検出</p>
       ) : (
-        report.forms.map((form, i) => (
-          <FormView key={`${form.formId || form.formType}-${i}`} form={form} />
-        ))
+        report.forms.map((form) => <FormView key={form.formId || form.formType} form={form} />)
       )}
     </div>
   )
@@ -280,7 +283,9 @@ function MatchBadge({ type }: { type: string }) {
     none: 'bg-danger/10 text-danger',
   }
   return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls[type] || cls.none}`}>
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls[type] || cls.none}`}
+    >
       {type}
     </span>
   )
@@ -314,8 +319,11 @@ function FormView({ form }: { form: DevModeDebugReport['forms'][0] }) {
 
       {expanded && (
         <div className="border-t border-border px-2 py-1.5 space-y-1">
-          {form.fields.map((field, i) => (
-            <FieldRow key={`${field.type}-${i}`} field={field} />
+          {form.fields.map((field) => (
+            <FieldRow
+              key={`${field.type}-${field.element.tagName}-${field.element.id}-${field.element.name}`}
+              field={field}
+            />
           ))}
         </div>
       )}

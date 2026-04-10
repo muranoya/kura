@@ -25,9 +25,7 @@ pub fn get_s3_config_session(
 }
 
 #[tauri::command]
-pub fn clear_s3_config_session(
-    state: tauri::State<'_, S3ConfigSession>,
-) -> Result<(), String> {
+pub fn clear_s3_config_session(state: tauri::State<'_, S3ConfigSession>) -> Result<(), String> {
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
     *guard = None;
     Ok(())

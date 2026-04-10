@@ -188,8 +188,7 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_unlock(
     jni_catch_void(&mut env, |env| {
         let vid = get_string(env, &vault_id)?;
         let mp = get_string(env, &master_password)?;
-        with_manager(&vid, |m| m.api_unlock(mp))
-            .map_err(|e| format!("Failed to unlock: {}", e))
+        with_manager(&vid, |m| m.api_unlock(mp)).map_err(|e| format!("Failed to unlock: {}", e))
     });
 }
 
@@ -216,8 +215,8 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_lock(
 ) -> jbyteArray {
     jni_catch(&mut env, |env| {
         let vid = get_string(env, &vault_id)?;
-        let bytes = with_manager(&vid, |m| m.api_lock())
-            .map_err(|e| format!("Failed to lock: {}", e))?;
+        let bytes =
+            with_manager(&vid, |m| m.api_lock()).map_err(|e| format!("Failed to lock: {}", e))?;
         new_jbyte_array(env, &bytes)
     })
 }
@@ -352,8 +351,8 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_updateEntry(
         let no = get_optional_string(env, &notes)?;
         let cf = get_optional_string(env, &custom_fields_json)?;
 
-        let li: Option<Vec<String>> = get_optional_string(env, &label_ids_json)?
-            .and_then(|s| serde_json::from_str(&s).ok());
+        let li: Option<Vec<String>> =
+            get_optional_string(env, &label_ids_json)?.and_then(|s| serde_json::from_str(&s).ok());
 
         with_manager(&vid, |m| m.api_update_entry(entry_id, n, no, tv, li, cf))
             .map_err(|e| format!("Failed to update entry: {}", e))
@@ -666,8 +665,8 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_generateTotpDef
 ) -> jstring {
     jni_catch(&mut env, |env| {
         let s = get_string(env, &secret)?;
-        let code = api_generate_totp_default(s)
-            .map_err(|e| format!("Failed to generate TOTP: {}", e))?;
+        let code =
+            api_generate_totp_default(s).map_err(|e| format!("Failed to generate TOTP: {}", e))?;
         new_jstring(env, &code)
     })
 }

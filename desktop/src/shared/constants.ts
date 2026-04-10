@@ -32,18 +32,3 @@ export const STORAGE_KEYS = {
   SORT_CONFIG: 'entrySortConfig',
   ENTRY_TYPE_FILTER: 'entryTypeFilter',
 }
-
-// Password generation defaults
-export const PASSWORD_GENERATION_DEFAULTS = {
-  length: 16,
-  includeUppercase: true,
-  includeLowercase: true,
-  includeNumbers: true,
-  includeSymbols: true,
-}
-
-// TOTP defaults
-export const TOTP_DEFAULTS = {
-  digits: 6,
-  period: 30,
-}

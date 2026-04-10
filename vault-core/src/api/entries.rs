@@ -86,11 +86,10 @@ impl VaultManager {
                 .map_err(|e| format!("Failed to get entry: {}", e))?
                 .ok_or_else(|| format!("Entry not found: {}", id))?;
 
-            let custom_fields = entry
-                .data
-                .custom_fields
-                .as_ref()
-                .map(|fields| serde_json::to_string(fields).unwrap_or_else(|_| "[]".to_string()));
+            let custom_fields =
+                entry.data.custom_fields.as_ref().map(|fields| {
+                    serde_json::to_string(fields).unwrap_or_else(|_| "[]".to_string())
+                });
 
             Ok(EntryDetail {
                 id: entry.id,

@@ -75,13 +75,7 @@ export function validatePatterns(json: unknown): SitePattern[] {
         continue
       }
 
-      const validFormTypes = [
-        'login',
-        'login_username',
-        'login_password',
-        'totp',
-        'credit_card',
-      ]
+      const validFormTypes = ['login', 'login_username', 'login_password', 'totp', 'credit_card']
       const validFieldNames = [
         'username',
         'password',

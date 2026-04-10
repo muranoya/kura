@@ -23,11 +23,6 @@ export async function unlock(password: string): Promise<void> {
   if (!res.success) throw new Error(field<'error', string>(res, 'error'))
 }
 
-export async function unlockExisting(password: string): Promise<void> {
-  const res = await sendMessage({ type: 'UNLOCK_EXISTING', password })
-  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
-}
-
 export async function recoverWithRecoveryKey(
   recoveryKey: string,
   newPassword: string,
@@ -39,15 +34,6 @@ export async function recoverWithRecoveryKey(
 export async function lock(): Promise<void> {
   const res = await sendMessage({ type: 'LOCK' })
   if (!res.success) throw new Error(field<'error', string>(res, 'error'))
-}
-
-export async function createVault(
-  masterPassword: string,
-  s3Config: Record<string, string>,
-): Promise<string> {
-  const res = await sendMessage({ type: 'CREATE_VAULT', masterPassword, s3Config })
-  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
-  return field<'recoveryKey', string>(res, 'recoveryKey') ?? ''
 }
 
 // Entries
@@ -235,12 +221,6 @@ export async function regenerateRecoveryKey(password: string): Promise<string> {
 }
 
 // Storage & Sync
-export async function downloadVault(): Promise<boolean> {
-  const res = await sendMessage({ type: 'DOWNLOAD_VAULT' })
-  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
-  return field<'vaultExists', boolean>(res, 'vaultExists') ?? false
-}
-
 export async function sync(): Promise<void> {
   const res = await sendMessage({ type: 'SYNC' })
   if (!res.success) throw new Error(field<'error', string>(res, 'error'))
