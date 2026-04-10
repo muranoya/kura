@@ -57,7 +57,7 @@
     "vite": "^8",
     "vite-plugin-wasm": "^3",
     "vitest": "^3",
-    "web-ext": "^8"
+    "web-ext": "^10"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
