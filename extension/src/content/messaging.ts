@@ -60,7 +60,7 @@ export async function requestOpenPopup(): Promise<boolean> {
 
 export async function requestTotp(
   url: string,
-  entryId?: string,
+  entryId: string,
 ): Promise<{ totpCode: string; totpEntryName: string } | null> {
   const response = await sendMessage({ type: 'AUTOFILL_GET_TOTP', url, entryId })
   if (response.success && 'totpCode' in response && response.totpCode) {
@@ -70,6 +70,16 @@ export async function requestTotp(
     }
   }
   return null
+}
+
+export async function requestTotpCandidates(
+  url: string,
+): Promise<AutofillCredentialCandidate[]> {
+  const response = await sendMessage({ type: 'AUTOFILL_GET_TOTP_CANDIDATES', url })
+  if (response.success && 'totpCandidates' in response) {
+    return (response.totpCandidates as AutofillCredentialCandidate[]) || []
+  }
+  return []
 }
 
 export async function requestCreditCards(): Promise<AutofillCredentialCandidate[]> {

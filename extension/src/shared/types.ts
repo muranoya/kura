@@ -101,6 +101,7 @@ export interface AutofillCredentialCandidate {
   entryId: string
   name: string
   username: string | null
+  totpPeriod?: number
 }
 
 /** Full credential data sent only when the user selects a candidate */

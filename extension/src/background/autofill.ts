@@ -24,6 +24,7 @@ export interface VaultApi {
     sortOrder: string | null,
   ): string
   api_generate_totp_from_value(value: string): string
+  api_parse_totp_period(value: string): number
   api_create_entry(
     vaultId: string,
     entryType: string,
@@ -181,10 +182,11 @@ interface TotpResult {
   totpEntryName: string
 }
 
-function getTotpForUrl(url: string): TotpResult | null {
-  if (!vaultApi || !isUnlocked()) return null
+function getTotpCandidatesForUrl(url: string): AutofillCredentialCandidate[] {
+  if (!vaultApi || !isUnlocked()) return []
 
   const candidates = getCredentialsForUrl(url)
+  const totpCandidates: AutofillCredentialCandidate[] = []
   for (const candidate of candidates) {
     try {
       const result = vaultApi.api_get_entry(DEFAULT_VAULT_ID, candidate.entryId)
@@ -198,13 +200,13 @@ function getTotpForUrl(url: string): TotpResult | null {
       const totpField = customFields.find((f) => f.field_type === 'totp')
       if (!totpField?.value) continue
 
-      const code = vaultApi.api_generate_totp_from_value(totpField.value)
-      return { totpCode: code, totpEntryName: candidate.name }
+      const period = vaultApi.api_parse_totp_period(totpField.value)
+      totpCandidates.push({ ...candidate, totpPeriod: period })
     } catch (e) {
-      console.error(LOG_PREFIX, `getTotpForUrl: error for entry ${candidate.entryId}:`, e)
+      console.error(LOG_PREFIX, `getTotpCandidatesForUrl: error for entry ${candidate.entryId}:`, e)
     }
   }
-  return null
+  return totpCandidates
 }
 
 function getTotpForEntry(entryId: string): TotpResult | null {
@@ -396,27 +398,27 @@ export async function handleAutofillMessage(
         sendResponse({ success: false, error: 'Vault not unlocked' })
         break
       }
-      const totpEntryId = message.entryId as string | undefined
-      const totpUrl = message.url as string
-
-      // If entryId is provided, get TOTP from that specific entry (split login flow)
-      let totpResult: TotpResult | null = null
-      if (totpEntryId) {
-        totpResult = getTotpForEntry(totpEntryId)
-        console.log(LOG_PREFIX, `AUTOFILL_GET_TOTP: entryId=${totpEntryId}, found=${!!totpResult}`)
-      }
-
-      // Fall back to URL-based search
-      if (!totpResult && totpUrl) {
-        totpResult = getTotpForUrl(totpUrl)
-        console.log(LOG_PREFIX, `AUTOFILL_GET_TOTP: url=${totpUrl}, found=${!!totpResult}`)
-      }
+      const totpEntryId = message.entryId as string
+      const totpResult = getTotpForEntry(totpEntryId)
+      console.log(LOG_PREFIX, `AUTOFILL_GET_TOTP: entryId=${totpEntryId}, found=${!!totpResult}`)
 
       if (totpResult) {
         sendResponse({ success: true, ...totpResult })
       } else {
         sendResponse({ success: true, totpCode: null })
       }
+      break
+    }
+
+    case 'AUTOFILL_GET_TOTP_CANDIDATES': {
+      if (!isUnlocked()) {
+        sendResponse({ success: false, error: 'Vault not unlocked' })
+        break
+      }
+      const totpCandidateUrl = message.url as string
+      const totpCandidates = getTotpCandidatesForUrl(totpCandidateUrl)
+      console.log(LOG_PREFIX, `AUTOFILL_GET_TOTP_CANDIDATES: returning ${totpCandidates.length} candidates`)
+      sendResponse({ success: true, totpCandidates })
       break
     }
 

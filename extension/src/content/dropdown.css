@@ -131,3 +131,31 @@
 .kura-dropdown-warning + .kura-dropdown-item:first-of-type {
   border-radius: 0;
 }
+
+.kura-totp-timer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.kura-totp-timer svg {
+  display: block;
+}
+
+.kura-totp-seconds {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4f46e5;
+  min-width: 24px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.kura-totp-urgent .kura-totp-progress {
+  stroke: #ef4444;
+}
+
+.kura-totp-urgent .kura-totp-seconds {
+  color: #ef4444;
+}

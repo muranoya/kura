@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -72,7 +73,7 @@ fun MasterPasswordScreen(
                 value = password,
                 onValueChange = { password = it; error = "" },
                 label = { Text("マスターパスワード") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("master_password_input"),
                 singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
@@ -85,7 +86,7 @@ fun MasterPasswordScreen(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it; error = "" },
                 label = { Text("パスワード確認") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("confirm_password_input"),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation()
             )
@@ -93,7 +94,7 @@ fun MasterPasswordScreen(
             Spacer(modifier = Modifier.weight(1f))
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f), enabled = !isLoading) { Text("戻る") }
+                OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f).testTag("password_back_button"), enabled = !isLoading) { Text("戻る") }
                 Button(
                     onClick = {
                         when {
@@ -115,7 +116,7 @@ fun MasterPasswordScreen(
                             }
                         }
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).testTag("create_vault_button"),
                     enabled = !isLoading
                 ) {
                     if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)

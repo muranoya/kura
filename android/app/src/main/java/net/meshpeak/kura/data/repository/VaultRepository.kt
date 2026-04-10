@@ -12,7 +12,101 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import java.io.File
 
-class VaultRepository(private val context: Context) {
+interface IVaultRepository {
+    // Local file operations
+    suspend fun vaultFileExists(): Boolean
+    suspend fun readVaultFile(): ByteArray?
+    suspend fun writeVaultFile(bytes: ByteArray)
+    suspend fun deleteVaultFile()
+
+    // Session management
+    suspend fun createVault(masterPassword: String): String
+    suspend fun loadVault(vaultBytes: ByteArray, etag: String = "")
+    suspend fun unlock(masterPassword: String)
+    suspend fun unlockWithRecoveryKey(recoveryKey: String)
+    suspend fun lock(): ByteArray
+    suspend fun getVaultBytes(): ByteArray
+    suspend fun isUnlocked(): Boolean
+
+    // Entry operations
+    suspend fun listEntries(
+        searchQuery: String? = null,
+        entryType: String? = null,
+        labelId: String? = null,
+        includeTrash: Boolean = false,
+        onlyFavorites: Boolean = false,
+        sortField: String? = null,
+        sortOrder: String? = null
+    ): List<EntryRow>
+    suspend fun getEntry(id: String): Entry
+    suspend fun createEntry(
+        entryType: String,
+        name: String,
+        notes: String?,
+        typedValueJson: String,
+        labelIds: List<String>,
+        customFieldsJson: String?
+    ): String
+    suspend fun updateEntry(
+        id: String,
+        name: String,
+        typedValueJson: String?,
+        notes: String?,
+        labelIds: List<String>?,
+        customFieldsJson: String?
+    )
+    suspend fun deleteEntry(id: String)
+    suspend fun restoreEntry(id: String)
+    suspend fun purgeEntry(id: String)
+    suspend fun setFavorite(id: String, isFavorite: Boolean)
+
+    // Label operations
+    suspend fun listLabels(): List<Label>
+    suspend fun createLabel(name: String): String
+    suspend fun deleteLabel(id: String)
+    suspend fun renameLabel(id: String, newName: String)
+    suspend fun setEntryLabels(entryId: String, labelIds: List<String>)
+
+    // Security
+    suspend fun verifyPassword(password: String)
+    suspend fun changeMasterPassword(oldPassword: String, newPassword: String)
+    suspend fun rotateDek(password: String): String
+    suspend fun regenerateRecoveryKey(password: String): String
+
+    // Transfer Config
+    suspend fun encryptTransferConfig(password: String, configJson: String): String
+    suspend fun decryptTransferConfig(password: String, transferString: String): String
+
+    // Utilities
+    suspend fun generatePassword(
+        length: Int = 16,
+        lowercase: Boolean = true,
+        uppercase: Boolean = true,
+        numbers: Boolean = true,
+        symbols1: Boolean = true,
+        symbols2: Boolean = true,
+        symbols3: Boolean = true
+    ): String
+    suspend fun generateTotp(secret: String, digits: Int = 6, period: Int = 30): String
+    suspend fun generateTotpDefault(secret: String): String
+    suspend fun generateTotpFromValue(value: String): String
+    suspend fun parseTotpPeriod(value: String): Long
+
+    // Sync
+    suspend fun syncVault(configJson: String): SyncResult
+    suspend fun pushVault(configJson: String)
+    suspend fun downloadVault(configJson: String): Boolean
+    suspend fun getLastSyncTime(): Long
+    suspend fun restoreLastSyncTime(ts: Long)
+
+    // Combined helpers
+    suspend fun saveLocally()
+    suspend fun syncInBackground(s3ConfigJson: String?)
+    suspend fun saveAndSync(s3ConfigJson: String?)
+    suspend fun saveAndPush(s3ConfigJson: String?)
+}
+
+class VaultRepository(private val context: Context) : IVaultRepository {
 
     companion object {
         private const val DEFAULT_VAULT_ID = "default"
@@ -26,20 +120,20 @@ class VaultRepository(private val context: Context) {
     // Local file operations
     // ========================================================================
 
-    suspend fun vaultFileExists(): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun vaultFileExists(): Boolean = withContext(Dispatchers.IO) {
         vaultFile().exists()
     }
 
-    suspend fun readVaultFile(): ByteArray? = withContext(Dispatchers.IO) {
+    override suspend fun readVaultFile(): ByteArray? = withContext(Dispatchers.IO) {
         val f = vaultFile()
         if (f.exists()) f.readBytes() else null
     }
 
-    suspend fun writeVaultFile(bytes: ByteArray) = withContext(Dispatchers.IO) {
+    override suspend fun writeVaultFile(bytes: ByteArray) = withContext(Dispatchers.IO) {
         vaultFile().writeBytes(bytes)
     }
 
-    suspend fun deleteVaultFile() = withContext(Dispatchers.IO) {
+    override suspend fun deleteVaultFile() = withContext(Dispatchers.IO) {
         val f = vaultFile()
         if (f.exists()) f.delete()
     }
@@ -48,31 +142,31 @@ class VaultRepository(private val context: Context) {
     // Session management
     // ========================================================================
 
-    suspend fun createVault(masterPassword: String): String = withContext(Dispatchers.IO) {
+    override suspend fun createVault(masterPassword: String): String = withContext(Dispatchers.IO) {
         VaultBridge.createVault(DEFAULT_VAULT_ID, masterPassword)
     }
 
-    suspend fun loadVault(vaultBytes: ByteArray, etag: String = "") = withContext(Dispatchers.IO) {
+    override suspend fun loadVault(vaultBytes: ByteArray, etag: String) = withContext(Dispatchers.IO) {
         VaultBridge.loadVault(DEFAULT_VAULT_ID, vaultBytes, etag)
     }
 
-    suspend fun unlock(masterPassword: String) = withContext(Dispatchers.IO) {
+    override suspend fun unlock(masterPassword: String) = withContext(Dispatchers.IO) {
         VaultBridge.unlock(DEFAULT_VAULT_ID, masterPassword)
     }
 
-    suspend fun unlockWithRecoveryKey(recoveryKey: String) = withContext(Dispatchers.IO) {
+    override suspend fun unlockWithRecoveryKey(recoveryKey: String) = withContext(Dispatchers.IO) {
         VaultBridge.unlockWithRecoveryKey(DEFAULT_VAULT_ID, recoveryKey)
     }
 
-    suspend fun lock(): ByteArray = withContext(Dispatchers.IO) {
+    override suspend fun lock(): ByteArray = withContext(Dispatchers.IO) {
         VaultBridge.lock(DEFAULT_VAULT_ID)
     }
 
-    suspend fun getVaultBytes(): ByteArray = withContext(Dispatchers.IO) {
+    override suspend fun getVaultBytes(): ByteArray = withContext(Dispatchers.IO) {
         VaultBridge.getVaultBytes(DEFAULT_VAULT_ID)
     }
 
-    suspend fun isUnlocked(): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun isUnlocked(): Boolean = withContext(Dispatchers.IO) {
         VaultBridge.isUnlocked(DEFAULT_VAULT_ID)
     }
 
@@ -80,25 +174,25 @@ class VaultRepository(private val context: Context) {
     // Entry operations
     // ========================================================================
 
-    suspend fun listEntries(
-        searchQuery: String? = null,
-        entryType: String? = null,
-        labelId: String? = null,
-        includeTrash: Boolean = false,
-        onlyFavorites: Boolean = false,
-        sortField: String? = null,
-        sortOrder: String? = null
+    override suspend fun listEntries(
+        searchQuery: String?,
+        entryType: String?,
+        labelId: String?,
+        includeTrash: Boolean,
+        onlyFavorites: Boolean,
+        sortField: String?,
+        sortOrder: String?
     ): List<EntryRow> = withContext(Dispatchers.IO) {
         val jsonStr = VaultBridge.listEntries(DEFAULT_VAULT_ID, searchQuery, entryType, labelId, includeTrash, onlyFavorites, sortField, sortOrder)
         json.decodeFromString<List<EntryRow>>(jsonStr)
     }
 
-    suspend fun getEntry(id: String): Entry = withContext(Dispatchers.IO) {
+    override suspend fun getEntry(id: String): Entry = withContext(Dispatchers.IO) {
         val jsonStr = VaultBridge.getEntry(DEFAULT_VAULT_ID, id)
         json.decodeFromString<Entry>(jsonStr)
     }
 
-    suspend fun createEntry(
+    override suspend fun createEntry(
         entryType: String,
         name: String,
         notes: String?,
@@ -110,7 +204,7 @@ class VaultRepository(private val context: Context) {
         VaultBridge.createEntry(DEFAULT_VAULT_ID, entryType, name, notes, typedValueJson, labelIdsJson, customFieldsJson)
     }
 
-    suspend fun updateEntry(
+    override suspend fun updateEntry(
         id: String,
         name: String,
         typedValueJson: String?,
@@ -124,19 +218,19 @@ class VaultRepository(private val context: Context) {
         VaultBridge.updateEntry(DEFAULT_VAULT_ID, id, name, typedValueJson, notes, labelIdsJson, customFieldsJson)
     }
 
-    suspend fun deleteEntry(id: String) = withContext(Dispatchers.IO) {
+    override suspend fun deleteEntry(id: String) = withContext(Dispatchers.IO) {
         VaultBridge.deleteEntry(DEFAULT_VAULT_ID, id)
     }
 
-    suspend fun restoreEntry(id: String) = withContext(Dispatchers.IO) {
+    override suspend fun restoreEntry(id: String) = withContext(Dispatchers.IO) {
         VaultBridge.restoreEntry(DEFAULT_VAULT_ID, id)
     }
 
-    suspend fun purgeEntry(id: String) = withContext(Dispatchers.IO) {
+    override suspend fun purgeEntry(id: String) = withContext(Dispatchers.IO) {
         VaultBridge.purgeEntry(DEFAULT_VAULT_ID, id)
     }
 
-    suspend fun setFavorite(id: String, isFavorite: Boolean) = withContext(Dispatchers.IO) {
+    override suspend fun setFavorite(id: String, isFavorite: Boolean) = withContext(Dispatchers.IO) {
         VaultBridge.setFavorite(DEFAULT_VAULT_ID, id, isFavorite)
     }
 
@@ -144,24 +238,24 @@ class VaultRepository(private val context: Context) {
     // Label operations
     // ========================================================================
 
-    suspend fun listLabels(): List<Label> = withContext(Dispatchers.IO) {
+    override suspend fun listLabels(): List<Label> = withContext(Dispatchers.IO) {
         val jsonStr = VaultBridge.listLabels(DEFAULT_VAULT_ID)
         json.decodeFromString<List<Label>>(jsonStr)
     }
 
-    suspend fun createLabel(name: String): String = withContext(Dispatchers.IO) {
+    override suspend fun createLabel(name: String): String = withContext(Dispatchers.IO) {
         VaultBridge.createLabel(DEFAULT_VAULT_ID, name)
     }
 
-    suspend fun deleteLabel(id: String) = withContext(Dispatchers.IO) {
+    override suspend fun deleteLabel(id: String) = withContext(Dispatchers.IO) {
         VaultBridge.deleteLabel(DEFAULT_VAULT_ID, id)
     }
 
-    suspend fun renameLabel(id: String, newName: String) = withContext(Dispatchers.IO) {
+    override suspend fun renameLabel(id: String, newName: String) = withContext(Dispatchers.IO) {
         VaultBridge.renameLabel(DEFAULT_VAULT_ID, id, newName)
     }
 
-    suspend fun setEntryLabels(entryId: String, labelIds: List<String>) = withContext(Dispatchers.IO) {
+    override suspend fun setEntryLabels(entryId: String, labelIds: List<String>) = withContext(Dispatchers.IO) {
         val labelIdsJson = json.encodeToString(ListSerializer(String.serializer()), labelIds)
         VaultBridge.setEntryLabels(DEFAULT_VAULT_ID, entryId, labelIdsJson)
     }
@@ -170,19 +264,19 @@ class VaultRepository(private val context: Context) {
     // Security
     // ========================================================================
 
-    suspend fun verifyPassword(password: String) = withContext(Dispatchers.IO) {
+    override suspend fun verifyPassword(password: String) = withContext(Dispatchers.IO) {
         VaultBridge.verifyPassword(DEFAULT_VAULT_ID, password)
     }
 
-    suspend fun changeMasterPassword(oldPassword: String, newPassword: String) = withContext(Dispatchers.IO) {
+    override suspend fun changeMasterPassword(oldPassword: String, newPassword: String) = withContext(Dispatchers.IO) {
         VaultBridge.changeMasterPassword(DEFAULT_VAULT_ID, oldPassword, newPassword)
     }
 
-    suspend fun rotateDek(password: String): String = withContext(Dispatchers.IO) {
+    override suspend fun rotateDek(password: String): String = withContext(Dispatchers.IO) {
         VaultBridge.rotateDek(DEFAULT_VAULT_ID, password)
     }
 
-    suspend fun regenerateRecoveryKey(password: String): String = withContext(Dispatchers.IO) {
+    override suspend fun regenerateRecoveryKey(password: String): String = withContext(Dispatchers.IO) {
         VaultBridge.regenerateRecoveryKey(DEFAULT_VAULT_ID, password)
     }
 
@@ -190,11 +284,11 @@ class VaultRepository(private val context: Context) {
     // Transfer Config
     // ========================================================================
 
-    suspend fun encryptTransferConfig(password: String, configJson: String): String = withContext(Dispatchers.IO) {
+    override suspend fun encryptTransferConfig(password: String, configJson: String): String = withContext(Dispatchers.IO) {
         VaultBridge.encryptTransferConfig(password, configJson)
     }
 
-    suspend fun decryptTransferConfig(password: String, transferString: String): String = withContext(Dispatchers.IO) {
+    override suspend fun decryptTransferConfig(password: String, transferString: String): String = withContext(Dispatchers.IO) {
         VaultBridge.decryptTransferConfig(password, transferString)
     }
 
@@ -202,31 +296,31 @@ class VaultRepository(private val context: Context) {
     // Utilities
     // ========================================================================
 
-    suspend fun generatePassword(
-        length: Int = 16,
-        lowercase: Boolean = true,
-        uppercase: Boolean = true,
-        numbers: Boolean = true,
-        symbols1: Boolean = true,
-        symbols2: Boolean = true,
-        symbols3: Boolean = true
+    override suspend fun generatePassword(
+        length: Int,
+        lowercase: Boolean,
+        uppercase: Boolean,
+        numbers: Boolean,
+        symbols1: Boolean,
+        symbols2: Boolean,
+        symbols3: Boolean
     ): String = withContext(Dispatchers.IO) {
         VaultBridge.generatePassword(length, lowercase, uppercase, numbers, symbols1, symbols2, symbols3)
     }
 
-    suspend fun generateTotp(secret: String, digits: Int = 6, period: Int = 30): String = withContext(Dispatchers.IO) {
+    override suspend fun generateTotp(secret: String, digits: Int, period: Int): String = withContext(Dispatchers.IO) {
         VaultBridge.generateTotp(secret, digits, period)
     }
 
-    suspend fun generateTotpDefault(secret: String): String = withContext(Dispatchers.IO) {
+    override suspend fun generateTotpDefault(secret: String): String = withContext(Dispatchers.IO) {
         VaultBridge.generateTotpDefault(secret)
     }
 
-    suspend fun generateTotpFromValue(value: String): String = withContext(Dispatchers.IO) {
+    override suspend fun generateTotpFromValue(value: String): String = withContext(Dispatchers.IO) {
         VaultBridge.generateTotpFromValue(value)
     }
 
-    suspend fun parseTotpPeriod(value: String): Long = withContext(Dispatchers.IO) {
+    override suspend fun parseTotpPeriod(value: String): Long = withContext(Dispatchers.IO) {
         VaultBridge.parseTotpPeriod(value)
     }
 
@@ -249,7 +343,7 @@ class VaultRepository(private val context: Context) {
         VaultBridge.getEtag(DEFAULT_VAULT_ID)
     }
 
-    suspend fun syncVault(configJson: String): SyncResult = withContext(Dispatchers.IO) {
+    override suspend fun syncVault(configJson: String): SyncResult = withContext(Dispatchers.IO) {
         val s3Config = parseS3Config(configJson)
         val client = VaultS3Client(s3Config)
         val maxRetries = 5
@@ -293,7 +387,7 @@ class VaultRepository(private val context: Context) {
         throw RuntimeException("Sync failed after maximum retries")
     }
 
-    suspend fun pushVault(configJson: String): Unit = withContext(Dispatchers.IO) {
+    override suspend fun pushVault(configJson: String): Unit = withContext(Dispatchers.IO) {
         val s3Config = parseS3Config(configJson)
         val client = VaultS3Client(s3Config)
         val vaultBytes = getVaultBytes()
@@ -302,7 +396,7 @@ class VaultRepository(private val context: Context) {
         updateEtag(newEtag)
     }
 
-    suspend fun downloadVault(configJson: String): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun downloadVault(configJson: String): Boolean = withContext(Dispatchers.IO) {
         val s3Config = parseS3Config(configJson)
         val client = VaultS3Client(s3Config)
         val remote = client.download()
@@ -315,11 +409,11 @@ class VaultRepository(private val context: Context) {
         }
     }
 
-    suspend fun getLastSyncTime(): Long = withContext(Dispatchers.IO) {
+    override suspend fun getLastSyncTime(): Long = withContext(Dispatchers.IO) {
         VaultBridge.getLastSyncTime(DEFAULT_VAULT_ID)
     }
 
-    suspend fun restoreLastSyncTime(ts: Long) = withContext(Dispatchers.IO) {
+    override suspend fun restoreLastSyncTime(ts: Long) = withContext(Dispatchers.IO) {
         VaultBridge.restoreLastSyncTime(DEFAULT_VAULT_ID, ts)
     }
 
@@ -327,12 +421,12 @@ class VaultRepository(private val context: Context) {
     // Combined helpers
     // ========================================================================
 
-    suspend fun saveLocally() {
+    override suspend fun saveLocally() {
         val vaultBytes = getVaultBytes()
         writeVaultFile(vaultBytes)
     }
 
-    suspend fun syncInBackground(s3ConfigJson: String?) {
+    override suspend fun syncInBackground(s3ConfigJson: String?) {
         if (s3ConfigJson == null) return
         val result = syncVault(s3ConfigJson)
         if (result.synced) {
@@ -342,12 +436,12 @@ class VaultRepository(private val context: Context) {
         }
     }
 
-    suspend fun saveAndSync(s3ConfigJson: String?) {
+    override suspend fun saveAndSync(s3ConfigJson: String?) {
         saveLocally()
         syncInBackground(s3ConfigJson)
     }
 
-    suspend fun saveAndPush(s3ConfigJson: String?) {
+    override suspend fun saveAndPush(s3ConfigJson: String?) {
         val vaultBytes = getVaultBytes()
         writeVaultFile(vaultBytes)
         s3ConfigJson?.let { pushVault(it) }

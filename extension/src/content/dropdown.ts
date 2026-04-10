@@ -17,6 +17,7 @@ let onUnlockCallback: (() => void) | null = null
 let currentPageProtocol: string | null = null
 let lastAnchorRect: { top: number; left: number } | null = null
 const SCROLL_HIDE_THRESHOLD = 100
+let totpTimerInterval: ReturnType<typeof setInterval> | null = null
 
 function ensureShadowHost(): ShadowRoot {
   if (shadowRoot) return shadowRoot
@@ -48,6 +49,76 @@ function positionDropdown(anchor: HTMLInputElement) {
   dropdownEl.style.minWidth = `${Math.max(rect.width, 260)}px`
 }
 
+function getTotpRemaining(period: number): number {
+  const now = Math.floor(Date.now() / 1000)
+  return period - (now % period)
+}
+
+function updateTotpTimers() {
+  if (!shadowRoot) return
+  const timers = shadowRoot.querySelectorAll('.kura-totp-timer')
+  for (const timer of timers) {
+    const period = Number(timer.getAttribute('data-period'))
+    if (!period) continue
+    const remaining = getTotpRemaining(period)
+    const ratio = remaining / period
+
+    const textEl = timer.querySelector('.kura-totp-seconds') as HTMLElement | null
+    if (textEl) textEl.textContent = `${remaining}s`
+
+    const circle = timer.querySelector('.kura-totp-progress') as SVGCircleElement | null
+    if (circle) {
+      const circumference = 2 * Math.PI * 9
+      circle.style.strokeDashoffset = String(circumference * (1 - ratio))
+    }
+
+    // Change color when time is running low (<= 5 seconds)
+    if (remaining <= 5) {
+      timer.classList.add('kura-totp-urgent')
+    } else {
+      timer.classList.remove('kura-totp-urgent')
+    }
+  }
+}
+
+function startTotpTimer() {
+  stopTotpTimer()
+  updateTotpTimers()
+  totpTimerInterval = setInterval(updateTotpTimers, 1000)
+}
+
+function stopTotpTimer() {
+  if (totpTimerInterval) {
+    clearInterval(totpTimerInterval)
+    totpTimerInterval = null
+  }
+}
+
+function createTotpTimerEl(period: number): HTMLElement {
+  const timer = document.createElement('div')
+  timer.className = 'kura-totp-timer'
+  timer.setAttribute('data-period', String(period))
+
+  const circumference = 2 * Math.PI * 9
+  const remaining = getTotpRemaining(period)
+  const ratio = remaining / period
+
+  timer.innerHTML =
+    `<svg width="24" height="24" viewBox="0 0 24 24">` +
+    `<circle cx="12" cy="12" r="9" fill="none" stroke="#e5e7eb" stroke-width="2"/>` +
+    `<circle class="kura-totp-progress" cx="12" cy="12" r="9" fill="none" stroke="#4f46e5" stroke-width="2" ` +
+    `stroke-dasharray="${circumference}" stroke-dashoffset="${circumference * (1 - ratio)}" ` +
+    `stroke-linecap="round" transform="rotate(-90 12 12)"/>` +
+    `</svg>` +
+    `<span class="kura-totp-seconds">${remaining}s</span>`
+
+  if (remaining <= 5) {
+    timer.classList.add('kura-totp-urgent')
+  }
+
+  return timer
+}
+
 function renderItems() {
   if (!dropdownEl) return
   dropdownEl.innerHTML = ''
@@ -61,6 +132,8 @@ function renderItems() {
       '<span>このページは暗号化されていません</span>'
     dropdownEl.appendChild(warning)
   }
+
+  let hasTotpCandidates = false
 
   for (let i = 0; i < currentCandidates.length; i++) {
     const candidate = currentCandidates[i]
@@ -96,6 +169,12 @@ function renderItems() {
     item.appendChild(icon)
     item.appendChild(info)
 
+    // TOTP remaining time indicator
+    if (candidate.totpPeriod) {
+      hasTotpCandidates = true
+      item.appendChild(createTotpTimerEl(candidate.totpPeriod))
+    }
+
     item.addEventListener('mousedown', (e) => {
       e.preventDefault() // Prevent blur on the input
       e.stopPropagation()
@@ -108,6 +187,11 @@ function renderItems() {
     })
 
     dropdownEl.appendChild(item)
+  }
+
+  // Start timer if there are TOTP candidates
+  if (hasTotpCandidates) {
+    startTotpTimer()
   }
 
   // Footer
@@ -260,6 +344,8 @@ export function showDropdown(
 }
 
 export function hideDropdown() {
+  stopTotpTimer()
+
   if (blurTimeout) {
     clearTimeout(blurTimeout)
     blurTimeout = null

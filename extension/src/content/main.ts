@@ -14,6 +14,7 @@ import {
   requestFillData,
   requestOpenPopup,
   requestTotp,
+  requestTotpCandidates,
   storePendingFlow,
 } from './messaging'
 import { detectFormByPattern } from './pattern-detector'
@@ -143,37 +144,57 @@ async function handleInputFocus(input: HTMLInputElement) {
 
   const url = window.location.href
 
-  // === TOTP: auto-fill without dropdown ===
+  // === TOTP: dropdown selection (or auto-fill if pending flow exists) ===
   if (form.formType === 'TOTP') {
     // Check pending flow first (split login: use the same entry selected in username step)
     const pending = await queryPendingFlow(url)
-    let totpResult: { totpCode: string; totpEntryName: string } | null = null
-
     if (pending) {
       console.log(
         LOG_PREFIX,
         `handleInputFocus: checking TOTP from pending flow entry ${pending.entryId}`,
       )
-      totpResult = await requestTotp(url, pending.entryId)
-    }
-
-    // Fall back to URL-based search
-    if (!totpResult) {
-      totpResult = await requestTotp(url)
-    }
-
-    if (totpResult) {
-      const totpField = form.fields.find((f) => f.type === 'totp')
-      if (totpField && isVisible(totpField.element)) {
-        console.log(
-          LOG_PREFIX,
-          `handleInputFocus: auto-filling TOTP code from ${totpResult.totpEntryName}`,
-        )
-        fillField(totpField.element, totpResult.totpCode)
+      const totpResult = await requestTotp(url, pending.entryId)
+      if (totpResult) {
+        const totpField = form.fields.find((f) => f.type === 'totp')
+        if (totpField && isVisible(totpField.element)) {
+          console.log(
+            LOG_PREFIX,
+            `handleInputFocus: auto-filling TOTP code from ${totpResult.totpEntryName}`,
+          )
+          fillField(totpField.element, totpResult.totpCode)
+        }
       }
-    } else {
-      console.log(LOG_PREFIX, 'handleInputFocus: no TOTP entry found for this URL')
+      return
     }
+
+    // No pending flow — show dropdown for candidate selection
+    const candidates = await requestTotpCandidates(url)
+    if (candidates.length === 0) {
+      console.log(LOG_PREFIX, 'handleInputFocus: no TOTP entry found for this URL')
+      hideDropdown()
+      return
+    }
+
+    console.log(LOG_PREFIX, `handleInputFocus: ${candidates.length} TOTP candidates, showing dropdown`)
+    showDropdown(
+      input,
+      candidates,
+      async (candidate) => {
+        hideDropdown()
+        const totpResult = await requestTotp(url, candidate.entryId)
+        if (totpResult) {
+          const totpField = form.fields.find((f) => f.type === 'totp')
+          if (totpField && isVisible(totpField.element)) {
+            console.log(
+              LOG_PREFIX,
+              `handleInputFocus: filling TOTP code from ${totpResult.totpEntryName}`,
+            )
+            fillField(totpField.element, totpResult.totpCode)
+          }
+        }
+      },
+      window.location.protocol,
+    )
     return
   }
 

@@ -4,8 +4,10 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import net.meshpeak.kura.data.auth.BiometricHelper
+import net.meshpeak.kura.data.preferences.IPreferencesManager
 import net.meshpeak.kura.data.preferences.PreferencesManager
 import net.meshpeak.kura.data.preferences.SecureStorage
+import net.meshpeak.kura.data.repository.IVaultRepository
 import net.meshpeak.kura.data.repository.VaultRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -21,11 +23,12 @@ enum class AppState {
     LOADING, ONBOARDING, LOCKED, UNLOCKED
 }
 
-class AppViewModel(application: Application) : AndroidViewModel(application) {
-
-    val repository = VaultRepository(application)
-    val preferences = PreferencesManager(application)
-    val biometricHelper = BiometricHelper(SecureStorage(application))
+class AppViewModel(
+    application: Application,
+    val repository: IVaultRepository = VaultRepository(application),
+    val preferences: IPreferencesManager = PreferencesManager(application),
+    val biometricHelper: BiometricHelper = BiometricHelper(SecureStorage(application))
+) : AndroidViewModel(application) {
 
     private val _appState = MutableStateFlow(AppState.LOADING)
     val appState: StateFlow<AppState> = _appState

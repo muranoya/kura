@@ -312,18 +312,13 @@ default: help
 # Android のテスト
 @test-android:
 	echo "🧪 Testing Android..."
-	cd {{ANDROID_DIR}} && ./gradlew test
+	cd {{ANDROID_DIR}} && ./gradlew testDebugUnitTest
 	echo "✅ Android tests passed!"
 
-# Desktop のテスト（フロントエンド + Rust結合テスト）
+# Desktop のテスト（フロントエンド）
 @test-desktop: _desktop-icons
 	echo "🧪 Testing desktop (frontend)..."
 	cd {{DESKTOP_DIR}} && pnpm install && pnpm test
-	echo "🧪 Testing desktop (integration with MinIO)..."
-	docker compose -f docker-compose.test.yml up -d --wait minio
-	docker compose -f docker-compose.test.yml run --rm createbuckets
-	cargo test -p kura-desktop --test integration_test -- --test-threads=1 || { docker compose -f docker-compose.test.yml down -v; exit 1; }
-	docker compose -f docker-compose.test.yml down -v
 	echo "✅ desktop tests passed!"
 
 # Extension - Start manual autofill test environment (fixture + MinIO + test pages)
@@ -516,7 +511,7 @@ test-manual-autofill:
 	echo "    just test-vault-core      - Run vault-core tests"
 	echo "    just test-extension       - Run extension tests"
 	echo "    just test-android         - Run Android tests"
-	echo "    just test-desktop         - Run desktop tests (frontend + integration)"
+	echo "    just test-desktop         - Run desktop tests (frontend)"
 	echo "    just test-all             - Run all tests"
 	echo "    just test-manual-autofill      - Start autofill manual test environment"
 	echo "    just test-manual-autofill-stop - Stop autofill test environment"

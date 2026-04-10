@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import net.meshpeak.kura.util.copyToClipboard
@@ -44,7 +45,7 @@ fun RecoveryKeyScreen(
             ) {
                 Text(
                     text = recoveryKey,
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(16.dp).testTag("recovery_key_text"),
                     style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace)
                 )
             }
@@ -82,7 +83,7 @@ fun RecoveryKeyScreen(
                         onComplete()
                     }
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().testTag("complete_button")
             ) {
                 Text("完了")
             }

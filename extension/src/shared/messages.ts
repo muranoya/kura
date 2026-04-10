@@ -95,7 +95,8 @@ export type Message =
   // Autofill (Content Script → Service Worker)
   | { type: 'AUTOFILL_GET_CREDENTIALS'; url: string; strictSubdomain?: boolean }
   | { type: 'AUTOFILL_FILL_REQUEST'; entryId: string }
-  | { type: 'AUTOFILL_GET_TOTP'; url: string }
+  | { type: 'AUTOFILL_GET_TOTP'; url: string; entryId: string }
+  | { type: 'AUTOFILL_GET_TOTP_CANDIDATES'; url: string }
   | { type: 'AUTOFILL_GET_CREDIT_CARDS' }
   | { type: 'AUTOFILL_PENDING_FLOW_STORE'; entryId: string; username: string; url: string }
   | { type: 'AUTOFILL_PENDING_FLOW_QUERY'; url: string }
@@ -173,6 +174,7 @@ export type MessageResponse =
       totpCode?: string
       totpEntryName?: string
       creditCards?: AutofillCredentialCandidate[]
+      totpCandidates?: AutofillCredentialCandidate[]
       pendingFlow?: { entryId: string; username: string; password: string } | null
     })
 

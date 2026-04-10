@@ -40,6 +40,18 @@ android {
         compose = true
     }
 
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            all {
+                it.testLogging {
+                    events("passed", "skipped", "failed")
+                }
+                it.outputs.upToDateWhen { false }
+            }
+        }
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -53,6 +65,7 @@ android {
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)
+    testImplementation(composeBom)
 
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
@@ -94,6 +107,14 @@ dependencies {
     // Debug
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+    // Test
+    testImplementation("junit:junit:4.+")
+    testImplementation("org.robolectric:robolectric:4.+")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("io.mockk:mockk:1.+")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.+")
+    testImplementation("androidx.test:core:1.+")
 }
 
 tasks.register<Copy>("copyLegalAssets") {

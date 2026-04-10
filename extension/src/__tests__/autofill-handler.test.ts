@@ -55,6 +55,7 @@ function createMockVaultApi(entries: MockEntry[]): VaultApi {
       },
     ),
     api_generate_totp_from_value: vi.fn((_value: string) => '123456'),
+    api_parse_totp_period: vi.fn((_value: string) => 30),
     api_create_entry: vi.fn(
       (
         _vaultId: string,
@@ -368,14 +369,16 @@ describe('handleAutofillMessage', () => {
       const result = await callHandler({
         type: 'AUTOFILL_GET_TOTP',
         url: 'https://example.com',
+        entryId: 'entry-totp',
       })
       expect(result).toEqual({ success: false, error: 'Vault not unlocked' })
     })
 
-    it('returns TOTP code for entry with totp custom field', async () => {
+    it('returns TOTP code for specified entry', async () => {
       const result = (await callHandler({
         type: 'AUTOFILL_GET_TOTP',
         url: 'https://example.com',
+        entryId: 'entry-totp',
       })) as { success: boolean; totpCode: string; totpEntryName: string }
 
       expect(result.success).toBe(true)
@@ -383,24 +386,64 @@ describe('handleAutofillMessage', () => {
       expect(result.totpEntryName).toBe('TOTP Entry')
     })
 
-    it('returns null when no TOTP field found', async () => {
+    it('returns null when entry has no TOTP field', async () => {
       const result = (await callHandler({
         type: 'AUTOFILL_GET_TOTP',
-        url: 'https://other.com',
+        url: 'https://example.com',
+        entryId: 'entry-1',
       })) as { success: boolean; totpCode: string | null }
 
       expect(result.success).toBe(true)
       expect(result.totpCode).toBeNull()
     })
+  })
 
-    it('returns null when no matching entries for URL', async () => {
+  // ========== AUTOFILL_GET_TOTP_CANDIDATES ==========
+
+  describe('AUTOFILL_GET_TOTP_CANDIDATES', () => {
+    it('returns error when vault is locked', async () => {
+      unlocked = false
+      const result = await callHandler({
+        type: 'AUTOFILL_GET_TOTP_CANDIDATES',
+        url: 'https://example.com',
+      })
+      expect(result).toEqual({ success: false, error: 'Vault not unlocked' })
+    })
+
+    it('returns candidates with TOTP fields for matching URL', async () => {
       const result = (await callHandler({
-        type: 'AUTOFILL_GET_TOTP',
-        url: 'https://unknown.com',
-      })) as { success: boolean; totpCode: string | null }
+        type: 'AUTOFILL_GET_TOTP_CANDIDATES',
+        url: 'https://example.com',
+      })) as {
+        success: boolean
+        totpCandidates: Array<{ entryId: string; name: string; totpPeriod: number }>
+      }
 
       expect(result.success).toBe(true)
-      expect(result.totpCode).toBeNull()
+      expect(result.totpCandidates).toHaveLength(1)
+      expect(result.totpCandidates[0].entryId).toBe('entry-totp')
+      expect(result.totpCandidates[0].name).toBe('TOTP Entry')
+      expect(result.totpCandidates[0].totpPeriod).toBe(30)
+    })
+
+    it('returns empty array when no TOTP entries for URL', async () => {
+      const result = (await callHandler({
+        type: 'AUTOFILL_GET_TOTP_CANDIDATES',
+        url: 'https://other.com',
+      })) as { success: boolean; totpCandidates: Array<{ entryId: string; name: string }> }
+
+      expect(result.success).toBe(true)
+      expect(result.totpCandidates).toHaveLength(0)
+    })
+
+    it('returns empty array for unknown URL', async () => {
+      const result = (await callHandler({
+        type: 'AUTOFILL_GET_TOTP_CANDIDATES',
+        url: 'https://unknown.com',
+      })) as { success: boolean; totpCandidates: Array<{ entryId: string; name: string }> }
+
+      expect(result.success).toBe(true)
+      expect(result.totpCandidates).toHaveLength(0)
     })
   })
 

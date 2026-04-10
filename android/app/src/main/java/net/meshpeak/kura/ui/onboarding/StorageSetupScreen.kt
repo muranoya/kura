@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import net.meshpeak.kura.viewmodel.AppViewModel
@@ -161,31 +162,31 @@ fun StorageSetupScreen(
                 value = region, onValueChange = { region = it; error = "" },
                 label = { Text("リージョン *") },
                 placeholder = { Text("例: ap-northeast-1") },
-                modifier = Modifier.fillMaxWidth(), singleLine = true
+                modifier = Modifier.fillMaxWidth().testTag("region_input"), singleLine = true
             )
             OutlinedTextField(
                 value = bucket, onValueChange = { bucket = it; error = "" },
                 label = { Text("バケット *") },
                 placeholder = { Text("例: my-vault") },
-                modifier = Modifier.fillMaxWidth(), singleLine = true
+                modifier = Modifier.fillMaxWidth().testTag("bucket_input"), singleLine = true
             )
             OutlinedTextField(
                 value = key, onValueChange = { key = it },
                 label = { Text("ファイルパス *") },
                 placeholder = { Text("vault.json") },
-                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                modifier = Modifier.fillMaxWidth().testTag("key_input"), singleLine = true,
                 supportingText = { Text("バケット内の保存パス") }
             )
             OutlinedTextField(
                 value = accessKeyId, onValueChange = { accessKeyId = it; error = "" },
                 label = { Text("アクセスキーID *") },
                 placeholder = { Text("AKIA...") },
-                modifier = Modifier.fillMaxWidth(), singleLine = true
+                modifier = Modifier.fillMaxWidth().testTag("access_key_input"), singleLine = true
             )
             OutlinedTextField(
                 value = secretAccessKey, onValueChange = { secretAccessKey = it; error = "" },
                 label = { Text("シークレットアクセスキー *") },
-                modifier = Modifier.fillMaxWidth(), singleLine = true
+                modifier = Modifier.fillMaxWidth().testTag("secret_key_input"), singleLine = true
             )
             OutlinedTextField(
                 value = endpoint, onValueChange = { endpoint = it },
@@ -200,7 +201,7 @@ fun StorageSetupScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
                     onClick = onBack,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).testTag("storage_back_button"),
                     enabled = !isLoading
                 ) { Text("戻る") }
                 Button(
@@ -233,7 +234,7 @@ fun StorageSetupScreen(
                             }
                         }
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).testTag("storage_next_button"),
                     enabled = !isLoading
                 ) {
                     if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
