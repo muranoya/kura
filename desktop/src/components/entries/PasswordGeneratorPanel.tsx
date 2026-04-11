@@ -1,10 +1,10 @@
 import { Check, ChevronDown, ChevronRight, Copy, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import * as commands from '../../commands'
-import { copySensitive } from '../../lib/clipboard'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label as UILabel } from '../../components/ui/label'
+import { copySensitive } from '../../lib/clipboard'
 
 interface PasswordGeneratorPanelProps {
   onUse?: (password: string) => void

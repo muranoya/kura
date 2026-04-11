@@ -12,7 +12,8 @@ let storageStore: Record<string, unknown> = {}
 const chromeStorageLocal = {
   get: vi.fn(
     (keys: string | string[] | null, callback: (result: Record<string, unknown>) => void) => {
-      const keyList = keys === null ? Object.keys(storageStore) : Array.isArray(keys) ? keys : [keys]
+      const keyList =
+        keys === null ? Object.keys(storageStore) : Array.isArray(keys) ? keys : [keys]
       const result: Record<string, unknown> = {}
       for (const k of keyList) {
         if (k in storageStore) result[k] = storageStore[k]
@@ -39,7 +40,7 @@ const chromeStorageLocal = {
 
 // chrome.runtime.sendMessage with callback support
 const sendMessageMock = vi.fn(
-  (message: unknown, callbackOrOptions?: unknown, maybeCallback?: unknown) => {
+  (_message: unknown, callbackOrOptions?: unknown, maybeCallback?: unknown) => {
     // Support both (message, callback) and (message, options, callback) signatures
     const callback =
       typeof callbackOrOptions === 'function'
@@ -98,6 +99,7 @@ Object.defineProperty(navigator, 'clipboard', {
 
 // Reset storage between tests
 import { afterEach } from 'vitest'
+
 afterEach(() => {
   storageStore = {}
 })

@@ -2,10 +2,10 @@ import { CheckCircle2, Copy } from 'lucide-react'
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import * as commands from '../../commands'
-import { copySensitive } from '../../lib/clipboard'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { copySensitive } from '../../lib/clipboard'
 
 interface RecoveryKeyProps {
   onComplete?: () => void

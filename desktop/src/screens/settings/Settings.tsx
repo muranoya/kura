@@ -91,7 +91,9 @@ export default function Settings() {
     loadStorageConfig()
     loadSettings()
     commands.getVersion().then((v) => setCoreVersion(`v${v}`))
-    import('@tauri-apps/api/app').then((mod) => mod.getVersion()).then((v) => setAppVersion(`v${v}`))
+    import('@tauri-apps/api/app')
+      .then((mod) => mod.getVersion())
+      .then((v) => setAppVersion(`v${v}`))
   }, [])
 
   const saveSettings = async (updates: Partial<AppSettings>) => {

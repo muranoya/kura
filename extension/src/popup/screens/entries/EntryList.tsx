@@ -17,7 +17,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useLocation, useNavigate } from 'react-router-dom'
 import remarkGfm from 'remark-gfm'
-import { copySensitive } from '../../lib/clipboard'
 import { STORAGE_KEYS } from '../../../shared/constants'
 import { sendMessage } from '../../../shared/messages'
 import { getFromStorage, removeFromStorage, saveToStorage } from '../../../shared/storage'
@@ -32,6 +31,7 @@ import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { LargeTextDialog } from '../../components/ui/large-text-dialog'
 import { markdownComponents } from '../../components/ui/markdown-components'
+import { copySensitive } from '../../lib/clipboard'
 
 const DEFAULT_SORT: SortConfig = { field: 'created_at', order: 'desc' }
 

@@ -18,9 +18,7 @@ fn map_custom_field_type(kura_type: &str) -> u8 {
 }
 
 /// Convert kura custom fields to Bitwarden fields.
-fn map_custom_fields(
-    entry: &Entry,
-) -> Vec<BitwardenField> {
+fn map_custom_fields(entry: &Entry) -> Vec<BitwardenField> {
     entry
         .data
         .custom_fields
@@ -444,14 +442,9 @@ pub fn resolve_folder_id(_entry: &Entry, label_ids: &[String]) -> Option<String>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{EntryData, entry_data::CustomField};
+    use crate::models::{entry_data::CustomField, EntryData};
 
-    fn make_entry(
-        entry_type: &str,
-        name: &str,
-        data: EntryData,
-        labels: Vec<String>,
-    ) -> Entry {
+    fn make_entry(entry_type: &str, name: &str, data: EntryData, labels: Vec<String>) -> Entry {
         Entry {
             id: "test-id".to_string(),
             name: name.to_string(),
@@ -585,7 +578,8 @@ mod tests {
 
     #[test]
     fn test_map_secure_note() {
-        let data = EntryData::new_secure_note("Important content".into(), Some("extra notes".into()));
+        let data =
+            EntryData::new_secure_note("Important content".into(), Some("extra notes".into()));
         let entry = make_entry("secure_note", "My Note", data, vec![]);
         let item = map_entry(&entry, None);
 
@@ -629,7 +623,10 @@ mod tests {
 
     #[test]
     fn test_map_ssh_key() {
-        let data = EntryData::new_ssh_key("-----BEGIN RSA-----\nkey data\n-----END RSA-----".into(), None);
+        let data = EntryData::new_ssh_key(
+            "-----BEGIN RSA-----\nkey data\n-----END RSA-----".into(),
+            None,
+        );
         let entry = make_entry("ssh_key", "My SSH Key", data, vec![]);
         let item = map_entry(&entry, None);
 
@@ -668,8 +665,12 @@ mod tests {
 
         assert_eq!(item.item_type, BITWARDEN_TYPE_SECURE_NOTE);
         let fields = item.fields.unwrap();
-        assert!(fields.iter().any(|f| f.name == "ssid" && f.value == "MyNetwork"));
-        assert!(fields.iter().any(|f| f.name == "password" && f.value == "wifipass"));
+        assert!(fields
+            .iter()
+            .any(|f| f.name == "ssid" && f.value == "MyNetwork"));
+        assert!(fields
+            .iter()
+            .any(|f| f.name == "password" && f.value == "wifipass"));
     }
 
     #[test]
@@ -703,7 +704,10 @@ mod tests {
 
         let data2 = EntryData::new_login(None, "u".into(), "p".into(), None);
         let entry_no_labels = make_entry("login", "Test", data2, vec![]);
-        assert_eq!(resolve_folder_id(&entry_no_labels, &entry_no_labels.labels), None);
+        assert_eq!(
+            resolve_folder_id(&entry_no_labels, &entry_no_labels.labels),
+            None
+        );
     }
 
     #[test]

@@ -696,8 +696,7 @@ mod vault_manager_api {
     fn test_update_entry() {
         let (m, _) = setup_unlocked_vault();
 
-        let typed_value =
-            r#"{"url":"https://example.com","username":"old_user","password":"old_pass","totp":null}"#;
+        let typed_value = r#"{"url":"https://example.com","username":"old_user","password":"old_pass","totp":null}"#;
         let entry_id = m
             .api_create_entry(
                 "login".to_string(),
@@ -709,8 +708,7 @@ mod vault_manager_api {
             )
             .expect("Failed to create entry");
 
-        let new_typed_value =
-            r#"{"url":"https://updated.com","username":"new_user","password":"new_pass","totp":null}"#;
+        let new_typed_value = r#"{"url":"https://updated.com","username":"new_user","password":"new_pass","totp":null}"#;
         m.api_update_entry(
             entry_id.clone(),
             Some("Updated Name".to_string()),

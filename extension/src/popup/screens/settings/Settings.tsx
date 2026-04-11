@@ -2,7 +2,6 @@ import { Check, Code2, Copy, Download, ExternalLink, Tags, Trash2 } from 'lucide
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DEFAULT_SETTINGS } from '../../../shared/constants'
-import { copySensitive } from '../../lib/clipboard'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { PageHeader } from '../../components/layout/PageHeader'
@@ -20,6 +19,7 @@ import { PasswordInput } from '../../components/ui/password-input'
 import { Separator } from '../../components/ui/separator'
 import TypeFilterDropdown from '../../components/ui/type-filter-dropdown'
 import { usePushError } from '../../contexts/ErrorContext'
+import { copySensitive } from '../../lib/clipboard'
 
 const AUTOLOCK_OPTIONS = [
   { value: '0', label: '無効' },

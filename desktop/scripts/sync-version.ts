@@ -3,7 +3,11 @@ import { resolve } from 'node:path'
 
 const version = readFileSync(resolve(import.meta.dirname, '../VERSION'), 'utf-8').trim()
 
-const targets = ['../package.json', '../src-tauri/tauri.conf.json', '../src-tauri/tauri.conf.dev.json']
+const targets = [
+  '../package.json',
+  '../src-tauri/tauri.conf.json',
+  '../src-tauri/tauri.conf.dev.json',
+]
 
 for (const file of targets) {
   const path = resolve(import.meta.dirname, file)

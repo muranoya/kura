@@ -175,7 +175,10 @@ async function handleInputFocus(input: HTMLInputElement) {
       return
     }
 
-    console.log(LOG_PREFIX, `handleInputFocus: ${candidates.length} TOTP candidates, showing dropdown`)
+    console.log(
+      LOG_PREFIX,
+      `handleInputFocus: ${candidates.length} TOTP candidates, showing dropdown`,
+    )
     showDropdown(
       input,
       candidates,

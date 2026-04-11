@@ -35,9 +35,7 @@ function mockChromeMessages(handlers: Record<string, (msg: Record<string, unknow
 }
 
 // Helper: render onboarding flow with all routes
-function renderOnboarding(
-  initialRoute: string | { pathname: string; state?: unknown } = '/',
-) {
+function renderOnboarding(initialRoute: string | { pathname: string; state?: unknown } = '/') {
   const entries = typeof initialRoute === 'string' ? [initialRoute] : [initialRoute]
   return render(
     <MemoryRouter initialEntries={entries}>

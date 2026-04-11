@@ -417,7 +417,10 @@ export async function handleAutofillMessage(
       }
       const totpCandidateUrl = message.url as string
       const totpCandidates = getTotpCandidatesForUrl(totpCandidateUrl)
-      console.log(LOG_PREFIX, `AUTOFILL_GET_TOTP_CANDIDATES: returning ${totpCandidates.length} candidates`)
+      console.log(
+        LOG_PREFIX,
+        `AUTOFILL_GET_TOTP_CANDIDATES: returning ${totpCandidates.length} candidates`,
+      )
       sendResponse({ success: true, totpCandidates })
       break
     }

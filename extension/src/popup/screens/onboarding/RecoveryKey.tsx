@@ -1,10 +1,10 @@
 import { Check, Copy } from 'lucide-react'
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { copySensitive } from '../../lib/clipboard'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { copySensitive } from '../../lib/clipboard'
 
 export default function RecoveryKey() {
   const navigate = useNavigate()

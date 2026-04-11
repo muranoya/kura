@@ -72,9 +72,7 @@ export async function requestTotp(
   return null
 }
 
-export async function requestTotpCandidates(
-  url: string,
-): Promise<AutofillCredentialCandidate[]> {
+export async function requestTotpCandidates(url: string): Promise<AutofillCredentialCandidate[]> {
   const response = await sendMessage({ type: 'AUTOFILL_GET_TOTP_CANDIDATES', url })
   if (response.success && 'totpCandidates' in response) {
     return (response.totpCandidates as AutofillCredentialCandidate[]) || []
