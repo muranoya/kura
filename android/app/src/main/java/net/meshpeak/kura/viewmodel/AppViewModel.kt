@@ -2,6 +2,9 @@ package net.meshpeak.kura.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewModelScope
 import net.meshpeak.kura.data.auth.BiometricHelper
 import net.meshpeak.kura.data.preferences.IPreferencesManager
@@ -29,6 +32,16 @@ class AppViewModel(
     val preferences: IPreferencesManager = PreferencesManager(application),
     val biometricHelper: BiometricHelper = BiometricHelper(SecureStorage(application))
 ) : AndroidViewModel(application) {
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                val application = extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!
+                return AppViewModel(application) as T
+            }
+        }
+    }
 
     private val _appState = MutableStateFlow(AppState.LOADING)
     val appState: StateFlow<AppState> = _appState

@@ -19,7 +19,7 @@ import net.meshpeak.kura.viewmodel.AppViewModel
 
 class MainActivity : FragmentActivity() {
 
-    private val appViewModel: AppViewModel by viewModels()
+    private val appViewModel: AppViewModel by viewModels { AppViewModel.Factory }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

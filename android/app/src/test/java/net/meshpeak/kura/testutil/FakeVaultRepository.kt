@@ -109,6 +109,8 @@ class FakeVaultRepository : IVaultRepository {
     override suspend fun rotateDek(password: String): String = ""
     override suspend fun regenerateRecoveryKey(password: String): String = ""
 
+    override suspend fun exportBitwardenJson(): String = "{}"
+
     override suspend fun encryptTransferConfig(password: String, configJson: String): String = ""
 
     override suspend fun decryptTransferConfig(password: String, transferString: String): String {
