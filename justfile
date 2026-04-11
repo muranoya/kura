@@ -310,7 +310,7 @@ default: help
 	echo "✅ extension tests passed!"
 
 # Android のテスト
-@test-android:
+@test-android: _android-icons
 	echo "🧪 Testing Android..."
 	cd {{ANDROID_DIR}} && ./gradlew testDebugUnitTest
 	echo "✅ Android tests passed!"
