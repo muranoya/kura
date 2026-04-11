@@ -43,7 +43,7 @@ import net.meshpeak.kura.ui.components.LargeTextDialog
 import net.meshpeak.kura.ui.components.MarkdownText
 import net.meshpeak.kura.ui.components.EntryTypeIcon
 import net.meshpeak.kura.ui.components.entryTypeDisplayName
-import net.meshpeak.kura.util.copyToClipboard
+import net.meshpeak.kura.util.ClipboardUtil
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -430,7 +430,7 @@ fun DetailField(
                             context.startActivity(intent)
                         } else {
                             val copyValue = if (isSecret && !visible) value else value
-                            copyToClipboard(context, label, copyValue, clipboardClearSeconds, scope)
+                            ClipboardUtil.copyToClipboard(context, label, copyValue, clipboardClearSeconds, scope)
                             copied = true
                             scope.launch { delay(1500); copied = false }
                         }
@@ -488,7 +488,7 @@ fun DetailField(
             }
             if (isUrl && !isEmpty) {
                 IconButton(onClick = {
-                    copyToClipboard(context, label, value, clipboardClearSeconds, scope)
+                    ClipboardUtil.copyToClipboard(context, label, value, clipboardClearSeconds, scope)
                     copied = true
                     scope.launch { delay(1500); copied = false }
                 }, modifier = Modifier.size(32.dp)) {
@@ -555,7 +555,7 @@ fun TotpField(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple()
             ) {
-                copyToClipboard(context, "totp", totpCode, clipboardClearSeconds, scope)
+                ClipboardUtil.copyToClipboard(context, "totp", totpCode, clipboardClearSeconds, scope)
                 copied = true
                 scope.launch { delay(1500); copied = false }
             }

@@ -1,6 +1,7 @@
 import { Check, Maximize2 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as commands from '../../commands'
+import { copySensitive } from '../../lib/clipboard'
 import TotpDisplay from '../TotpDisplay'
 import { LargeTextDialog } from '../ui/large-text-dialog'
 
@@ -47,7 +48,7 @@ export default function TotpCustomFieldDisplay({ label, value }: TotpCustomField
 
   const handleCopy = () => {
     if (!totpCode) return
-    navigator.clipboard.writeText(totpCode)
+    copySensitive(totpCode)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }

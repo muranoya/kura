@@ -73,6 +73,9 @@ interface IVaultRepository {
     suspend fun rotateDek(password: String): String
     suspend fun regenerateRecoveryKey(password: String): String
 
+    // Export
+    suspend fun exportBitwardenJson(): String
+
     // Transfer Config
     suspend fun encryptTransferConfig(password: String, configJson: String): String
     suspend fun decryptTransferConfig(password: String, transferString: String): String
@@ -278,6 +281,14 @@ class VaultRepository(private val context: Context) : IVaultRepository {
 
     override suspend fun regenerateRecoveryKey(password: String): String = withContext(Dispatchers.IO) {
         VaultBridge.regenerateRecoveryKey(DEFAULT_VAULT_ID, password)
+    }
+
+    // ========================================================================
+    // Export
+    // ========================================================================
+
+    override suspend fun exportBitwardenJson(): String = withContext(Dispatchers.IO) {
+        VaultBridge.exportBitwardenJson(DEFAULT_VAULT_ID)
     }
 
     // ========================================================================

@@ -90,6 +90,7 @@ interface WasmApi {
   api_decrypt_config(vaultId: string, password: string, encryptedB64: string): string
   api_encrypt_transfer_config(password: string, configJson: string): string
   api_decrypt_transfer_config(password: string, transferString: string): string
+  api_export_bitwarden_json(vaultId: string): string
   api_get_version(): string
   [key: string]: unknown
 }
@@ -333,9 +334,10 @@ async function autoSync() {
 interface AppSettings {
   autolockMinutes: number
   clipboardClearSeconds: number
-  clipboardAutoClean: boolean
   theme: string
 }
+
+let lastCopiedText: string | null = null
 
 async function loadSettings(): Promise<AppSettings> {
   const settings = await getFromStorage<AppSettings>(STORAGE_KEYS.APP_SETTINGS)
@@ -343,7 +345,6 @@ async function loadSettings(): Promise<AppSettings> {
     settings || {
       autolockMinutes: 5,
       clipboardClearSeconds: 30,
-      clipboardAutoClean: true,
       theme: 'light',
     }
   )
@@ -1183,10 +1184,25 @@ async function handleMessage(
         break
       }
 
+      case 'EXPORT_BITWARDEN_JSON': {
+        if (!unlocked) {
+          sendResponse({ success: false, error: 'Vault not unlocked' })
+          break
+        }
+        try {
+          const json = vault.api_export_bitwarden_json(DEFAULT_VAULT_ID)
+          sendResponse({ success: true, json })
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
       case 'CLIPBOARD_COPIED': {
         try {
           const settings = await loadSettings()
-          if (settings.clipboardAutoClean) {
+          lastCopiedText = message.text ?? null
+          if (settings.clipboardClearSeconds > 0) {
             const minutes = settings.clipboardClearSeconds / 60
             chrome.alarms.create('clipboard-clear', { delayInMinutes: minutes })
           }
@@ -1240,18 +1256,31 @@ async function handleAutolockAlarm() {
 }
 
 async function handleClipboardClearAlarm() {
+  const expectedText = lastCopiedText
+  lastCopiedText = null
   try {
     if (typeof chrome.offscreen !== 'undefined') {
-      // Chrome: offscreen document 経由でクリップボードをクリア
+      // Chrome: offscreen document 経由でクリップボードを確認＆クリア
       await chrome.offscreen.createDocument({
         url: chrome.runtime.getURL('src/background/offscreen.html'),
         reasons: ['CLIPBOARD' as chrome.offscreen.Reason],
-        justification: 'Clear clipboard after copy timeout',
+        justification: 'Check and clear clipboard after copy timeout',
       })
-      chrome.runtime.sendMessage({ type: 'CLEAR_CLIPBOARD' })
+      chrome.runtime.sendMessage({
+        type: 'CHECK_AND_CLEAR_CLIPBOARD',
+        expectedText,
+      })
     } else {
-      // Firefox: background page から直接クリップボードをクリア
-      await navigator.clipboard.writeText('')
+      // Firefox: background page から直接クリップボードを確認＆クリア
+      try {
+        const current = await navigator.clipboard.readText()
+        if (current === expectedText) {
+          await navigator.clipboard.writeText('')
+        }
+      } catch {
+        // readText 失敗時は安全側に倒して無条件クリア
+        await navigator.clipboard.writeText('')
+      }
     }
   } catch (err) {
     console.error('[SW] Clipboard clear failed:', err)

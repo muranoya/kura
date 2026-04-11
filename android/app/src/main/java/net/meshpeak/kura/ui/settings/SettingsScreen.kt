@@ -5,6 +5,8 @@ import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.widget.Toast
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -23,7 +25,7 @@ import androidx.fragment.app.FragmentActivity
 import net.meshpeak.kura.bridge.VaultBridge
 import net.meshpeak.kura.data.model.S3Config
 import net.meshpeak.kura.ui.components.ConfirmDialog
-import net.meshpeak.kura.util.copyToClipboard
+import net.meshpeak.kura.util.ClipboardUtil
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -45,8 +47,27 @@ fun SettingsScreen(
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showBiometricEnrollDialog by remember { mutableStateOf(false) }
     var showTransferDialog by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
+    var exportJson by remember { mutableStateOf<String?>(null) }
+
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    val exportFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null && exportJson != null) {
+            try {
+                context.contentResolver.openOutputStream(uri)?.use { output ->
+                    output.write(exportJson!!.toByteArray())
+                }
+                Toast.makeText(context, "エクスポートが完了しました", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "エクスポートに失敗しました: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+            exportJson = null
+        }
+    }
 
     val autolockMinutes by appViewModel.preferences.autolockMinutesFlow
         .collectAsState(initial = 5)
@@ -179,7 +200,11 @@ fun SettingsScreen(
                             onExpandedChange = { clipboardClearExpanded = it }
                         ) {
                             OutlinedTextField(
-                                value = if (clipboardClearSeconds == 0) "無効" else "${clipboardClearSeconds}秒",
+                                value = when (clipboardClearSeconds) {
+                                    0 -> "無効"
+                                    in 1..59 -> "${clipboardClearSeconds}秒"
+                                    else -> "${clipboardClearSeconds / 60}分"
+                                },
                                 onValueChange = {},
                                 readOnly = true,
                                 modifier = Modifier
@@ -192,9 +217,9 @@ fun SettingsScreen(
                                 expanded = clipboardClearExpanded,
                                 onDismissRequest = { clipboardClearExpanded = false }
                             ) {
-                                listOf(0, 10, 30, 60, 120).forEach { seconds ->
+                                listOf(0 to "無効", 30 to "30秒", 60 to "1分", 120 to "2分").forEach { (seconds, label) ->
                                     DropdownMenuItem(
-                                        text = { Text(if (seconds == 0) "無効" else "${seconds}秒") },
+                                        text = { Text(label) },
                                         onClick = {
                                             scope.launch { appViewModel.preferences.saveClipboardClearSeconds(seconds) }
                                             clipboardClearExpanded = false
@@ -286,6 +311,23 @@ fun SettingsScreen(
             HorizontalDivider()
             Spacer(modifier = Modifier.height(8.dp))
 
+            // データセクション
+            Text("データ", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Card(onClick = { showExportDialog = true }, modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    headlineContent = { Text("Bitwarden形式でエクスポート") },
+                    supportingContent = { Text("他のパスワードマネージャーへ移行するためにデータをエクスポート") },
+                    leadingContent = { Icon(Icons.Default.FileDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(8.dp))
+
             // Transfer section
             Text("端末間転送", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(4.dp))
@@ -308,8 +350,17 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(4.dp))
 
             Card(modifier = Modifier.fillMaxWidth()) {
+                val context = LocalContext.current
+                val appVersion = remember {
+                    context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
+                }
                 ListItem(
                     headlineContent = { Text("バージョン") },
+                    trailingContent = { Text("v$appVersion", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                )
+                HorizontalDivider()
+                ListItem(
+                    headlineContent = { Text("vault-core") },
                     trailingContent = { Text("v${VaultBridge.getVersion()}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 )
             }
@@ -403,7 +454,7 @@ fun SettingsScreen(
                     }
                     OutlinedButton(
                         onClick = {
-                            copyToClipboard(context, "recovery_key", recoveryKeyValue, clipboardClearSeconds, scope)
+                            ClipboardUtil.copyToClipboard(context, "recovery_key", recoveryKeyValue, clipboardClearSeconds, scope)
                             copied = true
                             scope.launch { delay(2000); copied = false }
                         },
@@ -472,6 +523,29 @@ fun SettingsScreen(
             appViewModel = appViewModel,
             clipboardClearSeconds = clipboardClearSeconds,
             onDismiss = { showTransferDialog = false }
+        )
+    }
+
+    // Export dialog
+    if (showExportDialog) {
+        ConfirmDialog(
+            title = "データをエクスポート",
+            description = "Bitwarden JSON形式でエクスポートします。エクスポートされたファイルにはパスワードが平文で含まれます。取り扱いにご注意ください。",
+            confirmText = "エクスポート",
+            onConfirm = {
+                showExportDialog = false
+                scope.launch {
+                    try {
+                        val json = appViewModel.repository.exportBitwardenJson()
+                        exportJson = json
+                        val today = java.time.LocalDate.now().toString()
+                        exportFileLauncher.launch("kura-export-$today.json")
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "エクスポートに失敗しました: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onCancel = { showExportDialog = false }
         )
     }
 
@@ -645,7 +719,7 @@ fun TransferConfigDialog(
                     }
                     OutlinedButton(
                         onClick = {
-                            copyToClipboard(context, "transfer_config", transferString, clipboardClearSeconds, scope)
+                            ClipboardUtil.copyToClipboard(context, "transfer_config", transferString, clipboardClearSeconds, scope)
                             copied = true
                             scope.launch { delay(2000); copied = false }
                         },

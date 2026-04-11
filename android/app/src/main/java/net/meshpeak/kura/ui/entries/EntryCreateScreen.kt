@@ -13,7 +13,7 @@ import net.meshpeak.kura.data.model.CustomField
 import net.meshpeak.kura.data.model.EntryType
 import net.meshpeak.kura.data.model.Label
 import net.meshpeak.kura.ui.components.EntryForm
-import net.meshpeak.kura.util.copyToClipboard
+import net.meshpeak.kura.util.ClipboardUtil
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -145,7 +145,7 @@ fun EntryCreateScreen(
                         appViewModel.repository.generatePassword(len, lower, upper, num, sym1, sym2, sym3)
                     },
                     onCopyToClipboard = { text ->
-                        copyToClipboard(context, "kura", text, clipboardClearSeconds, scope)
+                        ClipboardUtil.copyToClipboard(context, "kura", text, clipboardClearSeconds, scope)
                     },
                     onCreateLabel = { name ->
                         val id = appViewModel.repository.createLabel(name)

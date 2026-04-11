@@ -11,7 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import net.meshpeak.kura.util.copyToClipboard
+import net.meshpeak.kura.util.ClipboardUtil
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -52,7 +52,7 @@ fun RecoveryKeyScreen(
 
             OutlinedButton(
                 onClick = {
-                    copyToClipboard(context, "recovery_key", recoveryKey, clipboardClearSeconds, scope)
+                    ClipboardUtil.copyToClipboard(context, "recovery_key", recoveryKey, clipboardClearSeconds, scope)
                     copied = true
                     scope.launch {
                         delay(2000)

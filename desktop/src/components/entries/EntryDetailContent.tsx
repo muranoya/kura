@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { copySensitive } from '../../lib/clipboard'
 import { getEntryTypeLabel } from '../../shared/constants'
 import type { Entry, Label } from '../../shared/types'
 import { Badge } from '../ui/badge'
@@ -38,7 +39,7 @@ function FieldDisplay({
       open(value)
       return
     }
-    navigator.clipboard.writeText(value)
+    copySensitive(value)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
@@ -109,7 +110,7 @@ function FieldDisplay({
           type="button"
           onClick={(e) => {
             e.stopPropagation()
-            navigator.clipboard.writeText(value)
+            copySensitive(value)
             setCopied(true)
             setTimeout(() => setCopied(false), 1500)
           }}

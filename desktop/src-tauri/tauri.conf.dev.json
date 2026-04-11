@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "net.meshpeak.kura",
   "build": {
-    "beforeDevCommand": "pnpm run dev",
+    "beforeDevCommand": "pnpm run sync-version && pnpm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm run build",
+    "beforeBuildCommand": "pnpm run sync-version && pnpm run build",
     "frontendDist": "../dist"
   },
   "app": {

@@ -80,6 +80,9 @@ pub fn run() {
             // Import
             commands::import::import_1pux_preview,
             commands::import::import_1pux_execute,
+            // Export
+            commands::export::export_bitwarden_json,
+            commands::export::save_export_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

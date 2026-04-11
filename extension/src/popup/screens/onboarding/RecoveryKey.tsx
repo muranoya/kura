@@ -1,6 +1,7 @@
 import { Check, Copy } from 'lucide-react'
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { copySensitive } from '../../lib/clipboard'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
@@ -14,7 +15,7 @@ export default function RecoveryKey() {
   const [completing, setCompleting] = useState(false)
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(recoveryKey)
+    copySensitive(recoveryKey)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }

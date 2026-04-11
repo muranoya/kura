@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { copySensitive } from '../lib/clipboard'
 
 interface CopyButtonProps {
   text: string
@@ -12,10 +13,8 @@ export default function CopyButton({ text, label = 'コピー', className, style
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(text)
+      await copySensitive(text)
       setCopied(true)
-      // Service Worker へメッセージを送信してクリップボードクリアタイマーを開始
-      chrome.runtime.sendMessage({ type: 'CLIPBOARD_COPIED' })
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('Failed to copy:', err)

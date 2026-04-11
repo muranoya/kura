@@ -1,3 +1,4 @@
+import { save } from '@tauri-apps/plugin-dialog'
 import { Check, Copy, ExternalLink, Smartphone } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useEffect, useState } from 'react'
@@ -24,6 +25,7 @@ import {
   SelectValue,
 } from '../../components/ui/select'
 import { usePushError } from '../../contexts/ErrorContext'
+import { copySensitive } from '../../lib/clipboard'
 import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../../shared/constants'
 import { clearStorage, getFromStorage, saveToStorage } from '../../shared/storage'
 import type { AppSettings } from '../../shared/types'
@@ -40,15 +42,26 @@ const AUTOLOCK_OPTIONS = [
   { value: '60', label: '60分' },
 ]
 
+const CLIPBOARD_CLEAR_OPTIONS = [
+  { value: '0', label: '無効' },
+  { value: '30', label: '30秒' },
+  { value: '60', label: '1分' },
+  { value: '120', label: '2分' },
+]
+
 export default function Settings() {
   const pushError = usePushError()
-  const [version, setVersion] = useState('...')
+  const [coreVersion, setCoreVersion] = useState('...')
+  const [appVersion, setAppVersion] = useState('...')
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
   const [storageConfig, setStorageConfig] = useState<Record<string, string> | null>(null)
   const [storageLoading, setStorageLoading] = useState(true)
 
   // Auto-lock settings
   const [autolockMinutes, setAutolockMinutes] = useState<number>(DEFAULT_SETTINGS.autolockMinutes)
+  const [clipboardClearSeconds, setClipboardClearSeconds] = useState<number>(
+    DEFAULT_SETTINGS.clipboardClearSeconds,
+  )
 
   // Load storage config and settings
   useEffect(() => {
@@ -67,6 +80,9 @@ export default function Settings() {
         const settings = await getFromStorage<AppSettings>(STORAGE_KEYS.APP_SETTINGS)
         if (settings) {
           setAutolockMinutes(settings.autolockMinutes ?? DEFAULT_SETTINGS.autolockMinutes)
+          setClipboardClearSeconds(
+            settings.clipboardClearSeconds ?? DEFAULT_SETTINGS.clipboardClearSeconds,
+          )
         }
       } catch (err) {
         console.error('Failed to load settings:', err)
@@ -74,7 +90,8 @@ export default function Settings() {
     }
     loadStorageConfig()
     loadSettings()
-    commands.getVersion().then((v) => setVersion(`v${v}`))
+    commands.getVersion().then((v) => setCoreVersion(`v${v}`))
+    import('@tauri-apps/api/app').then((mod) => mod.getVersion()).then((v) => setAppVersion(`v${v}`))
   }, [])
 
   const saveSettings = async (updates: Partial<AppSettings>) => {
@@ -94,8 +111,37 @@ export default function Settings() {
     saveSettings({ autolockMinutes: minutes })
   }
 
+  const handleClipboardClearChange = (value: string) => {
+    const seconds = Number(value)
+    setClipboardClearSeconds(seconds)
+    saveSettings({ clipboardClearSeconds: seconds })
+  }
+
   // Import Dialog
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+
+  // Export
+  const [exportConfirmOpen, setExportConfirmOpen] = useState(false)
+  const [exportLoading, setExportLoading] = useState(false)
+
+  const handleExport = async () => {
+    setExportConfirmOpen(false)
+    setExportLoading(true)
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const filePath = await save({
+        defaultPath: `kura-export-${today}.json`,
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      })
+      if (!filePath) return
+      const json = await commands.exportBitwardenJson()
+      await commands.saveExportFile(filePath, json)
+    } catch (err) {
+      pushError(`エクスポートに失敗しました: ${err}`)
+    } finally {
+      setExportLoading(false)
+    }
+  }
 
   // Change Master Password Dialog
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
@@ -258,7 +304,7 @@ export default function Settings() {
 
   const copyTransferString = async () => {
     try {
-      await navigator.clipboard.writeText(transferString)
+      await copySensitive(transferString)
       setTransferCopied(true)
       setTimeout(() => setTransferCopied(false), 2000)
     } catch (err) {
@@ -268,7 +314,7 @@ export default function Settings() {
 
   const copyRecoveryKey = async () => {
     try {
-      await navigator.clipboard.writeText(recoveryKeyDisplayValue)
+      await copySensitive(recoveryKeyDisplayValue)
       setRecoveryKeyCopied(true)
       setTimeout(() => setRecoveryKeyCopied(false), 2000)
     } catch (err) {
@@ -303,6 +349,27 @@ export default function Settings() {
                 </SelectTrigger>
                 <SelectContent>
                   {AUTOLOCK_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-text-primary">クリップボード自動クリア</p>
+                <p className="text-xs text-text-muted">コピー後の自動クリアまでの時間</p>
+              </div>
+              <Select
+                value={String(clipboardClearSeconds)}
+                onValueChange={handleClipboardClearChange}
+              >
+                <SelectTrigger className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CLIPBOARD_CLEAR_OPTIONS.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
@@ -358,6 +425,14 @@ export default function Settings() {
               className="w-full"
             >
               1Passwordからインポート
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setExportConfirmOpen(true)}
+              className="w-full"
+              disabled={exportLoading}
+            >
+              {exportLoading ? 'エクスポート中...' : 'Bitwarden形式でエクスポート'}
             </Button>
           </CardContent>
         </Card>
@@ -427,7 +502,11 @@ export default function Settings() {
           <CardContent className="px-3 pb-3 pt-2 space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm text-text-muted">バージョン</p>
-              <p className="text-sm text-text-primary">{version}</p>
+              <p className="text-sm text-text-primary">{appVersion}</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-text-muted">vault-core</p>
+              <p className="text-sm text-text-primary">{coreVersion}</p>
             </div>
             <div className="flex items-center justify-between">
               <p className="text-sm text-text-muted">リポジトリ</p>
@@ -610,6 +689,16 @@ export default function Settings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* エクスポート確認ダイアログ */}
+      <ConfirmDialog
+        open={exportConfirmOpen}
+        title="データをエクスポート"
+        description="Bitwarden JSON形式でエクスポートします。エクスポートされたファイルにはパスワードが平文で含まれます。取り扱いにご注意ください。"
+        confirmText="エクスポート"
+        onConfirm={handleExport}
+        onCancel={() => setExportConfirmOpen(false)}
+      />
 
       {/* インポートダイアログ */}
       <Import1puxDialog

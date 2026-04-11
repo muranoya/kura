@@ -1,7 +1,8 @@
-import { Check, Code2, Copy, ExternalLink, Tags, Trash2 } from 'lucide-react'
+import { Check, Code2, Copy, Download, ExternalLink, Tags, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DEFAULT_SETTINGS } from '../../../shared/constants'
+import { copySensitive } from '../../lib/clipboard'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { PageHeader } from '../../components/layout/PageHeader'
@@ -31,15 +32,25 @@ const AUTOLOCK_OPTIONS = [
   { value: '60', label: '60分' },
 ]
 
+const CLIPBOARD_CLEAR_OPTIONS = [
+  { value: '0', label: '無効' },
+  { value: '30', label: '30秒' },
+  { value: '60', label: '1分' },
+  { value: '120', label: '2分' },
+]
+
 export default function Settings() {
   const navigate = useNavigate()
   const pushError = usePushError()
   const [storageConfig, setStorageConfig] = useState<Record<string, string> | null>(null)
-  const [version, setVersion] = useState('...')
+  const [coreVersion, setCoreVersion] = useState('...')
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
   // Auto-lock settings
   const [autolockMinutes, setAutolockMinutes] = useState<number>(DEFAULT_SETTINGS.autolockMinutes)
+  const [clipboardClearSeconds, setClipboardClearSeconds] = useState<number>(
+    DEFAULT_SETTINGS.clipboardClearSeconds,
+  )
 
   // Change Master Password Dialog
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
@@ -66,6 +77,32 @@ export default function Settings() {
   const [recoveryKeyDisplayValue, setRecoveryKeyDisplayValue] = useState('')
   const [recoveryKeyCopied, setRecoveryKeyCopied] = useState(false)
 
+  // Export
+  const [exportConfirmOpen, setExportConfirmOpen] = useState(false)
+  const [exportLoading, setExportLoading] = useState(false)
+
+  const handleExport = async () => {
+    setExportConfirmOpen(false)
+    setExportLoading(true)
+    try {
+      const json = await commands.exportBitwardenJson()
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const today = new Date().toISOString().split('T')[0]
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `kura-export-${today}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      pushError(`エクスポートに失敗しました: ${err}`)
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
   const loadStorageConfig = useCallback(async () => {
     try {
       const response = await new Promise<{
@@ -86,6 +123,9 @@ export default function Settings() {
     try {
       const settings = await commands.getSettings()
       setAutolockMinutes(settings.autolockMinutes ?? DEFAULT_SETTINGS.autolockMinutes)
+      setClipboardClearSeconds(
+        settings.clipboardClearSeconds ?? DEFAULT_SETTINGS.clipboardClearSeconds,
+      )
     } catch (err) {
       console.error('Failed to load settings:', err)
     }
@@ -94,7 +134,7 @@ export default function Settings() {
   useEffect(() => {
     loadStorageConfig()
     loadSettings()
-    commands.getVersion().then((v) => setVersion(`v${v}`))
+    commands.getVersion().then((v) => setCoreVersion(`v${v}`))
   }, [loadStorageConfig, loadSettings])
 
   const handleAutolockChange = async (value: string) => {
@@ -103,6 +143,17 @@ export default function Settings() {
     try {
       const currentSettings = await commands.getSettings()
       await commands.saveSettings({ ...currentSettings, autolockMinutes: minutes })
+    } catch (err) {
+      pushError(`設定の保存に失敗しました: ${err}`)
+    }
+  }
+
+  const handleClipboardClearChange = async (value: string) => {
+    const seconds = Number(value)
+    setClipboardClearSeconds(seconds)
+    try {
+      const currentSettings = await commands.getSettings()
+      await commands.saveSettings({ ...currentSettings, clipboardClearSeconds: seconds })
     } catch (err) {
       pushError(`設定の保存に失敗しました: ${err}`)
     }
@@ -203,7 +254,7 @@ export default function Settings() {
 
   const copyRecoveryKey = async () => {
     try {
-      await navigator.clipboard.writeText(recoveryKeyDisplayValue)
+      await copySensitive(recoveryKeyDisplayValue)
       setRecoveryKeyCopied(true)
       setTimeout(() => setRecoveryKeyCopied(false), 2000)
     } catch (err) {
@@ -228,6 +279,16 @@ export default function Settings() {
                 value={String(autolockMinutes)}
                 onChange={handleAutolockChange}
                 options={AUTOLOCK_OPTIONS}
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between px-1 gap-2 mt-2">
+            <span className="text-sm text-text-primary shrink-0">クリップボード自動クリア</span>
+            <div className="w-24">
+              <TypeFilterDropdown
+                value={String(clipboardClearSeconds)}
+                onChange={handleClipboardClearChange}
+                options={CLIPBOARD_CLEAR_OPTIONS}
               />
             </div>
           </div>
@@ -258,6 +319,27 @@ export default function Settings() {
             >
               <Trash2 size={14} />
               ゴミ箱
+            </Button>
+          </div>
+        </section>
+
+        <Separator className="my-3" />
+
+        {/* データ */}
+        <section>
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+            データ
+          </h2>
+          <div className="space-y-1.5">
+            <Button
+              variant="secondary"
+              onClick={() => setExportConfirmOpen(true)}
+              className="w-full text-sm justify-start gap-2"
+              size="sm"
+              disabled={exportLoading}
+            >
+              <Download size={14} />
+              {exportLoading ? 'エクスポート中...' : 'Bitwarden形式でエクスポート'}
             </Button>
           </div>
         </section>
@@ -370,7 +452,11 @@ export default function Settings() {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-sm">
               <p className="text-text-muted">バージョン</p>
-              <p className="text-text-primary">{version}</p>
+              <p className="text-text-primary">v{chrome.runtime.getManifest().version}</p>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <p className="text-text-muted">vault-core</p>
+              <p className="text-text-primary">{coreVersion}</p>
             </div>
             <div className="flex items-center justify-between text-sm">
               <p className="text-text-muted">リポジトリ</p>
@@ -386,6 +472,16 @@ export default function Settings() {
           </div>
         </section>
       </div>
+
+      {/* エクスポート確認ダイアログ */}
+      <ConfirmDialog
+        open={exportConfirmOpen}
+        title="データをエクスポート"
+        description="Bitwarden JSON形式でエクスポートします。エクスポートされたファイルにはパスワードが平文で含まれます。取り扱いにご注意ください。"
+        confirmText="エクスポート"
+        onConfirm={handleExport}
+        onCancel={() => setExportConfirmOpen(false)}
+      />
 
       {/* ログアウト確認ダイアログ */}
       <ConfirmDialog

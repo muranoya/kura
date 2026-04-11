@@ -91,6 +91,9 @@ object VaultBridge {
     // Version
     external fun getVersion(): String
 
+    // Export
+    external fun exportBitwardenJson(vaultId: String): String
+
     // Sync
     external fun mergeRemoteVault(vaultId: String, remoteBytes: ByteArray, remoteEtag: String)
     external fun updateEtag(vaultId: String, etag: String)

@@ -192,6 +192,13 @@ export async function generateTotpFromValue(
   }
 }
 
+// Export
+export async function exportBitwardenJson(): Promise<string> {
+  const res = await sendMessage({ type: 'EXPORT_BITWARDEN_JSON' })
+  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
+  return field<'json', string>(res, 'json') ?? ''
+}
+
 // Version
 export async function getVersion(): Promise<string> {
   const res = await sendMessage({ type: 'GET_VERSION' })

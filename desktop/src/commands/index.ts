@@ -309,6 +309,18 @@ export async function deleteVaultFile(): Promise<void> {
 }
 
 // ============================================================================
+// Export
+// ============================================================================
+
+export async function exportBitwardenJson(): Promise<string> {
+  return invoke<string>('export_bitwarden_json', { vaultId })
+}
+
+export async function saveExportFile(path: string, content: string): Promise<void> {
+  return invoke<void>('save_export_file', { path, content })
+}
+
+// ============================================================================
 // Import
 // ============================================================================
 

@@ -6,8 +6,9 @@
   "packageManager": "pnpm@10.30.1",
   "scripts": {
     "dev": "vite",
-    "build": "pnpm exec tsx scripts/generate-etld.ts && pnpm exec tsx scripts/generate-patterns.ts && vite build",
-    "build:firefox": "pnpm exec tsx scripts/generate-etld.ts && pnpm exec tsx scripts/generate-patterns.ts && vite build --config vite.config.firefox.ts",
+    "sync-version": "pnpm exec tsx scripts/sync-version.ts",
+    "build": "pnpm run sync-version && pnpm exec tsx scripts/generate-etld.ts && pnpm exec tsx scripts/generate-patterns.ts && vite build",
+    "build:firefox": "pnpm run sync-version && pnpm exec tsx scripts/generate-etld.ts && pnpm exec tsx scripts/generate-patterns.ts && vite build --config vite.config.firefox.ts",
     "generate-etld": "pnpm exec tsx scripts/generate-etld.ts",
     "generate-patterns": "pnpm exec tsx scripts/generate-patterns.ts",
     "update-psl": "pnpm exec tsx scripts/update-psl.ts",

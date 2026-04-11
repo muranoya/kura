@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import net.meshpeak.kura.ui.components.PasswordGeneratorPanel
-import net.meshpeak.kura.util.copyToClipboard
+import net.meshpeak.kura.util.ClipboardUtil
 import net.meshpeak.kura.viewmodel.AppViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,7 +40,7 @@ fun PasswordGeneratorScreen(appViewModel: AppViewModel, onOpenDrawer: () -> Unit
                 appViewModel.repository.generatePassword(length, lower, upper, numbers, sym1, sym2, sym3)
             },
             onCopy = { password ->
-                copyToClipboard(context, "password", password, clipboardClearSeconds, scope)
+                ClipboardUtil.copyToClipboard(context, "password", password, clipboardClearSeconds, scope)
             },
             modifier = Modifier
                 .padding(padding)

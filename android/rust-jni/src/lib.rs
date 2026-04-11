@@ -713,6 +713,24 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_getVersion(
 }
 
 // ============================================================================
+// Export Operations
+// ============================================================================
+
+#[no_mangle]
+pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_exportBitwardenJson(
+    mut env: JNIEnv,
+    _class: JClass,
+    vault_id: JString,
+) -> jstring {
+    jni_catch(&mut env, |env| {
+        let vid = get_string(env, &vault_id)?;
+        let json_str = with_manager(&vid, |m| m.api_export_bitwarden_json())
+            .map_err(|e| format!("Export failed: {}", e))?;
+        new_jstring(env, &json_str)
+    })
+}
+
+// ============================================================================
 // Sync Operations
 // ============================================================================
 

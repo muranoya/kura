@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "サーバ不要、自分一人のためのパスワードマネージャー",
 
-  "permissions": ["storage", "alarms", "clipboardWrite", "tabs"],
+  "permissions": ["storage", "alarms", "clipboardWrite", "clipboardRead", "tabs"],
 
   "action": {
     "default_popup": "src/popup/index.html",

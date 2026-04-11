@@ -2,6 +2,7 @@ import { CheckCircle2, Copy } from 'lucide-react'
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import * as commands from '../../commands'
+import { copySensitive } from '../../lib/clipboard'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
@@ -16,7 +17,7 @@ export default function RecoveryKey({ onComplete }: RecoveryKeyProps) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(recoveryKey)
+    await copySensitive(recoveryKey)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
