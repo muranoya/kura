@@ -440,7 +440,7 @@ test-manual-autofill:
 	echo "✅ Extension checks passed!"
 
 # Android app - Lint & format check (Kotlin + Rust)
-@check-android:
+@check-android: _android-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔍 Checking Android app (lint & format)..."
