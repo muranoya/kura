@@ -1,0 +1,177 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vault-core:
+    name: vault-core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: vault-core
+
+      - name: Format check
+        run: cargo fmt --manifest-path vault-core/Cargo.toml -- --check
+
+      - name: Clippy
+        run: cargo clippy --manifest-path vault-core/Cargo.toml -- -D warnings
+
+      - name: Test
+        run: cargo test --manifest-path vault-core/Cargo.toml
+
+  extension:
+    name: extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: extension/wasm-bridge
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: extension/pnpm-lock.yaml
+
+      - name: Rust format check
+        run: cargo fmt --manifest-path extension/wasm-bridge/Cargo.toml -- --check
+
+      - name: Rust check
+        run: cargo check --manifest-path extension/wasm-bridge/Cargo.toml
+
+      - name: Rust test
+        run: cargo test --manifest-path extension/wasm-bridge/Cargo.toml
+
+      - name: Install dependencies
+        run: cd extension && pnpm install
+
+      - name: TypeScript type check
+        run: cd extension && pnpm tsc --noEmit
+
+      - name: Biome check
+        run: cd extension && pnpm run check
+
+      - name: Test
+        run: cd extension && pnpm test
+
+  desktop:
+    name: desktop
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            imagemagick
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: cd desktop && pnpm install
+
+      - name: Generate icons
+        run: |
+          bash assets/icons/convert2png.sh
+          cd desktop && pnpm tauri icon ../assets/icons/locked_icon.svg
+
+      - name: Rust format check
+        run: cargo fmt --manifest-path desktop/src-tauri/Cargo.toml -- --check
+
+      - name: Rust check
+        run: cargo check --manifest-path desktop/src-tauri/Cargo.toml
+
+      - name: TypeScript type check
+        run: cd desktop && pnpm tsc --noEmit
+
+      - name: Biome check
+        run: cd desktop && pnpm run check
+
+      - name: Test
+        run: cd desktop && pnpm test
+
+  android:
+    name: android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: android/rust-jni
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
+      - name: Generate icons
+        run: bash assets/icons/convert2png.sh
+
+      - name: Rust format check
+        run: cargo fmt --manifest-path android/rust-jni/Cargo.toml -- --check
+
+      - name: Rust check
+        run: cargo check --manifest-path android/rust-jni/Cargo.toml
+
+      - name: Kotlin lint
+        run: cd android && ./gradlew lintDebug
+
+      - name: Test
+        run: cd android && ./gradlew testDebugUnitTest
