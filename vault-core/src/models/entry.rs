@@ -14,6 +14,7 @@ pub enum SortField {
 }
 
 impl SortField {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "name" => Some(SortField::Name),
@@ -34,6 +35,7 @@ pub enum SortOrder {
 }
 
 impl SortOrder {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "asc" => Some(SortOrder::Asc),
@@ -74,6 +76,7 @@ impl EntryType {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "login" => Some(EntryType::Login),

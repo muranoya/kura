@@ -28,6 +28,7 @@ impl CustomFieldType {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "text" => Some(CustomFieldType::Text),
@@ -191,11 +192,11 @@ impl EntryData {
     }
 
     pub fn to_json_string(&self) -> Result<String> {
-        serde_json::to_string(self).map_err(|e| VaultError::JsonError(e))
+        serde_json::to_string(self).map_err(VaultError::JsonError)
     }
 
     pub fn from_json_string(json_str: &str) -> Result<Self> {
-        serde_json::from_str(json_str).map_err(|e| VaultError::JsonError(e))
+        serde_json::from_str(json_str).map_err(VaultError::JsonError)
     }
 }
 

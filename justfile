@@ -1,4 +1,4 @@
-set shell := ["zsh", "-c"]
+set shell := ["bash", "-c"]
 set positional-arguments := true
 
 # ディレクトリの定義
@@ -377,8 +377,8 @@ test-manual-autofill:
 	echo "🔍 Checking vault-core (lint & format)..."
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo ""
-	echo "🦀 Cargo check (vault-core)..."
-	cargo check --manifest-path {{VAULT_CORE_DIR}}/Cargo.toml
+	echo "🦀 Cargo clippy (vault-core)..."
+	cargo clippy --manifest-path {{VAULT_CORE_DIR}}/Cargo.toml -- -D warnings
 	echo ""
 	echo "🦀 Cargo fmt check (vault-core)..."
 	cargo fmt --manifest-path {{VAULT_CORE_DIR}}/Cargo.toml -- --check
@@ -416,8 +416,14 @@ test-manual-autofill:
 	echo "🔍 Checking extension (lint & format)..."
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo ""
+	echo "🦀 Building WASM package..."
+	wasm-pack build {{EXTENSION_DIR}}/wasm-bridge --target bundler --out-dir ../wasm
+	echo ""
 	echo "📥 Installing dependencies..."
 	cd {{EXTENSION_DIR}} && pnpm install --silent
+	echo ""
+	echo "🔧 Generating code (eTLD + patterns)..."
+	cd {{EXTENSION_DIR}} && pnpm run generate-etld && pnpm run generate-patterns
 	echo ""
 	echo "📝 TypeScript type check..."
 	cd {{EXTENSION_DIR}} && pnpm tsc --noEmit
@@ -464,7 +470,7 @@ test-manual-autofill:
 	just check-android
 	echo ""
 	echo "╔━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╗"
-	echo "║              ✅ All checks passed!                         ║"
+	echo "║              ✅ All checks passed!                     ║"
 	echo "╚━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╝"
 
 # クリーンアップ

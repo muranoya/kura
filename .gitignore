@@ -4,6 +4,10 @@
 # OS
 .DS_Store
 
+# Gradle
+.gradle/
+gradle/
+
 # Rust
 **/target/
 

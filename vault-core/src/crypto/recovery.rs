@@ -42,8 +42,7 @@ impl RecoveryKey {
     /// Parse from display string (with or without dashes)
     pub fn from_display_string(s: &str) -> Result<Self> {
         let clean = s.replace('-', "").to_uppercase();
-        let bytes =
-            crate::codec::base32::decode(&clean).ok_or_else(|| VaultError::InvalidRecoveryKey)?;
+        let bytes = crate::codec::base32::decode(&clean).ok_or(VaultError::InvalidRecoveryKey)?;
 
         if bytes.len() != 16 {
             return Err(VaultError::InvalidRecoveryKey);

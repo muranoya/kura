@@ -13,7 +13,7 @@ pub struct VaultFile {
 }
 
 /// In-memory vault contents after decryption
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VaultContents {
     pub labels: HashMap<String, LabelValue>,
     pub entries: HashMap<String, VaultEntry>,
@@ -58,20 +58,17 @@ pub struct VaultEntry {
 impl VaultContents {
     /// Create an empty vault
     pub fn new() -> Self {
-        VaultContents {
-            labels: HashMap::new(),
-            entries: HashMap::new(),
-        }
+        Self::default()
     }
 
     /// Convert to JSON bytes
     pub fn to_bytes(&self) -> crate::error::Result<Vec<u8>> {
-        serde_json::to_vec(self).map_err(|e| crate::error::VaultError::JsonError(e))
+        serde_json::to_vec(self).map_err(crate::error::VaultError::JsonError)
     }
 
     /// Create from JSON bytes
     pub fn from_bytes(bytes: &[u8]) -> crate::error::Result<Self> {
-        serde_json::from_slice(bytes).map_err(|e| crate::error::VaultError::JsonError(e))
+        serde_json::from_slice(bytes).map_err(crate::error::VaultError::JsonError)
     }
 }
 
@@ -196,11 +193,11 @@ mod tests {
 impl VaultFile {
     /// Convert to JSON bytes for transmission/storage
     pub fn to_bytes(&self) -> crate::error::Result<Vec<u8>> {
-        serde_json::to_vec(self).map_err(|e| crate::error::VaultError::JsonError(e))
+        serde_json::to_vec(self).map_err(crate::error::VaultError::JsonError)
     }
 
     /// Create from JSON bytes
     pub fn from_bytes(bytes: &[u8]) -> crate::error::Result<Self> {
-        serde_json::from_slice(bytes).map_err(|e| crate::error::VaultError::JsonError(e))
+        serde_json::from_slice(bytes).map_err(crate::error::VaultError::JsonError)
     }
 }

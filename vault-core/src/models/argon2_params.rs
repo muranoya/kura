@@ -10,8 +10,8 @@ pub struct Argon2Params {
     pub parallelism: u32, // p_cost
 }
 
-impl Argon2Params {
-    pub fn default() -> Self {
+impl Default for Argon2Params {
+    fn default() -> Self {
         let salt_bytes: [u8; 16] = rand::random();
 
         Argon2Params {
@@ -21,13 +21,15 @@ impl Argon2Params {
             parallelism: 4,
         }
     }
+}
 
+impl Argon2Params {
     pub fn to_json(&self) -> crate::error::Result<String> {
-        serde_json::to_string(self).map_err(|e| crate::error::VaultError::JsonError(e))
+        serde_json::to_string(self).map_err(crate::error::VaultError::JsonError)
     }
 
     pub fn from_json(json_str: &str) -> crate::error::Result<Self> {
-        serde_json::from_str(json_str).map_err(|e| crate::error::VaultError::JsonError(e))
+        serde_json::from_str(json_str).map_err(crate::error::VaultError::JsonError)
     }
 }
 

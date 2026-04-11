@@ -25,14 +25,13 @@ jobs:
         with:
           workspaces: vault-core
 
-      - name: Format check
-        run: cargo fmt --manifest-path vault-core/Cargo.toml -- --check
+      - uses: extractions/setup-just@v2
 
-      - name: Clippy
-        run: cargo clippy --manifest-path vault-core/Cargo.toml -- -D warnings
+      - name: Check
+        run: just check-vault-core
 
       - name: Test
-        run: cargo test --manifest-path vault-core/Cargo.toml
+        run: just test-vault-core
 
   extension:
     name: extension
@@ -58,26 +57,16 @@ jobs:
           cache: pnpm
           cache-dependency-path: extension/pnpm-lock.yaml
 
-      - name: Rust format check
-        run: cargo fmt --manifest-path extension/wasm-bridge/Cargo.toml -- --check
+      - uses: extractions/setup-just@v2
 
-      - name: Rust check
-        run: cargo check --manifest-path extension/wasm-bridge/Cargo.toml
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
 
-      - name: Rust test
-        run: cargo test --manifest-path extension/wasm-bridge/Cargo.toml
-
-      - name: Install dependencies
-        run: cd extension && pnpm install
-
-      - name: TypeScript type check
-        run: cd extension && pnpm tsc --noEmit
-
-      - name: Biome check
-        run: cd extension && pnpm run check
+      - name: Check
+        run: just check-extension
 
       - name: Test
-        run: cd extension && pnpm test
+        run: just test-extension
 
   desktop:
     name: desktop
@@ -114,28 +103,13 @@ jobs:
           cache: pnpm
           cache-dependency-path: desktop/pnpm-lock.yaml
 
-      - name: Install dependencies
-        run: cd desktop && pnpm install
+      - uses: extractions/setup-just@v2
 
-      - name: Generate icons
-        run: |
-          bash assets/icons/convert2png.sh
-          cd desktop && pnpm tauri icon ../assets/icons/locked_icon.svg
-
-      - name: Rust format check
-        run: cargo fmt --manifest-path desktop/src-tauri/Cargo.toml -- --check
-
-      - name: Rust check
-        run: cargo check --manifest-path desktop/src-tauri/Cargo.toml
-
-      - name: TypeScript type check
-        run: cd desktop && pnpm tsc --noEmit
-
-      - name: Biome check
-        run: cd desktop && pnpm run check
+      - name: Check
+        run: just check-desktop
 
       - name: Test
-        run: cd desktop && pnpm test
+        run: just test-desktop
 
   android:
     name: android
@@ -158,20 +132,13 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - uses: extractions/setup-just@v2
+
       - name: Install ImageMagick
         run: sudo apt-get update && sudo apt-get install -y imagemagick
 
-      - name: Generate icons
-        run: bash assets/icons/convert2png.sh
-
-      - name: Rust format check
-        run: cargo fmt --manifest-path android/rust-jni/Cargo.toml -- --check
-
-      - name: Rust check
-        run: cargo check --manifest-path android/rust-jni/Cargo.toml
-
-      - name: Kotlin lint
-        run: cd android && ./gradlew lintDebug
+      - name: Check
+        run: just check-android
 
       - name: Test
-        run: cd android && ./gradlew testDebugUnitTest
+        run: just test-android

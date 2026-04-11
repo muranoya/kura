@@ -107,7 +107,7 @@ fn merge_entry(local: Option<&VaultEntry>, remote: Option<&VaultEntry>) -> Optio
 
         // Group C/D: Both exist -> LWW + tie-breaking
         (Some(l), Some(r)) => {
-            let winner = match l.updated_at.cmp(&r.updated_at) {
+            match l.updated_at.cmp(&r.updated_at) {
                 std::cmp::Ordering::Greater => Some(l.clone()),
                 std::cmp::Ordering::Less => Some(r.clone()),
                 std::cmp::Ordering::Equal => {
@@ -129,8 +129,7 @@ fn merge_entry(local: Option<&VaultEntry>, remote: Option<&VaultEntry>) -> Optio
                         }
                     }
                 }
-            };
-            winner
+            }
         }
 
         (None, None) => None, // Both missing -> shouldn't happen in practice
@@ -146,7 +145,7 @@ fn is_soft_delete_newer_than_purge(
 ) -> bool {
     candidate_state == EntryState::SoftDeleted
         && other_state == EntryState::Purged
-        && other.purged_at.map_or(false, |t| candidate.updated_at > t)
+        && other.purged_at.is_some_and(|t| candidate.updated_at > t)
 }
 
 /// Merge labels using simple adoption or deletion priority

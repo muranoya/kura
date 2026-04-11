@@ -148,16 +148,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: desktop/pnpm-lock.yaml
 
-      - name: Install dependencies
-        run: cd desktop && pnpm install
+      - uses: extractions/setup-just@v2
 
-      - name: Generate icons
-        run: |
-          bash assets/icons/convert2png.sh
-          cd desktop && pnpm tauri icon ../assets/icons/locked_icon.svg
-
-      - name: Build AppImage
-        run: cd desktop && pnpm tauri build --bundles appimage
+      - name: Build
+        run: just release-desktop-linux
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -190,16 +184,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: desktop/pnpm-lock.yaml
 
-      - name: Install dependencies
-        run: cd desktop && pnpm install
+      - uses: extractions/setup-just@v2
 
-      - name: Generate icons
-        run: |
-          bash assets/icons/convert2png.sh
-          cd desktop && pnpm tauri icon ../assets/icons/locked_icon.svg
-
-      - name: Build DMG
-        run: cd desktop && pnpm tauri build --bundles dmg
+      - name: Build
+        run: just release-desktop-macos
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -232,17 +220,11 @@ jobs:
           cache: pnpm
           cache-dependency-path: desktop/pnpm-lock.yaml
 
-      - name: Install dependencies
-        run: cd desktop && pnpm install
+      - uses: extractions/setup-just@v2
 
-      - name: Generate icons
+      - name: Build
         shell: bash
-        run: |
-          bash assets/icons/convert2png.sh
-          cd desktop && pnpm tauri icon ../assets/icons/locked_icon.svg
-
-      - name: Build NSIS installer
-        run: cd desktop && pnpm tauri build --bundles nsis
+        run: just release-desktop-windows
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -283,26 +265,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: extension/pnpm-lock.yaml
 
-      - name: Generate icons
-        run: bash assets/icons/convert2png.sh
+      - uses: extractions/setup-just@v2
 
-      - name: Build WASM
-        run: wasm-pack build extension/wasm-bridge --target bundler --out-dir ../wasm
-
-      - name: Install dependencies
-        run: cd extension && pnpm install
-
-      - name: Build Chrome extension
-        run: cd extension && pnpm run build
-
-      - name: Package Chrome extension
-        run: cd extension/dist && zip -r ../kura-extension-chrome.zip .
-
-      - name: Build Firefox extension
-        run: cd extension && pnpm run build:firefox
-
-      - name: Package Firefox extension
-        run: cd extension/dist && zip -r ../kura-extension-firefox.zip .
+      - name: Build
+        run: just release-extension
 
       - name: Sign Firefox extension (AMO)
         continue-on-error: true
@@ -378,20 +344,12 @@ jobs:
       - name: Install ImageMagick
         run: sudo apt-get update && sudo apt-get install -y imagemagick
 
-      - name: Generate icons
-        run: bash assets/icons/convert2png.sh
+      - uses: extractions/setup-just@v2
 
-      - name: Build JNI libraries
+      - name: Build
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
-        run: |
-          cargo ndk -t arm64-v8a    -o android/app/src/main/jniLibs build --manifest-path android/rust-jni/Cargo.toml --release
-          cargo ndk -t armeabi-v7a  -o android/app/src/main/jniLibs build --manifest-path android/rust-jni/Cargo.toml --release
-          cargo ndk -t x86_64       -o android/app/src/main/jniLibs build --manifest-path android/rust-jni/Cargo.toml --release
-          cargo ndk -t x86          -o android/app/src/main/jniLibs build --manifest-path android/rust-jni/Cargo.toml --release
-
-      - name: Build release APK
-        run: cd android && ./gradlew assembleRelease
+        run: just release-android
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
