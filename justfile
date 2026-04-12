@@ -50,10 +50,10 @@ default: help
 	cd {{DESKTOP_DIR}} && pnpm install
 	echo ""
 	echo "🖥️  Building AppImage..."
-	cd {{DESKTOP_DIR}} && pnpm tauri build --bundles appimage
+	cd {{DESKTOP_DIR}} && pnpm tauri build --config src-tauri/tauri.conf.json
 	echo ""
 	echo "✅ Linux build completed!"
-	echo "  - Output: {{DESKTOP_DIR}}/src-tauri/target/release/bundle/appimage/"
+	echo "  - Output: target/release/bundle/appimage/"
 
 # Desktop app - macOS (DMG)
 @release-desktop-macos: _desktop-icons
@@ -66,10 +66,10 @@ default: help
 	cd {{DESKTOP_DIR}} && pnpm install
 	echo ""
 	echo "🖥️  Building DMG..."
-	cd {{DESKTOP_DIR}} && pnpm tauri build --bundles dmg
+	cd {{DESKTOP_DIR}} && pnpm tauri build --config src-tauri/tauri.conf.json
 	echo ""
 	echo "✅ macOS build completed!"
-	echo "  - Output: {{DESKTOP_DIR}}/src-tauri/target/release/bundle/dmg/"
+	echo "  - Output: target/release/bundle/dmg/"
 
 # Desktop app - Windows (NSIS installer)
 @release-desktop-windows: _desktop-icons
@@ -82,10 +82,10 @@ default: help
 	cd {{DESKTOP_DIR}} && pnpm install
 	echo ""
 	echo "🖥️  Building NSIS installer..."
-	cd {{DESKTOP_DIR}} && pnpm tauri build --bundles nsis
+	cd {{DESKTOP_DIR}} && pnpm tauri build --config src-tauri/tauri.conf.json
 	echo ""
 	echo "✅ Windows build completed!"
-	echo "  - Output: {{DESKTOP_DIR}}/src-tauri/target/release/bundle/nsis/"
+	echo "  - Output: target/release/bundle/nsis/"
 
 # Extension - Generate icons from SVG
 @_extension-icons:
@@ -292,7 +292,7 @@ default: help
 	just release-extension
 	echo ""
 	echo "╔━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╗"
-	echo "║                  🎉 All releases completed!                ║"
+	echo "║                 🎉 All releases completed!             ║"
 	echo "╚━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╝"
 
 # vault-core のテスト
