@@ -137,9 +137,19 @@ async function handleInputFocus(input: HTMLInputElement) {
     return
   }
 
+  // The focused input must itself be a classified autofill target.
+  // Otherwise, focusing unrelated inputs (search, comment, etc.) in the same
+  // container would also trigger suggestions.
+  const focusedField = form.fields.find((f) => f.element === input)
+  if (!focusedField) {
+    console.log(LOG_PREFIX, 'handleInputFocus: focused input is not an autofill target')
+    hideDropdown()
+    return
+  }
+
   console.log(
     LOG_PREFIX,
-    `handleInputFocus: detected form type=${form.formType}, fields=${form.fields.map((f) => f.type).join(',')}`,
+    `handleInputFocus: detected form type=${form.formType}, focused=${focusedField.type}, fields=${form.fields.map((f) => f.type).join(',')}`,
   )
 
   const url = window.location.href
