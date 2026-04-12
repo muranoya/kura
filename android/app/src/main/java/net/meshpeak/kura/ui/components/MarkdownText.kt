@@ -65,7 +65,8 @@ fun MarkdownText(
                             append(buildInlineAnnotatedString(node.inlines))
                         },
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(start = (node.depth * 16).dp)
                     )
                 }
                 is MarkdownBlock.ThematicBreak -> {
@@ -95,7 +96,7 @@ private sealed class MarkdownBlock {
     data class Heading(val level: Int, val inlines: List<MarkdownInline>) : MarkdownBlock()
     data class Paragraph(val inlines: List<MarkdownInline>) : MarkdownBlock()
     data class CodeBlock(val literal: String) : MarkdownBlock()
-    data class ListItem(val bullet: String, val inlines: List<MarkdownInline>) : MarkdownBlock()
+    data class ListItem(val bullet: String, val inlines: List<MarkdownInline>, val depth: Int) : MarkdownBlock()
     data object ThematicBreak : MarkdownBlock()
 }
 
@@ -110,7 +111,6 @@ private sealed class MarkdownInline {
 private fun flattenNodes(document: Node): List<MarkdownBlock> {
     val blocks = mutableListOf<MarkdownBlock>()
     var child = document.firstChild
-    var listIndex = 0
     while (child != null) {
         when (child) {
             is org.commonmark.node.Heading -> {
@@ -126,26 +126,10 @@ private fun flattenNodes(document: Node): List<MarkdownBlock> {
                 blocks.add(MarkdownBlock.CodeBlock(child.literal.trimEnd()))
             }
             is BulletList -> {
-                var item = child.firstChild
-                while (item != null) {
-                    if (item is org.commonmark.node.ListItem) {
-                        val inlines = extractListItemInlines(item)
-                        blocks.add(MarkdownBlock.ListItem("  \u2022 ", inlines))
-                    }
-                    item = item.next
-                }
+                flattenList(child, depth = 0, blocks = blocks)
             }
             is OrderedList -> {
-                listIndex = child.markerStartNumber
-                var item = child.firstChild
-                while (item != null) {
-                    if (item is org.commonmark.node.ListItem) {
-                        val inlines = extractListItemInlines(item)
-                        blocks.add(MarkdownBlock.ListItem("  ${listIndex}. ", inlines))
-                        listIndex++
-                    }
-                    item = item.next
-                }
+                flattenList(child, depth = 0, blocks = blocks)
             }
             is org.commonmark.node.ThematicBreak -> {
                 blocks.add(MarkdownBlock.ThematicBreak)
@@ -174,16 +158,33 @@ private fun flattenNodes(document: Node): List<MarkdownBlock> {
     return blocks
 }
 
-private fun extractListItemInlines(item: org.commonmark.node.ListItem): List<MarkdownInline> {
-    val inlines = mutableListOf<MarkdownInline>()
-    var child = item.firstChild
-    while (child != null) {
-        if (child is org.commonmark.node.Paragraph) {
-            inlines.addAll(extractInlines(child))
+private fun flattenList(listNode: Node, depth: Int, blocks: MutableList<MarkdownBlock>) {
+    var orderedIndex = if (listNode is OrderedList) listNode.markerStartNumber else 0
+    var item = listNode.firstChild
+    while (item != null) {
+        if (item is org.commonmark.node.ListItem) {
+            val bullet = if (listNode is OrderedList) {
+                "${orderedIndex}. ".also { orderedIndex++ }
+            } else {
+                "\u2022 "
+            }
+            val inlines = mutableListOf<MarkdownInline>()
+            val nestedLists = mutableListOf<Node>()
+            var itemChild = item.firstChild
+            while (itemChild != null) {
+                when (itemChild) {
+                    is org.commonmark.node.Paragraph -> inlines.addAll(extractInlines(itemChild))
+                    is BulletList, is OrderedList -> nestedLists.add(itemChild)
+                }
+                itemChild = itemChild.next
+            }
+            blocks.add(MarkdownBlock.ListItem(bullet, inlines, depth))
+            for (nested in nestedLists) {
+                flattenList(nested, depth + 1, blocks)
+            }
         }
-        child = child.next
+        item = item.next
     }
-    return inlines
 }
 
 private fun extractInlines(node: Node): List<MarkdownInline> {
