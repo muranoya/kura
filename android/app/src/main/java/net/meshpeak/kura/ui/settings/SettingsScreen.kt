@@ -358,11 +358,6 @@ fun SettingsScreen(
                     headlineContent = { Text("バージョン") },
                     trailingContent = { Text("v$appVersion", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 )
-                HorizontalDivider()
-                ListItem(
-                    headlineContent = { Text("vault-core") },
-                    trailingContent = { Text("v${VaultBridge.getVersion()}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))

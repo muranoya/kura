@@ -88,9 +88,6 @@ object VaultBridge {
     external fun generateTotpFromValue(value: String): String
     external fun parseTotpPeriod(value: String): Long
 
-    // Version
-    external fun getVersion(): String
-
     // Export
     external fun exportBitwardenJson(vaultId: String): String
 

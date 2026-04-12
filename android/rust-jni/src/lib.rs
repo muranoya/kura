@@ -698,21 +698,6 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_parseTotpPeriod
 }
 
 // ============================================================================
-// Version
-// ============================================================================
-
-#[no_mangle]
-pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_getVersion(
-    mut env: JNIEnv,
-    _class: JClass,
-) -> jstring {
-    jni_catch(&mut env, |env| {
-        let version = api_get_version();
-        new_jstring(env, &version)
-    })
-}
-
-// ============================================================================
 // Export Operations
 // ============================================================================
 

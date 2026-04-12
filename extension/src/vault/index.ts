@@ -52,7 +52,6 @@ interface WasmApi {
   api_upgrade_argon2_params(vaultId: string): string
   api_rotate_dek(vaultId: string): string
   api_regenerate_recovery_key(vaultId: string): string
-  api_get_version(): string
   api_export_bitwarden_json(vaultId: string): string
   [key: string]: unknown
 }
@@ -351,11 +350,6 @@ export async function generateTotpDefault(): Promise<string> {
     console.error('[Vault] Failed to generate TOTP default:', error)
     throw error
   }
-}
-
-export async function getVersion(): Promise<string> {
-  await ensureWasmReady()
-  return wasm.api_get_version()
 }
 
 // エクスポート

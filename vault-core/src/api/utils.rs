@@ -50,8 +50,3 @@ pub fn api_generate_totp_from_value(value: String) -> Result<String, String> {
 pub fn api_parse_totp_period(value: String) -> u64 {
     parse_totp_period(&value)
 }
-
-/// vault_coreのバージョンを返す
-pub fn api_get_version() -> String {
-    env!("CARGO_PKG_VERSION").to_string()
-}

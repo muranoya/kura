@@ -68,9 +68,6 @@ export type Message =
   | { type: 'GENERATE_TOTP'; secret: string }
   | { type: 'GENERATE_TOTP_FROM_VALUE'; value: string }
 
-  // Version
-  | { type: 'GET_VERSION' }
-
   // Security
   | { type: 'CHANGE_MASTER_PASSWORD'; oldPassword: string; newPassword: string }
   | { type: 'ROTATE_DEK'; password: string }

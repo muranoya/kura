@@ -1,10 +1,9 @@
 {
   "name": "kura-desktop",
-  "version": "0.1.1",
+  "version": "0.1.5",
   "type": "module",
   "packageManager": "pnpm@10.30.1",
   "scripts": {
-    "sync-version": "tsx scripts/sync-version.ts",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

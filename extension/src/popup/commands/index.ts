@@ -199,13 +199,6 @@ export async function exportBitwardenJson(): Promise<string> {
   return field<'json', string>(res, 'json') ?? ''
 }
 
-// Version
-export async function getVersion(): Promise<string> {
-  const res = await sendMessage({ type: 'GET_VERSION' })
-  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
-  return field<'version', string>(res, 'version') ?? ''
-}
-
 // Security
 export async function changeMasterPassword(
   oldPassword: string,

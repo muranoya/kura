@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "kura",
-  "version": "0.1.0",
+  "version": "0.1.5",
   "description": "サーバ不要、自分一人のためのパスワードマネージャー",
 
   "permissions": ["storage", "alarms", "clipboardWrite", "clipboardRead", "tabs"],

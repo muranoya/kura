@@ -393,11 +393,6 @@ pub fn api_parse_totp_period(value: String) -> u32 {
 }
 
 #[wasm_bindgen]
-pub fn api_get_version() -> String {
-    vault_core::api::api_get_version()
-}
-
-#[wasm_bindgen]
 pub fn api_export_bitwarden_json(vault_id: String) -> Result<String, JsValue> {
     with_manager(&vault_id, |m| m.api_export_bitwarden_json()).map_err(to_js_err)
 }

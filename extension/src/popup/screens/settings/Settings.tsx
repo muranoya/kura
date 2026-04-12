@@ -43,7 +43,6 @@ export default function Settings() {
   const navigate = useNavigate()
   const pushError = usePushError()
   const [storageConfig, setStorageConfig] = useState<Record<string, string> | null>(null)
-  const [coreVersion, setCoreVersion] = useState('...')
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
   // Auto-lock settings
@@ -134,7 +133,6 @@ export default function Settings() {
   useEffect(() => {
     loadStorageConfig()
     loadSettings()
-    commands.getVersion().then((v) => setCoreVersion(`v${v}`))
   }, [loadStorageConfig, loadSettings])
 
   const handleAutolockChange = async (value: string) => {
@@ -453,10 +451,6 @@ export default function Settings() {
             <div className="flex items-center justify-between text-sm">
               <p className="text-text-muted">バージョン</p>
               <p className="text-text-primary">v{chrome.runtime.getManifest().version}</p>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <p className="text-text-muted">vault-core</p>
-              <p className="text-text-primary">{coreVersion}</p>
             </div>
             <div className="flex items-center justify-between text-sm">
               <p className="text-text-muted">リポジトリ</p>

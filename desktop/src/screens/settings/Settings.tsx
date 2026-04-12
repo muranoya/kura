@@ -51,7 +51,6 @@ const CLIPBOARD_CLEAR_OPTIONS = [
 
 export default function Settings() {
   const pushError = usePushError()
-  const [coreVersion, setCoreVersion] = useState('...')
   const [appVersion, setAppVersion] = useState('...')
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
   const [storageConfig, setStorageConfig] = useState<Record<string, string> | null>(null)
@@ -90,7 +89,6 @@ export default function Settings() {
     }
     loadStorageConfig()
     loadSettings()
-    commands.getVersion().then((v) => setCoreVersion(`v${v}`))
     import('@tauri-apps/api/app')
       .then((mod) => mod.getVersion())
       .then((v) => setAppVersion(`v${v}`))
@@ -505,10 +503,6 @@ export default function Settings() {
             <div className="flex items-center justify-between">
               <p className="text-sm text-text-muted">バージョン</p>
               <p className="text-sm text-text-primary">{appVersion}</p>
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-text-muted">vault-core</p>
-              <p className="text-sm text-text-primary">{coreVersion}</p>
             </div>
             <div className="flex items-center justify-between">
               <p className="text-sm text-text-muted">リポジトリ</p>

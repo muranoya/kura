@@ -91,7 +91,6 @@ interface WasmApi {
   api_encrypt_transfer_config(password: string, configJson: string): string
   api_decrypt_transfer_config(password: string, transferString: string): string
   api_export_bitwarden_json(vaultId: string): string
-  api_get_version(): string
   [key: string]: unknown
 }
 
@@ -949,18 +948,6 @@ async function handleMessage(
           const totp = vault.api_generate_totp_from_value(message.value)
           const period = vault.api_parse_totp_period(message.value)
           sendResponse({ success: true, totp, period })
-        } catch (err) {
-          sendResponse({ success: false, error: String(err) })
-        }
-        break
-      }
-
-      // ========== Version ==========
-
-      case 'GET_VERSION': {
-        try {
-          const version = vault.api_get_version()
-          sendResponse({ success: true, version })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }

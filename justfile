@@ -17,6 +17,10 @@ EMULATOR := ANDROID_HOME / "emulator/emulator"
 # デフォルトレシピ
 default: help
 
+# VERSION ファイルの内容を各ターゲット（package.json / Cargo.toml 等）に反映
+@_sync-version:
+	node scripts/sync-version.mjs
+
 # Desktop app - Generate icons from SVG
 @_desktop-icons:
 	echo "🎨 Generating desktop icons..."
@@ -25,7 +29,7 @@ default: help
 	cd {{DESKTOP_DIR}} && pnpm tauri icon ../assets/icons/locked_icon.svg
 
 # Desktop app - Development (Tauri with hot reload)
-@dev-desktop: _desktop-icons
+@dev-desktop: _sync-version _desktop-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🚀 Starting desktop app in development mode..."
@@ -40,7 +44,7 @@ default: help
 	cd {{DESKTOP_DIR}} && pnpm tauri dev --config src-tauri/tauri.conf.dev.json
 
 # Desktop app - Linux (AppImage)
-@release-desktop-linux: _desktop-icons
+@release-desktop-linux: _sync-version _desktop-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building desktop app for Linux (AppImage)..."
@@ -56,7 +60,7 @@ default: help
 	echo "  - Output: target/release/bundle/appimage/"
 
 # Desktop app - macOS (DMG)
-@release-desktop-macos: _desktop-icons
+@release-desktop-macos: _sync-version _desktop-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building desktop app for macOS (DMG)..."
@@ -72,7 +76,7 @@ default: help
 	echo "  - Output: target/release/bundle/dmg/"
 
 # Desktop app - Windows (NSIS installer)
-@release-desktop-windows: _desktop-icons
+@release-desktop-windows: _sync-version _desktop-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building desktop app for Windows (NSIS)..."
@@ -93,7 +97,7 @@ default: help
 	bash assets/icons/convert2png.sh
 
 # Browser extension (Chrome + Firefox)
-@release-extension: _extension-icons
+@release-extension: _sync-version _extension-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building browser extensions (Chrome + Firefox)..."
@@ -148,7 +152,7 @@ default: help
 	echo "✅ Signed .xpi created in {{EXTENSION_DIR}}/"
 
 # Browser extension - Development (HMR付き)
-@dev-extension: _extension-icons
+@dev-extension: _sync-version _extension-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🚀 Starting extension in development mode..."
@@ -169,7 +173,7 @@ default: help
 	bash assets/icons/convert2png.sh
 
 # Android app - Build native libraries (Rust → .so)
-@build-android-jni: _android-icons
+@build-android-jni: _sync-version _android-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🦀 Building vault_jni native libraries for Android..."
