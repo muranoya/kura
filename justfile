@@ -59,21 +59,21 @@ default: help
 	echo "✅ Linux build completed!"
 	echo "  - Output: target/release/bundle/appimage/"
 
-# Desktop app - macOS (DMG)
+# Desktop app - macOS (DMG, Apple Silicon / arm64 only, ad-hoc signed)
 @release-desktop-macos: _sync-version _desktop-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo "🔨 Building desktop app for macOS (DMG)..."
+	echo "🔨 Building desktop app for macOS arm64 (DMG, ad-hoc signed)..."
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo ""
 	echo "📥 Installing dependencies..."
 	cd {{DESKTOP_DIR}} && pnpm install
 	echo ""
-	echo "🖥️  Building DMG..."
-	cd {{DESKTOP_DIR}} && pnpm tauri build --config src-tauri/tauri.conf.json
+	echo "🖥️  Building DMG (aarch64-apple-darwin)..."
+	cd {{DESKTOP_DIR}} && APPLE_SIGNING_IDENTITY="-" pnpm tauri build --target aarch64-apple-darwin --config src-tauri/tauri.conf.json
 	echo ""
 	echo "✅ macOS build completed!"
-	echo "  - Output: target/release/bundle/dmg/"
+	echo "  - Output: target/aarch64-apple-darwin/release/bundle/dmg/"
 
 # Desktop app - Windows (NSIS installer)
 @release-desktop-windows: _sync-version _desktop-icons

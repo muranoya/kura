@@ -21,7 +21,8 @@
 
 | プラットフォーム | 技術 | 状態 |
 |----------------|------|------|
-| Windows / macOS / Linux | Tauri (Rust + React) | 利用可能 |
+| Windows / Linux | Tauri (Rust + React) | 利用可能 |
+| macOS (Apple Silicon) | Tauri (Rust + React) | 利用可能（[インストール手順](#macos-インストール手順)参照） |
 | Android | Kotlin + Jetpack Compose | 利用可能 |
 | Chrome 拡張機能 | React + WASM | 利用可能 |
 | Firefox 拡張機能 | React + WASM | 利用可能 |
@@ -69,6 +70,30 @@ vaultデータをAES-256-GCMで暗号化
 - **WebAssembly** -- ブラウザ拡張機能用
 
 これにより、暗号化ロジック・同期アルゴリズム・データ処理がすべてのプラットフォームで同一です。
+
+## macOS インストール手順
+
+> **注意:** kura は Apple Developer Program に加入せず ad-hoc 署名で配布しています。そのため macOS 標準のセキュリティ機構（Gatekeeper）により、初回起動時に「"kura" は壊れているため開けません」と表示されます。これは kura のバイナリが実際に壊れているわけではなく、Apple による公証（Notarization）を受けていないために発生する既知の挙動です。
+
+### 対応アーキテクチャ
+
+macOS 版は **Apple Silicon (M1/M2/M3 など、arm64)** のみ対応しています。Intel Mac には対応していません。
+
+### インストール手順
+
+1. GitHub Releases から `kura-desktop-macos-arm64-<VERSION>.dmg` をダウンロード
+2. dmg をダブルクリックでマウントし、`kura.app` を `/Applications` へドラッグ&ドロップ
+3. ターミナルで以下を実行し、quarantine 属性を削除
+
+   ```sh
+   xattr -cr /Applications/kura.app
+   ```
+
+4. Launchpad または Finder から `kura.app` を起動
+
+### この手順は何をしているのか
+
+`xattr -cr` は macOS がインターネット経由のファイルに自動で付ける `com.apple.quarantine` 拡張属性を再帰的に削除するコマンドです。kura は本リポジトリで公開されているオープンソースソフトウェアです。自分でビルドする場合（`just release-desktop-macos`）はこの手順は不要です。
 
 ## セットアップ
 

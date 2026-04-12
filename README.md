@@ -21,7 +21,8 @@ A serverless password manager. Your vault lives in your own S3-compatible storag
 
 | Platform | Technology | Status |
 |----------|-----------|--------|
-| Windows / macOS / Linux | Tauri (Rust + React) | Available |
+| Windows / Linux | Tauri (Rust + React) | Available |
+| macOS (Apple Silicon) | Tauri (Rust + React) | Available (see [installation steps](#macos-installation)) |
 | Android | Kotlin + Jetpack Compose | Available |
 | Chrome extension | React + WASM | Available |
 | Firefox extension | React + WASM | Available |
@@ -69,6 +70,30 @@ The shared Rust core (`vault-core`) compiles to:
 - **WebAssembly** -- for browser extensions
 
 This means encryption logic, sync algorithms, and data handling are identical across all platforms.
+
+## macOS Installation
+
+> **Note:** kura is distributed with ad-hoc code signing and is not enrolled in the Apple Developer Program. Because of this, macOS Gatekeeper will show `"kura" is damaged and can't be opened` the first time you launch it. The binary is not actually damaged — this is the standard macOS behavior for applications that are not notarized by Apple.
+
+### Supported architecture
+
+The macOS build targets **Apple Silicon (M1/M2/M3, arm64)** only. Intel Macs are not supported.
+
+### Installation steps
+
+1. Download `kura-desktop-macos-arm64-<VERSION>.dmg` from GitHub Releases.
+2. Double-click the dmg to mount it, then drag `kura.app` into `/Applications`.
+3. Open Terminal and strip the quarantine attribute:
+
+   ```sh
+   xattr -cr /Applications/kura.app
+   ```
+
+4. Launch `kura.app` from Launchpad or Finder.
+
+### What `xattr -cr` does
+
+`xattr -cr` recursively removes the `com.apple.quarantine` extended attribute that macOS automatically attaches to files downloaded from the internet. kura is open source and its entire source is published in this repository. If you build it yourself (`just release-desktop-macos`), this step is not required.
 
 ## Setup
 
