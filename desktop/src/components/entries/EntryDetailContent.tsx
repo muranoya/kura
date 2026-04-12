@@ -166,10 +166,10 @@ const markdownComponents = {
     <p className="text-text-primary mb-3 leading-relaxed">{children}</p>
   ),
   ul: ({ children }: { children?: ReactNode }) => (
-    <ul className="list-disc list-inside text-text-primary mb-3 space-y-1">{children}</ul>
+    <ul className="list-disc pl-5 text-text-primary mb-3 space-y-1">{children}</ul>
   ),
   ol: ({ children }: { children?: ReactNode }) => (
-    <ol className="list-decimal list-inside text-text-primary mb-3 space-y-1">{children}</ol>
+    <ol className="list-decimal pl-5 text-text-primary mb-3 space-y-1">{children}</ol>
   ),
   li: ({ children }: { children?: ReactNode }) => <li className="text-text-primary">{children}</li>,
   code: ({ inline, children }: { children?: ReactNode; inline?: boolean }) =>
