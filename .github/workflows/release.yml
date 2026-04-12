@@ -123,6 +123,15 @@ jobs:
       - name: Build
         run: just release-desktop-linux
 
+      - name: Rename artifacts
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          appimage=$(find target/release/bundle/appimage -name '*.AppImage' | head -1)
+          deb=$(find target/release/bundle/deb -name '*.deb' | head -1)
+          mv "$appimage" "target/release/bundle/appimage/kura-desktop-linux-${VERSION}.AppImage"
+          mv "$deb" "target/release/bundle/deb/kura-desktop-linux-${VERSION}.deb"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
@@ -159,6 +168,13 @@ jobs:
       - name: Build
         run: just release-desktop-macos
 
+      - name: Rename artifacts
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          dmg=$(find target/release/bundle/dmg -name '*.dmg' | head -1)
+          mv "$dmg" "target/release/bundle/dmg/kura-desktop-macos-${VERSION}.dmg"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
@@ -193,6 +209,18 @@ jobs:
       - name: Build
         shell: bash
         run: just release-desktop-windows
+
+      - name: Rename artifacts
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          exe=$(find target/release/bundle/nsis -name '*.exe' | head -1)
+          mv "$exe" "target/release/bundle/nsis/kura-desktop-windows-${VERSION}.exe"
+          nsis_zip=$(find target/release/bundle/nsis -name '*.nsis.zip' | head -1)
+          if [ -n "$nsis_zip" ]; then
+            mv "$nsis_zip" "target/release/bundle/nsis/kura-desktop-windows-${VERSION}.nsis.zip"
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -257,34 +285,36 @@ jobs:
             --api-secret "$AMO_API_SECRET" \
             --artifacts-dir .
 
-      - name: Rename signed Firefox xpi
+      - name: Rename extension artifacts
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
+          mv extension/kura-extension-chrome.zip "extension/kura-chrome-extension-${VERSION}.zip"
+          mv extension/kura-extension-firefox.zip "extension/kura-firefox-extension-${VERSION}.zip"
           xpi_file=$(find extension -maxdepth 1 -name '*.xpi' | head -1)
-          if [ -z "$xpi_file" ]; then
+          if [ -n "$xpi_file" ]; then
+            mv "$xpi_file" "extension/kura-firefox-extension-${VERSION}.xpi"
+          else
             echo "No signed xpi found (signing likely skipped). Nothing to rename."
-            exit 0
           fi
-          mv "$xpi_file" "extension/kura-firefox-v${VERSION}.xpi"
 
       - name: Upload Chrome zip
         uses: actions/upload-artifact@v7
         with:
           name: extension-chrome
-          path: extension/kura-extension-chrome.zip
+          path: extension/kura-chrome-extension-${{ needs.prepare.outputs.version }}.zip
 
       - name: Upload Firefox zip
         uses: actions/upload-artifact@v7
         with:
           name: extension-firefox
-          path: extension/kura-extension-firefox.zip
+          path: extension/kura-firefox-extension-${{ needs.prepare.outputs.version }}.zip
 
       - name: Upload Firefox signed xpi
         uses: actions/upload-artifact@v7
         with:
           name: extension-firefox-signed
-          path: extension/*.xpi
+          path: extension/kura-firefox-extension-${{ needs.prepare.outputs.version }}.xpi
           if-no-files-found: ignore
 
   # ---------------------------------------------------------------------------
@@ -363,8 +393,8 @@ jobs:
           if [ -z "$apk_file" ]; then
             apk_file=$(find "$apk_dir" -name '*.apk' | head -1)
           fi
-          cp "$apk_file" "$apk_dir/kura-${VERSION}.apk"
-          find "$apk_dir" -name '*.apk' ! -name "kura-${VERSION}.apk" -delete
+          cp "$apk_file" "$apk_dir/kura-android-${VERSION}.apk"
+          find "$apk_dir" -name '*.apk' ! -name "kura-android-${VERSION}.apk" -delete
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
