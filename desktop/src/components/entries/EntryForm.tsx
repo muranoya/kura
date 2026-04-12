@@ -439,7 +439,7 @@ export default function EntryForm({
                   id="content"
                   value={v.content || ''}
                   onChange={(e) => updateTypedValue('content', e.target.value)}
-                  className="min-h-40"
+                  className="min-h-40 resize-y"
                 />
               ) : (
                 <div className="p-3 rounded-md bg-bg-elevated border border-border text-text-primary min-h-40 overflow-y-auto">
