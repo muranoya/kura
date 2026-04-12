@@ -285,6 +285,17 @@ jobs:
             --api-secret "$AMO_API_SECRET" \
             --artifacts-dir .
 
+      - name: Rename signed Firefox xpi
+        env:
+          VERSION: ${{ needs.prepare.outputs.extension_version }}
+        run: |
+          xpi_file=$(find extension -maxdepth 1 -name '*.xpi' | head -1)
+          if [ -z "$xpi_file" ]; then
+            echo "No signed xpi found (signing likely skipped). Nothing to rename."
+            exit 0
+          fi
+          mv "$xpi_file" "extension/kura-firefox-v${VERSION}.xpi"
+
       - name: Upload Chrome zip
         uses: actions/upload-artifact@v7
         with:
@@ -344,10 +355,43 @@ jobs:
 
       - uses: extractions/setup-just@v4
 
+      - name: Check keystore availability
+        id: check_keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Decode release keystore
+        if: steps.check_keystore.outputs.available == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+
       - name: Build
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
+          KURA_KEYSTORE_FILE: ${{ steps.check_keystore.outputs.available == 'true' && format('{0}/release.keystore', runner.temp) || '' }}
+          KURA_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KURA_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KURA_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: just release-android
+
+      - name: Rename APK
+        env:
+          VERSION: ${{ needs.prepare.outputs.android_version }}
+        run: |
+          apk_dir="android/app/build/outputs/apk/release"
+          apk_file=$(find "$apk_dir" -name '*.apk' -not -name '*-unsigned*' | head -1)
+          if [ -z "$apk_file" ]; then
+            apk_file=$(find "$apk_dir" -name '*.apk' | head -1)
+          fi
+          cp "$apk_file" "$apk_dir/kura-${VERSION}.apk"
+          find "$apk_dir" -name '*.apk' ! -name "kura-${VERSION}.apk" -delete
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -391,9 +435,9 @@ jobs:
           files=()
           for dir in artifacts/desktop-linux artifacts/desktop-macos artifacts/desktop-windows; do
             if [ -d "$dir" ]; then
-              for f in "$dir"/*; do
-                [ -f "$f" ] && files+=("$f")
-              done
+              while IFS= read -r f; do
+                files+=("$f")
+              done < <(find "$dir" -type f)
             fi
           done
           gh release create "$TAG" \
@@ -411,9 +455,9 @@ jobs:
           files=()
           for dir in artifacts/extension-chrome artifacts/extension-firefox artifacts/extension-firefox-signed; do
             if [ -d "$dir" ]; then
-              for f in "$dir"/*; do
-                [ -f "$f" ] && files+=("$f")
-              done
+              while IFS= read -r f; do
+                files+=("$f")
+              done < <(find "$dir" -type f)
             fi
           done
           gh release create "$TAG" \
@@ -430,9 +474,9 @@ jobs:
         run: |
           files=()
           if [ -d artifacts/android-apk ]; then
-            for f in artifacts/android-apk/*; do
-              [ -f "$f" ] && files+=("$f")
-            done
+            while IFS= read -r f; do
+              files+=("$f")
+            done < <(find artifacts/android-apk -type f)
           fi
           gh release create "$TAG" \
             --title "Android v${VERSION}" \

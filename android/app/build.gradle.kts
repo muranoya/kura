@@ -19,8 +19,21 @@ android {
         versionName = appVersion
     }
 
+    signingConfigs {
+        create("release") {
+            val ksFile = System.getenv("KURA_KEYSTORE_FILE")
+            if (ksFile != null && file(ksFile).exists()) {
+                storeFile = file(ksFile)
+                storePassword = System.getenv("KURA_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KURA_KEY_ALIAS")
+                keyPassword = System.getenv("KURA_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
