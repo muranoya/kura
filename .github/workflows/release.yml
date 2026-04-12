@@ -30,12 +30,8 @@ jobs:
       build_desktop: ${{ steps.targets.outputs.build_desktop }}
       build_extension: ${{ steps.targets.outputs.build_extension }}
       build_android: ${{ steps.targets.outputs.build_android }}
-      desktop_version: ${{ steps.versions.outputs.desktop }}
-      extension_version: ${{ steps.versions.outputs.extension }}
-      android_version: ${{ steps.versions.outputs.android }}
-      desktop_tag: ${{ steps.tags.outputs.desktop }}
-      extension_tag: ${{ steps.tags.outputs.extension }}
-      android_tag: ${{ steps.tags.outputs.android }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -62,53 +58,29 @@ jobs:
             echo "build_android=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Read VERSION files
-        id: versions
-        run: |
-          echo "desktop=$(cat desktop/VERSION)" >> "$GITHUB_OUTPUT"
-          echo "extension=$(cat extension/VERSION)" >> "$GITHUB_OUTPUT"
-          echo "android=$(cat android/VERSION)" >> "$GITHUB_OUTPUT"
-
-      - name: Compute tags and check duplicates
-        id: tags
+      - name: Read VERSION and validate
+        id: version
         env:
-          BUILD_DESKTOP: ${{ steps.targets.outputs.build_desktop }}
-          BUILD_EXTENSION: ${{ steps.targets.outputs.build_extension }}
-          BUILD_ANDROID: ${{ steps.targets.outputs.build_android }}
-          DESKTOP_VERSION: ${{ steps.versions.outputs.desktop }}
-          EXTENSION_VERSION: ${{ steps.versions.outputs.extension }}
-          ANDROID_VERSION: ${{ steps.versions.outputs.android }}
+          INPUT_COMPONENTS: ${{ inputs.components }}
         run: |
-          has_error=false
+          version=$(cat VERSION)
+          tag="v${version}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-          if [ "$BUILD_DESKTOP" = "true" ]; then
-            tag="desktop-v${DESKTOP_VERSION}"
-            echo "desktop=$tag" >> "$GITHUB_OUTPUT"
-            if git rev-parse "refs/tags/$tag" >/dev/null 2>&1; then
-              echo "::error::Tag $tag already exists. Bump desktop/VERSION before releasing."
-              has_error=true
-            fi
+          if git rev-parse "refs/tags/$tag" >/dev/null 2>&1; then
+            tag_exists=true
+          else
+            tag_exists=false
           fi
 
-          if [ "$BUILD_EXTENSION" = "true" ]; then
-            tag="extension-v${EXTENSION_VERSION}"
-            echo "extension=$tag" >> "$GITHUB_OUTPUT"
-            if git rev-parse "refs/tags/$tag" >/dev/null 2>&1; then
-              echo "::error::Tag $tag already exists. Bump extension/VERSION before releasing."
-              has_error=true
-            fi
+          if [ "$tag_exists" = "true" ] && [ "$INPUT_COMPONENTS" = "all" ]; then
+            echo "::error::Tag $tag already exists. Bump VERSION before releasing all components."
+            exit 1
           fi
 
-          if [ "$BUILD_ANDROID" = "true" ]; then
-            tag="android-v${ANDROID_VERSION}"
-            echo "android=$tag" >> "$GITHUB_OUTPUT"
-            if git rev-parse "refs/tags/$tag" >/dev/null 2>&1; then
-              echo "::error::Tag $tag already exists. Bump android/VERSION before releasing."
-              has_error=true
-            fi
-          fi
-
-          if [ "$has_error" = "true" ]; then
+          if [ "$tag_exists" = "false" ] && [ "$INPUT_COMPONENTS" != "all" ]; then
+            echo "::error::Tag $tag does not exist. New versions must be released with components=all."
             exit 1
           fi
 
@@ -287,7 +259,7 @@ jobs:
 
       - name: Rename signed Firefox xpi
         env:
-          VERSION: ${{ needs.prepare.outputs.extension_version }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           xpi_file=$(find extension -maxdepth 1 -name '*.xpi' | head -1)
           if [ -z "$xpi_file" ]; then
@@ -370,7 +342,8 @@ jobs:
         if: steps.check_keystore.outputs.available == 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+        run: |
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '\r' | base64 -d > "$RUNNER_TEMP/release.keystore"
 
       - name: Build
         env:
@@ -383,7 +356,7 @@ jobs:
 
       - name: Rename APK
         env:
-          VERSION: ${{ needs.prepare.outputs.android_version }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           apk_dir="android/app/build/outputs/apk/release"
           apk_file=$(find "$apk_dir" -name '*.apk' -not -name '*-unsigned*' | head -1)
@@ -425,60 +398,47 @@ jobs:
         with:
           path: artifacts
 
-      - name: Create desktop release
-        if: needs.prepare.outputs.build_desktop == 'true'
+      - name: Create or update release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.prepare.outputs.desktop_tag }}
-          VERSION: ${{ needs.prepare.outputs.desktop_version }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          BUILD_DESKTOP: ${{ needs.prepare.outputs.build_desktop }}
+          BUILD_EXTENSION: ${{ needs.prepare.outputs.build_extension }}
+          BUILD_ANDROID: ${{ needs.prepare.outputs.build_android }}
         run: |
-          files=()
-          for dir in artifacts/desktop-linux artifacts/desktop-macos artifacts/desktop-windows; do
-            if [ -d "$dir" ]; then
-              while IFS= read -r f; do
-                files+=("$f")
-              done < <(find "$dir" -type f)
-            fi
-          done
-          gh release create "$TAG" \
-            --title "Desktop v${VERSION}" \
-            --generate-notes \
-            "${files[@]}"
-
-      - name: Create extension release
-        if: needs.prepare.outputs.build_extension == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.prepare.outputs.extension_tag }}
-          VERSION: ${{ needs.prepare.outputs.extension_version }}
-        run: |
-          files=()
-          for dir in artifacts/extension-chrome artifacts/extension-firefox artifacts/extension-firefox-signed; do
-            if [ -d "$dir" ]; then
-              while IFS= read -r f; do
-                files+=("$f")
-              done < <(find "$dir" -type f)
-            fi
-          done
-          gh release create "$TAG" \
-            --title "Extension v${VERSION}" \
-            --generate-notes \
-            "${files[@]}"
-
-      - name: Create android release
-        if: needs.prepare.outputs.build_android == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.prepare.outputs.android_tag }}
-          VERSION: ${{ needs.prepare.outputs.android_version }}
-        run: |
-          files=()
-          if [ -d artifacts/android-apk ]; then
-            while IFS= read -r f; do
-              files+=("$f")
-            done < <(find artifacts/android-apk -type f)
+          artifact_dirs=()
+          if [ "$BUILD_DESKTOP" = "true" ]; then
+            artifact_dirs+=(artifacts/desktop-linux artifacts/desktop-macos artifacts/desktop-windows)
           fi
-          gh release create "$TAG" \
-            --title "Android v${VERSION}" \
-            --generate-notes \
-            "${files[@]}"
+          if [ "$BUILD_EXTENSION" = "true" ]; then
+            artifact_dirs+=(artifacts/extension-chrome artifacts/extension-firefox artifacts/extension-firefox-signed)
+          fi
+          if [ "$BUILD_ANDROID" = "true" ]; then
+            artifact_dirs+=(artifacts/android-apk)
+          fi
+
+          files=()
+          for dir in "${artifact_dirs[@]}"; do
+            if [ -d "$dir" ]; then
+              while IFS= read -r f; do
+                files+=("$f")
+              done < <(find "$dir" -type f)
+            fi
+          done
+
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::No artifacts found to publish."
+            exit 1
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG exists. Uploading assets with --clobber."
+            gh release upload "$TAG" --clobber "${files[@]}"
+          else
+            echo "Release $TAG does not exist. Creating new release."
+            gh release create "$TAG" \
+              --title "v${VERSION}" \
+              --generate-notes \
+              "${files[@]}"
+          fi

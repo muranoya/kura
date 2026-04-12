@@ -5,7 +5,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val appVersion = rootProject.file("VERSION").readText().trim()
+val appVersion = rootProject.file("../VERSION").readText().trim()
 
 android {
     namespace = "net.meshpeak.kura"

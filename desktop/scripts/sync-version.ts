@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-const version = readFileSync(resolve(import.meta.dirname, '../VERSION'), 'utf-8').trim()
+const version = readFileSync(resolve(import.meta.dirname, '../../VERSION'), 'utf-8').trim()
 
 const targets = [
   '../package.json',
