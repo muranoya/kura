@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import EntryCard from '../../components/entries/EntryCard'
@@ -40,6 +40,7 @@ interface EntryListProps {
 
 export default function EntryList({ onlyFavorites = false, labelId, labelName }: EntryListProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const syncVersion = useSyncVersion()
   const [entries, setEntries] = useState<EntryRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,7 +57,10 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
   const scrollKey = labelId ? `label-${labelId}` : onlyFavorites ? 'favorites' : 'entries'
 
   // 詳細ペイン用の state
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // 編集画面からの戻り遷移時は location.state.selectedId で前回の選択を復元する
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => (location.state as { selectedId?: string } | null)?.selectedId ?? null,
+  )
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
   const [allLabels, setAllLabels] = useState<Label[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
