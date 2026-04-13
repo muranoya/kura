@@ -40,7 +40,13 @@
     ],
     "category": "Utility",
     "shortDescription": "Password manager",
-    "targets": ["appimage", "deb", "nsis", "dmg"]
+    "targets": ["appimage", "deb", "nsis", "dmg"],
+    "macOS": {
+      "signingIdentity": "-",
+      "entitlements": "Entitlements.plist",
+      "hardenedRuntime": true,
+      "minimumSystemVersion": "11.0"
+    }
   },
   "plugins": {}
 }

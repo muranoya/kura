@@ -141,7 +141,7 @@ jobs:
             target/release/bundle/deb/*.deb
 
   release-desktop-macos:
-    name: Desktop (macOS)
+    name: Desktop (macOS arm64)
     needs: prepare
     if: needs.prepare.outputs.build_desktop == 'true'
     runs-on: macos-latest
@@ -149,6 +149,8 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
       - uses: Swatinem/rust-cache@v2
 
       - name: Install ImageMagick
@@ -168,18 +170,25 @@ jobs:
       - name: Build
         run: just release-desktop-macos
 
+      - name: Verify ad-hoc signature
+        run: |
+          app=$(find target/aarch64-apple-darwin/release/bundle/macos -maxdepth 2 -name '*.app' | head -1)
+          echo "Verifying: $app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dvv "$app"
+
       - name: Rename artifacts
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          dmg=$(find target/release/bundle/dmg -name '*.dmg' | head -1)
-          mv "$dmg" "target/release/bundle/dmg/kura-desktop-macos-${VERSION}.dmg"
+          dmg=$(find target/aarch64-apple-darwin/release/bundle/dmg -name '*.dmg' | head -1)
+          mv "$dmg" "target/aarch64-apple-darwin/release/bundle/dmg/kura-desktop-macos-arm64-${VERSION}.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: desktop-macos
-          path: target/release/bundle/dmg/*.dmg
+          path: target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
 
   release-desktop-windows:
     name: Desktop (Windows)
