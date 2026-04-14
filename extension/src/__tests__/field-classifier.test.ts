@@ -12,7 +12,8 @@ function signals(overrides: Partial<FieldSignals> = {}): FieldSignals {
   return {
     autocomplete: '',
     inputType: 'text',
-    nameId: '',
+    name: '',
+    id: '',
     textSignals: '',
     labelText: '',
     urlPath: '/',
@@ -161,28 +162,45 @@ describe('computeScores', () => {
 
   describe('name/id patterns (weight: 6)', () => {
     it('name containing "email" scores for username', () => {
-      const scores = computeScores(signals({ nameId: 'email_input' }))
+      const scores = computeScores(signals({ name: 'email_input' }))
       expect(scores.get('username')).toBeGreaterThanOrEqual(6)
     })
 
     it('name containing "user" scores for username', () => {
-      const scores = computeScores(signals({ nameId: 'user_name' }))
+      const scores = computeScores(signals({ name: 'user_name' }))
       expect(scores.get('username')).toBeGreaterThanOrEqual(6)
     })
 
     it('name containing "pass" scores for password', () => {
-      const scores = computeScores(signals({ nameId: 'password' }))
+      const scores = computeScores(signals({ name: 'password' }))
       expect(scores.get('password')).toBeGreaterThanOrEqual(6)
     })
 
     it('name containing "otp" scores for totp', () => {
-      const scores = computeScores(signals({ nameId: 'otp_code' }))
+      const scores = computeScores(signals({ name: 'otp_code' }))
       expect(scores.get('totp')).toBeGreaterThanOrEqual(6)
     })
 
     it('name containing "card_number" scores for cc_number', () => {
-      const scores = computeScores(signals({ nameId: 'card_number' }))
+      const scores = computeScores(signals({ name: 'card_number' }))
       expect(scores.get('cc_number')).toBeGreaterThanOrEqual(6)
+    })
+
+    it('id matches when name does not (independent evaluation)', () => {
+      // Site-specific name (non-matching) + recognizable id.
+      // Reproduces furusato-tax.jp's choice_id + login-id pair.
+      const scores = computeScores(signals({ name: 'choice_id', id: 'login-id' }))
+      expect(scores.get('username')).toBeGreaterThanOrEqual(6)
+    })
+
+    it('name matches when id does not', () => {
+      const scores = computeScores(signals({ name: 'user_email', id: 'ce12345' }))
+      expect(scores.get('username')).toBeGreaterThanOrEqual(6)
+    })
+
+    it('name/id match only adds weight once even if both match', () => {
+      const scores = computeScores(signals({ name: 'username', id: 'user_id' }))
+      expect(scores.get('username')).toBe(6)
     })
   })
 
@@ -269,7 +287,7 @@ describe('computeScores', () => {
     })
 
     it('text type with email name: username detected', () => {
-      const match = bestMatch(signals({ inputType: 'text', nameId: 'email' }))
+      const match = bestMatch(signals({ inputType: 'text', name: 'email' }))
       expect(match?.type).toBe('username')
       // name(6) = 6 (type="text" is too generic, no type score)
       expect(match?.score).toBe(6)
@@ -282,18 +300,18 @@ describe('computeScores', () => {
     })
 
     it('text input with username name pattern: still classified as username', () => {
-      const match = bestMatch(signals({ inputType: 'text', nameId: 'username' }))
+      const match = bestMatch(signals({ inputType: 'text', name: 'username' }))
       expect(match?.type).toBe('username')
       expect(match?.score).toBe(6)
     })
 
     it('generic text input with non-login name is not classified', () => {
-      const scores = computeScores(signals({ inputType: 'text', nameId: 'competitionname' }))
+      const scores = computeScores(signals({ inputType: 'text', name: 'competitionname' }))
       expect(scores.get('username')).toBeUndefined()
     })
 
     it('text input with otp name: still classified as totp', () => {
-      const match = bestMatch(signals({ inputType: 'text', nameId: 'otp_code' }))
+      const match = bestMatch(signals({ inputType: 'text', name: 'otp_code' }))
       expect(match?.type).toBe('totp')
       expect(match?.score).toBe(6)
     })
@@ -303,13 +321,89 @@ describe('computeScores', () => {
         signals({
           autocomplete: 'current-password',
           inputType: 'password',
-          nameId: 'password',
+          name: 'password',
           textSignals: 'Password',
           labelText: 'Password',
         }),
       )
       // password: autocomplete(10) + type(8) + name(6) + textSignals(4) + label(4) = 32
       expect(scores.get('password')).toBe(32)
+    })
+  })
+
+  describe('Japanese labels (JavaScript \\b does not recognize CJK boundaries)', () => {
+    it('label "ログインID" classifies as username', () => {
+      const match = bestMatch(signals({ labelText: 'ログインID', urlPath: '/login' }))
+      expect(match?.type).toBe('username')
+    })
+
+    it('label "ログイン" alone classifies as username', () => {
+      const match = bestMatch(signals({ labelText: 'ログイン', urlPath: '/login' }))
+      expect(match?.type).toBe('username')
+    })
+
+    it('label "パスワード" classifies as password even without type=password', () => {
+      const match = bestMatch(signals({ inputType: 'text', labelText: 'パスワード' }))
+      expect(match?.type).toBe('password')
+    })
+
+    it('placeholder "パスワード" classifies as password', () => {
+      const match = bestMatch(signals({ inputType: 'text', textSignals: 'パスワード' }))
+      expect(match?.type).toBe('password')
+    })
+
+    it('label "メールアドレス" classifies as username', () => {
+      const match = bestMatch(signals({ labelText: 'メールアドレス' }))
+      expect(match?.type).toBe('username')
+    })
+
+    it('label "新しいパスワード" classifies as new_password', () => {
+      const match = bestMatch(signals({ labelText: '新しいパスワード' }))
+      expect(match?.type).toBe('new_password')
+    })
+
+    it('label "認証コード" classifies as totp', () => {
+      const match = bestMatch(signals({ labelText: '認証コード' }))
+      expect(match?.type).toBe('totp')
+    })
+
+    it('label "カード番号" classifies as cc_number', () => {
+      const match = bestMatch(signals({ labelText: 'カード番号' }))
+      expect(match?.type).toBe('cc_number')
+    })
+
+    it('label "セキュリティコード" classifies as cc_cvc', () => {
+      const match = bestMatch(signals({ labelText: 'セキュリティコード' }))
+      expect(match?.type).toBe('cc_cvc')
+    })
+  })
+
+  describe('furusato-tax.jp reproduction', () => {
+    it('login id field (choice_id + login-id + ログインID label) is classified as username', () => {
+      const match = bestMatch(
+        signals({
+          inputType: 'text',
+          name: 'choice_id',
+          id: 'login-id',
+          labelText: 'ログインID',
+          urlPath: '/login',
+        }),
+      )
+      expect(match?.type).toBe('username')
+      // id pattern (6) + japanese label (4) + url (2) = 12
+      expect(match?.score).toBeGreaterThanOrEqual(4)
+    })
+
+    it('password field (type=password + パスワード label) is classified as password', () => {
+      const match = bestMatch(
+        signals({
+          inputType: 'password',
+          name: 'password',
+          labelText: 'パスワード',
+          urlPath: '/login',
+        }),
+      )
+      expect(match?.type).toBe('password')
     })
   })
 })
