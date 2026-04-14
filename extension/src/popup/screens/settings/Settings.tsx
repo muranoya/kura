@@ -1,7 +1,9 @@
-import { Check, Code2, Copy, Download, ExternalLink, Tags, Trash2 } from 'lucide-react'
+import { Check, Code2, Copy, Download, ExternalLink, Send, Tags, Trash2 } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DEFAULT_SETTINGS } from '../../../shared/constants'
+import { sendMessage } from '../../../shared/messages'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { PageHeader } from '../../components/layout/PageHeader'
@@ -79,6 +81,14 @@ export default function Settings() {
   // Export
   const [exportConfirmOpen, setExportConfirmOpen] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
+
+  // Transfer Config Dialog
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false)
+  const [transferPassword, setTransferPassword] = useState('')
+  const [transferString, setTransferString] = useState('')
+  const [transferLoading, setTransferLoading] = useState(false)
+  const [transferError, setTransferError] = useState('')
+  const [transferCopied, setTransferCopied] = useState(false)
 
   const handleExport = async () => {
     setExportConfirmOpen(false)
@@ -260,6 +270,42 @@ export default function Settings() {
     }
   }
 
+  const handleGenerateTransferConfig = async () => {
+    if (!storageConfig || !transferPassword) return
+    setTransferLoading(true)
+    setTransferError('')
+    try {
+      const response = await sendMessage({
+        type: 'ENCRYPT_TRANSFER_CONFIG',
+        password: transferPassword,
+        configJson: JSON.stringify(storageConfig),
+      })
+      if (!response.success) {
+        const msg = 'error' in response ? response.error : '転送コードの生成に失敗しました'
+        throw new Error(msg)
+      }
+      if (!('transferString' in response) || !response.transferString) {
+        throw new Error('転送コードが空です')
+      }
+      setTransferString(response.transferString)
+    } catch (err) {
+      setTransferError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setTransferLoading(false)
+    }
+  }
+
+  const copyTransferString = async () => {
+    if (!transferString) return
+    try {
+      await copySensitive(transferString)
+      setTransferCopied(true)
+      setTimeout(() => setTransferCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+
   return (
     <div className="h-full overflow-y-auto">
       <PageHeader title="設定" showBackButton={false} />
@@ -414,6 +460,15 @@ export default function Settings() {
                   </p>
                 </div>
               )}
+              <Button
+                variant="secondary"
+                onClick={() => setTransferDialogOpen(true)}
+                className="w-full text-sm justify-start gap-2"
+                size="sm"
+              >
+                <Send size={14} />
+                設定を別端末に転送
+              </Button>
             </div>
           ) : (
             <p className="text-text-muted text-sm">ストレージ設定が見つかりません</p>
@@ -704,6 +759,110 @@ export default function Settings() {
             <Button onClick={() => setRecoveryKeyDisplayOpen(false)} size="sm" className="text-sm">
               保管しました
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 設定転送ダイアログ */}
+      <Dialog
+        open={transferDialogOpen}
+        onOpenChange={(open) => {
+          setTransferDialogOpen(open)
+          if (!open) {
+            setTransferPassword('')
+            setTransferString('')
+            setTransferError('')
+            setTransferCopied(false)
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-sm">設定を別端末に転送</DialogTitle>
+            <DialogDescription className="text-sm">
+              転送パスワードで暗号化した転送コードを生成します。別端末のセットアップ時にこのコードと転送パスワードを入力してください。マスターパスワードとは異なるものを推奨します。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 min-h-0 -mx-1 px-1 py-1">
+            {transferString ? (
+              <div className="space-y-3">
+                <div className="flex justify-center p-3 bg-white rounded">
+                  <QRCodeSVG value={transferString} size={180} />
+                </div>
+                <div className="bg-bg-elevated p-2 rounded font-mono text-xs break-all max-h-24 overflow-y-auto select-all border border-border">
+                  {transferString}
+                </div>
+                <Button
+                  variant="secondary"
+                  onClick={copyTransferString}
+                  className="w-full text-sm"
+                  size="sm"
+                >
+                  {transferCopied ? (
+                    <>
+                      <Check size={12} className="mr-1" /> コピーしました
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={12} className="mr-1" /> 転送コードをコピー
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label htmlFor="transfer-password" className="text-sm">
+                    転送パスワード
+                  </Label>
+                  <PasswordInput
+                    id="transfer-password"
+                    value={transferPassword}
+                    onChange={(e) => setTransferPassword(e.target.value)}
+                    disabled={transferLoading}
+                    placeholder="受信側に共有するパスワード"
+                    className="text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && transferPassword && !transferLoading) {
+                        handleGenerateTransferConfig()
+                      }
+                    }}
+                  />
+                </div>
+                {transferError && (
+                  <div className="text-sm text-danger bg-danger/10 px-2 py-1.5 rounded">
+                    {transferError}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            {!transferString ? (
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={() => setTransferDialogOpen(false)}
+                  disabled={transferLoading}
+                  size="sm"
+                  className="text-sm"
+                >
+                  キャンセル
+                </Button>
+                <Button
+                  onClick={handleGenerateTransferConfig}
+                  disabled={transferLoading || !transferPassword}
+                  size="sm"
+                  className="text-sm"
+                >
+                  {transferLoading ? '生成中...' : '転送コードを生成'}
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => setTransferDialogOpen(false)} size="sm" className="text-sm">
+                閉じる
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
