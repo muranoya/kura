@@ -78,56 +78,69 @@ interface SignalDef {
   labelPatterns: RegExp[]
 }
 
+// Label patterns are split into ASCII (\b word-boundary protected) and
+// Japanese (no-boundary) sets. JavaScript's \b only recognizes ASCII word
+// boundaries; CJK characters are all \W, so /\bログイン\b/ never matches.
 const SIGNAL_DEFS: Record<FieldType, SignalDef> = {
   username: {
     autocomplete: ['username'],
     typeHints: ['email', 'tel'],
     nameIdPatterns: [/^(user|email|login|account|phone|id)/i],
     labelPatterns: [
-      /\b(user\s?name|email|log\s?in|account|ユーザー|メール|アカウント|ログイン)\b/i,
+      /\b(user\s?name|email|log\s?in|account)\b/i,
+      /(ユーザー名?|メール(?:アドレス)?|アカウント|ログイン(?:ID)?)/,
     ],
   },
   password: {
     autocomplete: ['current-password'],
     typeHints: ['password'],
     nameIdPatterns: [/^(pass|pwd|senha|contrase)/i],
-    labelPatterns: [/\b(password|パスワード)\b/i],
+    // The Japanese pattern must not match "新しいパスワード" / "パスワード確認" /
+    // "パスワード（確認）" — those belong to new_password. Excluded via
+    // lookbehind/lookahead.
+    labelPatterns: [/\bpassword\b/i, /(?<!新しい)パスワード(?!\s*(?:確認|（確認）|\(確認\)))/],
   },
   new_password: {
     autocomplete: ['new-password'],
     typeHints: ['password'],
     nameIdPatterns: [/^(new.?pass|confirm.?pass)/i],
-    labelPatterns: [/\b(new\s*password|confirm\s*password|新しいパスワード|パスワード確認)\b/i],
+    labelPatterns: [
+      /\b(new\s*password|confirm\s*password)\b/i,
+      /(新しいパスワード|パスワード\s*\(?\s*確認\s*\)?|パスワード（確認）)/,
+    ],
   },
   totp: {
     autocomplete: ['one-time-code'],
     typeHints: ['number', 'tel'],
     nameIdPatterns: [/^(otp|totp|code|token|verify|mfa|2fa)/i],
-    labelPatterns: [/\b(otp|verification\s*code|認証コード|確認コード)\b/i],
+    labelPatterns: [
+      /\b(otp|verification\s*code)\b/i,
+      /(認証コード|確認コード|ワンタイムパスワード)/,
+    ],
   },
   cc_number: {
     autocomplete: ['cc-number'],
     typeHints: [],
     nameIdPatterns: [/^(card.?num|cc.?num|credit)/i],
-    labelPatterns: [/\b(card\s*number|カード番号)\b/i],
+    labelPatterns: [/\b(card\s*number)\b/i, /カード番号/],
   },
   cc_exp: {
     autocomplete: ['cc-exp', 'cc-exp-month', 'cc-exp-year'],
     typeHints: [],
     nameIdPatterns: [/^(exp|valid)/i],
-    labelPatterns: [/\b(expir|有効期限)\b/i],
+    labelPatterns: [/\bexpir/i, /有効期限/],
   },
   cc_cvc: {
     autocomplete: ['cc-csc', 'cc-cvc', 'cc-cvv'],
     typeHints: [],
     nameIdPatterns: [/^(cvc|cvv|csc|security.?code)/i],
-    labelPatterns: [/\b(cvc|cvv|security\s*code|セキュリティコード)\b/i],
+    labelPatterns: [/\b(cvc|cvv|security\s*code)\b/i, /セキュリティコード/],
   },
   cc_name: {
     autocomplete: ['cc-name'],
     typeHints: [],
     nameIdPatterns: [/^(card.?holder|cc.?name)/i],
-    labelPatterns: [/\b(card\s*holder|name\s*on\s*card|カード名義)\b/i],
+    labelPatterns: [/\b(card\s*holder|name\s*on\s*card)\b/i, /カード名義/],
   },
 }
 
@@ -175,7 +188,8 @@ function getTextSignals(input: HTMLInputElement): string {
 export interface FieldSignals {
   autocomplete: string
   inputType: string
-  nameId: string
+  name: string
+  id: string
   textSignals: string
   labelText: string
   urlPath: string
@@ -197,12 +211,15 @@ export function computeScores(signals: FieldSignals): Map<FieldType, number> {
       score += WEIGHT_TYPE
     }
 
-    // 3. name/id patterns (weight: 6)
-    for (const pattern of def.nameIdPatterns) {
-      if (pattern.test(signals.nameId)) {
-        score += WEIGHT_NAME_ID
-        break
-      }
+    // 3. name/id patterns (weight: 6) — name and id are tested independently
+    // so that a match on either scores. Joining them with a space would let
+    // a non-matching name hide a matching id from the leading-anchor regex.
+    const nameIdHit = def.nameIdPatterns.some(
+      (pattern) =>
+        (signals.name && pattern.test(signals.name)) || (signals.id && pattern.test(signals.id)),
+    )
+    if (nameIdHit) {
+      score += WEIGHT_NAME_ID
     }
 
     // 4. aria-label / placeholder / title (weight: 4)
@@ -241,7 +258,8 @@ function scoreField(input: HTMLInputElement): Map<FieldType, number> {
   return computeScores({
     autocomplete: getAutocompleteValue(input),
     inputType: input.type.toLowerCase(),
-    nameId: `${input.name} ${input.id}`.toLowerCase(),
+    name: (input.name || '').toLowerCase(),
+    id: (input.id || '').toLowerCase(),
     textSignals: getTextSignals(input),
     labelText: getAssociatedLabelText(input),
     urlPath: window.location.pathname.toLowerCase(),

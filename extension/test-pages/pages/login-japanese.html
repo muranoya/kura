@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Japanese Login - Autofill Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.25rem; }
+    nav { margin-bottom: 24px; }
+    nav a { color: #2563eb; }
+    .frm-parts__label { display: block; margin-bottom: 16px; }
+    .frm-parts__title { margin-bottom: 4px; font-weight: 500; }
+    input[type="text"], input[type="password"] { display: block; width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    #result { margin-top: 24px; padding: 12px; background: #f3f4f6; border-radius: 4px; white-space: pre-wrap; display: none; }
+    .expected { margin: 24px 0; padding: 12px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.9rem; }
+    .expected summary { font-weight: 600; cursor: pointer; }
+    .expected ul { margin: 8px 0 0; padding-left: 20px; }
+    .expected li { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <nav><a href="/">&larr; Test Pages Index</a></nav>
+  <h1>日本語ラベル・非標準nameのログインフォーム</h1>
+  <p>ふるさとチョイス（furusato-tax.jp）の login フォーム構造を再現したテストページ。日本語ラベル・空 autocomplete・非標準 name 属性を持つ。</p>
+
+  <details class="expected" open>
+    <summary>Expected Behavior</summary>
+    <ul>
+      <li>Form type: <code>LOGIN</code></li>
+      <li>ログインIDフィールドにフォーカス → 候補ドロップダウンが出る（id=<code>login-id</code> が <code>^login</code> にマッチ + 親ラベル「ログインID」で日本語マッチ）</li>
+      <li>パスワードフィールドにフォーカス → 候補ドロップダウンが出る（<code>type="password"</code> で検出）</li>
+      <li>候補を選択 → 両フィールドがフィルされる</li>
+    </ul>
+  </details>
+
+  <form id="login-form" method="post" action="#">
+    <label class="frm-parts__label">
+      <div class="frm-parts__title">ログインID</div>
+      <input id="login-id" class="frm-input v-required v-login-id" type="text" name="choice_id" value="">
+    </label>
+    <label class="frm-parts__label">
+      <div class="frm-parts__title">パスワード</div>
+      <input class="frm-pass__input v-required v-password" type="password" name="password">
+    </label>
+    <button type="submit">ログイン</button>
+  </form>
+
+  <pre id="result"></pre>
+
+  <script>
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const username = document.getElementById('login-id').value;
+      const password = document.querySelector('input[name="password"]').value;
+      const result = document.getElementById('result');
+      result.style.display = 'block';
+      result.textContent = 'Submitted:\n  username: ' + username + '\n  password: ' + password;
+    });
+  </script>
+</body>
+</html>

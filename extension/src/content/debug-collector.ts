@@ -123,7 +123,8 @@ function collectHeuristicFormReports(): DevModeFormReport[] {
     const signals: FieldSignals = {
       autocomplete: (input.getAttribute('autocomplete') || '').trim().toLowerCase(),
       inputType: input.type.toLowerCase(),
-      nameId: `${input.name} ${input.id}`.toLowerCase(),
+      name: (input.name || '').toLowerCase(),
+      id: (input.id || '').toLowerCase(),
       textSignals: [
         input.getAttribute('aria-label') || '',
         input.getAttribute('placeholder') || '',
