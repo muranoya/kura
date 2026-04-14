@@ -29,6 +29,7 @@
     "class-variance-authority": "^0.7",
     "clsx": "^2",
     "lucide-react": "^1",
+    "qrcode.react": "^4",
     "react": "^19",
     "react-dom": "^19",
     "react-markdown": "^10",
