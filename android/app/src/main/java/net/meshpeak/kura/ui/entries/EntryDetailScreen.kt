@@ -85,7 +85,7 @@ fun EntryDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(entry?.name ?: "") },
+                title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
