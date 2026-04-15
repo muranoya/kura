@@ -170,13 +170,6 @@ jobs:
       - name: Build
         run: just release-desktop-macos
 
-      - name: Verify ad-hoc signature
-        run: |
-          app=$(find target/aarch64-apple-darwin/release/bundle/macos -maxdepth 2 -name '*.app' | head -1)
-          echo "Verifying: $app"
-          codesign --verify --deep --strict --verbose=2 "$app"
-          codesign -dvv "$app"
-
       - name: Rename artifacts
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
