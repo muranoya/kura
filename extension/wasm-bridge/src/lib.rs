@@ -275,6 +275,11 @@ pub fn api_set_entry_labels(
 // ============================================================================
 
 #[wasm_bindgen]
+pub fn api_verify_password(vault_id: String, password: String) -> Result<(), JsValue> {
+    with_manager(&vault_id, |m| m.api_verify_password(password)).map_err(to_js_err)
+}
+
+#[wasm_bindgen]
 pub fn api_change_master_password(
     vault_id: String,
     old_password: String,

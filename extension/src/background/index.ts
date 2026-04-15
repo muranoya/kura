@@ -83,6 +83,7 @@ interface WasmApi {
   api_generate_totp_default(secret: string): string
   api_generate_totp_from_value(value: string): string
   api_parse_totp_period(value: string): number
+  api_verify_password(vaultId: string, password: string): void
   api_change_master_password(vaultId: string, oldPassword: string, newPassword: string): void
   api_rotate_dek(vaultId: string, password: string): string
   api_regenerate_recovery_key(vaultId: string, password: string): string
@@ -1138,6 +1139,20 @@ async function handleMessage(
               chrome.alarms.clear('autolock')
             }
           }
+          sendResponse({ success: true })
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      case 'VERIFY_PASSWORD': {
+        if (!unlocked) {
+          sendResponse({ success: false, error: 'Vault not unlocked' })
+          break
+        }
+        try {
+          vault.api_verify_password(DEFAULT_VAULT_ID, message.password)
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })

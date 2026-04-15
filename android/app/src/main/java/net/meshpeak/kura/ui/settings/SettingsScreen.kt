@@ -47,7 +47,9 @@ fun SettingsScreen(
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showBiometricEnrollDialog by remember { mutableStateOf(false) }
     var showTransferDialog by remember { mutableStateOf(false) }
+    var showTransferPasswordConfirm by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var showExportPasswordConfirm by remember { mutableStateOf(false) }
     var exportJson by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
@@ -315,7 +317,7 @@ fun SettingsScreen(
             Text("データ", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(4.dp))
 
-            Card(onClick = { showExportDialog = true }, modifier = Modifier.fillMaxWidth()) {
+            Card(onClick = { showExportPasswordConfirm = true }, modifier = Modifier.fillMaxWidth()) {
                 ListItem(
                     headlineContent = { Text("Bitwarden形式でエクスポート") },
                     supportingContent = { Text("他のパスワードマネージャーへ移行するためにデータをエクスポート") },
@@ -332,7 +334,7 @@ fun SettingsScreen(
             Text("端末間転送", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(4.dp))
 
-            Card(onClick = { showTransferDialog = true }, modifier = Modifier.fillMaxWidth()) {
+            Card(onClick = { showTransferPasswordConfirm = true }, modifier = Modifier.fillMaxWidth()) {
                 ListItem(
                     headlineContent = { Text("設定を別端末に転送") },
                     supportingContent = { Text("S3設定を暗号化した転送コードを生成") },
@@ -509,6 +511,34 @@ fun SettingsScreen(
                 biometricPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
             },
             onDismiss = { showBiometricEnrollDialog = false }
+        )
+    }
+
+    // Export reauth dialog
+    if (showExportPasswordConfirm) {
+        SinglePasswordDialog(
+            title = "マスターパスワードの確認",
+            description = "機密情報を外部に書き出すため、マスターパスワードを再入力してください。",
+            onConfirm = { password ->
+                appViewModel.repository.verifyPassword(password)
+                showExportPasswordConfirm = false
+                showExportDialog = true
+            },
+            onDismiss = { showExportPasswordConfirm = false }
+        )
+    }
+
+    // Transfer reauth dialog
+    if (showTransferPasswordConfirm) {
+        SinglePasswordDialog(
+            title = "マスターパスワードの確認",
+            description = "機密情報を外部に書き出すため、マスターパスワードを再入力してください。",
+            onConfirm = { password ->
+                appViewModel.repository.verifyPassword(password)
+                showTransferPasswordConfirm = false
+                showTransferDialog = true
+            },
+            onDismiss = { showTransferPasswordConfirm = false }
         )
     }
 

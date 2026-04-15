@@ -165,6 +165,10 @@ export async function renameLabel(id: string, newName: string): Promise<void> {
 // Security
 // ============================================================================
 
+export async function verifyPassword(password: string): Promise<void> {
+  return invoke<void>('verify_password', { vaultId, password })
+}
+
 export async function changeMasterPassword(
   oldPassword: string,
   newPassword: string,
