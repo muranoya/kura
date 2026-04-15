@@ -97,6 +97,32 @@ describe('findMatchingPattern', () => {
   it('returns empty patterns array → null', () => {
     expect(findMatchingPattern([], 'example.com')).toBeNull()
   })
+
+  // このケースは本来ビルド時の重複検出でエラーになるべき組み合わせだが、
+  // ランタイムに重複パターンが到達した場合の First-Match-Wins 挙動を固定する。
+  it('returns the first pattern when duplicate (type, value) is present', () => {
+    const dupPatterns: SitePattern[] = [
+      { description: 'first', match: { type: 'domain', value: 'example.com' } },
+      { description: 'second', match: { type: 'domain', value: 'example.com' } },
+    ]
+    expect(findMatchingPattern(dupPatterns, 'example.com')?.description).toBe('first')
+  })
+
+  it('returns the first pattern when duplicate domain_suffix with same value is present', () => {
+    const dupPatterns: SitePattern[] = [
+      { description: 'first-suffix', match: { type: 'domain_suffix', value: 'example.com' } },
+      { description: 'second-suffix', match: { type: 'domain_suffix', value: 'example.com' } },
+    ]
+    expect(findMatchingPattern(dupPatterns, 'sub.example.com')?.description).toBe('first-suffix')
+  })
+
+  it('prefers domain over domain_suffix even when both have the same value', () => {
+    const mixedPatterns: SitePattern[] = [
+      { description: 'suffix-version', match: { type: 'domain_suffix', value: 'example.com' } },
+      { description: 'domain-version', match: { type: 'domain', value: 'example.com' } },
+    ]
+    expect(findMatchingPattern(mixedPatterns, 'example.com')?.description).toBe('domain-version')
+  })
 })
 
 // ========== evaluateCondition ==========

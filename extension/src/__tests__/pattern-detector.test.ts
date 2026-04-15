@@ -256,6 +256,40 @@ describe('detectFormByPattern', () => {
     passInput.remove()
   })
 
+  it('returns the first form when multiple forms all satisfy their conditions', async () => {
+    // 2つのformが両方とも、condition・全フィールド解決・focusedInput包含を満たす場合、
+    // 配列先頭のformが採用される（First-Match-Wins）ことを保証する。
+    const sharedInput = createInput({ id: 'shared-user' })
+    document.body.appendChild(sharedInput)
+
+    const pattern: SitePattern = {
+      description: 'Two matching forms',
+      match: { type: 'domain', value: 'example.com' },
+      forms: [
+        {
+          id: 'first-form',
+          type: 'login_username',
+          fields: {
+            username: { selector: '#shared-user' },
+          },
+        },
+        {
+          id: 'second-form',
+          type: 'login_password',
+          fields: {
+            password: { selector: '#shared-user' },
+          },
+        },
+      ],
+    }
+
+    const result = await detectFormByPattern(sharedInput, pattern)
+    expect(result).not.toBeNull()
+    expect(result?.form.formType).toBe('LOGIN_USERNAME')
+
+    sharedInput.remove()
+  })
+
   it('maps all form types correctly', async () => {
     const typeMap: Record<string, string> = {
       login: 'LOGIN',

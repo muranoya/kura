@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const SITES_DIR = resolve(import.meta.dirname, '../patterns/sites')
 const SCHEMA_PATH = resolve(import.meta.dirname, '../patterns/schema.json')
@@ -17,12 +18,12 @@ const VALID_FIELD_NAMES = new Set([
   'cc_name',
 ])
 
-interface ValidationError {
+export interface ValidationError {
   file: string
   message: string
 }
 
-function validate(data: unknown, file: string): ValidationError[] {
+export function validate(data: unknown, file: string): ValidationError[] {
   const errors: ValidationError[] = []
   const err = (msg: string) => errors.push({ file, message: msg })
 
@@ -66,12 +67,18 @@ function validate(data: unknown, file: string): ValidationError[] {
       return errors
     }
 
+    const seenFormIds = new Set<string>()
     for (let i = 0; i < obj.forms.length; i++) {
       const form = obj.forms[i] as Record<string, unknown>
       const prefix = `forms[${i}]`
 
       if (typeof form.id !== 'string' || !form.id) {
         err(`${prefix}.id is required`)
+      } else {
+        if (seenFormIds.has(form.id)) {
+          err(`${prefix}.id "${form.id}" is duplicated within the same pattern`)
+        }
+        seenFormIds.add(form.id)
       }
       if (!VALID_FORM_TYPES.includes(form.type as string)) {
         err(`${prefix}.type must be one of: ${VALID_FORM_TYPES.join(', ')}`)
@@ -149,6 +156,42 @@ function validate(data: unknown, file: string): ValidationError[] {
   return errors
 }
 
+export interface PatternFileEntry {
+  file: string
+  data: unknown
+}
+
+export function validateCrossFile(entries: PatternFileEntry[]): ValidationError[] {
+  const errors: ValidationError[] = []
+  const seen = new Map<string, string[]>()
+
+  for (const { file, data } of entries) {
+    if (typeof data !== 'object' || data === null) continue
+    const match = (data as Record<string, unknown>).match as Record<string, unknown> | undefined
+    if (!match) continue
+    const type = match.type
+    const value = match.value
+    if (typeof type !== 'string' || typeof value !== 'string') continue
+
+    const key = `${type}:${value.toLowerCase()}`
+    const files = seen.get(key) ?? []
+    files.push(file)
+    seen.set(key, files)
+  }
+
+  for (const [key, files] of seen) {
+    if (files.length > 1) {
+      const [type, value] = key.split(':', 2)
+      errors.push({
+        file: files.join(', '),
+        message: `Duplicate match rule: ${type}=${value} (defined in ${files.join(', ')})`,
+      })
+    }
+  }
+
+  return errors
+}
+
 function main() {
   console.log(`Schema: ${SCHEMA_PATH}`)
   console.log(`Sites directory: ${SITES_DIR}`)
@@ -163,6 +206,7 @@ function main() {
   console.log(`Found ${files.length} pattern file(s)`)
 
   const patterns: unknown[] = []
+  const validEntries: PatternFileEntry[] = []
   const allErrors: ValidationError[] = []
 
   for (const file of files) {
@@ -181,8 +225,11 @@ function main() {
       allErrors.push(...errors)
     } else {
       patterns.push(data)
+      validEntries.push({ file, data })
     }
   }
+
+  allErrors.push(...validateCrossFile(validEntries))
 
   if (allErrors.length > 0) {
     console.error('\nValidation errors:')
@@ -207,4 +254,6 @@ export const SITE_PATTERNS: SitePattern[] = ${JSON.stringify(patterns, null, 2)}
   console.log(`Generated ${OUTPUT_PATH} (${patterns.length} pattern(s))`)
 }
 
-main()
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  main()
+}

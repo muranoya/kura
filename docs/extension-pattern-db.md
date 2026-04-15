@@ -138,7 +138,14 @@ extension/patterns/
 
 **conditionの評価ロジック：** 指定された全条件をANDで評価する。`url_path`、`element_exists`、`element_not_exists` のいずれも省略可能で、省略された条件は常に真として扱う。全て省略した場合（`condition` 自体の省略を含む）はmatchさえすれば常に適用される。
 
-**複数フォームのマッチ：** `forms`配列内で複数のフォームがconditionを満たす場合、conditionを満たし且つ `fields` 内のセレクタが実際にDOMに存在する全フォームが適用される。
+**複数フォームのマッチ：** `forms` 配列は先頭から順に評価され、以下を全て満たした **最初の1つのform** が採用される（First-Match-Wins）。後続のformは評価されない。
+
+1. `condition`（`url_path`、`element_exists`、`element_not_exists`）が全て真
+2. `wait_for` のセレクタが指定時間内に出現
+3. `fields` の全セレクタがDOMに存在し、かつ可視である
+4. フォーカス中のinput要素が解決した `fields` のいずれかと一致する
+
+そのため、**より具体的な条件を持つformを配列の先頭に配置すること**。例えば `/login` 専用formと汎用formの両方を定義する場合、`/login` 用を先に書く。
 
 **matchタイプの説明：**
 
@@ -153,11 +160,16 @@ extension/patterns/
 
 ## 4. パターンの評価順序
 
-1. `domain`マッチ
-2. `domain_suffix`マッチ
-3. `default`（汎用ヒューリスティック）
+ホスト名に対してパターンを1つだけ選択する。評価順は以下:
 
-複数のパターンがマッチした場合、より具体的なパターンを優先する。
+1. `domain` マッチ（ホスト名の完全一致、大文字小文字を区別しない）
+2. `domain_suffix` マッチ（最長のサフィックスを持つパターンを優先）
+
+`domain` マッチが見つかった時点で `domain_suffix` は評価されない。いずれもマッチしない場合はパターンDBを使わず、汎用ヒューリスティックにフォールバックする（これはパターンDBの評価順ではなく、フォールバック動作）。
+
+**重複定義の扱い：** 同一の `(match.type, match.value)` を持つパターンが複数定義された場合は **ビルド時にエラー** として検出され、ビルドが失敗する。値の比較は大文字小文字を正規化した上で行う。異なる `type`（例: `domain` と `domain_suffix` の両方で `"example.com"`）は重複扱いにしない（`domain` が優先されるため挙動が定まる）。
+
+**サフィックスの入れ子：** `amazon.com` と `login.amazon.com` の両方を `domain_suffix` で定義することは正当で、より具体的な `login.amazon.com` が優先される。これは重複ではない。
 
 ## 5. ビルド時処理
 
