@@ -270,22 +270,13 @@ jobs:
       - name: Build
         run: just release-extension
 
-      - name: Sign Firefox extension (AMO)
+      - name: Sign or download Firefox extension (AMO)
         continue-on-error: true
         env:
           AMO_API_KEY: ${{ secrets.AMO_API_KEY }}
           AMO_API_SECRET: ${{ secrets.AMO_API_SECRET }}
-        run: |
-          if [ -z "$AMO_API_KEY" ] || [ -z "$AMO_API_SECRET" ]; then
-            echo "::warning::AMO credentials not configured. Skipping Firefox signing."
-            exit 0
-          fi
-          cd extension && pnpm web-ext sign \
-            --source-dir dist \
-            --channel unlisted \
-            --api-key "$AMO_API_KEY" \
-            --api-secret "$AMO_API_SECRET" \
-            --artifacts-dir .
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: cd extension && pnpm exec tsx scripts/sign-or-download-firefox.ts
 
       - name: Rename extension artifacts
         env:
