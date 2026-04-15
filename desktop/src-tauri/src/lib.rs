@@ -52,6 +52,7 @@ pub fn run() {
             commands::labels::rename_label,
             commands::labels::set_entry_labels,
             // Security
+            commands::security::verify_password,
             commands::security::change_master_password,
             commands::security::upgrade_argon2_params,
             commands::security::rotate_dek,

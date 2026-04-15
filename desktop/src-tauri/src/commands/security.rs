@@ -1,6 +1,14 @@
 use super::get_manager;
 
 #[tauri::command]
+pub async fn verify_password(vault_id: String, password: String) -> Result<(), String> {
+    let manager = get_manager(&vault_id);
+    tokio::task::spawn_blocking(move || manager.api_verify_password(password))
+        .await
+        .map_err(|e| format!("Task error: {}", e))?
+}
+
+#[tauri::command]
 pub async fn change_master_password(
     vault_id: String,
     old_password: String,

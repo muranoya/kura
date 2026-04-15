@@ -176,6 +176,41 @@ export default function Settings() {
   const [recoveryKeyDisplayValue, setRecoveryKeyDisplayValue] = useState('')
   const [recoveryKeyCopied, setRecoveryKeyCopied] = useState(false)
 
+  // 機密操作前のマスターパスワード再認証ダイアログ
+  const [reauthOpen, setReauthOpen] = useState(false)
+  const [reauthPassword, setReauthPassword] = useState('')
+  const [reauthLoading, setReauthLoading] = useState(false)
+  const [reauthError, setReauthError] = useState('')
+  const [reauthNext, setReauthNext] = useState<(() => void) | null>(null)
+
+  const openReauth = (next: () => void) => {
+    setReauthPassword('')
+    setReauthError('')
+    setReauthNext(() => next)
+    setReauthOpen(true)
+  }
+
+  const handleReauthConfirm = async () => {
+    if (!reauthPassword) {
+      setReauthError('マスターパスワードを入力してください')
+      return
+    }
+    setReauthLoading(true)
+    setReauthError('')
+    try {
+      await commands.verifyPassword(reauthPassword)
+      const next = reauthNext
+      setReauthOpen(false)
+      setReauthPassword('')
+      setReauthNext(null)
+      next?.()
+    } catch {
+      setReauthError('マスターパスワードが正しくありません')
+    } finally {
+      setReauthLoading(false)
+    }
+  }
+
   const handleLogoutConfirmed = async () => {
     try {
       // バックエンドのvaultセッションをロック
@@ -428,7 +463,7 @@ export default function Settings() {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => setExportConfirmOpen(true)}
+              onClick={() => openReauth(() => setExportConfirmOpen(true))}
               className="w-full"
               disabled={exportLoading}
             >
@@ -481,7 +516,7 @@ export default function Settings() {
                 )}
                 <Button
                   variant="secondary"
-                  onClick={() => setTransferDialogOpen(true)}
+                  onClick={() => openReauth(() => setTransferDialogOpen(true))}
                   className="w-full"
                 >
                   <Smartphone size={16} className="mr-2" />
@@ -791,6 +826,64 @@ export default function Settings() {
               </>
             )}
             {transferString && <Button onClick={() => setTransferDialogOpen(false)}>閉じる</Button>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* マスターパスワード再認証ダイアログ */}
+      <Dialog
+        open={reauthOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReauthOpen(false)
+            setReauthPassword('')
+            setReauthError('')
+            setReauthNext(null)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>マスターパスワードの確認</DialogTitle>
+            <DialogDescription>
+              機密情報を外部に書き出すため、マスターパスワードを再入力してください。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reauth-password" className="text-sm">
+                マスターパスワード
+              </Label>
+              <PasswordInput
+                id="reauth-password"
+                value={reauthPassword}
+                onChange={(e) => setReauthPassword(e.target.value)}
+                disabled={reauthLoading}
+                placeholder="マスターパスワード"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && reauthPassword) {
+                    handleReauthConfirm()
+                  }
+                }}
+              />
+            </div>
+            {reauthError && (
+              <div className="text-sm text-danger bg-danger/10 px-3 py-2 rounded">
+                {reauthError}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setReauthOpen(false)}
+              disabled={reauthLoading}
+            >
+              キャンセル
+            </Button>
+            <Button onClick={handleReauthConfirm} disabled={reauthLoading || !reauthPassword}>
+              {reauthLoading ? '確認中...' : '確認'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
