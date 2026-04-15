@@ -31,6 +31,7 @@ import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { LargeTextDialog } from '../../components/ui/large-text-dialog'
 import { markdownComponents } from '../../components/ui/markdown-components'
+import { useCurrentTabUrl } from '../../hooks/useCurrentTabUrl'
 import { copySensitive } from '../../lib/clipboard'
 
 const DEFAULT_SORT: SortConfig = { field: 'created_at', order: 'desc' }
@@ -230,6 +231,42 @@ export default function EntryList() {
     return entries.filter((e) => !selectedType || e.entryType === selectedType)
   }, [entries, selectedType])
 
+  // 現在タブのドメインに合致するアイテムを優先セクションに表示
+  const { url: currentTabUrl } = useCurrentTabUrl()
+  const [matchedIds, setMatchedIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (!currentTabUrl || entries.length === 0) {
+      setMatchedIds(new Set())
+      return
+    }
+    let cancelled = false
+    commands
+      .listEntryIdsForUrl(currentTabUrl)
+      .then((ids) => {
+        if (!cancelled) setMatchedIds(new Set(ids))
+      })
+      .catch(() => {
+        if (!cancelled) setMatchedIds(new Set())
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [currentTabUrl, entries])
+
+  const { matchedEntries, otherEntries } = useMemo(() => {
+    if (matchedIds.size === 0) {
+      return { matchedEntries: [], otherEntries: filteredEntries }
+    }
+    const matched: EntryRow[] = []
+    const other: EntryRow[] = []
+    for (const entry of filteredEntries) {
+      if (matchedIds.has(entry.id)) matched.push(entry)
+      else other.push(entry)
+    }
+    return { matchedEntries: matched, otherEntries: other }
+  }, [filteredEntries, matchedIds])
+
   const handleDelete = async (id: string) => {
     if (confirm('このエントリを削除しますか？')) {
       try {
@@ -340,7 +377,7 @@ export default function EntryList() {
             onLabelChange={handleLabelChange}
             sortConfig={sortConfig}
             onSortChange={handleSortChange}
-            entries={filteredEntries}
+            entries={otherEntries}
             loading={loading}
             error={error ?? ''}
             emptyTitle={onlyFavorites ? 'お気に入りがありません' : 'アイテムがありません'}
@@ -348,6 +385,11 @@ export default function EntryList() {
               onlyFavorites
                 ? 'お気に入りのアイテムをここに表示します'
                 : '新しいアイテムを作成してください'
+            }
+            prioritySection={
+              matchedEntries.length > 0
+                ? { label: 'このサイト', entries: matchedEntries }
+                : undefined
             }
             renderCard={(entry) => (
               <EntryCard

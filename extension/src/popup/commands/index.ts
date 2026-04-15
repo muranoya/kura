@@ -116,6 +116,12 @@ export async function setFavorite(id: string, isFavorite: boolean): Promise<void
   if (!res.success) throw new Error(field<'error', string>(res, 'error'))
 }
 
+export async function listEntryIdsForUrl(url: string): Promise<string[]> {
+  const res = await sendMessage({ type: 'LIST_ENTRY_IDS_FOR_URL', url })
+  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
+  return field<'entryIds', string[]>(res, 'entryIds') ?? []
+}
+
 // Trash
 export async function listTrash(filter?: EntryFilter): Promise<EntryRow[]> {
   const res = await sendMessage({ type: 'LIST_TRASH', filter: { ...filter, includeTrash: true } })

@@ -30,8 +30,25 @@ interface EntryListPanelProps {
   emptyTitle: string
   emptyDescription: string
 
+  // 優先表示セクション（現在タブのドメインに合致するアイテム等）
+  prioritySection?: {
+    label: string
+    entries: EntryRow[]
+  }
+
   // カードのレンダリング（差分部分のみ render prop）
   renderCard: (entry: EntryRow) => React.ReactNode
+}
+
+function SectionHeader({ label, count }: { label: string; count?: number }) {
+  return (
+    <div className="flex items-center gap-1.5 pt-2 pb-0.5 px-2">
+      <span className="text-[11px] font-medium text-text-secondary uppercase tracking-wider">
+        {count !== undefined ? `${label} (${count})` : label}
+      </span>
+      <div className="flex-1 border-t border-border" />
+    </div>
+  )
 }
 
 const SORT_OPTIONS: Array<{ value: string; label: string }> = [
@@ -69,6 +86,7 @@ export default function EntryListPanel({
   error,
   emptyTitle,
   emptyDescription,
+  prioritySection,
   renderCard,
 }: EntryListPanelProps) {
   const sortValue = `${sortConfig.field}:${sortConfig.order}`
@@ -138,16 +156,41 @@ export default function EntryListPanel({
           <div className="p-3">
             <EmptyState icon="⏳" title="読み込み中..." description="エントリを読み込んでいます" />
           </div>
-        ) : entries.length === 0 ? (
+        ) : !prioritySection?.entries.length && entries.length === 0 ? (
           <div className="p-3">
             <EmptyState icon="🔑" title={emptyTitle} description={emptyDescription} />
           </div>
         ) : (
-          <div className="divide-y divide-border">
-            {entries.map((entry) => (
-              <div key={entry.id}>{renderCard(entry)}</div>
-            ))}
-          </div>
+          <>
+            {prioritySection && prioritySection.entries.length > 0 && (
+              <>
+                <SectionHeader
+                  label={prioritySection.label}
+                  count={prioritySection.entries.length}
+                />
+                <div className="divide-y divide-border">
+                  {prioritySection.entries.map((entry) => (
+                    <div key={`priority-${entry.id}`}>{renderCard(entry)}</div>
+                  ))}
+                </div>
+                <SectionHeader label="すべてのアイテム" />
+              </>
+            )}
+            {entries.length > 0 ? (
+              <div className="divide-y divide-border">
+                {entries.map((entry) => (
+                  <div key={entry.id}>{renderCard(entry)}</div>
+                ))}
+              </div>
+            ) : (
+              prioritySection &&
+              prioritySection.entries.length > 0 && (
+                <div className="px-2 py-2 text-xs text-text-secondary italic">
+                  他のアイテムはありません
+                </div>
+              )
+            )}
+          </>
         )}
       </div>
     </div>
