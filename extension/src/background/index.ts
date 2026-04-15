@@ -13,6 +13,7 @@ import {
 import type { S3Config } from '../shared/types'
 import {
   cleanupPendingFlow,
+  getMatchedEntryIdsForUrl,
   handleAutofillMessage,
   initAutofill,
   onVaultLocked,
@@ -800,6 +801,20 @@ async function handleMessage(
           await saveLocally()
           autoSync().catch((e) => console.error('[SW] Sync failed:', e))
           sendResponse({ success: true })
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      case 'LIST_ENTRY_IDS_FOR_URL': {
+        if (!unlocked) {
+          sendResponse({ success: true, entryIds: [] })
+          break
+        }
+        try {
+          const entryIds = getMatchedEntryIdsForUrl(message.url)
+          sendResponse({ success: true, entryIds })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }

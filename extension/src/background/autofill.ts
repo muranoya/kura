@@ -134,6 +134,15 @@ function getCredentialsForUrl(
   return candidates
 }
 
+/**
+ * Return the entry IDs of login entries whose URL matches the given page URL.
+ * Uses the same eTLD+1 matching as getCredentialsForUrl. Popup uses this to
+ * build the "this site" priority section in the entry list.
+ */
+export function getMatchedEntryIdsForUrl(url: string): string[] {
+  return getCredentialsForUrl(url).map((c) => c.entryId)
+}
+
 function getFillData(entryId: string): AutofillFillData | null {
   if (!vaultApi || !isUnlocked()) return null
 

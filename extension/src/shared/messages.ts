@@ -43,6 +43,7 @@ export type Message =
   | { type: 'RESTORE_ENTRY'; id: string }
   | { type: 'PURGE_ENTRY'; id: string }
   | { type: 'SET_FAVORITE'; id: string; isFavorite: boolean }
+  | { type: 'LIST_ENTRY_IDS_FOR_URL'; url: string }
 
   // Trash
   | { type: 'LIST_TRASH'; filter: EntryFilter }
@@ -130,6 +131,7 @@ export type MessageResponse =
       entry?: EntryRow | null
       entries?: EntryRow[]
       entryId?: string
+      entryIds?: string[]
     })
 
   // Label responses
