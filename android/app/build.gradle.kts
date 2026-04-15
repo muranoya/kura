@@ -116,6 +116,10 @@ dependencies {
 
     // Biometric
     implementation("androidx.biometric:biometric:1.1.0")
+    // Fragment: biometric 1.1.0 が引き込む古い 1.2.4 では FragmentActivity が
+    // startActivityForResult の requestCode を 16bit に制限しており、
+    // ActivityResultRegistry と併用すると IllegalArgumentException となる。
+    implementation("androidx.fragment:fragment:1.6.2")
 
     // Markdown
     implementation("org.commonmark:commonmark:0.24.0")
