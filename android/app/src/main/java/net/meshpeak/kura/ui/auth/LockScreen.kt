@@ -15,11 +15,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import net.meshpeak.kura.R
 import net.meshpeak.kura.ui.components.ConfirmDialog
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.flow.first
@@ -55,9 +57,9 @@ fun LockScreen(
             try {
                 val cipher = biometricHelper.getDecryptCipher()
                 val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                    .setTitle("kura")
-                    .setSubtitle("生体認証でアンロック")
-                    .setNegativeButtonText("パスワードを使用")
+                    .setTitle(context.getString(R.string.app_name))
+                    .setSubtitle(context.getString(R.string.lock_biometric_prompt))
+                    .setNegativeButtonText(context.getString(R.string.lock_use_password))
                     .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
                     .build()
 
@@ -74,7 +76,7 @@ fun LockScreen(
                                     appViewModel.repository.unlock(masterPassword)
                                     onUnlocked()
                                 } catch (e: Exception) {
-                                    error = "アンロックに失敗しました"
+                                    error = context.getString(R.string.lock_unlock_failed)
                                 } finally {
                                     isLoading = false
                                 }
@@ -85,7 +87,7 @@ fun LockScreen(
                             if (errorCode == BiometricPrompt.ERROR_LOCKOUT ||
                                 errorCode == BiometricPrompt.ERROR_LOCKOUT_PERMANENT
                             ) {
-                                error = "生体認証がロックされました。しばらくしてからお試しください"
+                                error = context.getString(R.string.lock_biometric_locked)
                             }
                             // ERROR_NEGATIVE_BUTTON / ERROR_USER_CANCELED: パスワード入力にフォールバック
                         }
@@ -95,7 +97,7 @@ fun LockScreen(
             } catch (_: KeyPermanentlyInvalidatedException) {
                 biometricHelper.clearAll()
                 scope.launch { appViewModel.preferences.setBiometricEnabled(false) }
-                Toast.makeText(context, "生体認証が無効になりました。設定から再度有効にしてください", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, context.getString(R.string.lock_biometric_disabled), Toast.LENGTH_LONG).show()
             } catch (_: Exception) {
                 // キーやデータの不整合: フォールバック
             }
@@ -124,9 +126,9 @@ fun LockScreen(
             tint = MaterialTheme.colorScheme.primary
         )
         Spacer(modifier = Modifier.height(16.dp))
-        Text("kura", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+        Text(stringResource(R.string.lock_title), style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(8.dp))
-        Text("ロック中", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.lock_subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.height(32.dp))
 
         if (error.isNotEmpty()) {
@@ -139,7 +141,7 @@ fun LockScreen(
         OutlinedTextField(
             value = password,
             onValueChange = { password = it; error = "" },
-            label = { Text("マスターパスワード") },
+            label = { Text(stringResource(R.string.lock_password_label)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -153,14 +155,14 @@ fun LockScreen(
 
         Button(
             onClick = {
-                if (password.isBlank()) { error = "パスワードを入力してください"; return@Button }
+                if (password.isBlank()) { error = context.getString(R.string.lock_password_required); return@Button }
                 scope.launch {
                     isLoading = true
                     try {
                         appViewModel.repository.unlock(password)
                         onUnlocked()
                     } catch (e: Exception) {
-                        error = "アンロックに失敗しました"
+                        error = context.getString(R.string.lock_unlock_failed)
                     } finally { isLoading = false }
                 }
             },
@@ -168,7 +170,7 @@ fun LockScreen(
             enabled = !isLoading
         ) {
             if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-            else Text("アンロック")
+            else Text(stringResource(R.string.action_unlock))
         }
 
         if (biometricAvailable) {
@@ -180,24 +182,24 @@ fun LockScreen(
             ) {
                 Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("生体認証でアンロック")
+                Text(stringResource(R.string.lock_biometric_prompt))
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        TextButton(onClick = onRecovery) { Text("リカバリーキーでアンロック") }
+        TextButton(onClick = onRecovery) { Text(stringResource(R.string.lock_unlock_with_recovery)) }
 
         TextButton(onClick = { showLogoutDialog = true }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
-            Text("ログアウト")
+            Text(stringResource(R.string.action_logout))
         }
     }
 
     if (showLogoutDialog) {
         ConfirmDialog(
-            title = "ログアウト",
-            description = "ログアウトするとローカルキャッシュとS3設定がクリアされます。再度ログインには設定の再入力が必要になります。",
-            confirmText = "ログアウト",
+            title = stringResource(R.string.lock_logout_confirm_title),
+            description = stringResource(R.string.lock_logout_confirm_description),
+            confirmText = stringResource(R.string.action_logout),
             isDangerous = true,
             onConfirm = {
                 scope.launch {

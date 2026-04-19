@@ -1,0 +1,537 @@
+{
+  "common": {
+    "save": "保存",
+    "cancel": "キャンセル",
+    "delete": "削除",
+    "edit": "編集",
+    "create": "作成",
+    "close": "閉じる",
+    "confirm": "確認",
+    "back": "戻る",
+    "next": "次へ",
+    "copy": "コピー",
+    "copied": "コピーしました",
+    "loading": "読み込み中...",
+    "processing": "処理中...",
+    "saving": "保存中...",
+    "creating": "作成中...",
+    "deleting": "削除中...",
+    "search": "検索",
+    "clearSearch": "検索をクリア",
+    "preview": "プレビュー",
+    "newTag": "新規",
+    "unset": "未設定",
+    "yes": "はい",
+    "no": "いいえ",
+    "value": "値",
+    "fieldName": "フィールド名"
+  },
+  "app": {
+    "name": "kura",
+    "loading": "読み込み中...",
+    "syncFailed": "同期に失敗しました"
+  },
+  "sidebar": {
+    "brand": "kura",
+    "tagline": "パスワードマネージャー",
+    "allItems": "全てのアイテム",
+    "favorites": "お気に入り",
+    "labels": "ラベル",
+    "passwordGenerator": "パスワード生成",
+    "trash": "ゴミ箱",
+    "settings": "設定"
+  },
+  "entryTypes": {
+    "login": "ログイン",
+    "bank": "銀行口座",
+    "ssh_key": "SSHキー",
+    "secure_note": "セキュアノート",
+    "credit_card": "クレジットカード",
+    "password": "パスワード",
+    "software_license": "ソフトウェアライセンス"
+  },
+  "fields": {
+    "username": "ユーザー名",
+    "password": "パスワード",
+    "url": "URL",
+    "bank_name": "銀行名",
+    "branch_code": "支店コード",
+    "account_type": "口座種別",
+    "account_holder": "口座名義",
+    "account_number": "口座番号",
+    "pin": "PIN",
+    "private_key": "秘密鍵",
+    "content": "内容",
+    "cardholder": "カード名義",
+    "number": "カード番号",
+    "expiry": "有効期限",
+    "cvv": "CVV",
+    "cc_pin": "暗証番号",
+    "license_key": "ライセンスキー"
+  },
+  "fieldPlaceholders": {
+    "url": "https://example.com",
+    "account_type": "普通 / 当座 / 貯蓄",
+    "number": "1234 5678 9012 3456",
+    "expiry": "MM/YY",
+    "cvv": "123",
+    "totp": "otpauth:// URI または Base32 シークレット",
+    "name": "例: Gmail アカウント"
+  },
+  "sections": {
+    "login": "ログイン情報",
+    "bank": "銀行口座",
+    "credit_card": "クレジットカード",
+    "ssh_key": "SSH キー",
+    "secure_note": "ノート",
+    "password": "パスワード情報",
+    "software_license": "ライセンス情報",
+    "notes": "メモ"
+  },
+  "customFieldTypes": {
+    "text": "テキスト",
+    "password": "パスワード",
+    "email": "メール",
+    "url": "URL",
+    "phone": "電話番号",
+    "totp": "ワンタイムパスワード"
+  },
+  "filters": {
+    "all": "すべて",
+    "category": "カテゴリ",
+    "sortBy": "並び替え"
+  },
+  "sortOptions": {
+    "createdDesc": "作成日（新しい順）",
+    "createdAsc": "作成日（古い順）",
+    "updatedDesc": "更新日（新しい順）",
+    "updatedAsc": "更新日（古い順）",
+    "nameAsc": "名前（A → Z）",
+    "nameDesc": "名前（Z → A）"
+  },
+  "onboarding": {
+    "welcome": {
+      "tagline1": "サーバ不要、自分一人のための",
+      "tagline2": "パスワードマネージャー",
+      "termsLink": "利用規約",
+      "agreementSuffix": "に同意する",
+      "termsTitle": "利用規約",
+      "start": "始める",
+      "close": "閉じる"
+    },
+    "storageSetup": {
+      "title": "ストレージ設定",
+      "subtitle": "S3互換のクラウドストレージを設定します",
+      "transferShow": "別の端末から設定を転送",
+      "transferTitle": "別の端末から設定を転送",
+      "transferDescription": "設定済みの端末で生成した転送コードと転送パスワードを入力してください。",
+      "transferStringLabel": "転送コード",
+      "transferStringPlaceholder": "kura-config-v1$...",
+      "transferPasswordLabel": "転送パスワード",
+      "transferPasswordPlaceholder": "転送コード生成時に設定したパスワード",
+      "transferLoad": "設定を読み込む",
+      "regionLabel": "リージョン",
+      "regionPlaceholder": "例: ap-northeast-1",
+      "regionHelp": "AWS S3 のリージョンコードを入力してください",
+      "bucketLabel": "バケット",
+      "bucketPlaceholder": "例: my-vault",
+      "bucketHelp": "vaultファイルを保存するバケット名",
+      "keyLabel": "ファイルパス",
+      "keyPlaceholder": "vault.json",
+      "keyHelp": "バケット内の保存パス",
+      "accessKeyLabel": "アクセスキーID",
+      "accessKeyPlaceholder": "AKIA...",
+      "secretKeyLabel": "シークレットアクセスキー",
+      "secretKeyPlaceholder": "••••••••••••••••",
+      "endpointLabel": "エンドポイント (オプション)",
+      "endpointPlaceholder": "例: https://s3.example.com",
+      "endpointHelp": "自社ホストの S3 互換サーバーを使用する場合のみ入力",
+      "errorRequired": "すべての必須フィールドを入力してください",
+      "errorAccess": "ストレージへのアクセスに失敗しました: {{error}}",
+      "errorTransfer": "転送コードの復号に失敗しました: {{error}}"
+    },
+    "masterPassword": {
+      "title": "マスターパスワード設定",
+      "subtitle": "Vault全体を保護するパスワードを設定します",
+      "passwordLabel": "パスワード",
+      "passwordPlaceholder": "強力なパスワードを入力",
+      "passwordHelp": "8文字以上の強力なパスワードを設定してください",
+      "confirmLabel": "パスワード確認",
+      "confirmPlaceholder": "パスワードを再入力",
+      "matchOk": "パスワードが一致しています",
+      "errorRequired": "パスワードを入力してください",
+      "errorMismatch": "パスワードが一致しません",
+      "errorMinLength": "パスワードは8文字以上である必要があります",
+      "errorGeneric": "エラー: {{error}}",
+      "createVault": "Vaultを作成"
+    },
+    "recoveryKey": {
+      "title": "リカバリーキー",
+      "subtitle": "Vaultの復旧に必要です",
+      "cardTitle": "あなたのリカバリーキー",
+      "copyAction": "リカバリーキーをコピー",
+      "copied": "コピーしました",
+      "complete": "完了",
+      "errorGeneric": "エラー: {{error}}"
+    },
+    "unlockExisting": {
+      "title": "既存のVaultを使用",
+      "subtitle": "このストレージには既にVaultが存在しています",
+      "description": "このVaultを使用するためには、マスターパスワードを入力してください。",
+      "masterPasswordLabel": "マスターパスワード",
+      "passwordPlaceholder": "パスワードを入力",
+      "errorRequired": "パスワードを入力してください",
+      "errorWrongPassword": "パスワードが違います",
+      "useThis": "このVaultを使う"
+    }
+  },
+  "auth": {
+    "lock": {
+      "subtitle": "Vaultはロックされています",
+      "masterPasswordLabel": "マスターパスワード",
+      "passwordPlaceholder": "パスワードを入力",
+      "unlock": "ロック解除",
+      "unlocking": "ロック解除中...",
+      "recoveryAction": "リカバリーキーで復旧",
+      "logout": "ログアウト",
+      "errorRequired": "パスワードを入力してください",
+      "errorUnlock": "ロック解除失敗: {{error}}",
+      "errorLogout": "ログアウト失敗: {{error}}",
+      "logoutDialog": {
+        "title": "ログアウト",
+        "description": "設定とローカルキャッシュを削除し、初期設定から再開します。この操作は取り消せません。よろしいですか？",
+        "confirm": "ログアウト"
+      }
+    },
+    "recovery": {
+      "back": "戻る",
+      "title": "リカバリーキーで復旧",
+      "recoveryKeyLabel": "リカバリーキー",
+      "recoveryKeyPlaceholder": "リカバリーキーを入力",
+      "newPasswordLabel": "新しいパスワード",
+      "newPasswordPlaceholder": "新しいパスワード",
+      "confirmLabel": "パスワード確認",
+      "confirmPlaceholder": "パスワードを再入力",
+      "recover": "復旧",
+      "recovering": "復旧中...",
+      "errorRequired": "すべてのフィールドを入力してください",
+      "errorMismatch": "パスワードが一致しません",
+      "errorRecover": "復旧失敗: {{error}}"
+    }
+  },
+  "entries": {
+    "list": {
+      "title": "アイテム一覧",
+      "favoritesTitle": "お気に入り",
+      "create": "新規作成",
+      "selectPrompt": "アイテムを選択してください",
+      "emptyTitle": "アイテムがありません",
+      "emptyFavoritesTitle": "お気に入りがありません",
+      "emptyDescription": "新規作成ボタンからアイテムを追加してください",
+      "emptyFavoritesDescription": "お気に入りに登録したアイテムがここに表示されます",
+      "createFirst": "最初のアイテムを作成",
+      "errorLoad": "アイテム読み込み失敗: {{error}}",
+      "errorFavorite": "お気に入り変更失敗: {{error}}",
+      "errorDelete": "削除失敗: {{error}}",
+      "deleteDialog": {
+        "title": "アイテムを削除",
+        "description": "このアイテムをゴミ箱に移動します。後から復元できます。"
+      }
+    },
+    "create": {
+      "title": "新規アイテム",
+      "errorName": "名前を入力してください",
+      "errorCreate": "アイテム作成失敗: {{error}}",
+      "errorLabelLoad": "ラベル読み込み失敗:"
+    },
+    "edit": {
+      "title": "アイテム編集",
+      "notFound": "アイテムが見つかりません",
+      "errorLoad": "アイテム読み込み失敗: {{error}}",
+      "errorName": "名前を入力してください",
+      "errorSave": "保存失敗: {{error}}"
+    },
+    "trash": {
+      "title": "ゴミ箱",
+      "emptyTitle": "ゴミ箱が空です",
+      "emptyDescription": "削除済みエントリはありません",
+      "deletedAt": "削除日時:",
+      "restore": "復元",
+      "delete": "削除",
+      "errorLoad": "ゴミ箱読み込み失敗: {{error}}",
+      "errorRestore": "復元失敗: {{error}}",
+      "errorPurge": "完全削除失敗: {{error}}",
+      "purgeDialog": {
+        "title": "完全に削除",
+        "description": "このアイテムは完全に削除されます。この操作は取り消せません。"
+      }
+    },
+    "panel": {
+      "loadingTitle": "読み込み中...",
+      "loadingDescription": "エントリを読み込んでいます",
+      "searchPlaceholder": "名前、メモ、カスタムフィールド名で検索...",
+      "iconKey": "🔑",
+      "iconLoading": "⏳"
+    },
+    "detail": {
+      "favorite": "お気に入り",
+      "unfavorite": "お気に入り解除",
+      "edit": "編集",
+      "delete": "削除",
+      "updated": "更新:",
+      "created": "作成:"
+    },
+    "form": {
+      "passwordGenerate": "パスワード生成",
+      "secureNoteEdit": "編集",
+      "secureNotePreview": "プレビュー",
+      "addField": "フィールドを追加",
+      "selectFieldType": "フィールドの種類を選択",
+      "fieldNamePlaceholder": "フィールド名",
+      "valuePlaceholder": "値",
+      "notes": "メモ",
+      "notesPlaceholder": "メモを追加...",
+      "labels": "ラベル",
+      "noLabels": "ラベルがありません",
+      "newLabelPlaceholder": "ラベル名",
+      "newLabelButton": "新規",
+      "errorLabelCreate": "ラベル作成失敗:"
+    },
+    "typeSelectDialog": {
+      "title": "アイテム種別を選択",
+      "description": "作成するアイテムの種別を選んでください"
+    }
+  },
+  "labels": {
+    "title": "ラベル管理",
+    "newCardTitle": "新規ラベル",
+    "newPlaceholder": "ラベル名を入力",
+    "list": "ラベル一覧",
+    "loading": "読み込み中...",
+    "loadingDescription": "ラベルを読み込んでいます",
+    "emptyTitle": "ラベルがありません",
+    "emptyDescription": "最初のラベルを作成してください",
+    "renamePlaceholder": "ラベル名",
+    "errorRequired": "ラベル名を入力してください",
+    "errorCreate": "ラベル作成失敗: {{error}}",
+    "errorDelete": "ラベル削除失敗: {{error}}",
+    "errorUpdate": "ラベル更新失敗: {{error}}",
+    "errorLoad": "ラベル読み込み失敗: {{error}}",
+    "deleteDialog": {
+      "title": "ラベルを削除",
+      "description": "このラベルを削除します。エントリへの割り当てのみ削除され、エントリ自体は削除されません。"
+    }
+  },
+  "sync": {
+    "conflict": {
+      "title": "コンフリクト解決",
+      "description": "複数デバイスからの同時更新により、ローカルとクラウドストレージ間にコンフリクトが発生しました。以下から選択して解決してください。"
+    },
+    "header": {
+      "syncNow": "今すぐ同期",
+      "justNow": "たった今",
+      "minutesAgo": "{{count}}分前",
+      "hoursAgo": "{{count}}時間前",
+      "daysAgo": "{{count}}日前",
+      "syncFailed": "同期に失敗しました: {{error}}"
+    }
+  },
+  "passwordGenerator": {
+    "title": "パスワードジェネレータ",
+    "generated": "生成されたパスワード",
+    "settings": "設定",
+    "length": "長さ: {{length}}",
+    "charSettings": "文字種の設定",
+    "lowercase": "小文字 (a-z)",
+    "uppercase": "大文字 (A-Z)",
+    "numbers": "数字 (0-9)",
+    "symbols1": "記号 (!@#$%^&*-_.)",
+    "symbols2": "記号 (()[]{}+=~/)",
+    "symbols3": "記号 (`<>'\"\\|;,:)",
+    "regenerate": "再生成",
+    "use": "使用する",
+    "notGenerated": "パスワードをまだ生成していません"
+  },
+  "settings": {
+    "title": "設定",
+    "general": {
+      "title": "一般",
+      "language": "言語",
+      "languageDescription": "UI で使用する言語を選択します",
+      "languageSystem": "システム",
+      "languageJa": "日本語",
+      "languageEn": "English",
+      "autolock": "自動ロック",
+      "autolockDescription": "ウィンドウのフォーカスが外れてからの時間",
+      "clipboardClear": "クリップボード自動クリア",
+      "clipboardClearDescription": "コピー後の自動クリアまでの時間"
+    },
+    "autolockOptions": {
+      "disabled": "無効",
+      "minutes1": "1分",
+      "minutes3": "3分",
+      "minutes5": "5分",
+      "minutes10": "10分",
+      "minutes15": "15分",
+      "minutes30": "30分",
+      "minutes60": "60分"
+    },
+    "clipboardOptions": {
+      "disabled": "無効",
+      "seconds30": "30秒",
+      "minutes1": "1分",
+      "minutes2": "2分"
+    },
+    "security": {
+      "title": "セキュリティ",
+      "changePassword": "マスターパスワード変更",
+      "rotateDek": "DEK更新",
+      "regenerateRecovery": "リカバリーキー再生成",
+      "logout": "ログアウト"
+    },
+    "data": {
+      "title": "データ",
+      "import1pux": "1Passwordからインポート",
+      "exportBitwarden": "Bitwarden形式でエクスポート",
+      "exporting": "エクスポート中..."
+    },
+    "storage": {
+      "title": "ストレージ設定",
+      "loading": "読み込み中...",
+      "notFound": "ストレージ設定が見つかりません",
+      "bucket": "バケット",
+      "region": "リージョン",
+      "key": "ファイルパス",
+      "endpoint": "エンドポイント",
+      "transferToOther": "設定を別端末に転送"
+    },
+    "about": {
+      "title": "このアプリについて",
+      "version": "バージョン",
+      "repository": "リポジトリ"
+    },
+    "logoutDialog": {
+      "title": "ログアウト",
+      "description": "ログアウトするとローカルキャッシュとS3設定がクリアされます。再度ログインには設定の再入力が必要になります。",
+      "confirm": "ログアウト"
+    },
+    "changePasswordDialog": {
+      "title": "マスターパスワード変更",
+      "description": "新しいマスターパスワードを設定します。現在のパスワードで認証が必要です。 変更後、他のセットアップ済み端末では新しいマスターパスワードでの再ログインが必要になります。",
+      "oldPasswordLabel": "現在のパスワード",
+      "oldPasswordPlaceholder": "現在のパスワード",
+      "newPasswordLabel": "新しいパスワード",
+      "newPasswordPlaceholder": "新しいパスワード",
+      "confirmLabel": "新しいパスワード（確認）",
+      "confirmPlaceholder": "新しいパスワード（確認）",
+      "submit": "変更",
+      "submitting": "変更中...",
+      "errorRequired": "すべてのフィールドを入力してください",
+      "errorMismatch": "新しいパスワードが一致しません",
+      "errorSame": "新しいパスワードは現在のものと異なる必要があります",
+      "errorGeneric": "パスワード変更に失敗しました"
+    },
+    "rotateDekDialog": {
+      "title": "DEK更新",
+      "description": "データ暗号化キーを新しく生成します。マスターパスワードで認証が必要です。 同時にリカバリーキーも更新されます。",
+      "passwordLabel": "マスターパスワード",
+      "passwordPlaceholder": "マスターパスワード",
+      "submit": "更新",
+      "submitting": "更新中...",
+      "errorRequired": "パスワードを入力してください",
+      "errorGeneric": "DEK更新に失敗しました"
+    },
+    "regenerateRecoveryDialog": {
+      "title": "リカバリーキー再生成",
+      "description": "新しいリカバリーキーを生成します。マスターパスワードで認証が必要です。",
+      "passwordLabel": "マスターパスワード",
+      "passwordPlaceholder": "マスターパスワード",
+      "submit": "生成",
+      "submitting": "生成中...",
+      "errorRequired": "パスワードを入力してください",
+      "errorGeneric": "リカバリーキー再生成に失敗しました"
+    },
+    "exportDialog": {
+      "title": "データをエクスポート",
+      "description": "Bitwarden JSON形式でエクスポートします。エクスポートされたファイルにはパスワードが平文で含まれます。取り扱いにご注意ください。",
+      "confirm": "エクスポート",
+      "errorGeneric": "エクスポートに失敗しました: {{error}}"
+    },
+    "transferDialog": {
+      "title": "設定を別端末に転送",
+      "description": "転送パスワードで暗号化した転送コードを生成します。別の端末のセットアップ時にこのコードと転送パスワードを入力してください。",
+      "passwordLabel": "転送パスワード",
+      "passwordPlaceholder": "受信側に共有するパスワードを設定",
+      "generate": "転送コードを生成",
+      "generating": "生成中...",
+      "copyCode": "転送コードをコピー",
+      "copiedCode": "コピーしました",
+      "close": "閉じる",
+      "errorRequired": "パスワードを入力してください",
+      "errorMissing": "S3設定が見つかりません",
+      "errorGeneric": "転送コードの生成に失敗しました"
+    },
+    "reauthDialog": {
+      "title": "マスターパスワードの確認",
+      "description": "機密情報を外部に書き出すため、マスターパスワードを再入力してください。",
+      "passwordLabel": "マスターパスワード",
+      "passwordPlaceholder": "マスターパスワード",
+      "submit": "確認",
+      "submitting": "確認中...",
+      "errorRequired": "マスターパスワードを入力してください",
+      "errorWrongPassword": "マスターパスワードが正しくありません"
+    },
+    "recoveryKeyDialog": {
+      "title": "新しいリカバリーキー",
+      "description": "新しいリカバリーキーが生成されました。安全な場所に保管してください。 マスターパスワードを忘れた場合に使用できます。",
+      "copy": "コピー",
+      "copied": "コピーしました",
+      "saved": "保管しました"
+    },
+    "errors": {
+      "saveSettings": "設定の保存に失敗しました: {{error}}",
+      "logout": "ログアウトに失敗しました: {{error}}"
+    }
+  },
+  "import1pux": {
+    "title": "1Passwordからインポート",
+    "description": "1Passwordからエクスポートした .1pux ファイルを選択してください。",
+    "selectFile": "ファイルを選択",
+    "parsing": "ファイルを解析中...",
+    "previewTitle": "インポートプレビュー",
+    "previewAccount": "アカウント: {{account}} · ",
+    "totalCount": "合計 {{count}} 件",
+    "noDuplicates": "重複なし {{count}} 件",
+    "duplicatesHigh": "重複(高) {{count}} 件",
+    "duplicatesMedium": "重複(中) {{count}} 件",
+    "duplicatesLow": "重複(低) {{count}} 件",
+    "archived": "アーカイブ済み {{count}} 件",
+    "attachmentWarnings": "添付ファイル警告 {{count}} 件",
+    "searchPlaceholder": "名前で検索...",
+    "bulkActions": "一括操作:",
+    "importAll": "全て取り込む",
+    "skipAll": "全てスキップ",
+    "importCount": "{{count}} 件をインポート",
+    "executingTitle": "インポート実行中",
+    "executingDescription": "エントリを作成しています...",
+    "resultTitle": "インポート完了",
+    "createdCount": "作成 {{count}} 件",
+    "overwrittenCount": "上書き {{count}} 件",
+    "skippedCount": "スキップ {{count}} 件",
+    "errorCount": "エラー {{count}} 件",
+    "labelsCreated": "新規作成ラベル: {{labels}}",
+    "itemArchived": "アーカイブ済み",
+    "duplicateRow": "重複: {{name}}",
+    "confidenceHigh": " (高)",
+    "confidenceMedium": " (中)",
+    "confidenceLow": " (低)",
+    "actions": {
+      "import": "取り込む",
+      "skip": "スキップ",
+      "overwrite": "上書き: {{name}}"
+    }
+  },
+  "totp": {
+    "loading": "読み込み中..."
+  }
+}

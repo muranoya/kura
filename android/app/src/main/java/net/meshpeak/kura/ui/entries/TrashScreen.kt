@@ -9,7 +9,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import net.meshpeak.kura.R
 import net.meshpeak.kura.data.model.EntryRow
 import net.meshpeak.kura.ui.components.ConfirmDialog
 import net.meshpeak.kura.ui.components.EntryCard
@@ -44,10 +46,10 @@ fun TrashScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("ゴミ箱") },
+                title = { Text(stringResource(R.string.trash_title)) },
                 navigationIcon = {
                     IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Default.Menu, contentDescription = "メニュー")
+                        Icon(Icons.Default.Menu, contentDescription = stringResource(R.string.cd_menu))
                     }
                 }
             )
@@ -59,7 +61,7 @@ fun TrashScreen(
             }
         } else if (entries.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("ゴミ箱は空です", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.trash_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             LazyColumn(
@@ -90,9 +92,9 @@ fun TrashScreen(
 
     purgeTargetId?.let { targetId ->
         ConfirmDialog(
-            title = "完全削除",
-            description = "このアイテムを完全に削除しますか？この操作は取り消せません。",
-            confirmText = "完全削除",
+            title = stringResource(R.string.trash_purge_title),
+            description = stringResource(R.string.trash_purge_description),
+            confirmText = stringResource(R.string.action_purge_permanently),
             isDangerous = true,
             onConfirm = {
                 scope.launch {

@@ -7,8 +7,12 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import android.content.Context
 import androidx.lifecycle.viewmodel.compose.viewModel
+import net.meshpeak.kura.R
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
@@ -202,9 +206,9 @@ fun MainNavHost(appViewModel: AppViewModel) {
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("kura", style = MaterialTheme.typography.headlineSmall)
+                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall)
                     Text(
-                        "パスワードマネージャー",
+                        stringResource(R.string.app_subtitle),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -216,7 +220,7 @@ fun MainNavHost(appViewModel: AppViewModel) {
                 @Suppress("DEPRECATION")
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.List, contentDescription = null) },
-                    label = { Text("アイテム一覧") },
+                    label = { Text(stringResource(R.string.nav_entries)) },
                     selected = currentRoute == Routes.HOME,
                     onClick = {
                         scope.launch { drawerState.close() }
@@ -230,12 +234,15 @@ fun MainNavHost(appViewModel: AppViewModel) {
 
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
 
+                val navContext = LocalContext.current
+                val syncFailedMsg = stringResource(R.string.sync_failed)
+                val notSyncedLabel = stringResource(R.string.time_not_synced)
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Sync, contentDescription = null) },
-                    label = { Text("同期") },
+                    label = { Text(stringResource(R.string.nav_sync)) },
                     badge = {
                         Text(
-                            if (lastSyncTime != null) formatRelativeTime(lastSyncTime!!) else "未同期",
+                            if (lastSyncTime != null) formatRelativeTime(navContext, lastSyncTime!!) else notSyncedLabel,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -254,7 +261,7 @@ fun MainNavHost(appViewModel: AppViewModel) {
                                 if (newTs != null && newTs > 0) lastSyncTime = newTs
                                 syncDialogState = SyncDialogState.SUCCESS
                             } catch (e: Exception) {
-                                syncErrorMessage = e.localizedMessage ?: "同期に失敗しました"
+                                syncErrorMessage = e.localizedMessage ?: syncFailedMsg
                                 syncDialogState = SyncDialogState.ERROR
                             }
                         }
@@ -266,7 +273,7 @@ fun MainNavHost(appViewModel: AppViewModel) {
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
-                    label = { Text("パスワード生成") },
+                    label = { Text(stringResource(R.string.nav_password_generator)) },
                     selected = currentRoute == Routes.PASSWORD_GENERATOR,
                     onClick = {
                         scope.launch { drawerState.close() }
@@ -277,7 +284,7 @@ fun MainNavHost(appViewModel: AppViewModel) {
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null) },
-                    label = { Text("ラベル管理") },
+                    label = { Text(stringResource(R.string.nav_label_manager)) },
                     selected = currentRoute == Routes.LABEL_MANAGER,
                     onClick = {
                         scope.launch { drawerState.close() }
@@ -288,7 +295,7 @@ fun MainNavHost(appViewModel: AppViewModel) {
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                    label = { Text("ゴミ箱") },
+                    label = { Text(stringResource(R.string.nav_trash)) },
                     selected = currentRoute == Routes.TRASH,
                     onClick = {
                         scope.launch { drawerState.close() }
@@ -301,7 +308,7 @@ fun MainNavHost(appViewModel: AppViewModel) {
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                    label = { Text("設定") },
+                    label = { Text(stringResource(R.string.nav_settings)) },
                     selected = currentRoute == Routes.SETTINGS,
                     onClick = {
                         scope.launch { drawerState.close() }
@@ -424,13 +431,13 @@ fun MainNavHost(appViewModel: AppViewModel) {
     }
 }
 
-private fun formatRelativeTime(timestamp: Long): String {
+private fun formatRelativeTime(context: Context, timestamp: Long): String {
     val now = System.currentTimeMillis() / 1000
     val diff = now - timestamp
     return when {
-        diff < 60 -> "たった今"
-        diff < 3600 -> "${diff / 60}分前"
-        diff < 86400 -> "${diff / 3600}時間前"
-        else -> "${diff / 86400}日前"
+        diff < 60 -> context.getString(R.string.time_just_now)
+        diff < 3600 -> context.getString(R.string.time_minutes_ago, (diff / 60).toInt())
+        diff < 86400 -> context.getString(R.string.time_hours_ago, (diff / 3600).toInt())
+        else -> context.getString(R.string.time_days_ago, (diff / 86400).toInt())
     }
 }

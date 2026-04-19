@@ -6,9 +6,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import android.content.Context
 import androidx.compose.ui.platform.LocalContext
+import net.meshpeak.kura.R
 import net.meshpeak.kura.data.model.CustomField
 import net.meshpeak.kura.data.model.EntryType
 import net.meshpeak.kura.data.model.Label
@@ -47,17 +48,17 @@ fun EntryCreateScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("新規作成") },
+                title = { Text(stringResource(R.string.entry_create_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 actions = {
                     if (selectedType != null) {
                         TextButton(
                             onClick = {
-                                if (name.isBlank()) { error = "名前を入力してください"; return@TextButton }
+                                if (name.isBlank()) { error = context.getString(R.string.entry_create_name_required); return@TextButton }
                                 scope.launch {
                                     isLoading = true
                                     try {
@@ -79,14 +80,14 @@ fun EntryCreateScreen(
                                         scope.launch { try { appViewModel.repository.syncInBackground(appViewModel.preferences.s3ConfigFlow.first()) } catch (_: Exception) { } }
                                         onCreated(id)
                                     } catch (e: Exception) {
-                                        error = "作成に失敗しました: ${e.message}"
+                                        error = context.getString(R.string.entry_create_failed, e.message ?: "")
                                     } finally { isLoading = false }
                                 }
                             },
                             enabled = !isLoading
                         ) {
                             if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            else Text("保存")
+                            else Text(stringResource(R.string.action_save))
                         }
                     }
                 }
@@ -102,7 +103,7 @@ fun EntryCreateScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("エントリのタイプを選択", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.entry_create_select_type), style = MaterialTheme.typography.titleMedium)
                 EntryType.entries.forEach { type ->
                     Card(
                         onClick = { selectedType = type.value },
@@ -111,7 +112,7 @@ fun EntryCreateScreen(
                         Row(modifier = Modifier.padding(16.dp)) {
                             net.meshpeak.kura.ui.components.EntryTypeIcon(type.value, tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text(type.displayName, style = MaterialTheme.typography.bodyLarge)
+                            Text(stringResource(type.displayNameResId), style = MaterialTheme.typography.bodyLarge)
                         }
                     }
                 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   isDevModeEnabled,
   setDevModeEnabled,
@@ -17,6 +18,7 @@ interface TabInfo {
 }
 
 export default function DevMode() {
+  const { t } = useTranslation()
   const [enabled, setEnabled] = useState(false)
   const [patterns, setPatterns] = useState<SitePattern[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -105,7 +107,7 @@ export default function DevMode() {
       if (response?.success && response.report) {
         setReport(response.report)
       } else {
-        setInspectError(response?.error || 'Content Scriptからの応答なし')
+        setInspectError(response?.error || t('devMode.noResponseFromContentScript'))
       }
     } catch (err) {
       setInspectError(err instanceof Error ? err.message : String(err))
@@ -116,12 +118,12 @@ export default function DevMode() {
 
   return (
     <div className="h-full flex flex-col">
-      <PageHeader title="開発者モード" />
+      <PageHeader title={t('devMode.title')} />
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {/* Toggle */}
         <div className="flex items-center justify-between">
-          <span className="text-sm text-text-primary">パターンDBテストモード</span>
+          <span className="text-sm text-text-primary">{t('devMode.patternDbTestMode')}</span>
           <button
             type="button"
             onClick={handleToggle}
@@ -142,11 +144,11 @@ export default function DevMode() {
             {/* Pattern loader */}
             <section className="space-y-2">
               <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-                カスタムパターン
+                {t('devMode.customPatterns')}
               </h3>
               <div className="flex items-center gap-2">
                 <label className="inline-flex cursor-pointer items-center rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover active:scale-95">
-                  ファイル選択
+                  {t('devMode.selectFile')}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -162,7 +164,7 @@ export default function DevMode() {
                     onClick={handleClearPatterns}
                     className="text-xs px-3 py-1.5"
                   >
-                    クリア
+                    {t('devMode.clearButton')}
                   </Button>
                 )}
               </div>
@@ -175,27 +177,27 @@ export default function DevMode() {
 
               {patterns && (
                 <div className="rounded bg-accent-subtle p-2 text-xs space-y-0.5">
-                  <p className="font-medium text-accent">{patterns.length} 件読み込み済み</p>
+                  <p className="font-medium text-accent">
+                    {t('devMode.patternsLoaded', { count: patterns.length })}
+                  </p>
                   {patterns.map((p) => (
                     <p
                       key={`${p.match.type}-${p.match.value}`}
                       className="text-text-secondary font-mono"
                     >
                       {p.match.type}: {p.match.value}
-                      {p.match.strict_subdomain ? ' (strict)' : ''}
+                      {p.match.strict_subdomain ? t('devMode.strictSuffix') : ''}
                     </p>
                   ))}
                 </div>
               )}
-              <p className="text-xs text-text-muted">
-                メモリ上にのみ保持。ブラウザ再起動でクリアされます。
-              </p>
+              <p className="text-xs text-text-muted">{t('devMode.memoryOnlyNote')}</p>
             </section>
 
             {/* Debug panel */}
             <section className="space-y-2">
               <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-                デバッグ
+                {t('devMode.debugSection')}
               </h3>
 
               <div className="flex items-center gap-2">
@@ -214,7 +216,7 @@ export default function DevMode() {
                   type="button"
                   onClick={refreshTabs}
                   className="rounded border border-border bg-bg-elevated px-2 py-1.5 text-xs hover:bg-bg-elevated/80"
-                  title="タブ更新"
+                  title={t('devMode.refreshTabsTooltip')}
                 >
                   ↻
                 </button>
@@ -224,7 +226,7 @@ export default function DevMode() {
                   disabled={!selectedTabId || inspecting}
                   className="text-xs px-3 py-1.5"
                 >
-                  {inspecting ? '...' : 'Inspect'}
+                  {inspecting ? '...' : t('devMode.inspectButton')}
                 </Button>
               </div>
 
@@ -244,13 +246,16 @@ export default function DevMode() {
 // ========== Debug report display ==========
 
 function DebugReportView({ report }: { report: DevModeDebugReport }) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-2">
       {/* Summary */}
       <div className="rounded bg-bg-elevated p-2 space-y-0.5">
         <div className="flex items-center gap-1.5 flex-wrap">
           <MatchBadge type={report.matchType} />
-          <span className="text-xs text-text-muted">src: {report.patternSource}</span>
+          <span className="text-xs text-text-muted">
+            {t('devMode.patternSourceLabel')}: {report.patternSource}
+          </span>
         </div>
         <p className="text-xs font-mono text-text-secondary truncate" title={report.url}>
           {report.url}
@@ -267,7 +272,7 @@ function DebugReportView({ report }: { report: DevModeDebugReport }) {
 
       {/* Forms */}
       {report.forms.length === 0 ? (
-        <p className="text-xs text-text-muted">フォーム未検出</p>
+        <p className="text-xs text-text-muted">{t('devMode.noFormsDetected')}</p>
       ) : (
         report.forms.map((form) => <FormView key={form.formId || form.formType} form={form} />)
       )}

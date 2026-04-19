@@ -17,9 +17,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import net.meshpeak.kura.R
 import net.meshpeak.kura.data.model.EntryRow
 import net.meshpeak.kura.data.model.EntryType
 import net.meshpeak.kura.data.model.Label
@@ -163,7 +165,7 @@ fun HomeScreen(
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                             Icon(
                                 Icons.Default.Menu,
-                                contentDescription = "メニュー",
+                                contentDescription = stringResource(R.string.cd_menu),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -173,7 +175,7 @@ fun HomeScreen(
                     // Title
                     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            "kura",
+                            stringResource(R.string.app_name),
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.ExtraBold,
                                 letterSpacing = (-0.5).sp
@@ -202,7 +204,7 @@ fun HomeScreen(
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                 Icon(
                                     Icons.Default.Add,
-                                    contentDescription = "新規作成",
+                                    contentDescription = stringResource(R.string.action_new),
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -224,7 +226,7 @@ fun HomeScreen(
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                 Icon(
                                     if (showFavoritesOnly) Icons.Default.Star else Icons.Outlined.StarOutline,
-                                    contentDescription = "お気に入りフィルター",
+                                    contentDescription = stringResource(R.string.cd_favorite),
                                     tint = if (showFavoritesOnly) Color(0xFFD97706) else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -242,7 +244,7 @@ fun HomeScreen(
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                 Icon(
                                     Icons.Default.SwapVert,
-                                    contentDescription = "並び替え",
+                                    contentDescription = stringResource(R.string.action_sort),
                                     tint = if (sortField != "created_at" || sortOrder != "desc")
                                         MaterialTheme.colorScheme.primary
                                     else
@@ -317,15 +319,15 @@ fun HomeScreen(
                                         )
                                         Spacer(modifier = Modifier.height(16.dp))
                                         Text(
-                                            if (showFavoritesOnly) "お気に入りがありません"
-                                            else "アイテムがありません",
+                                            if (showFavoritesOnly) stringResource(R.string.home_no_favorites)
+                                            else stringResource(R.string.home_no_entries),
                                             style = MaterialTheme.typography.bodyLarge,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                         if (!showFavoritesOnly && selectedType == null && selectedLabelId == null) {
                                             Spacer(modifier = Modifier.height(8.dp))
                                             Text(
-                                                "右下の + ボタンで新しいアイテムを作成できます",
+                                                stringResource(R.string.home_no_entries_hint),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -390,18 +392,18 @@ fun SortBottomSheet(
     onDismiss: () -> Unit
 ) {
     val options = listOf(
-        Triple("created_at", "desc", "作成日（新しい順）"),
-        Triple("created_at", "asc", "作成日（古い順）"),
-        Triple("updated_at", "desc", "更新日（新しい順）"),
-        Triple("updated_at", "asc", "更新日（古い順）"),
-        Triple("name", "asc", "名前（A → Z）"),
-        Triple("name", "desc", "名前（Z → A）"),
+        Triple("created_at", "desc", stringResource(R.string.sort_created_desc)),
+        Triple("created_at", "asc", stringResource(R.string.sort_created_asc)),
+        Triple("updated_at", "desc", stringResource(R.string.sort_updated_desc)),
+        Triple("updated_at", "asc", stringResource(R.string.sort_updated_asc)),
+        Triple("name", "asc", stringResource(R.string.sort_name_asc)),
+        Triple("name", "desc", stringResource(R.string.sort_name_desc)),
     )
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(bottom = 32.dp)) {
             Text(
-                "並び替え",
+                stringResource(R.string.home_sort_title),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
             )
@@ -457,12 +459,12 @@ private fun StickyHeaderContent(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = onSearchQueryChange,
-            placeholder = { Text("アイテムを検索...") },
+            placeholder = { Text(stringResource(R.string.home_search_placeholder)) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
                     IconButton(onClick = { onSearchQueryChange("") }) {
-                        Icon(Icons.Default.Close, contentDescription = "クリア")
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_clear))
                     }
                 }
             },
@@ -492,7 +494,7 @@ private fun StickyHeaderContent(
                     onClick = { labelDropdownExpanded = true },
                     label = {
                         Text(
-                            selectedLabelName ?: "ラベル",
+                            selectedLabelName ?: stringResource(R.string.home_labels),
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold
                             )
@@ -524,7 +526,7 @@ private fun StickyHeaderContent(
                 ) {
                     if (selectedLabelId != null) {
                         DropdownMenuItem(
-                            text = { Text("クリア") },
+                            text = { Text(stringResource(R.string.action_clear)) },
                             onClick = {
                                 onLabelSelected(null)
                                 labelDropdownExpanded = false
@@ -577,7 +579,7 @@ private fun StickyHeaderContent(
                     onClick = { onTypeSelected(null) },
                     label = {
                         Text(
-                            "全て",
+                            stringResource(R.string.home_all),
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold
                             )
@@ -598,7 +600,7 @@ private fun StickyHeaderContent(
                     },
                     label = {
                         Text(
-                            type.displayName,
+                            stringResource(type.displayNameResId),
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold
                             )

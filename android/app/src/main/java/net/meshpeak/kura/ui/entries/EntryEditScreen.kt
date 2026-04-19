@@ -1,6 +1,5 @@
 package net.meshpeak.kura.ui.entries
 
-import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -9,7 +8,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import net.meshpeak.kura.R
 import net.meshpeak.kura.data.model.CustomField
 import net.meshpeak.kura.data.model.Label
 import net.meshpeak.kura.ui.components.EntryForm
@@ -60,7 +61,7 @@ fun EntryEditScreen(
                 k to (v.jsonPrimitive.contentOrNull ?: "")
             }
         } catch (e: Exception) {
-            error = e.message ?: "エラー"
+            error = e.message ?: context.getString(R.string.entry_generic_error)
         }
         loading = false
     }
@@ -68,17 +69,17 @@ fun EntryEditScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("編集") },
+                title = { Text(stringResource(R.string.entry_edit_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 actions = {
                     if (!loading) {
                         TextButton(
                             onClick = {
-                                if (name.isBlank()) { error = "名前を入力してください"; return@TextButton }
+                                if (name.isBlank()) { error = context.getString(R.string.entry_create_name_required); return@TextButton }
                                 scope.launch {
                                     isLoading = true
                                     try {
@@ -98,14 +99,14 @@ fun EntryEditScreen(
                                         scope.launch { try { appViewModel.repository.syncInBackground(appViewModel.preferences.s3ConfigFlow.first()) } catch (_: Exception) { } }
                                         onSaved()
                                     } catch (e: Exception) {
-                                        error = "更新に失敗しました: ${e.message}"
+                                        error = context.getString(R.string.entry_edit_update_failed, e.message ?: "")
                                     } finally { isLoading = false }
                                 }
                             },
                             enabled = !isLoading
                         ) {
                             if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            else Text("保存")
+                            else Text(stringResource(R.string.action_save))
                         }
                     }
                 }

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom'
 import * as commands from './commands'
 import Sidebar from './components/Sidebar'
 import ErrorBar from './components/layout/ErrorBar'
 import { ErrorProvider, usePushError } from './contexts/ErrorContext'
 import { SyncProvider, useNotifySynced } from './contexts/SyncContext'
+import { setLanguage } from './i18n'
 import Lock from './screens/auth/Lock'
 import Recovery from './screens/auth/Recovery'
 import EntryCreate from './screens/entries/EntryCreate'
@@ -28,6 +30,7 @@ import type { AppSettings } from './shared/types'
 type AppState = 'loading' | 'onboarding' | 'locked' | 'unlocked'
 
 function AppContent() {
+  const { t } = useTranslation()
   const notifySynced = useNotifySynced()
   const pushError = usePushError()
   const [appState, setAppState] = useState<AppState>('loading')
@@ -38,6 +41,9 @@ function AppContent() {
     try {
       const settings = await getFromStorage<AppSettings>(STORAGE_KEYS.APP_SETTINGS)
       setAutolockMinutes(settings?.autolockMinutes ?? DEFAULT_SETTINGS.autolockMinutes)
+      if (settings?.language) {
+        await setLanguage(settings.language)
+      }
     } catch {
       // デフォルト値を使用
     }
@@ -160,18 +166,18 @@ function AppContent() {
           notifySynced()
         }
       } catch (_e) {
-        pushError('同期に失敗しました', 'periodic-sync')
+        pushError(t('app.syncFailed'), 'periodic-sync')
       }
     }, 60_000) // 1 minute
 
     return () => clearInterval(timer)
-  }, [appState, notifySynced, pushError])
+  }, [appState, notifySynced, pushError, t])
 
   if (appState === 'loading') {
     return (
       <div className="flex items-center justify-center h-screen bg-bg-base">
         <div className="text-center">
-          <div className="text-lg text-text-primary">読み込み中...</div>
+          <div className="text-lg text-text-primary">{t('app.loading')}</div>
         </div>
       </div>
     )

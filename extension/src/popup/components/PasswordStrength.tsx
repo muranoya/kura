@@ -1,8 +1,12 @@
+import { useTranslation } from 'react-i18next'
+
 interface PasswordStrengthProps {
   password: string
 }
 
 export default function PasswordStrength({ password }: PasswordStrengthProps) {
+  const { t } = useTranslation()
+
   const calculateStrength = (pwd: string) => {
     if (!pwd) return 0
     let strength = 0
@@ -14,7 +18,13 @@ export default function PasswordStrength({ password }: PasswordStrengthProps) {
   }
 
   const strength = calculateStrength(password)
-  const strengthLabels = ['', '弱', '中弱', '中', '強']
+  const strengthLabels = [
+    '',
+    t('passwordStrength.weak'),
+    t('passwordStrength.mediumWeak'),
+    t('passwordStrength.medium'),
+    t('passwordStrength.strong'),
+  ]
   const strengthColors = ['', '#dc2626', '#ea580c', '#f59e0b', '#16a34a']
 
   if (!password) return null
@@ -31,7 +41,7 @@ export default function PasswordStrength({ password }: PasswordStrengthProps) {
         textAlign: 'center',
       }}
     >
-      強度: {strengthLabels[strength]}
+      {t('passwordStrength.label')}: {strengthLabels[strength]}
     </div>
   )
 }

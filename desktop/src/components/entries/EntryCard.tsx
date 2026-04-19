@@ -9,6 +9,7 @@ import {
   Terminal,
   Trash2,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { EntryRow } from '../../shared/types'
 import { Button } from '../ui/button'
 
@@ -53,6 +54,7 @@ interface EntryCardTrashProps {
 type EntryCardProps = EntryCardNormalProps | EntryCardTrashProps
 
 export default function EntryCard(props: EntryCardProps) {
+  const { t, i18n } = useTranslation()
   if (props.variant === 'normal') {
     return (
       <button
@@ -91,9 +93,9 @@ export default function EntryCard(props: EntryCardProps) {
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold text-text-primary truncate">{props.entry.name}</h3>
           <p className="text-xs text-text-muted mt-1">
-            削除日時:{' '}
+            {t('entries.trash.deletedAt')}{' '}
             {props.entry.deletedAt
-              ? new Date(props.entry.deletedAt * 1000).toLocaleString('ja-JP')
+              ? new Date(props.entry.deletedAt * 1000).toLocaleString(i18n.language)
               : '-'}
           </p>
         </div>
@@ -106,7 +108,7 @@ export default function EntryCard(props: EntryCardProps) {
             className="gap-1"
           >
             <RotateCw size={16} />
-            復元
+            {t('entries.trash.restore')}
           </Button>
           <Button
             variant="destructive"
@@ -115,7 +117,7 @@ export default function EntryCard(props: EntryCardProps) {
             className="gap-1"
           >
             <Trash2 size={16} />
-            削除
+            {t('entries.trash.delete')}
           </Button>
         </div>
       </div>

@@ -14,10 +14,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import net.meshpeak.kura.R
 import net.meshpeak.kura.data.model.Label
 import net.meshpeak.kura.ui.components.ConfirmDialog
 import net.meshpeak.kura.viewmodel.AppViewModel
@@ -53,17 +55,17 @@ fun LabelManagerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("ラベル管理") },
+                title = { Text(stringResource(R.string.label_manager_title)) },
                 navigationIcon = {
                     IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Default.Menu, contentDescription = "メニュー")
+                        Icon(Icons.Default.Menu, contentDescription = stringResource(R.string.cd_menu))
                     }
                 }
             )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showCreateDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "追加")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_add))
             }
         }
     ) { padding ->
@@ -73,7 +75,7 @@ fun LabelManagerScreen(
             }
         } else if (labels.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("ラベルがありません", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.label_manager_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             LazyColumn(
@@ -128,7 +130,7 @@ fun LabelManagerScreen(
                                 onClick = { editingLabel = label; editName = label.name },
                                 modifier = Modifier.size(36.dp)
                             ) {
-                                Icon(Icons.Default.Edit, contentDescription = "編集", modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.cd_edit), modifier = Modifier.size(20.dp))
                             }
                             IconButton(
                                 onClick = { deleteTargetId = label.id },
@@ -136,7 +138,7 @@ fun LabelManagerScreen(
                             ) {
                                 Icon(
                                     Icons.Default.Delete,
-                                    contentDescription = "削除",
+                                    contentDescription = stringResource(R.string.cd_delete),
                                     tint = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -152,12 +154,12 @@ fun LabelManagerScreen(
     if (showCreateDialog) {
         AlertDialog(
             onDismissRequest = { showCreateDialog = false },
-            title = { Text("ラベル作成") },
+            title = { Text(stringResource(R.string.label_manager_create_title)) },
             text = {
                 OutlinedTextField(
                     value = newLabelName,
                     onValueChange = { newLabelName = it },
-                    label = { Text("ラベル名") },
+                    label = { Text(stringResource(R.string.label_new_name_placeholder)) },
                     singleLine = true
                 )
             },
@@ -175,9 +177,9 @@ fun LabelManagerScreen(
                             } catch (_: Exception) { }
                         }
                     }
-                }) { Text("作成") }
+                }) { Text(stringResource(R.string.action_create)) }
             },
-            dismissButton = { TextButton(onClick = { showCreateDialog = false }) { Text("キャンセル") } }
+            dismissButton = { TextButton(onClick = { showCreateDialog = false }) { Text(stringResource(R.string.action_cancel)) } }
         )
     }
 
@@ -185,12 +187,12 @@ fun LabelManagerScreen(
     editingLabel?.let { label ->
         AlertDialog(
             onDismissRequest = { editingLabel = null },
-            title = { Text("ラベル名変更") },
+            title = { Text(stringResource(R.string.label_manager_rename_title)) },
             text = {
                 OutlinedTextField(
                     value = editName,
                     onValueChange = { editName = it },
-                    label = { Text("新しいラベル名") },
+                    label = { Text(stringResource(R.string.label_manager_rename_label)) },
                     singleLine = true
                 )
             },
@@ -207,18 +209,18 @@ fun LabelManagerScreen(
                             } catch (_: Exception) { }
                         }
                     }
-                }) { Text("変更") }
+                }) { Text(stringResource(R.string.action_rename)) }
             },
-            dismissButton = { TextButton(onClick = { editingLabel = null }) { Text("キャンセル") } }
+            dismissButton = { TextButton(onClick = { editingLabel = null }) { Text(stringResource(R.string.action_cancel)) } }
         )
     }
 
     // Delete dialog
     deleteTargetId?.let { targetId ->
         ConfirmDialog(
-            title = "ラベル削除",
-            description = "このラベルを削除しますか？",
-            confirmText = "削除",
+            title = stringResource(R.string.label_manager_delete_title),
+            description = stringResource(R.string.label_manager_delete_description),
+            confirmText = stringResource(R.string.action_delete),
             isDangerous = true,
             onConfirm = {
                 scope.launch {

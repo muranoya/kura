@@ -8,10 +8,13 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import net.meshpeak.kura.R
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.launch
 
@@ -27,14 +30,15 @@ fun UnlockExistingVaultScreen(
     var error by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("既存Vaultのアンロック") },
+                title = { Text(stringResource(R.string.unlock_existing_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack, modifier = Modifier.testTag("unlock_back_button")) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 }
             )
@@ -48,7 +52,7 @@ fun UnlockExistingVaultScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                "S3上に既存のVaultが見つかりました。マスターパスワードを入力してアンロックしてください。",
+                stringResource(R.string.unlock_existing_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -62,7 +66,7 @@ fun UnlockExistingVaultScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it; error = "" },
-                label = { Text("マスターパスワード") },
+                label = { Text(stringResource(R.string.master_password_label)) },
                 modifier = Modifier.fillMaxWidth().testTag("unlock_password_input"),
                 singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -78,7 +82,7 @@ fun UnlockExistingVaultScreen(
             Button(
                 onClick = {
                     if (password.isBlank()) {
-                        error = "パスワードを入力してください"
+                        error = context.getString(R.string.unlock_existing_password_required)
                         return@Button
                     }
                     scope.launch {
@@ -89,7 +93,7 @@ fun UnlockExistingVaultScreen(
                             appViewModel.repository.writeVaultFile(vaultBytes)
                             onUnlocked()
                         } catch (e: Exception) {
-                            error = "アンロックに失敗しました: ${e.message}"
+                            error = context.getString(R.string.unlock_existing_failed, e.message ?: "")
                         } finally {
                             isLoading = false
                         }
@@ -99,7 +103,7 @@ fun UnlockExistingVaultScreen(
                 enabled = !isLoading
             ) {
                 if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Text("アンロック")
+                else Text(stringResource(R.string.action_unlock))
             }
         }
     }

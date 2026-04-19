@@ -1,5 +1,6 @@
 import { AlertCircle } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -26,14 +27,17 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  confirmText = '確認',
-  cancelText = 'キャンセル',
+  confirmText,
+  cancelText,
   isDangerous = false,
   onConfirm,
   onCancel,
   isLoading = false,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation()
   const [isProcessing, setIsProcessing] = useState(false)
+  const confirmLabel = confirmText ?? t('common.confirm')
+  const cancelLabel = cancelText ?? t('common.cancel')
 
   const handleConfirm = async () => {
     setIsProcessing(true)
@@ -62,14 +66,14 @@ export function ConfirmDialog({
         </DialogHeader>
         <DialogFooter className="gap-2">
           <Button variant="secondary" onClick={onCancel} disabled={isProcessing || isLoading}>
-            {cancelText}
+            {cancelLabel}
           </Button>
           <Button
             variant={isDangerous ? 'destructive' : 'primary'}
             onClick={handleConfirm}
             disabled={isProcessing || isLoading}
           >
-            {isProcessing || isLoading ? '処理中...' : confirmText}
+            {isProcessing || isLoading ? t('common.processing') : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

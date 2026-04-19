@@ -17,11 +17,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.os.LocaleListCompat
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.fragment.app.FragmentActivity
+import net.meshpeak.kura.R
 import net.meshpeak.kura.bridge.VaultBridge
 import net.meshpeak.kura.data.model.S3Config
 import net.meshpeak.kura.ui.components.ConfirmDialog
@@ -63,9 +67,9 @@ fun SettingsScreen(
                 context.contentResolver.openOutputStream(uri)?.use { output ->
                     output.write(exportJson!!.toByteArray())
                 }
-                Toast.makeText(context, "エクスポートが完了しました", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.export_success), Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                Toast.makeText(context, "エクスポートに失敗しました: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.export_failed, e.message ?: ""), Toast.LENGTH_SHORT).show()
             }
             exportJson = null
         }
@@ -100,10 +104,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("設定") },
+                title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Default.Menu, contentDescription = "メニュー")
+                        Icon(Icons.Default.Menu, contentDescription = stringResource(R.string.cd_menu))
                     }
                 }
             )
@@ -118,13 +122,13 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // セキュリティセクション
-            Text("セキュリティ", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Text(stringResource(R.string.settings_section_security), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(4.dp))
 
             Card(onClick = { showChangePasswordDialog = true }, modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = { Text("マスターパスワード変更") },
-                    supportingContent = { Text("マスターパスワードを新しいものに変更") },
+                    headlineContent = { Text(stringResource(R.string.settings_change_master_password)) },
+                    supportingContent = { Text(stringResource(R.string.settings_change_master_password_description)) },
                     leadingContent = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 )
@@ -132,8 +136,8 @@ fun SettingsScreen(
 
             Card(onClick = { showRotateDekDialog = true }, modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = { Text("DEK更新") },
-                    supportingContent = { Text("データ暗号化キーを更新し、リカバリーキーも再生成") },
+                    headlineContent = { Text(stringResource(R.string.settings_dek_rotate)) },
+                    supportingContent = { Text(stringResource(R.string.settings_dek_rotate_description_long)) },
                     leadingContent = { Icon(Icons.Default.VpnKey, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 )
@@ -141,8 +145,8 @@ fun SettingsScreen(
 
             Card(onClick = { showRegenRecoveryDialog = true }, modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = { Text("リカバリーキー再生成") },
-                    supportingContent = { Text("新しいリカバリーキーを生成して表示") },
+                    headlineContent = { Text(stringResource(R.string.settings_recovery_key_rotate)) },
+                    supportingContent = { Text(stringResource(R.string.settings_recovery_key_rotate_description)) },
                     leadingContent = { Icon(Icons.Default.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 )
@@ -150,8 +154,8 @@ fun SettingsScreen(
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = { Text("自動ロック") },
-                    supportingContent = { Text("バックグラウンド移行後の自動ロック時間") },
+                    headlineContent = { Text(stringResource(R.string.settings_autolock)) },
+                    supportingContent = { Text(stringResource(R.string.settings_autolock_description_background)) },
                     leadingContent = {
                         Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     },
@@ -161,7 +165,7 @@ fun SettingsScreen(
                             onExpandedChange = { autolockExpanded = it }
                         ) {
                             OutlinedTextField(
-                                value = if (autolockMinutes == 0) "無効" else "${autolockMinutes}分",
+                                value = if (autolockMinutes == 0) stringResource(R.string.settings_autolock_disabled) else stringResource(R.string.settings_autolock_minutes_format, autolockMinutes),
                                 onValueChange = {},
                                 readOnly = true,
                                 modifier = Modifier
@@ -176,7 +180,7 @@ fun SettingsScreen(
                             ) {
                                 listOf(0, 1, 3, 5, 10, 15, 30, 60).forEach { minutes ->
                                     DropdownMenuItem(
-                                        text = { Text(if (minutes == 0) "無効" else "${minutes}分") },
+                                        text = { Text(if (minutes == 0) stringResource(R.string.settings_autolock_disabled) else stringResource(R.string.settings_autolock_minutes_format, minutes)) },
                                         onClick = {
                                             scope.launch { appViewModel.preferences.saveAutolockMinutes(minutes) }
                                             autolockExpanded = false
@@ -191,8 +195,8 @@ fun SettingsScreen(
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = { Text("クリップボード自動クリア") },
-                    supportingContent = { Text("コピー後に自動でクリップボードをクリア") },
+                    headlineContent = { Text(stringResource(R.string.settings_clipboard_clear)) },
+                    supportingContent = { Text(stringResource(R.string.settings_clipboard_clear_description)) },
                     leadingContent = {
                         Icon(Icons.Default.ContentPaste, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     },
@@ -203,9 +207,9 @@ fun SettingsScreen(
                         ) {
                             OutlinedTextField(
                                 value = when (clipboardClearSeconds) {
-                                    0 -> "無効"
-                                    in 1..59 -> "${clipboardClearSeconds}秒"
-                                    else -> "${clipboardClearSeconds / 60}分"
+                                    0 -> stringResource(R.string.settings_clipboard_clear_disabled)
+                                    in 1..59 -> stringResource(R.string.settings_clipboard_clear_seconds, clipboardClearSeconds)
+                                    else -> stringResource(R.string.settings_autolock_minutes_format, clipboardClearSeconds / 60)
                                 },
                                 onValueChange = {},
                                 readOnly = true,
@@ -219,7 +223,13 @@ fun SettingsScreen(
                                 expanded = clipboardClearExpanded,
                                 onDismissRequest = { clipboardClearExpanded = false }
                             ) {
-                                listOf(0 to "無効", 30 to "30秒", 60 to "1分", 120 to "2分").forEach { (seconds, label) ->
+                                val clipboardOptions = listOf(
+                                    0 to stringResource(R.string.settings_clipboard_clear_disabled),
+                                    30 to stringResource(R.string.settings_clipboard_clear_30s),
+                                    60 to stringResource(R.string.settings_clipboard_clear_1min),
+                                    120 to stringResource(R.string.settings_clipboard_clear_2min)
+                                )
+                                clipboardOptions.forEach { (seconds, label) ->
                                     DropdownMenuItem(
                                         text = { Text(label) },
                                         onClick = {
@@ -237,8 +247,8 @@ fun SettingsScreen(
             if (canUseBiometric) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     ListItem(
-                        headlineContent = { Text("生体認証でアンロック") },
-                        supportingContent = { Text("指紋認証や顔認証でアンロック") },
+                        headlineContent = { Text(stringResource(R.string.settings_biometric)) },
+                        supportingContent = { Text(stringResource(R.string.settings_biometric_description)) },
                         leadingContent = {
                             Icon(Icons.Default.Fingerprint, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         },
@@ -266,27 +276,27 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             // ストレージ設定セクション
-            Text("ストレージ設定", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Text(stringResource(R.string.settings_section_storage), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(4.dp))
 
             if (s3Config != null) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     ListItem(
-                        headlineContent = { Text("バケット") },
+                        headlineContent = { Text(stringResource(R.string.settings_storage_bucket)) },
                         supportingContent = { Text(s3Config.bucket) },
                         leadingContent = { Icon(Icons.Default.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                     )
                 }
                 Card(modifier = Modifier.fillMaxWidth()) {
                     ListItem(
-                        headlineContent = { Text("リージョン") },
+                        headlineContent = { Text(stringResource(R.string.settings_storage_region)) },
                         supportingContent = { Text(s3Config.region) },
                         leadingContent = { Icon(Icons.Default.Public, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                     )
                 }
                 Card(modifier = Modifier.fillMaxWidth()) {
                     ListItem(
-                        headlineContent = { Text("ファイルパス") },
+                        headlineContent = { Text(stringResource(R.string.settings_storage_file_path)) },
                         supportingContent = { Text(s3Config.key) },
                         leadingContent = { Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                     )
@@ -294,7 +304,7 @@ fun SettingsScreen(
                 if (!s3Config.endpoint.isNullOrEmpty()) {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         ListItem(
-                            headlineContent = { Text("エンドポイント") },
+                            headlineContent = { Text(stringResource(R.string.settings_storage_endpoint)) },
                             supportingContent = { Text(s3Config.endpoint!!) },
                             leadingContent = { Icon(Icons.Default.Link, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                         )
@@ -303,7 +313,7 @@ fun SettingsScreen(
             } else {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     ListItem(
-                        headlineContent = { Text("ストレージ設定が見つかりません", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        headlineContent = { Text(stringResource(R.string.settings_storage_not_configured), color = MaterialTheme.colorScheme.onSurfaceVariant) },
                         leadingContent = { Icon(Icons.Default.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                     )
                 }
@@ -314,13 +324,13 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             // データセクション
-            Text("データ", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Text(stringResource(R.string.settings_section_data), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(4.dp))
 
             Card(onClick = { showExportPasswordConfirm = true }, modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = { Text("Bitwarden形式でエクスポート") },
-                    supportingContent = { Text("他のパスワードマネージャーへ移行するためにデータをエクスポート") },
+                    headlineContent = { Text(stringResource(R.string.settings_export_bitwarden)) },
+                    supportingContent = { Text(stringResource(R.string.settings_export_bitwarden_description)) },
                     leadingContent = { Icon(Icons.Default.FileDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 )
@@ -331,13 +341,13 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Transfer section
-            Text("端末間転送", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Text(stringResource(R.string.settings_section_transfer), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(4.dp))
 
             Card(onClick = { showTransferPasswordConfirm = true }, modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = { Text("設定を別端末に転送") },
-                    supportingContent = { Text("S3設定を暗号化した転送コードを生成") },
+                    headlineContent = { Text(stringResource(R.string.settings_transfer_card_title)) },
+                    supportingContent = { Text(stringResource(R.string.settings_transfer_card_description)) },
                     leadingContent = { Icon(Icons.Default.PhoneAndroid, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 )
@@ -347,8 +357,75 @@ fun SettingsScreen(
             HorizontalDivider()
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Language section
+            Text(stringResource(R.string.settings_section_language), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(4.dp))
+
+            var languageExpanded by remember { mutableStateOf(false) }
+            val currentLocales = AppCompatDelegate.getApplicationLocales()
+            val currentLanguageTag = if (currentLocales.isEmpty) "" else currentLocales.toLanguageTags().substringBefore(',')
+            val languageLabel = when (currentLanguageTag) {
+                "en" -> stringResource(R.string.settings_language_english)
+                "ja" -> stringResource(R.string.settings_language_japanese)
+                else -> stringResource(R.string.settings_language_system)
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_section_language)) },
+                    leadingContent = {
+                        Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    },
+                    trailingContent = {
+                        ExposedDropdownMenuBox(
+                            expanded = languageExpanded,
+                            onExpandedChange = { languageExpanded = it }
+                        ) {
+                            OutlinedTextField(
+                                value = languageLabel,
+                                onValueChange = {},
+                                readOnly = true,
+                                modifier = Modifier
+                                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                    .width(180.dp),
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = languageExpanded) },
+                                singleLine = true
+                            )
+                            ExposedDropdownMenu(
+                                expanded = languageExpanded,
+                                onDismissRequest = { languageExpanded = false }
+                            ) {
+                                val languageOptions = listOf(
+                                    "" to stringResource(R.string.settings_language_system),
+                                    "en" to stringResource(R.string.settings_language_english),
+                                    "ja" to stringResource(R.string.settings_language_japanese)
+                                )
+                                languageOptions.forEach { (tag, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(label) },
+                                        onClick = {
+                                            val locales = if (tag.isEmpty()) {
+                                                LocaleListCompat.getEmptyLocaleList()
+                                            } else {
+                                                LocaleListCompat.forLanguageTags(tag)
+                                            }
+                                            AppCompatDelegate.setApplicationLocales(locales)
+                                            languageExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(8.dp))
+
             // About section
-            Text("このアプリについて", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Text(stringResource(R.string.settings_section_about), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(4.dp))
 
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -357,7 +434,7 @@ fun SettingsScreen(
                     context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
                 }
                 ListItem(
-                    headlineContent = { Text("バージョン") },
+                    headlineContent = { Text(stringResource(R.string.settings_about_version)) },
                     trailingContent = { Text("v$appVersion", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 )
             }
@@ -374,11 +451,11 @@ fun SettingsScreen(
             ) {
                 ListItem(
                     headlineContent = {
-                        Text("ログアウト", color = MaterialTheme.colorScheme.onErrorContainer)
+                        Text(stringResource(R.string.settings_logout_title), color = MaterialTheme.colorScheme.onErrorContainer)
                     },
                     supportingContent = {
                         Text(
-                            "ローカルキャッシュとS3設定をクリア",
+                            stringResource(R.string.settings_logout_description_short),
                             color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
                         )
                     },
@@ -405,8 +482,8 @@ fun SettingsScreen(
     // Rotate DEK dialog
     if (showRotateDekDialog) {
         SinglePasswordDialog(
-            title = "DEK更新",
-            description = "データ暗号化キーを新しく生成します。マスターパスワードで認証が必要です。同時にリカバリーキーも更新されます。",
+            title = stringResource(R.string.settings_dek_rotate),
+            description = stringResource(R.string.settings_dek_rotate_description_long),
             onConfirm = { password ->
                 val newKey = appViewModel.repository.rotateDek(password)
                 appViewModel.repository.saveAndPush(appViewModel.preferences.s3ConfigFlow.first())
@@ -424,8 +501,8 @@ fun SettingsScreen(
     // Regenerate recovery key dialog
     if (showRegenRecoveryDialog) {
         SinglePasswordDialog(
-            title = "リカバリーキー再生成",
-            description = "新しいリカバリーキーを生成します。マスターパスワードで認証が必要です。",
+            title = stringResource(R.string.settings_recovery_key_rotate),
+            description = stringResource(R.string.settings_recovery_key_rotate_description),
             onConfirm = { password ->
                 val newKey = appViewModel.repository.regenerateRecoveryKey(password)
                 appViewModel.repository.saveAndPush(appViewModel.preferences.s3ConfigFlow.first())
@@ -442,10 +519,10 @@ fun SettingsScreen(
         var copied by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { showRecoveryKeyDisplay = false },
-            title = { Text("新しいリカバリーキー") },
+            title = { Text(stringResource(R.string.recovery_key_new_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("新しいリカバリーキーが生成されました。安全な場所に保管してください。", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.recovery_key_new_description), style = MaterialTheme.typography.bodySmall)
                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                         Text(recoveryKeyValue, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace))
                     }
@@ -459,19 +536,19 @@ fun SettingsScreen(
                     ) {
                         Icon(if (copied) Icons.Default.Check else Icons.Default.ContentCopy, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(if (copied) "コピーしました" else "コピー")
+                        Text(if (copied) stringResource(R.string.feedback_copied) else stringResource(R.string.action_copy))
                     }
                 }
             },
-            confirmButton = { Button(onClick = { showRecoveryKeyDisplay = false }) { Text("保管しました") } }
+            confirmButton = { Button(onClick = { showRecoveryKeyDisplay = false }) { Text(stringResource(R.string.recovery_key_stored)) } }
         )
     }
 
     // Biometric enrollment dialog
     if (showBiometricEnrollDialog) {
         SinglePasswordDialog(
-            title = "生体認証の有効化",
-            description = "マスターパスワードを入力してから、生体認証で確認します。",
+            title = stringResource(R.string.biometric_enroll_title),
+            description = stringResource(R.string.biometric_enroll_description),
             onConfirm = { password ->
                 // まずマスターパスワードが正しいか検証
                 appViewModel.repository.verifyPassword(password)
@@ -483,9 +560,9 @@ fun SettingsScreen(
                 val cipher = biometricHelper.getEncryptCipher()
 
                 val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                    .setTitle("kura")
-                    .setSubtitle("生体認証を登録")
-                    .setNegativeButtonText("キャンセル")
+                    .setTitle(context.getString(R.string.app_name))
+                    .setSubtitle(context.getString(R.string.biometric_enroll_prompt_subtitle))
+                    .setNegativeButtonText(context.getString(R.string.action_cancel))
                     .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
                     .build()
 
@@ -504,7 +581,7 @@ fun SettingsScreen(
 
                         override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                             biometricHelper.clearAll()
-                            Toast.makeText(context, "生体認証の登録に失敗しました", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.biometric_enroll_failed), Toast.LENGTH_SHORT).show()
                         }
                     }
                 )
@@ -517,8 +594,8 @@ fun SettingsScreen(
     // Export reauth dialog
     if (showExportPasswordConfirm) {
         SinglePasswordDialog(
-            title = "マスターパスワードの確認",
-            description = "機密情報を外部に書き出すため、マスターパスワードを再入力してください。",
+            title = stringResource(R.string.reauth_master_password_title),
+            description = stringResource(R.string.reauth_master_password_description),
             onConfirm = { password ->
                 appViewModel.repository.verifyPassword(password)
                 showExportPasswordConfirm = false
@@ -531,8 +608,8 @@ fun SettingsScreen(
     // Transfer reauth dialog
     if (showTransferPasswordConfirm) {
         SinglePasswordDialog(
-            title = "マスターパスワードの確認",
-            description = "機密情報を外部に書き出すため、マスターパスワードを再入力してください。",
+            title = stringResource(R.string.reauth_master_password_title),
+            description = stringResource(R.string.reauth_master_password_description),
             onConfirm = { password ->
                 appViewModel.repository.verifyPassword(password)
                 showTransferPasswordConfirm = false
@@ -554,9 +631,9 @@ fun SettingsScreen(
     // Export dialog
     if (showExportDialog) {
         ConfirmDialog(
-            title = "データをエクスポート",
-            description = "Bitwarden JSON形式でエクスポートします。エクスポートされたファイルにはパスワードが平文で含まれます。取り扱いにご注意ください。",
-            confirmText = "エクスポート",
+            title = stringResource(R.string.export_dialog_title),
+            description = stringResource(R.string.export_dialog_description),
+            confirmText = stringResource(R.string.action_export),
             onConfirm = {
                 showExportDialog = false
                 scope.launch {
@@ -566,7 +643,7 @@ fun SettingsScreen(
                         val today = java.time.LocalDate.now().toString()
                         exportFileLauncher.launch("kura-export-$today.json")
                     } catch (e: Exception) {
-                        Toast.makeText(context, "エクスポートに失敗しました: ${e.message}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.export_failed, e.message ?: ""), Toast.LENGTH_SHORT).show()
                     }
                 }
             },
@@ -577,9 +654,9 @@ fun SettingsScreen(
     // Logout dialog
     if (showLogoutDialog) {
         ConfirmDialog(
-            title = "ログアウト",
-            description = "ログアウトするとローカルキャッシュとS3設定がクリアされます。再度ログインには設定の再入力が必要になります。",
-            confirmText = "ログアウト",
+            title = stringResource(R.string.settings_logout_title),
+            description = stringResource(R.string.settings_logout_description),
+            confirmText = stringResource(R.string.action_logout),
             isDangerous = true,
             onConfirm = {
                 scope.launch {
@@ -605,28 +682,33 @@ fun PasswordChangeDialog(
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    val allRequiredMsg = stringResource(R.string.password_change_all_required)
+    val mismatchMsg = stringResource(R.string.password_change_mismatch)
+    val sameAsOldMsg = stringResource(R.string.password_change_same_as_old)
+    val failedDefaultMsg = stringResource(R.string.password_change_failed_default)
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("マスターパスワード変更") },
+        title = { Text(stringResource(R.string.password_change_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("新しいマスターパスワードを設定します。", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.password_change_description), style = MaterialTheme.typography.bodySmall)
                 if (error.isNotEmpty()) {
                     Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
                 OutlinedTextField(
                     value = oldPassword, onValueChange = { oldPassword = it; error = "" },
-                    label = { Text("現在のパスワード") },
+                    label = { Text(stringResource(R.string.password_change_current)) },
                     singleLine = true, visualTransformation = PasswordVisualTransformation()
                 )
                 OutlinedTextField(
                     value = newPassword, onValueChange = { newPassword = it; error = "" },
-                    label = { Text("新しいパスワード") },
+                    label = { Text(stringResource(R.string.password_change_new)) },
                     singleLine = true, visualTransformation = PasswordVisualTransformation()
                 )
                 OutlinedTextField(
                     value = confirmPassword, onValueChange = { confirmPassword = it; error = "" },
-                    label = { Text("新しいパスワード（確認）") },
+                    label = { Text(stringResource(R.string.password_change_confirm)) },
                     singleLine = true, visualTransformation = PasswordVisualTransformation()
                 )
             }
@@ -635,9 +717,9 @@ fun PasswordChangeDialog(
             Button(
                 onClick = {
                     when {
-                        oldPassword.isBlank() || newPassword.isBlank() || confirmPassword.isBlank() -> error = "すべてのフィールドを入力してください"
-                        newPassword != confirmPassword -> error = "新しいパスワードが一致しません"
-                        newPassword == oldPassword -> error = "新しいパスワードは現在のものと異なる必要があります"
+                        oldPassword.isBlank() || newPassword.isBlank() || confirmPassword.isBlank() -> error = allRequiredMsg
+                        newPassword != confirmPassword -> error = mismatchMsg
+                        newPassword == oldPassword -> error = sameAsOldMsg
                         else -> scope.launch {
                             isLoading = true
                             try {
@@ -648,7 +730,7 @@ fun PasswordChangeDialog(
                                 appViewModel.preferences.setBiometricEnabled(false)
                                 onDismiss()
                             } catch (e: Exception) {
-                                error = "パスワード変更に失敗しました"
+                                error = failedDefaultMsg
                             } finally { isLoading = false }
                         }
                     }
@@ -656,10 +738,10 @@ fun PasswordChangeDialog(
                 enabled = !isLoading
             ) {
                 if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Text("変更")
+                else Text(stringResource(R.string.action_change))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("キャンセル") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
     )
 }
 
@@ -674,6 +756,8 @@ fun SinglePasswordDialog(
     var error by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val emptyMsg = stringResource(R.string.single_password_empty)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -686,7 +770,7 @@ fun SinglePasswordDialog(
                 }
                 OutlinedTextField(
                     value = password, onValueChange = { password = it; error = "" },
-                    label = { Text("マスターパスワード") },
+                    label = { Text(stringResource(R.string.single_password_label)) },
                     singleLine = true, visualTransformation = PasswordVisualTransformation()
                 )
             }
@@ -694,20 +778,20 @@ fun SinglePasswordDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (password.isBlank()) { error = "パスワードを入力してください"; return@Button }
+                    if (password.isBlank()) { error = emptyMsg; return@Button }
                     scope.launch {
                         isLoading = true
-                        try { onConfirm(password) } catch (e: Exception) { error = "操作に失敗しました: ${e.message}" }
+                        try { onConfirm(password) } catch (e: Exception) { error = context.getString(R.string.single_password_failed, e.message ?: "") }
                         finally { isLoading = false }
                     }
                 },
                 enabled = !isLoading
             ) {
                 if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Text("実行")
+                else Text(stringResource(R.string.action_execute))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("キャンセル") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
     )
 }
 
@@ -724,15 +808,17 @@ fun TransferConfigDialog(
     var copied by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val emptyMsg = stringResource(R.string.single_password_empty)
+    val s3NotFoundMsg = stringResource(R.string.transfer_config_s3_not_found)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("設定を別端末に転送") },
+        title = { Text(stringResource(R.string.transfer_config_card_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (transferString.isNotEmpty()) {
                     Text(
-                        "転送コードが生成されました。別の端末のセットアップ時にこのコードと転送パスワードを入力してください。",
+                        stringResource(R.string.transfer_config_code_generated),
                         style = MaterialTheme.typography.bodySmall
                     )
                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
@@ -752,11 +838,11 @@ fun TransferConfigDialog(
                     ) {
                         Icon(if (copied) Icons.Default.Check else Icons.Default.ContentCopy, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(if (copied) "コピーしました" else "転送コードをコピー")
+                        Text(if (copied) stringResource(R.string.feedback_copied) else stringResource(R.string.transfer_config_copy_code))
                     }
                 } else {
                     Text(
-                        "転送パスワードで暗号化した転送コードを生成します。受信側にこのパスワードを共有してください。",
+                        stringResource(R.string.transfer_config_description),
                         style = MaterialTheme.typography.bodySmall
                     )
                     if (error.isNotEmpty()) {
@@ -764,8 +850,8 @@ fun TransferConfigDialog(
                     }
                     OutlinedTextField(
                         value = password, onValueChange = { password = it; error = "" },
-                        label = { Text("転送パスワード") },
-                        placeholder = { Text("受信側に共有するパスワードを設定") },
+                        label = { Text(stringResource(R.string.transfer_dialog_password)) },
+                        placeholder = { Text(stringResource(R.string.transfer_config_password_placeholder)) },
                         singleLine = true, visualTransformation = PasswordVisualTransformation()
                     )
                 }
@@ -773,32 +859,32 @@ fun TransferConfigDialog(
         },
         confirmButton = {
             if (transferString.isNotEmpty()) {
-                Button(onClick = onDismiss) { Text("閉じる") }
+                Button(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
             } else {
                 Button(
                     onClick = {
-                        if (password.isBlank()) { error = "パスワードを入力してください"; return@Button }
+                        if (password.isBlank()) { error = emptyMsg; return@Button }
                         scope.launch {
                             isLoading = true
                             try {
                                 val configJson = appViewModel.preferences.s3ConfigFlow.first()
-                                    ?: throw IllegalStateException("S3設定が見つかりません")
+                                    ?: throw IllegalStateException(s3NotFoundMsg)
                                 transferString = appViewModel.repository.encryptTransferConfig(password, configJson)
                             } catch (e: Exception) {
-                                error = "転送コードの生成に失敗しました: ${e.message}"
+                                error = context.getString(R.string.transfer_dialog_generate_failed, e.message ?: "")
                             } finally { isLoading = false }
                         }
                     },
                     enabled = !isLoading
                 ) {
                     if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    else Text("生成")
+                    else Text(stringResource(R.string.transfer_dialog_generate))
                 }
             }
         },
         dismissButton = {
             if (transferString.isEmpty()) {
-                TextButton(onClick = onDismiss) { Text("キャンセル") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
             }
         }
     )

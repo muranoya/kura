@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">kura</string>
+    <string name="app_subtitle">パスワードマネージャー</string>
+    <string name="app_tagline">サーバ不要、自分一人のための\nパスワードマネージャー</string>
+
+    <!-- Common actions -->
+    <string name="action_ok">OK</string>
+    <string name="action_cancel">キャンセル</string>
+    <string name="action_confirm">確認</string>
+    <string name="action_save">保存</string>
+    <string name="action_delete">削除</string>
+    <string name="action_close">閉じる</string>
+    <string name="action_back">戻る</string>
+    <string name="action_edit">編集</string>
+    <string name="action_restore">復元</string>
+    <string name="action_add">追加</string>
+    <string name="action_purge">完全削除</string>
+    <string name="action_logout">ログアウト</string>
+    <string name="action_copy">コピー</string>
+    <string name="action_menu">メニュー</string>
+    <string name="action_clear">クリア</string>
+    <string name="action_unlock">アンロック</string>
+    <string name="action_regenerate">再生成</string>
+    <string name="action_create">作成</string>
+    <string name="action_next">次へ</string>
+    <string name="action_new">新規</string>
+    <string name="action_use">使用する</string>
+    <string name="action_change">変更</string>
+    <string name="action_generate">生成</string>
+    <string name="action_export">エクスポート</string>
+    <string name="action_rename">名前変更</string>
+    <string name="action_sort">並び替え</string>
+    <string name="action_move_up">上へ移動</string>
+    <string name="action_move_down">下へ移動</string>
+    <string name="action_show">表示</string>
+    <string name="action_hide">隠す</string>
+    <string name="action_expand">拡大表示</string>
+    <string name="action_execute">実行</string>
+    <string name="action_complete">完了</string>
+    <string name="action_retry">再試行</string>
+    <string name="action_search">検索</string>
+    <string name="action_move_to_trash">ゴミ箱に移動</string>
+    <string name="action_purge_permanently">完全削除</string>
+
+    <!-- Feedback -->
+    <string name="feedback_copied">コピーしました</string>
+    <string name="feedback_empty_value">未設定</string>
+
+    <!-- Relative time -->
+    <string name="time_just_now">たった今</string>
+    <string name="time_minutes_ago">%1$d分前</string>
+    <string name="time_hours_ago">%1$d時間前</string>
+    <string name="time_days_ago">%1$d日前</string>
+    <string name="time_not_synced">未同期</string>
+
+    <!-- Navigation / Drawer -->
+    <string name="nav_entries">アイテム一覧</string>
+    <string name="nav_sync">同期</string>
+    <string name="nav_password_generator">パスワード生成</string>
+    <string name="nav_label_manager">ラベル管理</string>
+    <string name="nav_trash">ゴミ箱</string>
+    <string name="nav_settings">設定</string>
+    <string name="nav_last_synced_prefix">最終同期: %1$s</string>
+    <string name="nav_sync_error">同期エラー</string>
+
+    <!-- Welcome screen -->
+    <string name="welcome_title">kura</string>
+    <string name="welcome_subtitle">パスワードマネージャー</string>
+    <string name="welcome_tagline">サーバ不要、自分一人のための\nパスワードマネージャー</string>
+    <string name="welcome_terms_prefix"></string>
+    <string name="welcome_terms_link">利用規約</string>
+    <string name="welcome_terms_suffix">に同意する</string>
+    <string name="welcome_get_started">始める</string>
+
+    <!-- Storage setup -->
+    <string name="storage_title">ストレージ設定</string>
+    <string name="storage_description">vaultの保存先となるS3互換ストレージを設定します。</string>
+    <string name="storage_region">リージョン</string>
+    <string name="storage_region_hint">例: us-east-1, auto</string>
+    <string name="storage_bucket">バケット</string>
+    <string name="storage_bucket_hint">バケット名</string>
+    <string name="storage_file_path">ファイルパス</string>
+    <string name="storage_file_path_hint">vault.json</string>
+    <string name="storage_access_key">アクセスキーID</string>
+    <string name="storage_secret_key">シークレットアクセスキー</string>
+    <string name="storage_endpoint">エンドポイント (任意)</string>
+    <string name="storage_endpoint_hint">https://s3.example.com</string>
+    <string name="storage_next">次へ</string>
+    <string name="storage_restore_from_transfer">転送コードから復元</string>
+    <string name="storage_transfer_title">転送コードから復元</string>
+    <string name="storage_transfer_description">別端末でエクスポートした転送コードを入力してください。</string>
+    <string name="storage_transfer_code">転送コード</string>
+    <string name="storage_transfer_password">転送用パスワード</string>
+    <string name="storage_transfer_decrypt">復号</string>
+    <string name="storage_transfer_error">復号に失敗しました: %1$s</string>
+    <string name="storage_validation_required">この項目は必須です</string>
+    <string name="storage_region_required">リージョン *</string>
+    <string name="storage_region_placeholder">例: ap-northeast-1</string>
+    <string name="storage_bucket_required">バケット *</string>
+    <string name="storage_bucket_placeholder">例: my-vault</string>
+    <string name="storage_file_path_required">ファイルパス *</string>
+    <string name="storage_file_path_placeholder">vault.json</string>
+    <string name="storage_file_path_supporting">バケット内の保存パス</string>
+    <string name="storage_access_key_required">アクセスキーID *</string>
+    <string name="storage_access_key_placeholder">AKIA…</string>
+    <string name="storage_secret_key_required">シークレットアクセスキー *</string>
+    <string name="storage_endpoint_label">エンドポイント (オプション)</string>
+    <string name="storage_endpoint_placeholder">例: https://s3.example.com</string>
+    <string name="storage_endpoint_supporting">S3互換サーバーを使用する場合のみ</string>
+    <string name="storage_description_generic">S3互換のクラウドストレージを設定します</string>
+    <string name="storage_required_all">すべての必須フィールドを入力してください</string>
+    <string name="storage_access_failed">ストレージへのアクセスに失敗しました: %1$s</string>
+    <string name="storage_transfer_import_title">別の端末から設定を転送</string>
+    <string name="storage_transfer_import_description">設定済みの端末で生成した転送コードと転送パスワードを入力してください。</string>
+    <string name="storage_transfer_code_placeholder">kura-config-v1$…</string>
+    <string name="storage_transfer_password_placeholder">転送コード生成時に設定したパスワード</string>
+    <string name="storage_transfer_load">設定を読み込む</string>
+    <string name="storage_transfer_import_button">別の端末から設定を転送</string>
+    <string name="storage_transfer_decrypt_failed">転送コードの復号に失敗しました: %1$s</string>
+
+    <!-- Master password screen -->
+    <string name="master_password_title">マスターパスワード</string>
+    <string name="master_password_description">マスターパスワードを設定してください。このパスワードでvaultを暗号化します。</string>
+    <string name="master_password_warning">マスターパスワードを忘れた場合、リカバリーキーでのみ復旧できます。安全な場所に保管してください。</string>
+    <string name="master_password_label">マスターパスワード</string>
+    <string name="master_password_confirm_label">パスワード確認</string>
+    <string name="master_password_min_length">パスワードは8文字以上必要です</string>
+    <string name="master_password_mismatch">パスワードが一致しません</string>
+    <string name="master_password_create_failed">Vault作成に失敗しました: %1$s</string>
+
+    <!-- Unlock existing vault -->
+    <string name="unlock_existing_title">既存Vaultのアンロック</string>
+    <string name="unlock_existing_description">S3上に既存のVaultが見つかりました。マスターパスワードを入力してアンロックしてください。</string>
+    <string name="unlock_existing_password_required">パスワードを入力してください</string>
+    <string name="unlock_existing_failed">アンロックに失敗しました: %1$s</string>
+
+    <!-- Recovery key screen -->
+    <string name="recovery_key_title">リカバリーキー</string>
+    <string name="recovery_key_description">このリカバリーキーを安全な場所に保管してください。マスターパスワードを忘れた場合、これが唯一の復旧手段です。</string>
+
+    <!-- Lock screen -->
+    <string name="lock_title">kura</string>
+    <string name="lock_subtitle">ロック中</string>
+    <string name="lock_password_label">マスターパスワード</string>
+    <string name="lock_biometric_prompt">生体認証でアンロック</string>
+    <string name="lock_use_password">パスワードを使用</string>
+    <string name="lock_biometric_locked">生体認証がロックされました。しばらくしてからお試しください</string>
+    <string name="lock_biometric_disabled">生体認証が無効になりました。設定から再度有効にしてください</string>
+    <string name="lock_unlock_with_recovery">リカバリーキーでアンロック</string>
+    <string name="lock_logout_confirm_title">ログアウト</string>
+    <string name="lock_logout_confirm_description">次回起動時にマスターパスワードでアンロックが必要になります。続行しますか？</string>
+    <string name="lock_password_required">パスワードを入力してください</string>
+    <string name="lock_unlock_failed">アンロックに失敗しました</string>
+
+    <!-- Recovery screen -->
+    <string name="recovery_title">リカバリーキーでアンロック</string>
+    <string name="recovery_description">リカバリーキーを入力してVaultをアンロックします。</string>
+    <string name="recovery_key_label">リカバリーキー</string>
+    <string name="recovery_key_placeholder">XXXX-XXXX-XXXX-XXXX</string>
+    <string name="recovery_key_required">リカバリーキーを入力してください</string>
+    <string name="recovery_unlock_failed">アンロックに失敗しました: %1$s</string>
+
+    <!-- Home / entry list -->
+    <string name="home_search_placeholder">アイテムを検索…</string>
+    <string name="home_no_favorites">お気に入りがありません</string>
+    <string name="home_no_entries">アイテムがありません</string>
+    <string name="home_no_entries_hint">右下の + ボタンで新しいアイテムを作成できます</string>
+    <string name="home_all">全て</string>
+    <string name="home_labels">ラベル</string>
+    <string name="home_sort_title">並び替え</string>
+    <string name="sort_created_desc">作成日（新しい順）</string>
+    <string name="sort_created_asc">作成日（古い順）</string>
+    <string name="sort_updated_desc">更新日（新しい順）</string>
+    <string name="sort_updated_asc">更新日（古い順）</string>
+    <string name="sort_name_asc">名前（A → Z）</string>
+    <string name="sort_name_desc">名前（Z → A）</string>
+
+    <string name="entry_list_favorites">お気に入り</string>
+    <string name="entry_list_by_label">ラベル</string>
+    <string name="entry_list_items">アイテム</string>
+    <string name="entry_list_all_items">全てのアイテム</string>
+    <string name="entry_list_empty">アイテムがありません</string>
+    <string name="entry_list_delete_title">アイテムを削除</string>
+    <string name="entry_list_delete_description">このアイテムをゴミ箱に移動しますか？</string>
+
+    <!-- Trash -->
+    <string name="trash_title">ゴミ箱</string>
+    <string name="trash_empty">ゴミ箱は空です</string>
+    <string name="trash_purge_title">完全削除</string>
+    <string name="trash_purge_description">このアイテムを完全に削除しますか？この操作は取り消せません。</string>
+
+    <!-- Entry create / edit -->
+    <string name="entry_create_title">新規作成</string>
+    <string name="entry_create_name_required">名前を入力してください</string>
+    <string name="entry_create_failed">作成に失敗しました: %1$s</string>
+    <string name="entry_create_select_type">エントリのタイプを選択</string>
+    <string name="entry_edit_title">編集</string>
+    <string name="entry_edit_update_failed">更新に失敗しました: %1$s</string>
+    <string name="entry_generic_error">エラー</string>
+
+    <!-- Entry detail -->
+    <string name="entry_detail_updated">更新</string>
+    <string name="entry_detail_created">作成</string>
+    <string name="entry_detail_delete_title">アイテムを削除</string>
+    <string name="entry_detail_delete_description">このアイテムをゴミ箱に移動しますか？</string>
+
+    <!-- Entry types -->
+    <string name="entry_type_login">ログイン</string>
+    <string name="entry_type_bank">銀行口座</string>
+    <string name="entry_type_ssh_key">SSH キー</string>
+    <string name="entry_type_secure_note">セキュアノート</string>
+    <string name="entry_type_credit_card">クレジットカード</string>
+    <string name="entry_type_password">パスワード</string>
+    <string name="entry_type_software_license">ソフトウェアライセンス</string>
+
+    <!-- Section headers (detail) -->
+    <string name="section_login">ログイン情報</string>
+    <string name="section_bank">銀行口座</string>
+    <string name="section_credit_card">クレジットカード</string>
+    <string name="section_ssh_key">SSH キー</string>
+    <string name="section_secure_note">ノート</string>
+    <string name="section_password">パスワード情報</string>
+    <string name="section_software_license">ライセンス情報</string>
+    <string name="section_default">基本情報</string>
+    <string name="section_notes">メモ</string>
+    <string name="section_labels">ラベル</string>
+
+    <!-- Fields -->
+    <string name="field_url">URL</string>
+    <string name="field_username">ユーザー名</string>
+    <string name="field_password">パスワード</string>
+    <string name="field_bank_name">銀行名</string>
+    <string name="field_branch_code">支店コード</string>
+    <string name="field_account_type">口座種別</string>
+    <string name="field_account_holder">口座名義</string>
+    <string name="field_account_number">口座番号</string>
+    <string name="field_pin">PIN</string>
+    <string name="field_private_key">秘密鍵</string>
+    <string name="field_content">内容</string>
+    <string name="field_cardholder">カード名義</string>
+    <string name="field_number">カード番号</string>
+    <string name="field_expiry">有効期限</string>
+    <string name="field_cvv">CVV</string>
+    <string name="field_license_key">ライセンスキー</string>
+    <string name="field_notes">メモ</string>
+    <string name="field_name_placeholder">アイテム名を入力…</string>
+    <string name="field_value_placeholder">値</string>
+    <string name="field_totp_placeholder">otpauth:// URI または Base32 シークレット</string>
+
+    <!-- Custom fields -->
+    <string name="custom_field_text">テキスト</string>
+    <string name="custom_field_password">パスワード</string>
+    <string name="custom_field_email">メール</string>
+    <string name="custom_field_url">URL</string>
+    <string name="custom_field_phone">電話番号</string>
+    <string name="custom_field_totp">ワンタイムパスワード</string>
+    <string name="custom_field_select_type">フィールドの種類を選択</string>
+    <string name="custom_field_add">フィールドを追加</string>
+    <string name="custom_field_name_placeholder">フィールド名</string>
+    <string name="custom_field_totp_label">TOTP</string>
+
+    <!-- Labels (entry form) -->
+    <string name="label_new_dialog_title">新しいラベル</string>
+    <string name="label_new_name_placeholder">ラベル名</string>
+    <string name="label_new_chip">新規</string>
+
+    <!-- Password generator -->
+    <string name="pwgen_length">長さ: %1$d</string>
+    <string name="pwgen_character_settings">文字種の設定</string>
+    <string name="pwgen_lowercase">小文字 (a-z)</string>
+    <string name="pwgen_uppercase">大文字 (A-Z)</string>
+    <string name="pwgen_numbers">数字 (0-9)</string>
+    <string name="pwgen_symbols_basic">記号 (!@#$%^&amp;*-_.)</string>
+    <string name="pwgen_symbols_brackets">記号 (()[]{}+=~/)</string>
+    <string name="pwgen_symbols_other">記号 (&lt;&gt;\'\"\\|;,:)</string>
+
+    <!-- Sync dialog -->
+    <string name="sync_in_progress">同期中…</string>
+    <string name="sync_success">同期完了</string>
+    <string name="sync_error">同期エラー</string>
+    <string name="sync_failed">同期に失敗しました</string>
+
+    <!-- Label manager -->
+    <string name="label_manager_title">ラベル管理</string>
+    <string name="label_manager_empty">ラベルがありません</string>
+    <string name="label_manager_create_title">ラベル作成</string>
+    <string name="label_manager_rename_title">ラベル名変更</string>
+    <string name="label_manager_rename_label">新しいラベル名</string>
+    <string name="label_manager_delete_title">ラベル削除</string>
+    <string name="label_manager_delete_description">このラベルを削除しますか？</string>
+
+    <!-- Settings screen -->
+    <string name="settings_title">設定</string>
+    <string name="settings_section_security">セキュリティ</string>
+    <string name="settings_section_storage">ストレージ</string>
+    <string name="settings_section_data">データ</string>
+    <string name="settings_section_transfer">端末間転送</string>
+    <string name="settings_section_language">言語</string>
+    <string name="settings_section_about">アプリ情報</string>
+
+    <string name="settings_biometric">生体認証でアンロック</string>
+    <string name="settings_biometric_description">指紋認証や顔認証でアンロック</string>
+    <string name="settings_autolock">自動ロック</string>
+    <string name="settings_autolock_description">一定時間操作がない場合に自動でロックします。</string>
+    <string name="settings_autolock_description_background">バックグラウンド移行後の自動ロック時間</string>
+    <string name="settings_autolock_disabled">無効</string>
+    <string name="settings_autolock_1_min">1分</string>
+    <string name="settings_autolock_5_min">5分</string>
+    <string name="settings_autolock_15_min">15分</string>
+    <string name="settings_autolock_30_min">30分</string>
+    <string name="settings_autolock_60_min">1時間</string>
+    <string name="settings_autolock_minutes_format">%1$d分</string>
+    <string name="settings_clipboard_clear">クリップボード自動クリア</string>
+    <string name="settings_clipboard_clear_description">コピー後に自動でクリップボードをクリア</string>
+    <string name="settings_clipboard_clear_disabled">無効</string>
+    <string name="settings_clipboard_clear_seconds">%1$d秒</string>
+    <string name="settings_clipboard_clear_30s">30秒</string>
+    <string name="settings_clipboard_clear_1min">1分</string>
+    <string name="settings_clipboard_clear_2min">2分</string>
+    <string name="settings_change_master_password">マスターパスワード変更</string>
+    <string name="settings_change_master_password_description">マスターパスワードを新しいものに変更</string>
+    <string name="settings_argon2_upgrade">Argon2パラメータ強化</string>
+    <string name="settings_argon2_upgrade_description">より強いパラメータでKEKを再導出します。</string>
+    <string name="settings_recovery_key_show">リカバリーキーを表示</string>
+    <string name="settings_recovery_key_rotate">リカバリーキー再生成</string>
+    <string name="settings_recovery_key_rotate_description">新しいリカバリーキーを生成して表示</string>
+    <string name="settings_dek_rotate">DEK更新</string>
+    <string name="settings_dek_rotate_description">新しいデータ暗号化鍵でvaultを再暗号化します。</string>
+    <string name="settings_dek_rotate_description_long">データ暗号化キーを更新し、リカバリーキーも再生成</string>
+    <string name="settings_storage_region">リージョン</string>
+    <string name="settings_storage_bucket">バケット</string>
+    <string name="settings_storage_file_path">ファイルパス</string>
+    <string name="settings_storage_access_key">アクセスキーID</string>
+    <string name="settings_storage_endpoint">エンドポイント</string>
+    <string name="settings_storage_edit">ストレージ設定を編集</string>
+    <string name="settings_export_vault">暗号化済みvaultをエクスポート</string>
+    <string name="settings_export_bitwarden">Bitwarden形式でエクスポート</string>
+    <string name="settings_export_bitwarden_description">他のパスワードマネージャーへ移行するためにデータをエクスポート</string>
+    <string name="settings_storage_not_configured">ストレージ設定が見つかりません</string>
+    <string name="settings_transfer_export">転送コードを生成</string>
+    <string name="settings_transfer_export_description">別の端末にvault設定を移す転送コードを生成します。</string>
+    <string name="settings_transfer_card_title">設定を別端末に転送</string>
+    <string name="settings_transfer_card_description">S3設定を暗号化した転送コードを生成</string>
+    <string name="settings_transfer_password">転送用パスワード</string>
+    <string name="settings_language_system">システムに従う</string>
+    <string name="settings_language_english">English (英語)</string>
+    <string name="settings_language_japanese">日本語</string>
+    <string name="settings_about_version">バージョン</string>
+    <string name="settings_about_licenses">オープンソースライセンス</string>
+    <string name="settings_logout_title">ログアウト</string>
+    <string name="settings_logout_description">ログアウトするとローカルキャッシュとS3設定がクリアされます。再度ログインには設定の再入力が必要になります。</string>
+    <string name="settings_logout_description_short">ローカルキャッシュとS3設定をクリア</string>
+
+    <!-- Password change dialog -->
+    <string name="password_change_title">マスターパスワード変更</string>
+    <string name="password_change_description">新しいマスターパスワードを設定します。</string>
+    <string name="password_change_current">現在のパスワード</string>
+    <string name="password_change_new">新しいパスワード</string>
+    <string name="password_change_confirm">新しいパスワード（確認）</string>
+    <string name="password_change_incorrect">現在のパスワードが正しくありません</string>
+    <string name="password_change_min_length">パスワードは8文字以上必要です</string>
+    <string name="password_change_mismatch">新しいパスワードが一致しません</string>
+    <string name="password_change_all_required">すべてのフィールドを入力してください</string>
+    <string name="password_change_same_as_old">新しいパスワードは現在のものと異なる必要があります</string>
+    <string name="password_change_failed">変更に失敗しました: %1$s</string>
+    <string name="password_change_failed_default">パスワード変更に失敗しました</string>
+    <string name="password_change_success">パスワードを変更しました</string>
+
+    <!-- Single password dialog -->
+    <string name="single_password_title">マスターパスワードを入力</string>
+    <string name="single_password_label">マスターパスワード</string>
+    <string name="single_password_incorrect">パスワードが正しくありません</string>
+    <string name="single_password_empty">パスワードを入力してください</string>
+    <string name="single_password_failed">操作に失敗しました: %1$s</string>
+
+    <!-- Transfer dialog -->
+    <string name="transfer_dialog_title">転送コード</string>
+    <string name="transfer_dialog_description">転送コードを暗号化するパスワードを入力してください。受信側の端末でも同じパスワードが必要です。</string>
+    <string name="transfer_dialog_password">転送用パスワード</string>
+    <string name="transfer_dialog_password_min">8文字以上</string>
+    <string name="transfer_dialog_generate">生成</string>
+    <string name="transfer_dialog_code_label">転送コード</string>
+    <string name="transfer_dialog_code_note">受信側の端末でこのコードと設定したパスワードを入力してください。</string>
+    <string name="transfer_dialog_generate_failed">生成に失敗しました: %1$s</string>
+    <string name="transfer_config_card_title">設定を別端末に転送</string>
+    <string name="transfer_config_description">転送パスワードで暗号化した転送コードを生成します。受信側にこのパスワードを共有してください。</string>
+    <string name="transfer_config_code_generated">転送コードが生成されました。別の端末のセットアップ時にこのコードと転送パスワードを入力してください。</string>
+    <string name="transfer_config_password_placeholder">受信側に共有するパスワードを設定</string>
+    <string name="transfer_config_copy_code">転送コードをコピー</string>
+    <string name="transfer_config_s3_not_found">S3設定が見つかりません</string>
+
+    <!-- Recovery key new dialog -->
+    <string name="recovery_key_new_title">新しいリカバリーキー</string>
+    <string name="recovery_key_new_description">新しいリカバリーキーが生成されました。安全な場所に保管してください。</string>
+    <string name="recovery_key_stored">保管しました</string>
+
+    <!-- Biometric enrollment dialog -->
+    <string name="biometric_enroll_title">生体認証の有効化</string>
+    <string name="biometric_enroll_description">マスターパスワードを入力してから、生体認証で確認します。</string>
+    <string name="biometric_enroll_prompt_subtitle">生体認証を登録</string>
+    <string name="biometric_enroll_failed">生体認証の登録に失敗しました</string>
+
+    <!-- Reauth / export dialogs -->
+    <string name="reauth_master_password_title">マスターパスワードの確認</string>
+    <string name="reauth_master_password_description">機密情報を外部に書き出すため、マスターパスワードを再入力してください。</string>
+    <string name="export_dialog_title">データをエクスポート</string>
+    <string name="export_dialog_description">Bitwarden JSON形式でエクスポートします。エクスポートされたファイルにはパスワードが平文で含まれます。取り扱いにご注意ください。</string>
+    <string name="export_success">エクスポートが完了しました</string>
+    <string name="export_failed">エクスポートに失敗しました: %1$s</string>
+
+    <!-- Content descriptions (accessibility) -->
+    <string name="cd_favorite">お気に入り</string>
+    <string name="cd_not_favorite">お気に入りではない</string>
+    <string name="cd_delete">削除</string>
+    <string name="cd_restore">復元</string>
+    <string name="cd_purge">完全削除</string>
+    <string name="cd_copy">コピー</string>
+    <string name="cd_generate_password">パスワード生成</string>
+    <string name="cd_show">表示</string>
+    <string name="cd_hide">隠す</string>
+    <string name="cd_expand">拡大表示</string>
+    <string name="cd_move_up">上へ移動</string>
+    <string name="cd_move_down">下へ移動</string>
+    <string name="cd_add">追加</string>
+    <string name="cd_clear">クリア</string>
+    <string name="cd_back">戻る</string>
+    <string name="cd_menu">メニュー</string>
+    <string name="cd_edit">編集</string>
+    <string name="cd_trash">ゴミ箱に移動</string>
+    <string name="cd_close">閉じる</string>
+
+    <!-- Misc labels -->
+    <string name="misc_not_set">未設定</string>
+    <string name="misc_copied">コピーしました</string>
+</resources>

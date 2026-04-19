@@ -25,8 +25,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import net.meshpeak.kura.R
 import kotlin.math.roundToInt
 
 @Composable
@@ -84,7 +86,7 @@ fun PasswordGeneratorPanel(
                             length = if (currentLength < 128f) currentLength + 0.01f else currentLength - 0.01f
                         }
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "再生成")
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.action_regenerate))
                     }
                     FilledTonalButton(
                         onClick = { if (password.isNotEmpty()) onUse(password) },
@@ -92,11 +94,11 @@ fun PasswordGeneratorPanel(
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("使用する")
+                        Text(stringResource(R.string.action_use))
                     }
                 } else {
                     IconButton(onClick = { if (password.isNotEmpty()) onCopy(password) }) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "コピー")
+                        Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.cd_copy))
                     }
                 }
             }
@@ -106,7 +108,7 @@ fun PasswordGeneratorPanel(
 
         // Length slider
         Text(
-            "長さ: ${length.roundToInt()}",
+            stringResource(R.string.pwgen_length, length.roundToInt()),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -137,7 +139,7 @@ fun PasswordGeneratorPanel(
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    "文字種の設定",
+                    stringResource(R.string.pwgen_character_settings),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -190,42 +192,42 @@ fun PasswordGeneratorPanel(
                     modifier = Modifier.clickable { lowercase = !lowercase }
                 ) {
                     Checkbox(checked = lowercase, onCheckedChange = { lowercase = it })
-                    Text("小文字 (a-z)", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.pwgen_lowercase), style = MaterialTheme.typography.bodyMedium)
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { uppercase = !uppercase }
                 ) {
                     Checkbox(checked = uppercase, onCheckedChange = { uppercase = it })
-                    Text("大文字 (A-Z)", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.pwgen_uppercase), style = MaterialTheme.typography.bodyMedium)
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { numbers = !numbers }
                 ) {
                     Checkbox(checked = numbers, onCheckedChange = { numbers = it })
-                    Text("数字 (0-9)", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.pwgen_numbers), style = MaterialTheme.typography.bodyMedium)
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { symbols1 = !symbols1 }
                 ) {
                     Checkbox(checked = symbols1, onCheckedChange = { symbols1 = it })
-                    Text("記号 (!@#$%^&*-_.)", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.pwgen_symbols_basic), style = MaterialTheme.typography.bodyMedium)
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { symbols2 = !symbols2 }
                 ) {
                     Checkbox(checked = symbols2, onCheckedChange = { symbols2 = it })
-                    Text("記号 (()[]{}+=~/)", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.pwgen_symbols_brackets), style = MaterialTheme.typography.bodyMedium)
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { symbols3 = !symbols3 }
                 ) {
                     Checkbox(checked = symbols3, onCheckedChange = { symbols3 = it })
-                    Text("記号 (`<>'\"\\|;,:)", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.pwgen_symbols_other), style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -244,7 +246,7 @@ fun PasswordGeneratorPanel(
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("再生成")
+                Text(stringResource(R.string.action_regenerate))
             }
         }
     }

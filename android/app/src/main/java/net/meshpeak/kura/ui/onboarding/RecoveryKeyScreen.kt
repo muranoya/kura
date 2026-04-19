@@ -9,8 +9,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import net.meshpeak.kura.R
 import net.meshpeak.kura.util.ClipboardUtil
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
@@ -31,7 +33,7 @@ fun RecoveryKeyScreen(
         .collectAsState(initial = 30)
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("リカバリーキー") }) }
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.recovery_key_title)) }) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -66,7 +68,7 @@ fun RecoveryKeyScreen(
                     contentDescription = null
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(if (copied) "コピーしました" else "コピー")
+                Text(if (copied) stringResource(R.string.feedback_copied) else stringResource(R.string.action_copy))
             }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -85,7 +87,7 @@ fun RecoveryKeyScreen(
                 },
                 modifier = Modifier.fillMaxWidth().testTag("complete_button")
             ) {
-                Text("完了")
+                Text(stringResource(R.string.action_complete))
             }
         }
     }

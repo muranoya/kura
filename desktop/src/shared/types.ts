@@ -76,10 +76,14 @@ export interface S3Config {
   secretAccessKey: string
 }
 
+// Language setting: 'system' = follow OS, otherwise the explicit code
+export type LanguageSetting = 'system' | 'ja' | 'en'
+
 // App settings
 export interface AppSettings {
   clipboardClearSeconds: number
   autolockMinutes: number
+  language: LanguageSetting
 }
 
 // ============================================================================

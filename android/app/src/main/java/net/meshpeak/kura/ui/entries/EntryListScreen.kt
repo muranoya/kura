@@ -11,7 +11,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import net.meshpeak.kura.R
 import net.meshpeak.kura.data.model.EntryRow
 import net.meshpeak.kura.data.model.EntryType
 import net.meshpeak.kura.ui.components.ConfirmDialog
@@ -52,10 +54,12 @@ fun EntryListScreen(
     }
 
     val title = when {
-        onlyFavorites -> "お気に入り"
-        labelId != null -> "ラベル"
-        selectedType != null -> EntryType.fromValue(selectedType!!)?.displayName ?: "アイテム"
-        else -> "全てのアイテム"
+        onlyFavorites -> stringResource(R.string.entry_list_favorites)
+        labelId != null -> stringResource(R.string.entry_list_by_label)
+        selectedType != null -> EntryType.fromValue(selectedType!!)
+            ?.let { stringResource(it.displayNameResId) }
+            ?: stringResource(R.string.entry_list_items)
+        else -> stringResource(R.string.entry_list_all_items)
     }
 
     fun loadEntries() {
@@ -86,7 +90,7 @@ fun EntryListScreen(
                 navigationIcon = {
                     if (onBack != null) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                         }
                     }
                 },
@@ -94,7 +98,7 @@ fun EntryListScreen(
                     IconButton(onClick = { showSortSheet = true }) {
                         Icon(
                             Icons.Default.SwapVert,
-                            contentDescription = "並び替え",
+                            contentDescription = stringResource(R.string.action_sort),
                             tint = if (sortField != "created_at" || sortOrder != "desc")
                                 MaterialTheme.colorScheme.primary
                             else
@@ -106,7 +110,7 @@ fun EntryListScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onCreateClick) {
-                Icon(Icons.Default.Add, contentDescription = "新規作成")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_new))
             }
         }
     ) { padding ->
@@ -115,7 +119,7 @@ fun EntryListScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("検索...") },
+                placeholder = { Text(stringResource(R.string.home_search_placeholder)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -124,7 +128,7 @@ fun EntryListScreen(
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Close, contentDescription = "クリア")
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_clear))
                         }
                     }
                 }
@@ -139,7 +143,7 @@ fun EntryListScreen(
                     FilterChip(
                         selected = selectedType == null,
                         onClick = { selectedType = null },
-                        label = { Text("全て") }
+                        label = { Text(stringResource(R.string.home_all)) }
                     )
                 }
                 items(EntryType.entries) { type ->
@@ -148,7 +152,7 @@ fun EntryListScreen(
                         onClick = {
                             selectedType = if (selectedType == type.value) null else type.value
                         },
-                        label = { Text(type.displayName) }
+                        label = { Text(stringResource(type.displayNameResId)) }
                     )
                 }
             }
@@ -161,7 +165,7 @@ fun EntryListScreen(
                 }
             } else if (entries.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("アイテムがありません", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.entry_list_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
                 LazyColumn(
@@ -195,9 +199,9 @@ fun EntryListScreen(
 
     deleteTargetId?.let { targetId ->
         ConfirmDialog(
-            title = "アイテムを削除",
-            description = "このアイテムをゴミ箱に移動しますか？",
-            confirmText = "削除",
+            title = stringResource(R.string.entry_list_delete_title),
+            description = stringResource(R.string.entry_list_delete_description),
+            confirmText = stringResource(R.string.action_delete),
             isDangerous = true,
             onConfirm = {
                 scope.launch {

@@ -1,7 +1,8 @@
 import { save } from '@tauri-apps/plugin-dialog'
 import { Check, Copy, ExternalLink, Smartphone } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import SyncHeaderActions from '../../components/layout/SyncHeaderActions'
@@ -25,41 +26,50 @@ import {
   SelectValue,
 } from '../../components/ui/select'
 import { usePushError } from '../../contexts/ErrorContext'
+import { setLanguage } from '../../i18n'
 import { copySensitive } from '../../lib/clipboard'
 import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../../shared/constants'
 import { clearStorage, getFromStorage, saveToStorage } from '../../shared/storage'
-import type { AppSettings } from '../../shared/types'
+import type { AppSettings, LanguageSetting } from '../../shared/types'
 import Import1puxDialog from './Import1puxDialog'
 
-const AUTOLOCK_OPTIONS = [
-  { value: '0', label: '無効' },
-  { value: '1', label: '1分' },
-  { value: '3', label: '3分' },
-  { value: '5', label: '5分' },
-  { value: '10', label: '10分' },
-  { value: '15', label: '15分' },
-  { value: '30', label: '30分' },
-  { value: '60', label: '60分' },
-]
-
-const CLIPBOARD_CLEAR_OPTIONS = [
-  { value: '0', label: '無効' },
-  { value: '30', label: '30秒' },
-  { value: '60', label: '1分' },
-  { value: '120', label: '2分' },
-]
-
 export default function Settings() {
+  const { t } = useTranslation()
   const pushError = usePushError()
   const [appVersion, setAppVersion] = useState('...')
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
   const [storageConfig, setStorageConfig] = useState<Record<string, string> | null>(null)
   const [storageLoading, setStorageLoading] = useState(true)
 
-  // Auto-lock settings
+  // Language / Auto-lock / Clipboard settings
+  const [language, setLanguageState] = useState<LanguageSetting>(DEFAULT_SETTINGS.language)
   const [autolockMinutes, setAutolockMinutes] = useState<number>(DEFAULT_SETTINGS.autolockMinutes)
   const [clipboardClearSeconds, setClipboardClearSeconds] = useState<number>(
     DEFAULT_SETTINGS.clipboardClearSeconds,
+  )
+
+  const autolockOptions = useMemo(
+    () => [
+      { value: '0', label: t('settings.autolockOptions.disabled') },
+      { value: '1', label: t('settings.autolockOptions.minutes1') },
+      { value: '3', label: t('settings.autolockOptions.minutes3') },
+      { value: '5', label: t('settings.autolockOptions.minutes5') },
+      { value: '10', label: t('settings.autolockOptions.minutes10') },
+      { value: '15', label: t('settings.autolockOptions.minutes15') },
+      { value: '30', label: t('settings.autolockOptions.minutes30') },
+      { value: '60', label: t('settings.autolockOptions.minutes60') },
+    ],
+    [t],
+  )
+
+  const clipboardOptions = useMemo(
+    () => [
+      { value: '0', label: t('settings.clipboardOptions.disabled') },
+      { value: '30', label: t('settings.clipboardOptions.seconds30') },
+      { value: '60', label: t('settings.clipboardOptions.minutes1') },
+      { value: '120', label: t('settings.clipboardOptions.minutes2') },
+    ],
+    [t],
   )
 
   // Load storage config and settings
@@ -78,6 +88,7 @@ export default function Settings() {
       try {
         const settings = await getFromStorage<AppSettings>(STORAGE_KEYS.APP_SETTINGS)
         if (settings) {
+          setLanguageState(settings.language ?? DEFAULT_SETTINGS.language)
           setAutolockMinutes(settings.autolockMinutes ?? DEFAULT_SETTINGS.autolockMinutes)
           setClipboardClearSeconds(
             settings.clipboardClearSeconds ?? DEFAULT_SETTINGS.clipboardClearSeconds,
@@ -101,8 +112,15 @@ export default function Settings() {
       await saveToStorage(STORAGE_KEYS.APP_SETTINGS, merged)
       window.dispatchEvent(new CustomEvent('settings-changed'))
     } catch (err) {
-      pushError(`設定の保存に失敗しました: ${err}`)
+      pushError(t('settings.errors.saveSettings', { error: String(err) }))
     }
+  }
+
+  const handleLanguageChange = async (value: string) => {
+    const lang = value as LanguageSetting
+    setLanguageState(lang)
+    await setLanguage(lang)
+    await saveSettings({ language: lang })
   }
 
   const handleAutolockChange = (value: string) => {
@@ -137,7 +155,7 @@ export default function Settings() {
       const json = await commands.exportBitwardenJson()
       await commands.saveExportFile(filePath, json)
     } catch (err) {
-      pushError(`エクスポートに失敗しました: ${err}`)
+      pushError(t('settings.exportDialog.errorGeneric', { error: String(err) }))
     } finally {
       setExportLoading(false)
     }
@@ -192,7 +210,7 @@ export default function Settings() {
 
   const handleReauthConfirm = async () => {
     if (!reauthPassword) {
-      setReauthError('マスターパスワードを入力してください')
+      setReauthError(t('settings.reauthDialog.errorRequired'))
       return
     }
     setReauthLoading(true)
@@ -205,7 +223,7 @@ export default function Settings() {
       setReauthNext(null)
       next?.()
     } catch {
-      setReauthError('マスターパスワードが正しくありません')
+      setReauthError(t('settings.reauthDialog.errorWrongPassword'))
     } finally {
       setReauthLoading(false)
     }
@@ -222,7 +240,7 @@ export default function Settings() {
       // ページをリロードしてオンボーディングに戻る
       window.location.href = '/'
     } catch (err) {
-      pushError(`ログアウトに失敗しました: ${err}`)
+      pushError(t('settings.errors.logout', { error: String(err) }))
     }
   }
 
@@ -239,15 +257,15 @@ export default function Settings() {
   const handleChangePassword = async () => {
     setChangePasswordError('')
     if (!oldPassword || !newPassword || !confirmPassword) {
-      setChangePasswordError('すべてのフィールドを入力してください')
+      setChangePasswordError(t('settings.changePasswordDialog.errorRequired'))
       return
     }
     if (newPassword !== confirmPassword) {
-      setChangePasswordError('新しいパスワードが一致しません')
+      setChangePasswordError(t('settings.changePasswordDialog.errorMismatch'))
       return
     }
     if (newPassword === oldPassword) {
-      setChangePasswordError('新しいパスワードは現在のものと異なる必要があります')
+      setChangePasswordError(t('settings.changePasswordDialog.errorSame'))
       return
     }
 
@@ -266,7 +284,9 @@ export default function Settings() {
       setNewPassword('')
       setConfirmPassword('')
     } catch (err: unknown) {
-      setChangePasswordError(err instanceof Error ? err.message : 'パスワード変更に失敗しました')
+      setChangePasswordError(
+        err instanceof Error ? err.message : t('settings.changePasswordDialog.errorGeneric'),
+      )
     } finally {
       setChangePasswordLoading(false)
     }
@@ -275,7 +295,7 @@ export default function Settings() {
   const handleRotateDek = async () => {
     setRotateDekError('')
     if (!rotateDekPassword) {
-      setRotateDekError('パスワードを入力してください')
+      setRotateDekError(t('settings.rotateDekDialog.errorRequired'))
       return
     }
 
@@ -288,7 +308,9 @@ export default function Settings() {
       setRecoveryKeyDisplayValue(newRecoveryKey)
       setRecoveryKeyDisplayOpen(true)
     } catch (err: unknown) {
-      setRotateDekError(err instanceof Error ? err.message : 'DEK更新に失敗しました')
+      setRotateDekError(
+        err instanceof Error ? err.message : t('settings.rotateDekDialog.errorGeneric'),
+      )
     } finally {
       setRotateDekLoading(false)
     }
@@ -297,7 +319,7 @@ export default function Settings() {
   const handleRegenerateRecoveryKey = async () => {
     setRegenerateError('')
     if (!regeneratePassword) {
-      setRegenerateError('パスワードを入力してください')
+      setRegenerateError(t('settings.regenerateRecoveryDialog.errorRequired'))
       return
     }
 
@@ -310,7 +332,9 @@ export default function Settings() {
       setRecoveryKeyDisplayValue(newRecoveryKey)
       setRecoveryKeyDisplayOpen(true)
     } catch (err: unknown) {
-      setRegenerateError(err instanceof Error ? err.message : 'リカバリーキー再生成に失敗しました')
+      setRegenerateError(
+        err instanceof Error ? err.message : t('settings.regenerateRecoveryDialog.errorGeneric'),
+      )
     } finally {
       setRegenerateLoading(false)
     }
@@ -319,19 +343,21 @@ export default function Settings() {
   const handleGenerateTransferConfig = async () => {
     setTransferError('')
     if (!transferPassword) {
-      setTransferError('パスワードを入力してください')
+      setTransferError(t('settings.transferDialog.errorRequired'))
       return
     }
     setTransferLoading(true)
     try {
       const configJson = await commands.getS3ConfigSession()
       if (!configJson) {
-        throw new Error('S3設定が見つかりません')
+        throw new Error(t('settings.transferDialog.errorMissing'))
       }
       const result = await commands.encryptTransferConfig(transferPassword, configJson)
       setTransferString(result)
     } catch (err: unknown) {
-      setTransferError(err instanceof Error ? err.message : '転送コードの生成に失敗しました')
+      setTransferError(
+        err instanceof Error ? err.message : t('settings.transferDialog.errorGeneric'),
+      )
     } finally {
       setTransferLoading(false)
     }
@@ -361,7 +387,7 @@ export default function Settings() {
     <div className="flex flex-col h-screen bg-bg-base">
       {/* sticky ヘッダー */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
-        <h1 className="text-sm font-semibold text-text-primary flex-1">設定</h1>
+        <h1 className="text-sm font-semibold text-text-primary flex-1">{t('settings.title')}</h1>
         <SyncHeaderActions />
       </div>
 
@@ -370,20 +396,40 @@ export default function Settings() {
         {/* 一般 */}
         <Card>
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-sm font-medium">一般</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('settings.general.title')}</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-text-primary">自動ロック</p>
-                <p className="text-xs text-text-muted">ウィンドウのフォーカスが外れてからの時間</p>
+                <p className="text-sm text-text-primary">{t('settings.general.language')}</p>
+                <p className="text-xs text-text-muted">
+                  {t('settings.general.languageDescription')}
+                </p>
+              </div>
+              <Select value={language} onValueChange={handleLanguageChange}>
+                <SelectTrigger className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="system">{t('settings.general.languageSystem')}</SelectItem>
+                  <SelectItem value="ja">{t('settings.general.languageJa')}</SelectItem>
+                  <SelectItem value="en">{t('settings.general.languageEn')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-text-primary">{t('settings.general.autolock')}</p>
+                <p className="text-xs text-text-muted">
+                  {t('settings.general.autolockDescription')}
+                </p>
               </div>
               <Select value={String(autolockMinutes)} onValueChange={handleAutolockChange}>
                 <SelectTrigger className="w-28">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {AUTOLOCK_OPTIONS.map((opt) => (
+                  {autolockOptions.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
@@ -393,8 +439,10 @@ export default function Settings() {
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-text-primary">クリップボード自動クリア</p>
-                <p className="text-xs text-text-muted">コピー後の自動クリアまでの時間</p>
+                <p className="text-sm text-text-primary">{t('settings.general.clipboardClear')}</p>
+                <p className="text-xs text-text-muted">
+                  {t('settings.general.clipboardClearDescription')}
+                </p>
               </div>
               <Select
                 value={String(clipboardClearSeconds)}
@@ -404,7 +452,7 @@ export default function Settings() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CLIPBOARD_CLEAR_OPTIONS.map((opt) => (
+                  {clipboardOptions.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
@@ -418,7 +466,7 @@ export default function Settings() {
         {/* セキュリティ */}
         <Card>
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-sm font-medium">セキュリティ</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('settings.security.title')}</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2 space-y-2">
             <Button
@@ -426,24 +474,24 @@ export default function Settings() {
               onClick={() => setChangePasswordOpen(true)}
               className="w-full"
             >
-              マスターパスワード変更
+              {t('settings.security.changePassword')}
             </Button>
             <Button variant="secondary" onClick={() => setRotateDekOpen(true)} className="w-full">
-              DEK更新
+              {t('settings.security.rotateDek')}
             </Button>
             <Button
               variant="secondary"
               onClick={() => setRegenerateRecoveryOpen(true)}
               className="w-full"
             >
-              リカバリーキー再生成
+              {t('settings.security.regenerateRecovery')}
             </Button>
             <Button
               variant="destructive"
               onClick={() => setLogoutDialogOpen(true)}
               className="w-full"
             >
-              ログアウト
+              {t('settings.security.logout')}
             </Button>
           </CardContent>
         </Card>
@@ -451,7 +499,7 @@ export default function Settings() {
         {/* データ */}
         <Card>
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-sm font-medium">データ</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('settings.data.title')}</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2 space-y-2">
             <Button
@@ -459,7 +507,7 @@ export default function Settings() {
               onClick={() => setImportDialogOpen(true)}
               className="w-full"
             >
-              1Passwordからインポート
+              {t('settings.data.import1pux')}
             </Button>
             <Button
               variant="secondary"
@@ -467,7 +515,7 @@ export default function Settings() {
               className="w-full"
               disabled={exportLoading}
             >
-              {exportLoading ? 'エクスポート中...' : 'Bitwarden形式でエクスポート'}
+              {exportLoading ? t('settings.data.exporting') : t('settings.data.exportBitwarden')}
             </Button>
           </CardContent>
         </Card>
@@ -475,16 +523,16 @@ export default function Settings() {
         {/* ストレージ設定 */}
         <Card>
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-sm font-medium">ストレージ設定</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('settings.storage.title')}</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2 space-y-3">
             {storageLoading ? (
-              <p className="text-sm text-text-muted">読み込み中...</p>
+              <p className="text-sm text-text-muted">{t('settings.storage.loading')}</p>
             ) : storageConfig ? (
               <div className="space-y-3">
                 <div>
                   <span className="text-xs font-medium text-text-secondary block mb-1">
-                    バケット
+                    {t('settings.storage.bucket')}
                   </span>
                   <p className="text-sm text-text-primary font-mono">
                     {storageConfig.bucket || 'N/A'}
@@ -492,7 +540,7 @@ export default function Settings() {
                 </div>
                 <div>
                   <span className="text-xs font-medium text-text-secondary block mb-1">
-                    リージョン
+                    {t('settings.storage.region')}
                   </span>
                   <p className="text-sm text-text-primary font-mono">
                     {storageConfig.region || 'N/A'}
@@ -500,14 +548,14 @@ export default function Settings() {
                 </div>
                 <div>
                   <span className="text-xs font-medium text-text-secondary block mb-1">
-                    ファイルパス
+                    {t('settings.storage.key')}
                   </span>
                   <p className="text-sm text-text-primary font-mono">{storageConfig.key}</p>
                 </div>
                 {storageConfig.endpoint && (
                   <div>
                     <span className="text-xs font-medium text-text-secondary block mb-1">
-                      エンドポイント
+                      {t('settings.storage.endpoint')}
                     </span>
                     <p className="text-sm text-text-primary font-mono break-all">
                       {storageConfig.endpoint}
@@ -520,11 +568,11 @@ export default function Settings() {
                   className="w-full"
                 >
                   <Smartphone size={16} className="mr-2" />
-                  設定を別端末に転送
+                  {t('settings.storage.transferToOther')}
                 </Button>
               </div>
             ) : (
-              <p className="text-sm text-text-muted">ストレージ設定が見つかりません</p>
+              <p className="text-sm text-text-muted">{t('settings.storage.notFound')}</p>
             )}
           </CardContent>
         </Card>
@@ -532,15 +580,15 @@ export default function Settings() {
         {/* このアプリについて */}
         <Card>
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-sm font-medium">このアプリについて</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('settings.about.title')}</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2 space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-text-muted">バージョン</p>
+              <p className="text-sm text-text-muted">{t('settings.about.version')}</p>
               <p className="text-sm text-text-primary">{appVersion}</p>
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-sm text-text-muted">リポジトリ</p>
+              <p className="text-sm text-text-muted">{t('settings.about.repository')}</p>
               <a
                 href="https://github.com/muranoya/kura"
                 target="_blank"
@@ -557,10 +605,10 @@ export default function Settings() {
       {/* ログアウト確認ダイアログ */}
       <ConfirmDialog
         open={logoutDialogOpen}
-        title="ログアウト"
-        description="ログアウトするとローカルキャッシュとS3設定がクリアされます。再度ログインには設定の再入力が必要になります。"
-        confirmText="ログアウト"
-        cancelText="キャンセル"
+        title={t('settings.logoutDialog.title')}
+        description={t('settings.logoutDialog.description')}
+        confirmText={t('settings.logoutDialog.confirm')}
+        cancelText={t('common.cancel')}
         isDangerous={true}
         onConfirm={handleLogoutConfirmed}
         onCancel={() => setLogoutDialogOpen(false)}
@@ -570,47 +618,44 @@ export default function Settings() {
       <Dialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>マスターパスワード変更</DialogTitle>
-            <DialogDescription>
-              新しいマスターパスワードを設定します。現在のパスワードで認証が必要です。
-              変更後、他のセットアップ済み端末では新しいマスターパスワードでの再ログインが必要になります。
-            </DialogDescription>
+            <DialogTitle>{t('settings.changePasswordDialog.title')}</DialogTitle>
+            <DialogDescription>{t('settings.changePasswordDialog.description')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="old-password" className="text-sm">
-                現在のパスワード
+                {t('settings.changePasswordDialog.oldPasswordLabel')}
               </Label>
               <PasswordInput
                 id="old-password"
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
                 disabled={changePasswordLoading}
-                placeholder="現在のパスワード"
+                placeholder={t('settings.changePasswordDialog.oldPasswordPlaceholder')}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="new-password" className="text-sm">
-                新しいパスワード
+                {t('settings.changePasswordDialog.newPasswordLabel')}
               </Label>
               <PasswordInput
                 id="new-password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 disabled={changePasswordLoading}
-                placeholder="新しいパスワード"
+                placeholder={t('settings.changePasswordDialog.newPasswordPlaceholder')}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm-password" className="text-sm">
-                新しいパスワード（確認）
+                {t('settings.changePasswordDialog.confirmLabel')}
               </Label>
               <PasswordInput
                 id="confirm-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 disabled={changePasswordLoading}
-                placeholder="新しいパスワード（確認）"
+                placeholder={t('settings.changePasswordDialog.confirmPlaceholder')}
               />
             </div>
             {changePasswordError && (
@@ -625,10 +670,12 @@ export default function Settings() {
               onClick={() => setChangePasswordOpen(false)}
               disabled={changePasswordLoading}
             >
-              キャンセル
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleChangePassword} disabled={changePasswordLoading}>
-              {changePasswordLoading ? '変更中...' : '変更'}
+              {changePasswordLoading
+                ? t('settings.changePasswordDialog.submitting')
+                : t('settings.changePasswordDialog.submit')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -638,23 +685,20 @@ export default function Settings() {
       <Dialog open={rotateDekOpen} onOpenChange={setRotateDekOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>DEK更新</DialogTitle>
-            <DialogDescription>
-              データ暗号化キーを新しく生成します。マスターパスワードで認証が必要です。
-              同時にリカバリーキーも更新されます。
-            </DialogDescription>
+            <DialogTitle>{t('settings.rotateDekDialog.title')}</DialogTitle>
+            <DialogDescription>{t('settings.rotateDekDialog.description')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="rotate-dek-password" className="text-sm">
-                マスターパスワード
+                {t('settings.rotateDekDialog.passwordLabel')}
               </Label>
               <PasswordInput
                 id="rotate-dek-password"
                 value={rotateDekPassword}
                 onChange={(e) => setRotateDekPassword(e.target.value)}
                 disabled={rotateDekLoading}
-                placeholder="マスターパスワード"
+                placeholder={t('settings.rotateDekDialog.passwordPlaceholder')}
               />
             </div>
             {rotateDekError && (
@@ -669,10 +713,12 @@ export default function Settings() {
               onClick={() => setRotateDekOpen(false)}
               disabled={rotateDekLoading}
             >
-              キャンセル
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleRotateDek} disabled={rotateDekLoading}>
-              {rotateDekLoading ? '更新中...' : '更新'}
+              {rotateDekLoading
+                ? t('settings.rotateDekDialog.submitting')
+                : t('settings.rotateDekDialog.submit')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -682,22 +728,22 @@ export default function Settings() {
       <Dialog open={regenerateRecoveryOpen} onOpenChange={setRegenerateRecoveryOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>リカバリーキー再生成</DialogTitle>
+            <DialogTitle>{t('settings.regenerateRecoveryDialog.title')}</DialogTitle>
             <DialogDescription>
-              新しいリカバリーキーを生成します。マスターパスワードで認証が必要です。
+              {t('settings.regenerateRecoveryDialog.description')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="regenerate-password" className="text-sm">
-                マスターパスワード
+                {t('settings.regenerateRecoveryDialog.passwordLabel')}
               </Label>
               <PasswordInput
                 id="regenerate-password"
                 value={regeneratePassword}
                 onChange={(e) => setRegeneratePassword(e.target.value)}
                 disabled={regenerateLoading}
-                placeholder="マスターパスワード"
+                placeholder={t('settings.regenerateRecoveryDialog.passwordPlaceholder')}
               />
             </div>
             {regenerateError && (
@@ -712,10 +758,12 @@ export default function Settings() {
               onClick={() => setRegenerateRecoveryOpen(false)}
               disabled={regenerateLoading}
             >
-              キャンセル
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleRegenerateRecoveryKey} disabled={regenerateLoading}>
-              {regenerateLoading ? '生成中...' : '生成'}
+              {regenerateLoading
+                ? t('settings.regenerateRecoveryDialog.submitting')
+                : t('settings.regenerateRecoveryDialog.submit')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -724,9 +772,9 @@ export default function Settings() {
       {/* エクスポート確認ダイアログ */}
       <ConfirmDialog
         open={exportConfirmOpen}
-        title="データをエクスポート"
-        description="Bitwarden JSON形式でエクスポートします。エクスポートされたファイルにはパスワードが平文で含まれます。取り扱いにご注意ください。"
-        confirmText="エクスポート"
+        title={t('settings.exportDialog.title')}
+        description={t('settings.exportDialog.description')}
+        confirmText={t('settings.exportDialog.confirm')}
         onConfirm={handleExport}
         onCancel={() => setExportConfirmOpen(false)}
       />
@@ -756,10 +804,8 @@ export default function Settings() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>設定を別端末に転送</DialogTitle>
-            <DialogDescription>
-              転送パスワードで暗号化した転送コードを生成します。別の端末のセットアップ時にこのコードと転送パスワードを入力してください。
-            </DialogDescription>
+            <DialogTitle>{t('settings.transferDialog.title')}</DialogTitle>
+            <DialogDescription>{t('settings.transferDialog.description')}</DialogDescription>
           </DialogHeader>
           {transferString ? (
             <div className="space-y-4">
@@ -772,11 +818,11 @@ export default function Settings() {
               <Button variant="secondary" onClick={copyTransferString} className="w-full">
                 {transferCopied ? (
                   <>
-                    <Check size={16} className="mr-2" /> コピーしました
+                    <Check size={16} className="mr-2" /> {t('settings.transferDialog.copiedCode')}
                   </>
                 ) : (
                   <>
-                    <Copy size={16} className="mr-2" /> 転送コードをコピー
+                    <Copy size={16} className="mr-2" /> {t('settings.transferDialog.copyCode')}
                   </>
                 )}
               </Button>
@@ -785,14 +831,14 @@ export default function Settings() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="transfer-password" className="text-sm">
-                  転送パスワード
+                  {t('settings.transferDialog.passwordLabel')}
                 </Label>
                 <PasswordInput
                   id="transfer-password"
                   value={transferPassword}
                   onChange={(e) => setTransferPassword(e.target.value)}
                   disabled={transferLoading}
-                  placeholder="受信側に共有するパスワードを設定"
+                  placeholder={t('settings.transferDialog.passwordPlaceholder')}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && transferPassword) {
                       handleGenerateTransferConfig()
@@ -815,17 +861,23 @@ export default function Settings() {
                   onClick={() => setTransferDialogOpen(false)}
                   disabled={transferLoading}
                 >
-                  キャンセル
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   onClick={handleGenerateTransferConfig}
                   disabled={transferLoading || !transferPassword}
                 >
-                  {transferLoading ? '生成中...' : '転送コードを生成'}
+                  {transferLoading
+                    ? t('settings.transferDialog.generating')
+                    : t('settings.transferDialog.generate')}
                 </Button>
               </>
             )}
-            {transferString && <Button onClick={() => setTransferDialogOpen(false)}>閉じる</Button>}
+            {transferString && (
+              <Button onClick={() => setTransferDialogOpen(false)}>
+                {t('settings.transferDialog.close')}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -844,22 +896,20 @@ export default function Settings() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>マスターパスワードの確認</DialogTitle>
-            <DialogDescription>
-              機密情報を外部に書き出すため、マスターパスワードを再入力してください。
-            </DialogDescription>
+            <DialogTitle>{t('settings.reauthDialog.title')}</DialogTitle>
+            <DialogDescription>{t('settings.reauthDialog.description')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="reauth-password" className="text-sm">
-                マスターパスワード
+                {t('settings.reauthDialog.passwordLabel')}
               </Label>
               <PasswordInput
                 id="reauth-password"
                 value={reauthPassword}
                 onChange={(e) => setReauthPassword(e.target.value)}
                 disabled={reauthLoading}
-                placeholder="マスターパスワード"
+                placeholder={t('settings.reauthDialog.passwordPlaceholder')}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && reauthPassword) {
                     handleReauthConfirm()
@@ -879,10 +929,12 @@ export default function Settings() {
               onClick={() => setReauthOpen(false)}
               disabled={reauthLoading}
             >
-              キャンセル
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleReauthConfirm} disabled={reauthLoading || !reauthPassword}>
-              {reauthLoading ? '確認中...' : '確認'}
+              {reauthLoading
+                ? t('settings.reauthDialog.submitting')
+                : t('settings.reauthDialog.submit')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -892,11 +944,8 @@ export default function Settings() {
       <Dialog open={recoveryKeyDisplayOpen} onOpenChange={setRecoveryKeyDisplayOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>新しいリカバリーキー</DialogTitle>
-            <DialogDescription>
-              新しいリカバリーキーが生成されました。安全な場所に保管してください。
-              マスターパスワードを忘れた場合に使用できます。
-            </DialogDescription>
+            <DialogTitle>{t('settings.recoveryKeyDialog.title')}</DialogTitle>
+            <DialogDescription>{t('settings.recoveryKeyDialog.description')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="bg-bg-muted p-4 rounded font-mono text-sm break-all max-h-40 overflow-y-auto">
@@ -905,17 +954,19 @@ export default function Settings() {
             <Button variant="secondary" onClick={copyRecoveryKey} className="w-full">
               {recoveryKeyCopied ? (
                 <>
-                  <Check size={16} className="mr-2" /> コピーしました
+                  <Check size={16} className="mr-2" /> {t('settings.recoveryKeyDialog.copied')}
                 </>
               ) : (
                 <>
-                  <Copy size={16} className="mr-2" /> コピー
+                  <Copy size={16} className="mr-2" /> {t('settings.recoveryKeyDialog.copy')}
                 </>
               )}
             </Button>
           </div>
           <DialogFooter>
-            <Button onClick={() => setRecoveryKeyDisplayOpen(false)}>保管しました</Button>
+            <Button onClick={() => setRecoveryKeyDisplayOpen(false)}>
+              {t('settings.recoveryKeyDialog.saved')}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

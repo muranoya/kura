@@ -1,20 +1,17 @@
 // Default vault ID for single-vault extension
 export const DEFAULT_VAULT_ID = 'default'
 
-// Entry type labels and icons
-export const ENTRY_TYPE_LABELS: Record<string, string> = {
-  login: 'ログイン',
-  bank: '銀行口座',
-  ssh_key: 'SSHキー',
-  secure_note: 'セキュアノート',
-  credit_card: 'クレジットカード',
-  password: 'パスワード',
-  software_license: 'ソフトウェアライセンス',
-}
-
-export function getEntryTypeLabel(type: string): string {
-  return ENTRY_TYPE_LABELS[type] ?? type
-}
+// Entry type identifiers (UIラベルは i18n の `entries.types.*` キーを参照する)
+export const ENTRY_TYPE_KEYS = [
+  'login',
+  'bank',
+  'ssh_key',
+  'secure_note',
+  'credit_card',
+  'password',
+  'software_license',
+] as const
+export type EntryTypeKey = (typeof ENTRY_TYPE_KEYS)[number]
 
 // Default app settings
 export const DEFAULT_SETTINGS = {

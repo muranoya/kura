@@ -12,7 +12,8 @@ import {
   Wand2,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { cn } from '../../lib/utils'
@@ -117,24 +118,6 @@ const markdownComponents = {
   ),
 }
 
-const CUSTOM_FIELD_TYPES = [
-  { value: 'text' as const, label: 'テキスト', icon: Type },
-  { value: 'password' as const, label: 'パスワード', icon: Lock },
-  { value: 'email' as const, label: 'メール', icon: Mail },
-  { value: 'url' as const, label: 'URL', icon: Link },
-  { value: 'phone' as const, label: '電話番号', icon: Phone },
-  { value: 'totp' as const, label: 'ワンタイムパスワード', icon: Timer },
-]
-
-const FIELD_TYPE_LABELS: Record<string, string> = {
-  text: 'テキスト',
-  password: 'パスワード',
-  email: 'メール',
-  url: 'URL',
-  phone: '電話番号',
-  totp: 'ワンタイムパスワード',
-}
-
 export default function EntryForm({
   entryType,
   name,
@@ -151,6 +134,29 @@ export default function EntryForm({
   onCreateLabel,
   error,
 }: EntryFormProps) {
+  const { t } = useTranslation()
+  const customFieldTypes = useMemo(
+    () => [
+      { value: 'text' as const, label: t('customFieldTypes.text'), icon: Type },
+      { value: 'password' as const, label: t('customFieldTypes.password'), icon: Lock },
+      { value: 'email' as const, label: t('customFieldTypes.email'), icon: Mail },
+      { value: 'url' as const, label: t('customFieldTypes.url'), icon: Link },
+      { value: 'phone' as const, label: t('customFieldTypes.phone'), icon: Phone },
+      { value: 'totp' as const, label: t('customFieldTypes.totp'), icon: Timer },
+    ],
+    [t],
+  )
+  const fieldTypeLabels: Record<string, string> = useMemo(
+    () => ({
+      text: t('customFieldTypes.text'),
+      password: t('customFieldTypes.password'),
+      email: t('customFieldTypes.email'),
+      url: t('customFieldTypes.url'),
+      phone: t('customFieldTypes.phone'),
+      totp: t('customFieldTypes.totp'),
+    }),
+    [t],
+  )
   const [secureNotePreviewMode, setSecureNotePreviewMode] = useState(false)
   const [showNewLabelInput, setShowNewLabelInput] = useState(false)
   const [newLabelName, setNewLabelName] = useState('')
@@ -216,7 +222,7 @@ export default function EntryForm({
           <div className="space-y-3">
             <div className="space-y-1">
               <UILabel htmlFor="username" className="text-xs">
-                ユーザー名
+                {t('fields.username')}
               </UILabel>
               <Input
                 id="username"
@@ -226,7 +232,7 @@ export default function EntryForm({
             </div>
             <div className="space-y-1">
               <UILabel htmlFor="password" className="text-xs">
-                パスワード
+                {t('fields.password')}
               </UILabel>
               <div className="relative">
                 <Input
@@ -254,7 +260,7 @@ export default function EntryForm({
                         activeGeneratorFieldId === 'password' ? null : 'password',
                       )
                     }
-                    title="パスワード生成"
+                    title={t('entries.form.passwordGenerate')}
                   >
                     <Wand2 size={16} />
                   </button>
@@ -273,13 +279,13 @@ export default function EntryForm({
             </div>
             <div className="space-y-1">
               <UILabel htmlFor="url" className="text-xs">
-                URL
+                {t('fields.url')}
               </UILabel>
               <Input
                 id="url"
                 value={v.url || ''}
                 onChange={(e) => updateTypedValue('url', e.target.value)}
-                placeholder="https://example.com"
+                placeholder={t('fieldPlaceholders.url')}
               />
             </div>
           </div>
@@ -289,7 +295,7 @@ export default function EntryForm({
           <div className="space-y-3">
             <div className="space-y-1">
               <UILabel htmlFor="bank_name" className="text-xs">
-                銀行名
+                {t('fields.bank_name')}
               </UILabel>
               <Input
                 id="bank_name"
@@ -299,7 +305,7 @@ export default function EntryForm({
             </div>
             <div className="space-y-1">
               <UILabel htmlFor="branch_code" className="text-xs">
-                支店コード
+                {t('fields.branch_code')}
               </UILabel>
               <Input
                 id="branch_code"
@@ -309,18 +315,18 @@ export default function EntryForm({
             </div>
             <div className="space-y-1">
               <UILabel htmlFor="account_type" className="text-xs">
-                口座種別
+                {t('fields.account_type')}
               </UILabel>
               <Input
                 id="account_type"
                 value={v.account_type || ''}
                 onChange={(e) => updateTypedValue('account_type', e.target.value)}
-                placeholder="普通 / 当座 / 貯蓄"
+                placeholder={t('fieldPlaceholders.account_type')}
               />
             </div>
             <div className="space-y-1">
               <UILabel htmlFor="account_holder" className="text-xs">
-                口座名義
+                {t('fields.account_holder')}
               </UILabel>
               <Input
                 id="account_holder"
@@ -330,7 +336,7 @@ export default function EntryForm({
             </div>
             <div className="space-y-1">
               <UILabel htmlFor="account_number" className="text-xs">
-                口座番号
+                {t('fields.account_number')}
               </UILabel>
               <Input
                 id="account_number"
@@ -340,7 +346,7 @@ export default function EntryForm({
             </div>
             <div className="space-y-1">
               <UILabel htmlFor="pin" className="text-xs">
-                PIN
+                {t('fields.pin')}
               </UILabel>
               <div className="relative">
                 <Input
@@ -366,7 +372,7 @@ export default function EntryForm({
                     onClick={() =>
                       setActiveGeneratorFieldId(activeGeneratorFieldId === 'pin' ? null : 'pin')
                     }
-                    title="パスワード生成"
+                    title={t('entries.form.passwordGenerate')}
                   >
                     <Wand2 size={16} />
                   </button>
@@ -390,7 +396,7 @@ export default function EntryForm({
           <div className="space-y-3">
             <div className="space-y-1">
               <UILabel htmlFor="private_key" className="text-xs">
-                秘密鍵
+                {t('fields.private_key')}
               </UILabel>
               <Textarea
                 id="private_key"
@@ -407,7 +413,7 @@ export default function EntryForm({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <UILabel htmlFor="content" className="text-xs">
-                  内容
+                  {t('fields.content')}
                 </UILabel>
                 <div className="flex gap-2">
                   <button
@@ -419,7 +425,7 @@ export default function EntryForm({
                         : 'bg-bg-elevated text-text-secondary hover:text-text-primary'
                     }`}
                   >
-                    編集
+                    {t('entries.form.secureNoteEdit')}
                   </button>
                   <button
                     type="button"
@@ -430,7 +436,7 @@ export default function EntryForm({
                         : 'bg-bg-elevated text-text-secondary hover:text-text-primary'
                     }`}
                   >
-                    プレビュー
+                    {t('entries.form.secureNotePreview')}
                   </button>
                 </div>
               </div>
@@ -456,7 +462,7 @@ export default function EntryForm({
           <div className="space-y-3">
             <div className="space-y-1">
               <UILabel htmlFor="cardholder" className="text-xs">
-                カード名義
+                {t('fields.cardholder')}
               </UILabel>
               <Input
                 id="cardholder"
@@ -466,43 +472,43 @@ export default function EntryForm({
             </div>
             <div className="space-y-1">
               <UILabel htmlFor="number" className="text-xs">
-                カード番号
+                {t('fields.number')}
               </UILabel>
               <Input
                 id="number"
                 value={v.number || ''}
                 onChange={(e) => updateTypedValue('number', e.target.value)}
-                placeholder="1234 5678 9012 3456"
+                placeholder={t('fieldPlaceholders.number')}
               />
             </div>
             <div className="space-y-1">
               <UILabel htmlFor="expiry" className="text-xs">
-                有効期限
+                {t('fields.expiry')}
               </UILabel>
               <Input
                 id="expiry"
                 value={v.expiry || ''}
                 onChange={(e) => updateTypedValue('expiry', e.target.value)}
-                placeholder="MM/YY"
+                placeholder={t('fieldPlaceholders.expiry')}
               />
             </div>
             <div className="space-y-1">
               <UILabel htmlFor="cvv" className="text-xs">
-                CVV
+                {t('fields.cvv')}
               </UILabel>
               <Input
                 id="cvv"
                 type={focusedPasswordFieldId === 'cvv' ? 'text' : 'password'}
                 value={v.cvv || ''}
                 onChange={(e) => updateTypedValue('cvv', e.target.value)}
-                placeholder="123"
+                placeholder={t('fieldPlaceholders.cvv')}
                 onFocus={() => setFocusedPasswordFieldId('cvv')}
                 onBlur={() => setFocusedPasswordFieldId(null)}
               />
             </div>
             <div className="space-y-1">
               <UILabel htmlFor="cc_pin" className="text-xs">
-                暗証番号
+                {t('fields.cc_pin')}
               </UILabel>
               <div className="relative">
                 <Input
@@ -530,7 +536,7 @@ export default function EntryForm({
                         activeGeneratorFieldId === 'cc_pin' ? null : 'cc_pin',
                       )
                     }
-                    title="パスワード生成"
+                    title={t('entries.form.passwordGenerate')}
                   >
                     <Wand2 size={16} />
                   </button>
@@ -554,7 +560,7 @@ export default function EntryForm({
           <div className="space-y-3">
             <div className="space-y-1">
               <UILabel htmlFor="username" className="text-xs">
-                ユーザー名
+                {t('fields.username')}
               </UILabel>
               <Input
                 id="username"
@@ -564,7 +570,7 @@ export default function EntryForm({
             </div>
             <div className="space-y-1">
               <UILabel htmlFor="password" className="text-xs">
-                パスワード
+                {t('fields.password')}
               </UILabel>
               <div className="relative">
                 <Input
@@ -592,7 +598,7 @@ export default function EntryForm({
                         activeGeneratorFieldId === 'password' ? null : 'password',
                       )
                     }
-                    title="パスワード生成"
+                    title={t('entries.form.passwordGenerate')}
                   >
                     <Wand2 size={16} />
                   </button>
@@ -616,7 +622,7 @@ export default function EntryForm({
           <div className="space-y-3">
             <div className="space-y-1">
               <UILabel htmlFor="license_key" className="text-xs">
-                ライセンスキー
+                {t('fields.license_key')}
               </UILabel>
               <Input
                 id="license_key"
@@ -636,6 +642,7 @@ export default function EntryForm({
     secureNotePreviewMode,
     activeGeneratorFieldId,
     focusedPasswordFieldId,
+    t,
   ])
 
   const renderCustomFields = useCallback(() => {
@@ -645,13 +652,13 @@ export default function EntryForm({
           <div key={field.id} className="space-y-1.5">
             <div className="group flex items-start gap-2">
               <Badge variant="muted" className="shrink-0 mt-1.5 text-[10px]">
-                {FIELD_TYPE_LABELS[field.fieldType] || field.fieldType}
+                {fieldTypeLabels[field.fieldType] || field.fieldType}
               </Badge>
               <Input
                 id={`field-name-${field.id}`}
                 value={field.name}
                 onChange={(e) => updateCustomField(field.id, { name: e.target.value })}
-                placeholder="フィールド名"
+                placeholder={t('entries.form.fieldNamePlaceholder')}
                 className="h-8 text-xs flex-[2] min-w-0"
               />
               <div className="relative flex-[3]">
@@ -667,7 +674,9 @@ export default function EntryForm({
                   value={field.value}
                   onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
                   placeholder={
-                    field.fieldType === 'totp' ? 'otpauth:// URI または Base32 シークレット' : '値'
+                    field.fieldType === 'totp'
+                      ? t('fieldPlaceholders.totp')
+                      : t('entries.form.valuePlaceholder')
                   }
                   className={cn('h-8 text-xs', field.fieldType === 'password' && 'pr-9')}
                   onFocus={() => {
@@ -696,7 +705,7 @@ export default function EntryForm({
                             : `custom-${field.id}`,
                         )
                       }
-                      title="パスワード生成"
+                      title={t('entries.form.passwordGenerate')}
                     >
                       <Wand2 size={14} />
                     </button>
@@ -744,9 +753,9 @@ export default function EntryForm({
         ))}
         {pendingFieldType ? (
           <div className="space-y-2">
-            <span className="text-xs text-text-muted">フィールドの種類を選択</span>
+            <span className="text-xs text-text-muted">{t('entries.form.selectFieldType')}</span>
             <div className="flex flex-wrap gap-1.5">
-              {CUSTOM_FIELD_TYPES.map(({ value, label, icon: Icon }) => (
+              {customFieldTypes.map(({ value, label, icon: Icon }) => (
                 <button
                   key={value}
                   type="button"
@@ -763,7 +772,7 @@ export default function EntryForm({
               onClick={() => setPendingFieldType(false)}
               className="text-xs text-text-muted hover:text-text-secondary transition-colors"
             >
-              キャンセル
+              {t('common.cancel')}
             </button>
           </div>
         ) : (
@@ -774,7 +783,7 @@ export default function EntryForm({
             className="w-full gap-2"
           >
             <Plus size={16} />
-            フィールドを追加
+            {t('entries.form.addField')}
           </Button>
         )}
       </div>
@@ -788,6 +797,9 @@ export default function EntryForm({
     activeGeneratorFieldId,
     focusedPasswordFieldId,
     pendingFieldType,
+    customFieldTypes,
+    fieldTypeLabels,
+    t,
   ])
 
   return (
@@ -805,7 +817,7 @@ export default function EntryForm({
           id="name"
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
-          placeholder="例: Gmail アカウント"
+          placeholder={t('fieldPlaceholders.name')}
           className="text-base font-medium h-11 border-0 border-b border-border rounded-none bg-transparent px-0 focus-visible:ring-0 focus-visible:border-accent"
         />
       </div>
@@ -818,18 +830,18 @@ export default function EntryForm({
 
       {/* メモ */}
       <div className="space-y-1">
-        <UILabel className="text-xs text-text-muted">メモ</UILabel>
+        <UILabel className="text-xs text-text-muted">{t('entries.form.notes')}</UILabel>
         <Textarea
           value={notes || ''}
           onChange={(e) => onNotesChange(e.target.value)}
-          placeholder="メモを追加..."
+          placeholder={t('entries.form.notesPlaceholder')}
           className="min-h-20 resize-none border-dashed border-border/60 focus:border-solid focus:border-accent"
         />
       </div>
 
       {/* ラベル */}
       <div className="space-y-2">
-        <span className="text-xs text-text-muted">ラベル</span>
+        <span className="text-xs text-text-muted">{t('entries.form.labels')}</span>
         <div className="flex flex-wrap gap-1.5">
           {allLabels.map((label) => {
             const isSelected = selectedLabelIds.includes(label.id)
@@ -862,7 +874,7 @@ export default function EntryForm({
               className="px-2.5 py-1 text-xs rounded-full border border-dashed border-border text-text-muted hover:border-accent/50 hover:text-text-primary transition-colors flex items-center gap-1"
             >
               <Plus size={12} />
-              新規
+              {t('entries.form.newLabelButton')}
             </button>
           )}
           {onCreateLabel && showNewLabelInput && (
@@ -883,7 +895,7 @@ export default function EntryForm({
                       setNewLabelName('')
                       setShowNewLabelInput(false)
                     } catch (err) {
-                      console.error('ラベル作成失敗:', err)
+                      console.error(t('entries.form.errorLabelCreate'), err)
                     } finally {
                       setCreatingLabel(false)
                     }
@@ -892,7 +904,7 @@ export default function EntryForm({
                     setNewLabelName('')
                   }
                 }}
-                placeholder="ラベル名"
+                placeholder={t('entries.form.newLabelPlaceholder')}
                 className="h-7 w-28 text-xs"
                 disabled={creatingLabel}
               />
@@ -909,7 +921,7 @@ export default function EntryForm({
                     setNewLabelName('')
                     setShowNewLabelInput(false)
                   } catch (err) {
-                    console.error('ラベル作成失敗:', err)
+                    console.error(t('entries.form.errorLabelCreate'), err)
                   } finally {
                     setCreatingLabel(false)
                   }
@@ -922,7 +934,7 @@ export default function EntryForm({
           )}
         </div>
         {allLabels.length === 0 && !onCreateLabel && (
-          <p className="text-xs text-text-muted">ラベルがありません</p>
+          <p className="text-xs text-text-muted">{t('entries.form.noLabels')}</p>
         )}
       </div>
     </div>

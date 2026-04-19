@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import * as commands from '../../commands'
 import EntryForm from '../../components/entries/EntryForm'
@@ -7,6 +8,7 @@ import { Button } from '../../components/ui/button'
 import type { CustomField, Entry, Label } from '../../shared/types'
 
 export default function EntryEdit() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [entry, setEntry] = useState<Entry | null>(null)
@@ -34,18 +36,18 @@ export default function EntryEdit() {
           setSelectedLabelIds(data.labels || [])
           setAllLabels(labels)
         } catch (err) {
-          setError(`アイテム読み込み失敗: ${err}`)
+          setError(t('entries.edit.errorLoad', { error: String(err) }))
         } finally {
           setLoading(false)
         }
       }
     }
     load()
-  }, [id])
+  }, [id, t])
 
   const handleSave = async () => {
     if (!name.trim()) {
-      setError('名前を入力してください')
+      setError(t('entries.edit.errorName'))
       return
     }
 
@@ -74,7 +76,7 @@ export default function EntryEdit() {
       commands.syncVaultIfConfigured().catch((e) => console.warn('Sync failed:', e))
       navigate('/entries', { state: { selectedId: id } })
     } catch (err) {
-      setError(`保存失敗: ${err}`)
+      setError(t('entries.edit.errorSave', { error: String(err) }))
     } finally {
       setSaving(false)
     }
@@ -83,13 +85,13 @@ export default function EntryEdit() {
   if (loading)
     return (
       <div className="flex items-center justify-center h-screen text-text-secondary">
-        読み込み中...
+        {t('common.loading')}
       </div>
     )
   if (!entry)
     return (
       <div className="flex items-center justify-center h-screen text-danger">
-        アイテムが見つかりません
+        {t('entries.edit.notFound')}
       </div>
     )
 
@@ -97,7 +99,9 @@ export default function EntryEdit() {
     <div className="flex flex-col h-screen bg-bg-surface">
       {/* sticky ヘッダー */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
-        <h1 className="text-sm font-semibold text-text-primary flex-1">アイテム編集</h1>
+        <h1 className="text-sm font-semibold text-text-primary flex-1">
+          {t('entries.edit.title')}
+        </h1>
         <SyncHeaderActions />
       </div>
 
@@ -132,10 +136,10 @@ export default function EntryEdit() {
           size="sm"
           onClick={() => navigate('/entries', { state: { selectedId: id } })}
         >
-          キャンセル
+          {t('common.cancel')}
         </Button>
         <Button size="sm" onClick={handleSave} disabled={saving}>
-          {saving ? '保存中...' : '保存'}
+          {saving ? t('common.saving') : t('common.save')}
         </Button>
       </div>
     </div>

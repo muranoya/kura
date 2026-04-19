@@ -9,8 +9,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import net.meshpeak.kura.R
 import kotlinx.coroutines.delay
 
 enum class SyncDialogState {
@@ -41,9 +43,9 @@ fun SyncProgressDialog(
         title = {
             Text(
                 when (state) {
-                    SyncDialogState.SYNCING -> "同期中..."
-                    SyncDialogState.SUCCESS -> "同期完了"
-                    SyncDialogState.ERROR -> "同期エラー"
+                    SyncDialogState.SYNCING -> stringResource(R.string.sync_in_progress)
+                    SyncDialogState.SUCCESS -> stringResource(R.string.sync_success)
+                    SyncDialogState.ERROR -> stringResource(R.string.sync_error)
                 }
             )
         },
@@ -72,7 +74,7 @@ fun SyncProgressDialog(
                             modifier = Modifier.size(48.dp),
                             tint = MaterialTheme.colorScheme.error
                         )
-                        Text(errorMessage ?: "同期に失敗しました")
+                        Text(errorMessage ?: stringResource(R.string.sync_failed))
                     }
                 }
             }
@@ -80,7 +82,7 @@ fun SyncProgressDialog(
         confirmButton = {
             if (state == SyncDialogState.ERROR) {
                 TextButton(onClick = onDismiss) {
-                    Text("OK")
+                    Text(stringResource(R.string.action_ok))
                 }
             }
         }

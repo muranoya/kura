@@ -1,4 +1,6 @@
 import { ArrowUpDown, Search, X } from 'lucide-react'
+import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { EntryRow, EntryType, SortConfig } from '../../shared/types'
 import { EmptyState } from '../layout/EmptyState'
 import {
@@ -38,6 +40,7 @@ export default function EntryListPanel({
   renderCard,
   scrollRef,
 }: EntryListPanelProps) {
+  const { t } = useTranslation()
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* エラーメッセージ */}
@@ -53,7 +56,11 @@ export default function EntryListPanel({
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="p-3">
-            <EmptyState icon="⏳" title="読み込み中..." description="エントリを読み込んでいます" />
+            <EmptyState
+              icon="⏳"
+              title={t('entries.panel.loadingTitle')}
+              description={t('entries.panel.loadingDescription')}
+            />
           </div>
         ) : entries.length === 0 ? (
           <div className="p-3">
@@ -78,26 +85,6 @@ export default function EntryListPanel({
 
 // フィルターバーコンポーネント（EntryList のヘッダー行で使用）
 
-const SORT_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'created_at:desc', label: '作成日（新しい順）' },
-  { value: 'created_at:asc', label: '作成日（古い順）' },
-  { value: 'updated_at:desc', label: '更新日（新しい順）' },
-  { value: 'updated_at:asc', label: '更新日（古い順）' },
-  { value: 'name:asc', label: '名前（A → Z）' },
-  { value: 'name:desc', label: '名前（Z → A）' },
-]
-
-const ENTRY_TYPES: Array<{ value: string; label: string }> = [
-  { value: 'all', label: 'すべて' },
-  { value: 'login', label: 'ログイン' },
-  { value: 'bank', label: '銀行口座' },
-  { value: 'ssh_key', label: 'SSH キー' },
-  { value: 'secure_note', label: 'セキュアノート' },
-  { value: 'credit_card', label: 'クレジットカード' },
-  { value: 'password', label: 'パスワード' },
-  { value: 'software_license', label: 'ソフトウェアライセンス' },
-]
-
 interface EntryFilterBarProps {
   selectedType: EntryType | undefined
   onTypeChange: (type: EntryType | undefined) => void
@@ -119,7 +106,32 @@ export function EntryFilterBar({
   onSearchClear,
   actionButton,
 }: EntryFilterBarProps) {
+  const { t } = useTranslation()
   const sortValue = `${sortConfig.field}:${sortConfig.order}`
+  const entryTypes = useMemo(
+    () => [
+      { value: 'all', label: t('filters.all') },
+      { value: 'login', label: t('entryTypes.login') },
+      { value: 'bank', label: t('entryTypes.bank') },
+      { value: 'ssh_key', label: t('entryTypes.ssh_key') },
+      { value: 'secure_note', label: t('entryTypes.secure_note') },
+      { value: 'credit_card', label: t('entryTypes.credit_card') },
+      { value: 'password', label: t('entryTypes.password') },
+      { value: 'software_license', label: t('entryTypes.software_license') },
+    ],
+    [t],
+  )
+  const sortOptions = useMemo(
+    () => [
+      { value: 'created_at:desc', label: t('sortOptions.createdDesc') },
+      { value: 'created_at:asc', label: t('sortOptions.createdAsc') },
+      { value: 'updated_at:desc', label: t('sortOptions.updatedDesc') },
+      { value: 'updated_at:asc', label: t('sortOptions.updatedAsc') },
+      { value: 'name:asc', label: t('sortOptions.nameAsc') },
+      { value: 'name:desc', label: t('sortOptions.nameDesc') },
+    ],
+    [t],
+  )
   return (
     <div className="flex gap-2">
       <Select
@@ -127,12 +139,12 @@ export function EntryFilterBar({
         onValueChange={(value) => onTypeChange(value === 'all' ? undefined : (value as EntryType))}
       >
         <SelectTrigger className="w-[140px]">
-          <SelectValue placeholder="カテゴリ" />
+          <SelectValue placeholder={t('filters.category')} />
         </SelectTrigger>
         <SelectContent>
-          {ENTRY_TYPES.map((t) => (
-            <SelectItem key={t.value} value={t.value}>
-              {t.label}
+          {entryTypes.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
             </SelectItem>
           ))}
         </SelectContent>
@@ -146,7 +158,7 @@ export function EntryFilterBar({
         />
         <input
           type="text"
-          placeholder="名前、メモ、カスタムフィールド名で検索..."
+          placeholder={t('entries.panel.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           className="w-full pl-10 pr-10 py-2 rounded-md border border-border bg-bg-surface text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
@@ -156,7 +168,7 @@ export function EntryFilterBar({
             type="button"
             onClick={onSearchClear}
             className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
-            title="検索をクリア"
+            title={t('common.clearSearch')}
           >
             <X size={18} />
           </button>
@@ -169,7 +181,7 @@ export function EntryFilterBar({
           <button
             type="button"
             className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-bg-surface text-text-primary hover:bg-bg-elevated transition-colors focus:outline-none focus:ring-2 focus:ring-accent"
-            title="並び替え"
+            title={t('filters.sortBy')}
           >
             <ArrowUpDown size={16} />
           </button>
@@ -182,7 +194,7 @@ export function EntryFilterBar({
               onSortChange({ field, order })
             }}
           >
-            {SORT_OPTIONS.map((opt) => (
+            {sortOptions.map((opt) => (
               <DropdownMenuRadioItem key={opt.value} value={opt.value}>
                 {opt.label}
               </DropdownMenuRadioItem>

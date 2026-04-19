@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import type { CustomField, Label } from '../../../shared/types'
 import * as commands from '../../commands'
@@ -9,6 +10,7 @@ import { Button } from '../../components/ui/button'
 import { usePushError } from '../../contexts/ErrorContext'
 
 export default function EntryCreate() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const pushError = usePushError()
   const [showTypeDialog, setShowTypeDialog] = useState(true)
@@ -35,7 +37,7 @@ export default function EntryCreate() {
 
   const handleCreate = async () => {
     if (!name) {
-      alert('名前を入力してください')
+      alert(t('entries.create.nameRequired'))
       return
     }
 
@@ -63,7 +65,7 @@ export default function EntryCreate() {
       )
       navigate('/entries', { state: { selectedId: id } })
     } catch (err) {
-      pushError(`アイテム作成失敗: ${err}`)
+      pushError(t('entries.create.createFailed', { error: String(err) }))
     } finally {
       setLoading(false)
     }
@@ -81,11 +83,11 @@ export default function EntryCreate() {
       />
 
       <PageHeader
-        title="新規アイテム"
+        title={t('entries.create.title')}
         showBackButton={true}
         action={
           <Button size="sm" onClick={handleCreate} disabled={loading || !name} className="text-sm">
-            {loading ? '作成中...' : '作成'}
+            {loading ? t('entries.create.creating') : t('entries.create.createButton')}
           </Button>
         }
       />

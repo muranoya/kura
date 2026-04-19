@@ -1,0 +1,537 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "close": "Close",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "copy": "Copy",
+    "copied": "Copied",
+    "loading": "Loading…",
+    "processing": "Processing…",
+    "saving": "Saving…",
+    "creating": "Creating…",
+    "deleting": "Deleting…",
+    "search": "Search",
+    "clearSearch": "Clear search",
+    "preview": "Preview",
+    "newTag": "New",
+    "unset": "Not set",
+    "yes": "Yes",
+    "no": "No",
+    "value": "Value",
+    "fieldName": "Field name"
+  },
+  "app": {
+    "name": "kura",
+    "loading": "Loading…",
+    "syncFailed": "Sync failed"
+  },
+  "sidebar": {
+    "brand": "kura",
+    "tagline": "Password manager",
+    "allItems": "All items",
+    "favorites": "Favorites",
+    "labels": "Labels",
+    "passwordGenerator": "Password generator",
+    "trash": "Trash",
+    "settings": "Settings"
+  },
+  "entryTypes": {
+    "login": "Login",
+    "bank": "Bank account",
+    "ssh_key": "SSH key",
+    "secure_note": "Secure note",
+    "credit_card": "Credit card",
+    "password": "Password",
+    "software_license": "Software license"
+  },
+  "fields": {
+    "username": "Username",
+    "password": "Password",
+    "url": "URL",
+    "bank_name": "Bank name",
+    "branch_code": "Branch code",
+    "account_type": "Account type",
+    "account_holder": "Account holder",
+    "account_number": "Account number",
+    "pin": "PIN",
+    "private_key": "Private key",
+    "content": "Content",
+    "cardholder": "Cardholder",
+    "number": "Card number",
+    "expiry": "Expiry",
+    "cvv": "CVV",
+    "cc_pin": "PIN",
+    "license_key": "License key"
+  },
+  "fieldPlaceholders": {
+    "url": "https://example.com",
+    "account_type": "Checking / Savings / etc.",
+    "number": "1234 5678 9012 3456",
+    "expiry": "MM/YY",
+    "cvv": "123",
+    "totp": "otpauth:// URI or Base32 secret",
+    "name": "e.g. Gmail account"
+  },
+  "sections": {
+    "login": "Login info",
+    "bank": "Bank account",
+    "credit_card": "Credit card",
+    "ssh_key": "SSH key",
+    "secure_note": "Note",
+    "password": "Password info",
+    "software_license": "License info",
+    "notes": "Notes"
+  },
+  "customFieldTypes": {
+    "text": "Text",
+    "password": "Password",
+    "email": "Email",
+    "url": "URL",
+    "phone": "Phone",
+    "totp": "One-time password"
+  },
+  "filters": {
+    "all": "All",
+    "category": "Category",
+    "sortBy": "Sort by"
+  },
+  "sortOptions": {
+    "createdDesc": "Created (newest first)",
+    "createdAsc": "Created (oldest first)",
+    "updatedDesc": "Updated (newest first)",
+    "updatedAsc": "Updated (oldest first)",
+    "nameAsc": "Name (A → Z)",
+    "nameDesc": "Name (Z → A)"
+  },
+  "onboarding": {
+    "welcome": {
+      "tagline1": "No server required.",
+      "tagline2": "A password manager just for you.",
+      "termsLink": "Terms of Service",
+      "agreementSuffix": "I agree to the",
+      "termsTitle": "Terms of Service",
+      "start": "Get started",
+      "close": "Close"
+    },
+    "storageSetup": {
+      "title": "Storage setup",
+      "subtitle": "Configure an S3-compatible cloud storage",
+      "transferShow": "Transfer settings from another device",
+      "transferTitle": "Transfer settings from another device",
+      "transferDescription": "Enter the transfer code and password generated on the configured device.",
+      "transferStringLabel": "Transfer code",
+      "transferStringPlaceholder": "kura-config-v1$…",
+      "transferPasswordLabel": "Transfer password",
+      "transferPasswordPlaceholder": "The password set when generating the code",
+      "transferLoad": "Load settings",
+      "regionLabel": "Region",
+      "regionPlaceholder": "e.g. ap-northeast-1",
+      "regionHelp": "Enter the AWS S3 region code",
+      "bucketLabel": "Bucket",
+      "bucketPlaceholder": "e.g. my-vault",
+      "bucketHelp": "Bucket where the vault file is stored",
+      "keyLabel": "File path",
+      "keyPlaceholder": "vault.json",
+      "keyHelp": "Path inside the bucket",
+      "accessKeyLabel": "Access key ID",
+      "accessKeyPlaceholder": "AKIA…",
+      "secretKeyLabel": "Secret access key",
+      "secretKeyPlaceholder": "••••••••••••••••",
+      "endpointLabel": "Endpoint (optional)",
+      "endpointPlaceholder": "e.g. https://s3.example.com",
+      "endpointHelp": "Only required when using a self-hosted S3-compatible server",
+      "errorRequired": "Please fill in all required fields",
+      "errorAccess": "Failed to access storage: {{error}}",
+      "errorTransfer": "Failed to decrypt the transfer code: {{error}}"
+    },
+    "masterPassword": {
+      "title": "Set master password",
+      "subtitle": "Set the password that protects your entire vault",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "Enter a strong password",
+      "passwordHelp": "Use a strong password of at least 8 characters",
+      "confirmLabel": "Confirm password",
+      "confirmPlaceholder": "Re-enter the password",
+      "matchOk": "Passwords match",
+      "errorRequired": "Please enter a password",
+      "errorMismatch": "Passwords do not match",
+      "errorMinLength": "Password must be at least 8 characters",
+      "errorGeneric": "Error: {{error}}",
+      "createVault": "Create vault"
+    },
+    "recoveryKey": {
+      "title": "Recovery key",
+      "subtitle": "Required to recover your vault",
+      "cardTitle": "Your recovery key",
+      "copyAction": "Copy recovery key",
+      "copied": "Copied",
+      "complete": "Done",
+      "errorGeneric": "Error: {{error}}"
+    },
+    "unlockExisting": {
+      "title": "Use existing vault",
+      "subtitle": "A vault already exists in this storage",
+      "description": "Enter your master password to use this vault.",
+      "masterPasswordLabel": "Master password",
+      "passwordPlaceholder": "Enter your password",
+      "errorRequired": "Please enter a password",
+      "errorWrongPassword": "Incorrect password",
+      "useThis": "Use this vault"
+    }
+  },
+  "auth": {
+    "lock": {
+      "subtitle": "Vault is locked",
+      "masterPasswordLabel": "Master password",
+      "passwordPlaceholder": "Enter your password",
+      "unlock": "Unlock",
+      "unlocking": "Unlocking…",
+      "recoveryAction": "Recover with recovery key",
+      "logout": "Sign out",
+      "errorRequired": "Please enter a password",
+      "errorUnlock": "Failed to unlock: {{error}}",
+      "errorLogout": "Failed to sign out: {{error}}",
+      "logoutDialog": {
+        "title": "Sign out",
+        "description": "Settings and local cache will be deleted, and the app will restart from initial setup. This action cannot be undone. Are you sure?",
+        "confirm": "Sign out"
+      }
+    },
+    "recovery": {
+      "back": "Back",
+      "title": "Recover with recovery key",
+      "recoveryKeyLabel": "Recovery key",
+      "recoveryKeyPlaceholder": "Enter recovery key",
+      "newPasswordLabel": "New password",
+      "newPasswordPlaceholder": "New password",
+      "confirmLabel": "Confirm password",
+      "confirmPlaceholder": "Re-enter the password",
+      "recover": "Recover",
+      "recovering": "Recovering…",
+      "errorRequired": "Please fill in all fields",
+      "errorMismatch": "Passwords do not match",
+      "errorRecover": "Recovery failed: {{error}}"
+    }
+  },
+  "entries": {
+    "list": {
+      "title": "All items",
+      "favoritesTitle": "Favorites",
+      "create": "New item",
+      "selectPrompt": "Select an item",
+      "emptyTitle": "No items",
+      "emptyFavoritesTitle": "No favorites",
+      "emptyDescription": "Use the new item button to add one",
+      "emptyFavoritesDescription": "Items you mark as favorite appear here",
+      "createFirst": "Create your first item",
+      "errorLoad": "Failed to load items: {{error}}",
+      "errorFavorite": "Failed to update favorite: {{error}}",
+      "errorDelete": "Failed to delete: {{error}}",
+      "deleteDialog": {
+        "title": "Delete item",
+        "description": "This item will be moved to the trash. You can restore it later."
+      }
+    },
+    "create": {
+      "title": "New item",
+      "errorName": "Please enter a name",
+      "errorCreate": "Failed to create item: {{error}}",
+      "errorLabelLoad": "Failed to load labels:"
+    },
+    "edit": {
+      "title": "Edit item",
+      "notFound": "Item not found",
+      "errorLoad": "Failed to load item: {{error}}",
+      "errorName": "Please enter a name",
+      "errorSave": "Failed to save: {{error}}"
+    },
+    "trash": {
+      "title": "Trash",
+      "emptyTitle": "Trash is empty",
+      "emptyDescription": "There are no deleted entries",
+      "deletedAt": "Deleted at:",
+      "restore": "Restore",
+      "delete": "Delete",
+      "errorLoad": "Failed to load trash: {{error}}",
+      "errorRestore": "Failed to restore: {{error}}",
+      "errorPurge": "Failed to permanently delete: {{error}}",
+      "purgeDialog": {
+        "title": "Delete permanently",
+        "description": "This item will be permanently deleted. This action cannot be undone."
+      }
+    },
+    "panel": {
+      "loadingTitle": "Loading…",
+      "loadingDescription": "Loading entries",
+      "searchPlaceholder": "Search by name, notes, or custom field name…",
+      "iconKey": "🔑",
+      "iconLoading": "⏳"
+    },
+    "detail": {
+      "favorite": "Favorite",
+      "unfavorite": "Unfavorite",
+      "edit": "Edit",
+      "delete": "Delete",
+      "updated": "Updated:",
+      "created": "Created:"
+    },
+    "form": {
+      "passwordGenerate": "Generate password",
+      "secureNoteEdit": "Edit",
+      "secureNotePreview": "Preview",
+      "addField": "Add field",
+      "selectFieldType": "Select field type",
+      "fieldNamePlaceholder": "Field name",
+      "valuePlaceholder": "Value",
+      "notes": "Notes",
+      "notesPlaceholder": "Add a note…",
+      "labels": "Labels",
+      "noLabels": "No labels",
+      "newLabelPlaceholder": "Label name",
+      "newLabelButton": "New",
+      "errorLabelCreate": "Failed to create label:"
+    },
+    "typeSelectDialog": {
+      "title": "Select item type",
+      "description": "Choose the type of item to create"
+    }
+  },
+  "labels": {
+    "title": "Manage labels",
+    "newCardTitle": "New label",
+    "newPlaceholder": "Enter label name",
+    "list": "Labels",
+    "loading": "Loading…",
+    "loadingDescription": "Loading labels",
+    "emptyTitle": "No labels",
+    "emptyDescription": "Create your first label",
+    "renamePlaceholder": "Label name",
+    "errorRequired": "Please enter a label name",
+    "errorCreate": "Failed to create label: {{error}}",
+    "errorDelete": "Failed to delete label: {{error}}",
+    "errorUpdate": "Failed to update label: {{error}}",
+    "errorLoad": "Failed to load labels: {{error}}",
+    "deleteDialog": {
+      "title": "Delete label",
+      "description": "This label will be deleted. Only the assignment to entries is removed; the entries themselves are not deleted."
+    }
+  },
+  "sync": {
+    "conflict": {
+      "title": "Resolve conflict",
+      "description": "A conflict occurred between local and cloud storage due to simultaneous updates from multiple devices. Choose one of the options below to resolve it."
+    },
+    "header": {
+      "syncNow": "Sync now",
+      "justNow": "Just now",
+      "minutesAgo": "{{count}} min ago",
+      "hoursAgo": "{{count}} h ago",
+      "daysAgo": "{{count}} d ago",
+      "syncFailed": "Sync failed: {{error}}"
+    }
+  },
+  "passwordGenerator": {
+    "title": "Password generator",
+    "generated": "Generated password",
+    "settings": "Settings",
+    "length": "Length: {{length}}",
+    "charSettings": "Character options",
+    "lowercase": "Lowercase (a-z)",
+    "uppercase": "Uppercase (A-Z)",
+    "numbers": "Digits (0-9)",
+    "symbols1": "Symbols (!@#$%^&*-_.)",
+    "symbols2": "Symbols (()[]{}+=~/)",
+    "symbols3": "Symbols (`<>'\"\\|;,:)",
+    "regenerate": "Regenerate",
+    "use": "Use this",
+    "notGenerated": "No password generated yet"
+  },
+  "settings": {
+    "title": "Settings",
+    "general": {
+      "title": "General",
+      "language": "Language",
+      "languageDescription": "Select the language used in the UI",
+      "languageSystem": "System",
+      "languageJa": "日本語",
+      "languageEn": "English",
+      "autolock": "Auto-lock",
+      "autolockDescription": "Time after the window loses focus",
+      "clipboardClear": "Auto-clear clipboard",
+      "clipboardClearDescription": "Time before clipboard is cleared after copy"
+    },
+    "autolockOptions": {
+      "disabled": "Disabled",
+      "minutes1": "1 min",
+      "minutes3": "3 min",
+      "minutes5": "5 min",
+      "minutes10": "10 min",
+      "minutes15": "15 min",
+      "minutes30": "30 min",
+      "minutes60": "60 min"
+    },
+    "clipboardOptions": {
+      "disabled": "Disabled",
+      "seconds30": "30 s",
+      "minutes1": "1 min",
+      "minutes2": "2 min"
+    },
+    "security": {
+      "title": "Security",
+      "changePassword": "Change master password",
+      "rotateDek": "Rotate DEK",
+      "regenerateRecovery": "Regenerate recovery key",
+      "logout": "Sign out"
+    },
+    "data": {
+      "title": "Data",
+      "import1pux": "Import from 1Password",
+      "exportBitwarden": "Export as Bitwarden format",
+      "exporting": "Exporting…"
+    },
+    "storage": {
+      "title": "Storage settings",
+      "loading": "Loading…",
+      "notFound": "Storage settings not found",
+      "bucket": "Bucket",
+      "region": "Region",
+      "key": "File path",
+      "endpoint": "Endpoint",
+      "transferToOther": "Transfer settings to another device"
+    },
+    "about": {
+      "title": "About this app",
+      "version": "Version",
+      "repository": "Repository"
+    },
+    "logoutDialog": {
+      "title": "Sign out",
+      "description": "Signing out clears the local cache and S3 settings. You'll need to re-enter the settings to sign in again.",
+      "confirm": "Sign out"
+    },
+    "changePasswordDialog": {
+      "title": "Change master password",
+      "description": "Set a new master password. Authentication with the current password is required. After the change, other configured devices must sign in again with the new master password.",
+      "oldPasswordLabel": "Current password",
+      "oldPasswordPlaceholder": "Current password",
+      "newPasswordLabel": "New password",
+      "newPasswordPlaceholder": "New password",
+      "confirmLabel": "Confirm new password",
+      "confirmPlaceholder": "Confirm new password",
+      "submit": "Change",
+      "submitting": "Changing…",
+      "errorRequired": "Please fill in all fields",
+      "errorMismatch": "New passwords do not match",
+      "errorSame": "The new password must differ from the current one",
+      "errorGeneric": "Failed to change password"
+    },
+    "rotateDekDialog": {
+      "title": "Rotate DEK",
+      "description": "Generate a new data encryption key. Authentication with the master password is required. The recovery key will also be regenerated.",
+      "passwordLabel": "Master password",
+      "passwordPlaceholder": "Master password",
+      "submit": "Rotate",
+      "submitting": "Rotating…",
+      "errorRequired": "Please enter a password",
+      "errorGeneric": "Failed to rotate DEK"
+    },
+    "regenerateRecoveryDialog": {
+      "title": "Regenerate recovery key",
+      "description": "Generate a new recovery key. Authentication with the master password is required.",
+      "passwordLabel": "Master password",
+      "passwordPlaceholder": "Master password",
+      "submit": "Generate",
+      "submitting": "Generating…",
+      "errorRequired": "Please enter a password",
+      "errorGeneric": "Failed to regenerate recovery key"
+    },
+    "exportDialog": {
+      "title": "Export data",
+      "description": "Export in Bitwarden JSON format. The exported file contains passwords in plain text. Handle with care.",
+      "confirm": "Export",
+      "errorGeneric": "Export failed: {{error}}"
+    },
+    "transferDialog": {
+      "title": "Transfer settings to another device",
+      "description": "Generate a transfer code encrypted with a transfer password. Enter this code and the transfer password during setup on another device.",
+      "passwordLabel": "Transfer password",
+      "passwordPlaceholder": "Set the password to share with the receiver",
+      "generate": "Generate transfer code",
+      "generating": "Generating…",
+      "copyCode": "Copy transfer code",
+      "copiedCode": "Copied",
+      "close": "Close",
+      "errorRequired": "Please enter a password",
+      "errorMissing": "S3 settings not found",
+      "errorGeneric": "Failed to generate transfer code"
+    },
+    "reauthDialog": {
+      "title": "Confirm master password",
+      "description": "Re-enter your master password before exporting sensitive information.",
+      "passwordLabel": "Master password",
+      "passwordPlaceholder": "Master password",
+      "submit": "Confirm",
+      "submitting": "Confirming…",
+      "errorRequired": "Please enter your master password",
+      "errorWrongPassword": "Incorrect master password"
+    },
+    "recoveryKeyDialog": {
+      "title": "New recovery key",
+      "description": "A new recovery key has been generated. Store it in a safe place. Use it if you forget your master password.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "saved": "Saved"
+    },
+    "errors": {
+      "saveSettings": "Failed to save settings: {{error}}",
+      "logout": "Failed to sign out: {{error}}"
+    }
+  },
+  "import1pux": {
+    "title": "Import from 1Password",
+    "description": "Select a .1pux file exported from 1Password.",
+    "selectFile": "Select file",
+    "parsing": "Parsing file…",
+    "previewTitle": "Import preview",
+    "previewAccount": "Account: {{account}} · ",
+    "totalCount": "{{count}} items total",
+    "noDuplicates": "No duplicates: {{count}}",
+    "duplicatesHigh": "Duplicates (high): {{count}}",
+    "duplicatesMedium": "Duplicates (medium): {{count}}",
+    "duplicatesLow": "Duplicates (low): {{count}}",
+    "archived": "Archived: {{count}}",
+    "attachmentWarnings": "Attachment warnings: {{count}}",
+    "searchPlaceholder": "Search by name…",
+    "bulkActions": "Bulk actions:",
+    "importAll": "Import all",
+    "skipAll": "Skip all",
+    "importCount": "Import {{count}}",
+    "executingTitle": "Importing",
+    "executingDescription": "Creating entries…",
+    "resultTitle": "Import complete",
+    "createdCount": "Created: {{count}}",
+    "overwrittenCount": "Overwritten: {{count}}",
+    "skippedCount": "Skipped: {{count}}",
+    "errorCount": "Errors: {{count}}",
+    "labelsCreated": "New labels created: {{labels}}",
+    "itemArchived": "Archived",
+    "duplicateRow": "Duplicate: {{name}}",
+    "confidenceHigh": " (high)",
+    "confidenceMedium": " (medium)",
+    "confidenceLow": " (low)",
+    "actions": {
+      "import": "Import",
+      "skip": "Skip",
+      "overwrite": "Overwrite: {{name}}"
+    }
+  },
+  "totp": {
+    "loading": "Loading…"
+  }
+}

@@ -1,9 +1,13 @@
+import { useTranslation } from 'react-i18next'
+
 interface SyncIndicatorProps {
   status: 'idle' | 'syncing' | 'success' | 'error'
   lastSyncTime?: string
 }
 
 export default function SyncIndicator({ status, lastSyncTime }: SyncIndicatorProps) {
+  const { t } = useTranslation()
+
   const getStatusColor = () => {
     switch (status) {
       case 'syncing':
@@ -20,13 +24,13 @@ export default function SyncIndicator({ status, lastSyncTime }: SyncIndicatorPro
   const getStatusText = () => {
     switch (status) {
       case 'syncing':
-        return '同期中...'
+        return t('components.syncIndicator.syncing')
       case 'success':
-        return '✓ 同期済み'
+        return `✓ ${t('components.syncIndicator.synced')}`
       case 'error':
-        return '✗ 同期エラー'
+        return `✗ ${t('components.syncIndicator.error')}`
       default:
-        return 'オフライン'
+        return t('components.syncIndicator.offline')
     }
   }
 

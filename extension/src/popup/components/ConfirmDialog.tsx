@@ -1,5 +1,6 @@
 import { AlertCircle } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -26,13 +27,14 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  confirmText = '確認',
-  cancelText = 'キャンセル',
+  confirmText,
+  cancelText,
   isDangerous = false,
   onConfirm,
   onCancel,
   isLoading = false,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation()
   const [isProcessing, setIsProcessing] = useState(false)
 
   const handleConfirm = async () => {
@@ -43,6 +45,9 @@ export function ConfirmDialog({
       setIsProcessing(false)
     }
   }
+
+  const resolvedConfirm = confirmText ?? t('components.confirmDialog.defaultConfirm')
+  const resolvedCancel = cancelText ?? t('components.confirmDialog.defaultCancel')
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
@@ -62,14 +67,14 @@ export function ConfirmDialog({
         </DialogHeader>
         <DialogFooter className="gap-2">
           <Button variant="secondary" onClick={onCancel} disabled={isProcessing || isLoading}>
-            {cancelText}
+            {resolvedCancel}
           </Button>
           <Button
             variant={isDangerous ? 'destructive' : 'primary'}
             onClick={handleConfirm}
             disabled={isProcessing || isLoading}
           >
-            {isProcessing || isLoading ? '処理中...' : confirmText}
+            {isProcessing || isLoading ? t('components.confirmDialog.processing') : resolvedConfirm}
           </Button>
         </DialogFooter>
       </DialogContent>

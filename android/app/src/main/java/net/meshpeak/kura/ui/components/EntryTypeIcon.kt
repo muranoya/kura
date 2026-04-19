@@ -6,6 +6,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import net.meshpeak.kura.R
+import net.meshpeak.kura.data.model.EntryType
 
 fun entryTypeColor(entryType: String): Color = when (entryType) {
     "login" -> Color(0xFF7C3AED)
@@ -33,13 +36,6 @@ fun EntryTypeIcon(entryType: String, modifier: Modifier = Modifier, tint: Color 
     Icon(imageVector = icon, contentDescription = entryType, modifier = modifier, tint = tint)
 }
 
-fun entryTypeDisplayName(type: String): String = when (type) {
-    "login" -> "ログイン"
-    "bank" -> "銀行口座"
-    "ssh_key" -> "SSHキー"
-    "secure_note" -> "セキュアノート"
-    "credit_card" -> "クレジットカード"
-    "password" -> "パスワード"
-    "software_license" -> "ソフトウェアライセンス"
-    else -> type
-}
+@Composable
+fun entryTypeDisplayName(type: String): String =
+    EntryType.fromValue(type)?.let { stringResource(it.displayNameResId) } ?: type

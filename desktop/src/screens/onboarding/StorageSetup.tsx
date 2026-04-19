@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { decryptTransferConfig, downloadVault } from '../../commands'
 import { PageHeader } from '../../components/layout/PageHeader'
@@ -9,6 +10,7 @@ import { Label } from '../../components/ui/label'
 import { PasswordInput } from '../../components/ui/password-input'
 
 export default function StorageSetup() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [region, setRegion] = useState('')
   const [bucket, setBucket] = useState('')
@@ -37,7 +39,7 @@ export default function StorageSetup() {
 
   const handleNext = async () => {
     if (!region || !bucket || !key || !accessKeyId || !secretAccessKey) {
-      setError('すべての必須フィールドを入力してください')
+      setError(t('onboarding.storageSetup.errorRequired'))
       return
     }
 
@@ -68,7 +70,9 @@ export default function StorageSetup() {
       }
     } catch (err) {
       setError(
-        `ストレージへのアクセスに失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+        t('onboarding.storageSetup.errorAccess', {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       )
       setIsLoading(false)
     }
@@ -92,7 +96,9 @@ export default function StorageSetup() {
       setTransferPassword('')
     } catch (err) {
       setError(
-        `転送コードの復号に失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+        t('onboarding.storageSetup.errorTransfer', {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       )
     } finally {
       setIsLoading(false)
@@ -101,7 +107,10 @@ export default function StorageSetup() {
 
   return (
     <div className="min-h-screen bg-bg-base">
-      <PageHeader title="ストレージ設定" subtitle="S3互換のクラウドストレージを設定します" />
+      <PageHeader
+        title={t('onboarding.storageSetup.title')}
+        subtitle={t('onboarding.storageSetup.subtitle')}
+      />
 
       <div className="max-w-2xl mx-auto p-6 space-y-6">
         {/* エラーメッセージ */}
@@ -115,31 +124,35 @@ export default function StorageSetup() {
         {showTransfer ? (
           <Card>
             <CardHeader>
-              <CardTitle>別の端末から設定を転送</CardTitle>
+              <CardTitle>{t('onboarding.storageSetup.transferTitle')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-text-muted">
-                設定済みの端末で生成した転送コードと転送パスワードを入力してください。
+                {t('onboarding.storageSetup.transferDescription')}
               </p>
               <div>
-                <Label htmlFor="transfer-string">転送コード</Label>
+                <Label htmlFor="transfer-string">
+                  {t('onboarding.storageSetup.transferStringLabel')}
+                </Label>
                 <textarea
                   id="transfer-string"
                   value={transferString}
                   onChange={(e) => setTransferString(e.target.value)}
-                  placeholder="kura-config-v1$..."
+                  placeholder={t('onboarding.storageSetup.transferStringPlaceholder')}
                   className="w-full min-h-[100px] mt-1.5 rounded-md border border-border bg-input-bg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary resize-y"
                   disabled={isLoading}
                 />
               </div>
               <div>
-                <Label htmlFor="transfer-password">転送パスワード</Label>
+                <Label htmlFor="transfer-password">
+                  {t('onboarding.storageSetup.transferPasswordLabel')}
+                </Label>
                 <PasswordInput
                   id="transfer-password"
                   value={transferPassword}
                   onChange={(e) => setTransferPassword(e.target.value)}
                   disabled={isLoading}
-                  placeholder="転送コード生成時に設定したパスワード"
+                  placeholder={t('onboarding.storageSetup.transferPasswordPlaceholder')}
                 />
               </div>
               <div className="flex gap-3">
@@ -152,7 +165,7 @@ export default function StorageSetup() {
                   disabled={isLoading}
                   className="flex-1"
                 >
-                  キャンセル
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   onClick={handleTransferImport}
@@ -160,14 +173,14 @@ export default function StorageSetup() {
                   className="flex-1"
                   isLoading={isLoading}
                 >
-                  設定を読み込む
+                  {t('onboarding.storageSetup.transferLoad')}
                 </Button>
               </div>
             </CardContent>
           </Card>
         ) : (
           <Button variant="secondary" onClick={() => setShowTransfer(true)} className="w-full">
-            別の端末から設定を転送
+            {t('onboarding.storageSetup.transferShow')}
           </Button>
         )}
 
@@ -177,11 +190,11 @@ export default function StorageSetup() {
               {/* リージョン */}
               <div>
                 <Label htmlFor="region">
-                  リージョン <span className="text-danger">*</span>
+                  {t('onboarding.storageSetup.regionLabel')} <span className="text-danger">*</span>
                 </Label>
                 <Input
                   id="region"
-                  placeholder="例: ap-northeast-1"
+                  placeholder={t('onboarding.storageSetup.regionPlaceholder')}
                   value={region}
                   onChange={(e) => {
                     setRegion(e.target.value)
@@ -189,49 +202,54 @@ export default function StorageSetup() {
                   }}
                 />
                 <p className="text-xs text-text-muted mt-1.5">
-                  AWS S3 のリージョンコードを入力してください
+                  {t('onboarding.storageSetup.regionHelp')}
                 </p>
               </div>
 
               {/* バケット */}
               <div>
                 <Label htmlFor="bucket">
-                  バケット <span className="text-danger">*</span>
+                  {t('onboarding.storageSetup.bucketLabel')} <span className="text-danger">*</span>
                 </Label>
                 <Input
                   id="bucket"
-                  placeholder="例: my-vault"
+                  placeholder={t('onboarding.storageSetup.bucketPlaceholder')}
                   value={bucket}
                   onChange={(e) => {
                     setBucket(e.target.value)
                     setError('')
                   }}
                 />
-                <p className="text-xs text-text-muted mt-1.5">vaultファイルを保存するバケット名</p>
+                <p className="text-xs text-text-muted mt-1.5">
+                  {t('onboarding.storageSetup.bucketHelp')}
+                </p>
               </div>
 
               {/* ファイルパス */}
               <div>
                 <Label htmlFor="key">
-                  ファイルパス <span className="text-danger">*</span>
+                  {t('onboarding.storageSetup.keyLabel')} <span className="text-danger">*</span>
                 </Label>
                 <Input
                   id="key"
-                  placeholder="vault.json"
+                  placeholder={t('onboarding.storageSetup.keyPlaceholder')}
                   value={key}
                   onChange={(e) => setKey(e.target.value)}
                 />
-                <p className="text-xs text-text-muted mt-1.5">バケット内の保存パス</p>
+                <p className="text-xs text-text-muted mt-1.5">
+                  {t('onboarding.storageSetup.keyHelp')}
+                </p>
               </div>
 
               {/* アクセスキーID */}
               <div>
                 <Label htmlFor="access-key">
-                  アクセスキーID <span className="text-danger">*</span>
+                  {t('onboarding.storageSetup.accessKeyLabel')}{' '}
+                  <span className="text-danger">*</span>
                 </Label>
                 <Input
                   id="access-key"
-                  placeholder="AKIA..."
+                  placeholder={t('onboarding.storageSetup.accessKeyPlaceholder')}
                   value={accessKeyId}
                   onChange={(e) => {
                     setAccessKeyId(e.target.value)
@@ -243,11 +261,12 @@ export default function StorageSetup() {
               {/* シークレットアクセスキー */}
               <div>
                 <Label htmlFor="secret-key">
-                  シークレットアクセスキー <span className="text-danger">*</span>
+                  {t('onboarding.storageSetup.secretKeyLabel')}{' '}
+                  <span className="text-danger">*</span>
                 </Label>
                 <PasswordInput
                   id="secret-key"
-                  placeholder="••••••••••••••••"
+                  placeholder={t('onboarding.storageSetup.secretKeyPlaceholder')}
                   value={secretAccessKey}
                   onChange={(e) => {
                     setSecretAccessKey(e.target.value)
@@ -258,15 +277,15 @@ export default function StorageSetup() {
 
               {/* エンドポイント */}
               <div>
-                <Label htmlFor="endpoint">エンドポイント (オプション)</Label>
+                <Label htmlFor="endpoint">{t('onboarding.storageSetup.endpointLabel')}</Label>
                 <Input
                   id="endpoint"
-                  placeholder="例: https://s3.example.com"
+                  placeholder={t('onboarding.storageSetup.endpointPlaceholder')}
                   value={endpoint}
                   onChange={(e) => setEndpoint(e.target.value)}
                 />
                 <p className="text-xs text-text-muted mt-1.5">
-                  自社ホストの S3 互換サーバーを使用する場合のみ入力
+                  {t('onboarding.storageSetup.endpointHelp')}
                 </p>
               </div>
 
@@ -278,7 +297,7 @@ export default function StorageSetup() {
                   className="flex-1"
                   disabled={isLoading}
                 >
-                  戻る
+                  {t('common.back')}
                 </Button>
                 <Button
                   onClick={handleNext}
@@ -286,7 +305,7 @@ export default function StorageSetup() {
                   disabled={isLoading}
                   isLoading={isLoading}
                 >
-                  次へ
+                  {t('common.next')}
                 </Button>
               </div>
             </div>

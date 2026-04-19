@@ -1,30 +1,35 @@
 import { Loader2, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { STORAGE_KEYS } from '../../../shared/constants'
 import { getFromStorage } from '../../../shared/storage'
 import * as commands from '../../commands'
 import { usePushError } from '../../contexts/ErrorContext'
 import { Button } from '../ui/button'
 
-function formatRelativeTime(unixSecs: number): string {
-  const diffMin = Math.floor((Date.now() / 1000 - unixSecs) / 60)
-  if (diffMin < 1) return 'たった今'
-  if (diffMin < 60) return `${diffMin}分前`
-  const h = Math.floor(diffMin / 60)
-  if (h < 24) return `${h}時間前`
-  return `${Math.floor(h / 24)}日前`
-}
-
 interface SyncActionsProps {
   onSyncComplete?: () => void
 }
 
 export function SyncActions({ onSyncComplete }: SyncActionsProps) {
+  const { t } = useTranslation()
   const pushError = usePushError()
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [storageConfigExists, setStorageConfigExists] = useState(true)
   const [_tick, setTick] = useState(0)
+
+  const formatRelativeTime = useCallback(
+    (unixSecs: number): string => {
+      const diffMin = Math.floor((Date.now() / 1000 - unixSecs) / 60)
+      if (diffMin < 1) return t('components.syncActions.justNow')
+      if (diffMin < 60) return t('components.syncActions.minutesAgo', { count: diffMin })
+      const h = Math.floor(diffMin / 60)
+      if (h < 24) return t('components.syncActions.hoursAgo', { count: h })
+      return t('components.syncActions.daysAgo', { count: Math.floor(h / 24) })
+    },
+    [t],
+  )
 
   const loadLastSyncTime = useCallback(async () => {
     try {
@@ -49,10 +54,9 @@ export function SyncActions({ onSyncComplete }: SyncActionsProps) {
     loadLastSyncTime()
   }, [loadLastSyncTime])
 
-  // Auto-update relative time every minute
   useEffect(() => {
     if (!lastSyncTime) return
-    const timer = setInterval(() => setTick((t) => t + 1), 60000)
+    const timer = setInterval(() => setTick((tick) => tick + 1), 60000)
     return () => clearInterval(timer)
   }, [lastSyncTime])
 
@@ -71,19 +75,18 @@ export function SyncActions({ onSyncComplete }: SyncActionsProps) {
       }
       onSyncComplete?.()
     } catch (err) {
-      pushError(`同期に失敗しました: ${err}`, 'manual-sync')
+      pushError(t('errors.syncFailed', { error: String(err) }), 'manual-sync')
     } finally {
       setSyncing(false)
     }
   }
 
-  // Return nothing if storage not configured
   if (!storageConfigExists) return null
 
   return (
     <div className="flex items-center gap-1.5">
       <span className="text-xs text-text-muted whitespace-nowrap">
-        {lastSyncTime ? formatRelativeTime(lastSyncTime) : '未同期'}
+        {lastSyncTime ? formatRelativeTime(lastSyncTime) : t('components.syncActions.neverSynced')}
       </span>
       <Button
         onClick={handleSync}
