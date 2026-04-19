@@ -9,9 +9,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import net.meshpeak.kura.R
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
@@ -37,13 +40,14 @@ fun StorageSetupScreen(
     var transferPassword by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
+    val context = LocalContext.current
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("ストレージ設定") },
+                title = { Text(stringResource(R.string.storage_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 }
             )
@@ -58,7 +62,7 @@ fun StorageSetupScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                "S3互換のクラウドストレージを設定します",
+                stringResource(R.string.storage_description_generic),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -82,19 +86,19 @@ fun StorageSetupScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            "別の端末から設定を転送",
+                            stringResource(R.string.storage_transfer_import_title),
                             style = MaterialTheme.typography.titleSmall
                         )
                         Text(
-                            "設定済みの端末で生成した転送コードと転送パスワードを入力してください。",
+                            stringResource(R.string.storage_transfer_import_description),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         OutlinedTextField(
                             value = transferString,
                             onValueChange = { transferString = it },
-                            label = { Text("転送コード") },
-                            placeholder = { Text("kura-config-v1\$...") },
+                            label = { Text(stringResource(R.string.storage_transfer_code)) },
+                            placeholder = { Text(stringResource(R.string.storage_transfer_code_placeholder)) },
                             modifier = Modifier.fillMaxWidth(),
                             minLines = 3,
                             maxLines = 5,
@@ -103,8 +107,8 @@ fun StorageSetupScreen(
                         OutlinedTextField(
                             value = transferPassword,
                             onValueChange = { transferPassword = it },
-                            label = { Text("転送パスワード") },
-                            placeholder = { Text("転送コード生成時に設定したパスワード") },
+                            label = { Text(stringResource(R.string.storage_transfer_password)) },
+                            placeholder = { Text(stringResource(R.string.storage_transfer_password_placeholder)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             visualTransformation = PasswordVisualTransformation(),
@@ -115,7 +119,7 @@ fun StorageSetupScreen(
                                 onClick = { showTransfer = false; error = "" },
                                 modifier = Modifier.weight(1f),
                                 enabled = !isLoading
-                            ) { Text("キャンセル") }
+                            ) { Text(stringResource(R.string.action_cancel)) }
                             Button(
                                 onClick = {
                                     scope.launch {
@@ -136,7 +140,7 @@ fun StorageSetupScreen(
                                             transferString = ""
                                             transferPassword = ""
                                         } catch (e: Exception) {
-                                            error = "転送コードの復号に失敗しました: ${e.message ?: e.toString()}"
+                                            error = context.getString(R.string.storage_transfer_decrypt_failed, e.message ?: e.toString())
                                         } finally {
                                             isLoading = false
                                         }
@@ -146,7 +150,7 @@ fun StorageSetupScreen(
                                 enabled = !isLoading && transferString.isNotBlank() && transferPassword.isNotEmpty()
                             ) {
                                 if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                else Text("設定を読み込む")
+                                else Text(stringResource(R.string.storage_transfer_load))
                             }
                         }
                     }
@@ -155,45 +159,45 @@ fun StorageSetupScreen(
                 OutlinedButton(
                     onClick = { showTransfer = true },
                     modifier = Modifier.fillMaxWidth()
-                ) { Text("別の端末から設定を転送") }
+                ) { Text(stringResource(R.string.storage_transfer_import_button)) }
             }
 
             OutlinedTextField(
                 value = region, onValueChange = { region = it; error = "" },
-                label = { Text("リージョン *") },
-                placeholder = { Text("例: ap-northeast-1") },
+                label = { Text(stringResource(R.string.storage_region_required)) },
+                placeholder = { Text(stringResource(R.string.storage_region_placeholder)) },
                 modifier = Modifier.fillMaxWidth().testTag("region_input"), singleLine = true
             )
             OutlinedTextField(
                 value = bucket, onValueChange = { bucket = it; error = "" },
-                label = { Text("バケット *") },
-                placeholder = { Text("例: my-vault") },
+                label = { Text(stringResource(R.string.storage_bucket_required)) },
+                placeholder = { Text(stringResource(R.string.storage_bucket_placeholder)) },
                 modifier = Modifier.fillMaxWidth().testTag("bucket_input"), singleLine = true
             )
             OutlinedTextField(
                 value = key, onValueChange = { key = it },
-                label = { Text("ファイルパス *") },
-                placeholder = { Text("vault.json") },
+                label = { Text(stringResource(R.string.storage_file_path_required)) },
+                placeholder = { Text(stringResource(R.string.storage_file_path_placeholder)) },
                 modifier = Modifier.fillMaxWidth().testTag("key_input"), singleLine = true,
-                supportingText = { Text("バケット内の保存パス") }
+                supportingText = { Text(stringResource(R.string.storage_file_path_supporting)) }
             )
             OutlinedTextField(
                 value = accessKeyId, onValueChange = { accessKeyId = it; error = "" },
-                label = { Text("アクセスキーID *") },
-                placeholder = { Text("AKIA...") },
+                label = { Text(stringResource(R.string.storage_access_key_required)) },
+                placeholder = { Text(stringResource(R.string.storage_access_key_placeholder)) },
                 modifier = Modifier.fillMaxWidth().testTag("access_key_input"), singleLine = true
             )
             OutlinedTextField(
                 value = secretAccessKey, onValueChange = { secretAccessKey = it; error = "" },
-                label = { Text("シークレットアクセスキー *") },
+                label = { Text(stringResource(R.string.storage_secret_key_required)) },
                 modifier = Modifier.fillMaxWidth().testTag("secret_key_input"), singleLine = true
             )
             OutlinedTextField(
                 value = endpoint, onValueChange = { endpoint = it },
-                label = { Text("エンドポイント (オプション)") },
-                placeholder = { Text("例: https://s3.example.com") },
+                label = { Text(stringResource(R.string.storage_endpoint_label)) },
+                placeholder = { Text(stringResource(R.string.storage_endpoint_placeholder)) },
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
-                supportingText = { Text("S3互換サーバーを使用する場合のみ") }
+                supportingText = { Text(stringResource(R.string.storage_endpoint_supporting)) }
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -203,11 +207,11 @@ fun StorageSetupScreen(
                     onClick = onBack,
                     modifier = Modifier.weight(1f).testTag("storage_back_button"),
                     enabled = !isLoading
-                ) { Text("戻る") }
+                ) { Text(stringResource(R.string.action_back)) }
                 Button(
                     onClick = {
                         if (region.isBlank() || bucket.isBlank() || key.isBlank() || accessKeyId.isBlank() || secretAccessKey.isBlank()) {
-                            error = "すべての必須フィールドを入力してください"
+                            error = context.getString(R.string.storage_required_all)
                             return@Button
                         }
                         scope.launch {
@@ -228,7 +232,7 @@ fun StorageSetupScreen(
                                 if (exists) onExistingVault() else onNewVault()
                             } catch (e: Exception) {
                                 Log.e("StorageSetup", "S3 access failed", e)
-                                error = "ストレージへのアクセスに失敗しました: ${e.message ?: e.toString()}"
+                                error = context.getString(R.string.storage_access_failed, e.message ?: e.toString())
                             } finally {
                                 isLoading = false
                             }
@@ -238,7 +242,7 @@ fun StorageSetupScreen(
                     enabled = !isLoading
                 ) {
                     if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    else Text("次へ")
+                    else Text(stringResource(R.string.action_next))
                 }
             }
         }

@@ -114,6 +114,9 @@ dependencies {
     // Security (EncryptedSharedPreferences)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
+    // AppCompat (needed for AppCompatDelegate.setApplicationLocales on per-app language preferences)
+    implementation("androidx.appcompat:appcompat:1.7.0")
+
     // Biometric
     implementation("androidx.biometric:biometric:1.1.0")
     // Fragment: biometric 1.1.0 が引き込む古い 1.2.4 では FragmentActivity が

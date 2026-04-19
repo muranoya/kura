@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -39,6 +40,7 @@ interface EntryListProps {
 }
 
 export default function EntryList({ onlyFavorites = false, labelId, labelName }: EntryListProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const syncVersion = useSyncVersion()
@@ -115,7 +117,7 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
       // データが変わった場合のみstateを更新（不要な再描画を防ぐ）
       setEntries((prev: EntryRow[]) => (entriesChanged(prev, data) ? data : prev))
     } catch (err) {
-      setError(`アイテム読み込み失敗: ${err}`)
+      setError(t('entries.list.errorLoad', { error: String(err) }))
     } finally {
       if (isInitialLoad) {
         setLoading(false)
@@ -131,6 +133,7 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
     sortConfig,
     sortLoaded,
     typeFilterLoaded,
+    t,
   ])
 
   useEffect(() => {
@@ -220,7 +223,7 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
         setSelectedEntry({ ...selectedEntry, isFavorite: !currentFavorite })
       }
     } catch (err) {
-      setError(`お気に入り変更失敗: ${err}`)
+      setError(t('entries.list.errorFavorite', { error: String(err) }))
     }
   }
 
@@ -245,7 +248,7 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
       setDeleteDialogOpen(false)
       setDeleteTargetId(null)
     } catch (err) {
-      setError(`削除失敗: ${err}`)
+      setError(t('entries.list.errorDelete', { error: String(err) }))
     }
   }
 
@@ -265,7 +268,8 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
       <div className="sticky top-0 z-10 border-b border-border bg-bg-surface shrink-0">
         <div className="flex items-center gap-2 px-3 py-2">
           <h1 className="text-sm font-semibold text-text-primary flex-1">
-            {labelName || (onlyFavorites ? 'お気に入り' : 'アイテム一覧')}
+            {labelName ||
+              (onlyFavorites ? t('entries.list.favoritesTitle') : t('entries.list.title'))}
           </h1>
           <SyncHeaderActions />
         </div>
@@ -281,7 +285,7 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
             actionButton={
               !onlyFavorites && (
                 <Button onClick={() => navigate('/entries/create')} size="sm">
-                  新規作成
+                  {t('entries.list.create')}
                 </Button>
               )
             }
@@ -297,15 +301,19 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
             entries={entries}
             loading={loading}
             error={error}
-            emptyTitle={onlyFavorites ? 'お気に入りがありません' : 'アイテムがありません'}
+            emptyTitle={
+              onlyFavorites ? t('entries.list.emptyFavoritesTitle') : t('entries.list.emptyTitle')
+            }
             emptyDescription={
               onlyFavorites
-                ? 'お気に入りに登録したアイテムがここに表示されます'
-                : '新規作成ボタンからアイテムを追加してください'
+                ? t('entries.list.emptyFavoritesDescription')
+                : t('entries.list.emptyDescription')
             }
             emptyAction={
               !onlyFavorites && (
-                <Button onClick={() => navigate('/entries/create')}>最初のアイテムを作成</Button>
+                <Button onClick={() => navigate('/entries/create')}>
+                  {t('entries.list.createFirst')}
+                </Button>
               )
             }
             scrollRef={scrollRef}
@@ -327,7 +335,7 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
         <div className="flex-1 overflow-hidden">
           {detailLoading ? (
             <div className="flex items-center justify-center h-full text-text-secondary">
-              読み込み中...
+              {t('common.loading')}
             </div>
           ) : selectedEntry ? (
             <EntryDetailContent
@@ -342,7 +350,7 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
             />
           ) : (
             <div className="flex items-center justify-center h-full text-text-secondary">
-              アイテムを選択してください
+              {t('entries.list.selectPrompt')}
             </div>
           )}
         </div>
@@ -351,10 +359,10 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
       {/* 削除確認ダイアログ */}
       <ConfirmDialog
         open={deleteDialogOpen}
-        title="アイテムを削除"
-        description="このアイテムをゴミ箱に移動します。後から復元できます。"
-        confirmText="削除"
-        cancelText="キャンセル"
+        title={t('entries.list.deleteDialog.title')}
+        description={t('entries.list.deleteDialog.description')}
+        confirmText={t('common.delete')}
+        cancelText={t('common.cancel')}
         isDangerous={true}
         onConfirm={handleDeleteConfirmed}
         onCancel={() => {

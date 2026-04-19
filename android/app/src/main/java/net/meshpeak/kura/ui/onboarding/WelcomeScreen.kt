@@ -11,8 +11,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import java.util.Locale
+import net.meshpeak.kura.R
 import net.meshpeak.kura.ui.components.MarkdownText
 
 @Composable
@@ -23,11 +26,11 @@ fun WelcomeScreen(onStart: () -> Unit) {
 
     val termsText by remember {
         derivedStateOf {
-            try {
-                context.assets.open("legal/terms_ja.md").bufferedReader().readText()
-            } catch (_: Exception) {
-                ""
-            }
+            val lang = Locale.getDefault().language
+            val candidates = listOf("legal/terms_${lang}.md", "legal/terms_ja.md")
+            candidates.firstNotNullOfOrNull { path ->
+                runCatching { context.assets.open(path).bufferedReader().readText() }.getOrNull()
+            } ?: ""
         }
     }
 
@@ -46,19 +49,19 @@ fun WelcomeScreen(onStart: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            text = "kura",
+            text = stringResource(R.string.welcome_title),
             style = MaterialTheme.typography.displaySmall,
             color = MaterialTheme.colorScheme.primary
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "パスワードマネージャー",
+            text = stringResource(R.string.welcome_subtitle),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(32.dp))
         Text(
-            text = "サーバ不要、自分一人のための\nパスワードマネージャー",
+            text = stringResource(R.string.welcome_tagline),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -75,17 +78,28 @@ fun WelcomeScreen(onStart: () -> Unit) {
                 onCheckedChange = { agreed = it },
                 modifier = Modifier.testTag("terms_checkbox")
             )
+            val prefix = stringResource(R.string.welcome_terms_prefix)
+            if (prefix.isNotEmpty()) {
+                Text(
+                    text = prefix,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             TextButton(onClick = { showTermsDialog = true }) {
                 Text(
-                    text = "利用規約",
+                    text = stringResource(R.string.welcome_terms_link),
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-            Text(
-                text = "に同意する",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            val suffix = stringResource(R.string.welcome_terms_suffix)
+            if (suffix.isNotEmpty()) {
+                Text(
+                    text = suffix,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -95,7 +109,7 @@ fun WelcomeScreen(onStart: () -> Unit) {
             modifier = Modifier.fillMaxWidth().testTag("start_button"),
             enabled = agreed
         ) {
-            Text("始める")
+            Text(stringResource(R.string.welcome_get_started))
         }
     }
 
@@ -105,7 +119,7 @@ fun WelcomeScreen(onStart: () -> Unit) {
             onDismissRequest = { showTermsDialog = false },
             title = {
                 Text(
-                    text = "利用規約",
+                    text = stringResource(R.string.welcome_terms_link),
                     style = MaterialTheme.typography.titleLarge
                 )
             },
@@ -124,7 +138,7 @@ fun WelcomeScreen(onStart: () -> Unit) {
             },
             confirmButton = {
                 TextButton(onClick = { showTermsDialog = false }) {
-                    Text("閉じる")
+                    Text(stringResource(R.string.action_close))
                 }
             }
         )

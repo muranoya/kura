@@ -90,7 +90,7 @@ pub fn generate_preview(
     }
 
     let mut by_target_type: Vec<(String, usize)> = type_counts.into_iter().collect();
-    by_target_type.sort_by(|a, b| b.1.cmp(&a.1));
+    by_target_type.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     Ok(ImportPreview {
         stats: ImportPreviewStats {

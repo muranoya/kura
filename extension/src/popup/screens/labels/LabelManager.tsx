@@ -1,5 +1,6 @@
 import { Check, Edit2, Plus, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { EmptyState } from '../../components/layout/EmptyState'
@@ -10,6 +11,7 @@ import { Label } from '../../components/ui/label'
 import { Separator } from '../../components/ui/separator'
 
 export default function LabelManager() {
+  const { t } = useTranslation()
   const [labels, setLabels] = useState<{ id: string; name: string }[]>([])
   const [newLabelName, setNewLabelName] = useState('')
   const [loading, setLoading] = useState(true)
@@ -27,11 +29,11 @@ export default function LabelManager() {
       const result = await commands.listLabels()
       setLabels(result)
     } catch (err) {
-      setError(String(err) || 'ラベルの読み込みに失敗しました')
+      setError(String(err) || t('labels.loadFailed'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     loadLabels()
@@ -39,7 +41,7 @@ export default function LabelManager() {
 
   const handleCreateLabel = async () => {
     if (!newLabelName.trim()) {
-      setError('ラベル名を入力してください')
+      setError(t('labels.nameRequired'))
       return
     }
 
@@ -50,7 +52,7 @@ export default function LabelManager() {
       setLabels([...labels, { id: newLabelId, name: newLabelName }])
       setNewLabelName('')
     } catch (err) {
-      setError(String(err) || 'ラベルの作成に失敗しました')
+      setError(String(err) || t('labels.createFailed'))
     } finally {
       setCreating(false)
     }
@@ -63,7 +65,7 @@ export default function LabelManager() {
 
   const saveEdit = async (id: string) => {
     if (!editingName.trim()) {
-      setError('ラベル名を入力してください')
+      setError(t('labels.nameRequired'))
       return
     }
 
@@ -76,7 +78,7 @@ export default function LabelManager() {
       setEditingId(null)
       setEditingName('')
     } catch (err) {
-      setError(String(err) || 'ラベルの更新に失敗しました')
+      setError(String(err) || t('labels.updateFailed'))
     }
   }
 
@@ -94,13 +96,13 @@ export default function LabelManager() {
       setConfirmDeleteOpen(false)
       setSelectedDeleteId(null)
     } catch (err) {
-      setError(String(err) || '削除に失敗しました')
+      setError(String(err) || t('labels.deleteFailed'))
     }
   }
 
   return (
     <div className="h-full overflow-y-auto flex flex-col">
-      <PageHeader title="ラベル" showBackButton={true} />
+      <PageHeader title={t('labels.headerTitle')} showBackButton={true} />
 
       <div className="p-4">
         {error && (
@@ -109,20 +111,19 @@ export default function LabelManager() {
           </div>
         )}
 
-        {/* 新規ラベル作成 */}
         <section>
           <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
-            新しいラベル
+            {t('labels.newLabelSection')}
           </h2>
           <div className="space-y-1">
             <Label htmlFor="new-label-name" className="text-sm">
-              ラベル名
+              {t('labels.newLabelNameLabel')}
             </Label>
             <div className="flex gap-2">
               <Input
                 id="new-label-name"
                 type="text"
-                placeholder="ラベル名を入力"
+                placeholder={t('labels.newLabelNamePlaceholder')}
                 value={newLabelName}
                 onChange={(e) => {
                   setNewLabelName(e.target.value)
@@ -139,7 +140,7 @@ export default function LabelManager() {
                 size="sm"
               >
                 <Plus size={14} />
-                追加
+                {t('labels.addButton')}
               </Button>
             </div>
           </div>
@@ -147,15 +148,14 @@ export default function LabelManager() {
 
         <Separator className="my-4" />
 
-        {/* ラベル一覧 */}
         {loading ? (
-          <div className="text-center py-8 text-text-muted text-sm">読み込み中...</div>
+          <div className="text-center py-8 text-text-muted text-sm">{t('common.loading')}</div>
         ) : labels.length === 0 ? (
-          <EmptyState title="ラベルがありません" description="新しいラベルを作成してください" />
+          <EmptyState title={t('labels.empty')} description={t('labels.emptyDescription')} />
         ) : (
           <section>
             <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
-              ラベル一覧
+              {t('labels.listSection')}
             </h2>
             <div className="space-y-2">
               {labels.map((label) => (
@@ -224,9 +224,9 @@ export default function LabelManager() {
 
       <ConfirmDialog
         open={confirmDeleteOpen}
-        title="ラベル削除"
-        description="このラベルを削除します。このラベルで分類されたアイテムのラベルは削除されますが、アイテム自体は削除されません。"
-        confirmText="削除"
+        title={t('labels.deleteDialogTitle')}
+        description={t('labels.deleteDialogDesc')}
+        confirmText={t('labels.deleteButton')}
         isDangerous={true}
         onConfirm={handleDeleteLabel}
         onCancel={() => {

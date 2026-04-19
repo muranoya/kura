@@ -13,10 +13,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import net.meshpeak.kura.R
 import net.meshpeak.kura.data.model.CustomField
 import net.meshpeak.kura.data.model.CustomFieldType
 import net.meshpeak.kura.data.model.Label
@@ -60,7 +62,7 @@ fun EntryForm(
         TextField(
             value = name,
             onValueChange = onNameChange,
-            placeholder = { Text("アイテム名を入力...", style = MaterialTheme.typography.headlineSmall) },
+            placeholder = { Text(stringResource(R.string.field_name_placeholder), style = MaterialTheme.typography.headlineSmall) },
             textStyle = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
@@ -79,13 +81,13 @@ fun EntryForm(
                     FlatTextField(
                         value = typedValues["username"] ?: "",
                         onValueChange = { onTypedValueChange("username", it) },
-                        label = "ユーザー名"
+                        label = stringResource(R.string.field_username)
                     )
                     SectionDivider()
                     PasswordField(
                         value = typedValues["password"] ?: "",
                         onValueChange = { onTypedValueChange("password", it) },
-                        label = "パスワード",
+                        label = stringResource(R.string.field_password),
                         onGeneratePassword = onGeneratePassword,
                         onCopy = onCopyToClipboard
                     )
@@ -93,7 +95,7 @@ fun EntryForm(
                     FlatTextField(
                         value = typedValues["url"] ?: "",
                         onValueChange = { onTypedValueChange("url", it) },
-                        label = "URL",
+                        label = stringResource(R.string.field_url),
                         keyboardType = KeyboardType.Uri
                     )
                 }
@@ -101,37 +103,37 @@ fun EntryForm(
                     FlatTextField(
                         value = typedValues["bank_name"] ?: "",
                         onValueChange = { onTypedValueChange("bank_name", it) },
-                        label = "銀行名"
+                        label = stringResource(R.string.field_bank_name)
                     )
                     SectionDivider()
                     FlatTextField(
                         value = typedValues["branch_code"] ?: "",
                         onValueChange = { onTypedValueChange("branch_code", it) },
-                        label = "支店コード"
+                        label = stringResource(R.string.field_branch_code)
                     )
                     SectionDivider()
                     FlatTextField(
                         value = typedValues["account_type"] ?: "",
                         onValueChange = { onTypedValueChange("account_type", it) },
-                        label = "口座種別"
+                        label = stringResource(R.string.field_account_type)
                     )
                     SectionDivider()
                     FlatTextField(
                         value = typedValues["account_holder"] ?: "",
                         onValueChange = { onTypedValueChange("account_holder", it) },
-                        label = "口座名義"
+                        label = stringResource(R.string.field_account_holder)
                     )
                     SectionDivider()
                     FlatTextField(
                         value = typedValues["account_number"] ?: "",
                         onValueChange = { onTypedValueChange("account_number", it) },
-                        label = "口座番号"
+                        label = stringResource(R.string.field_account_number)
                     )
                     SectionDivider()
                     PasswordField(
                         value = typedValues["pin"] ?: "",
                         onValueChange = { onTypedValueChange("pin", it) },
-                        label = "PIN",
+                        label = stringResource(R.string.field_pin),
                         onCopy = onCopyToClipboard
                     )
                 }
@@ -139,7 +141,7 @@ fun EntryForm(
                     FlatTextField(
                         value = typedValues["private_key"] ?: "",
                         onValueChange = { onTypedValueChange("private_key", it) },
-                        label = "秘密鍵",
+                        label = stringResource(R.string.field_private_key),
                         minLines = 3,
                         maxLines = 8,
                         singleLine = false
@@ -149,7 +151,7 @@ fun EntryForm(
                     FlatTextField(
                         value = typedValues["content"] ?: "",
                         onValueChange = { onTypedValueChange("content", it) },
-                        label = "内容",
+                        label = stringResource(R.string.field_content),
                         minLines = 5,
                         maxLines = 20,
                         singleLine = false
@@ -159,33 +161,33 @@ fun EntryForm(
                     FlatTextField(
                         value = typedValues["cardholder"] ?: "",
                         onValueChange = { onTypedValueChange("cardholder", it) },
-                        label = "カード名義"
+                        label = stringResource(R.string.field_cardholder)
                     )
                     SectionDivider()
                     FlatTextField(
                         value = typedValues["number"] ?: "",
                         onValueChange = { onTypedValueChange("number", it) },
-                        label = "カード番号",
+                        label = stringResource(R.string.field_number),
                         keyboardType = KeyboardType.Number
                     )
                     SectionDivider()
                     FlatTextField(
                         value = typedValues["expiry"] ?: "",
                         onValueChange = { onTypedValueChange("expiry", it) },
-                        label = "有効期限"
+                        label = stringResource(R.string.field_expiry)
                     )
                     SectionDivider()
                     PasswordField(
                         value = typedValues["cvv"] ?: "",
                         onValueChange = { onTypedValueChange("cvv", it) },
-                        label = "CVV",
+                        label = stringResource(R.string.field_cvv),
                         onCopy = onCopyToClipboard
                     )
                     SectionDivider()
                     PasswordField(
                         value = typedValues["pin"] ?: "",
                         onValueChange = { onTypedValueChange("pin", it) },
-                        label = "PIN",
+                        label = stringResource(R.string.field_pin),
                         onCopy = onCopyToClipboard
                     )
                 }
@@ -193,13 +195,13 @@ fun EntryForm(
                     FlatTextField(
                         value = typedValues["username"] ?: "",
                         onValueChange = { onTypedValueChange("username", it) },
-                        label = "ユーザー名"
+                        label = stringResource(R.string.field_username)
                     )
                     SectionDivider()
                     PasswordField(
                         value = typedValues["password"] ?: "",
                         onValueChange = { onTypedValueChange("password", it) },
-                        label = "パスワード",
+                        label = stringResource(R.string.field_password),
                         onGeneratePassword = onGeneratePassword,
                         onCopy = onCopyToClipboard
                     )
@@ -208,7 +210,7 @@ fun EntryForm(
                     FlatTextField(
                         value = typedValues["license_key"] ?: "",
                         onValueChange = { onTypedValueChange("license_key", it) },
-                        label = "ライセンスキー",
+                        label = stringResource(R.string.field_license_key),
                         minLines = 2,
                         maxLines = 6,
                         singleLine = false
@@ -225,11 +227,11 @@ fun EntryForm(
         )
 
         // Notes section
-        FormSection(title = "メモ") {
+        FormSection(title = stringResource(R.string.section_notes)) {
             FlatTextField(
                 value = notes,
                 onValueChange = onNotesChange,
-                label = "メモ",
+                label = stringResource(R.string.field_notes),
                 minLines = 2,
                 maxLines = 6,
                 singleLine = false
@@ -238,7 +240,7 @@ fun EntryForm(
 
         // Labels section
         if (labels.isNotEmpty() || onCreateLabel != null) {
-            FormSection(title = "ラベル") {
+            FormSection(title = stringResource(R.string.section_labels)) {
                 FlowRow(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -257,7 +259,7 @@ fun EntryForm(
                     if (onCreateLabel != null) {
                         AssistChip(
                             onClick = { showNewLabelInput = true },
-                            label = { Text("新規") },
+                            label = { Text(stringResource(R.string.label_new_chip)) },
                             leadingIcon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp)) }
                         )
                     }
@@ -273,12 +275,12 @@ fun EntryForm(
                         newLabelName = ""
                     }
                 },
-                title = { Text("新しいラベル") },
+                title = { Text(stringResource(R.string.label_new_dialog_title)) },
                 text = {
                     OutlinedTextField(
                         value = newLabelName,
                         onValueChange = { newLabelName = it },
-                        placeholder = { Text("ラベル名") },
+                        placeholder = { Text(stringResource(R.string.label_new_name_placeholder)) },
                         singleLine = true,
                         enabled = !creatingLabel,
                         modifier = Modifier.fillMaxWidth()
@@ -306,7 +308,7 @@ fun EntryForm(
                         if (creatingLabel) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                         } else {
-                            Text("追加")
+                            Text(stringResource(R.string.action_add))
                         }
                     }
                 },
@@ -318,7 +320,7 @@ fun EntryForm(
                         },
                         enabled = !creatingLabel
                     ) {
-                        Text("キャンセル")
+                        Text(stringResource(R.string.action_cancel))
                     }
                 }
             )
@@ -383,7 +385,7 @@ private fun CustomFieldsSection(
             // Type selection chips
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Text(
-                    "フィールドの種類を選択",
+                    stringResource(R.string.custom_field_select_type),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -413,7 +415,7 @@ private fun CustomFieldsSection(
                                 onCustomFieldsChange(customFields + newField)
                                 showTypeSelector = false
                             },
-                            label = { Text(type.displayName) },
+                            label = { Text(stringResource(type.displayNameResId)) },
                             leadingIcon = {
                                 Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
                             }
@@ -424,7 +426,7 @@ private fun CustomFieldsSection(
                     onClick = { showTypeSelector = false },
                     modifier = Modifier.padding(top = 4.dp)
                 ) {
-                    Text("キャンセル")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         } else {
@@ -434,7 +436,7 @@ private fun CustomFieldsSection(
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("フィールドを追加")
+                Text(stringResource(R.string.custom_field_add))
             }
         }
       }
@@ -499,16 +501,19 @@ private fun FlatTextField(
     )
 }
 
-private fun sectionTitle(entryType: String): String = when (entryType) {
-    "login" -> "ログイン情報"
-    "bank" -> "銀行口座"
-    "ssh_key" -> "SSH キー"
-    "secure_note" -> "ノート"
-    "credit_card" -> "クレジットカード"
-    "password" -> "パスワード情報"
-    "software_license" -> "ライセンス情報"
-    else -> "基本情報"
-}
+@Composable
+private fun sectionTitle(entryType: String): String = stringResource(
+    when (entryType) {
+        "login" -> R.string.section_login
+        "bank" -> R.string.section_bank
+        "ssh_key" -> R.string.section_ssh_key
+        "secure_note" -> R.string.section_secure_note
+        "credit_card" -> R.string.section_credit_card
+        "password" -> R.string.section_password
+        "software_license" -> R.string.section_software_license
+        else -> R.string.section_default
+    }
+)
 
 @Composable
 fun PasswordField(
@@ -532,12 +537,12 @@ fun PasswordField(
             Row {
                 if (onCopy != null && value.isNotEmpty()) {
                     IconButton(onClick = { onCopy(value) }) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "コピー")
+                        Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.cd_copy))
                     }
                 }
                 if (onGeneratePassword != null) {
                     IconButton(onClick = { showGenerator = !showGenerator }) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = "生成")
+                        Icon(Icons.Default.AutoAwesome, contentDescription = stringResource(R.string.cd_generate_password))
                     }
                 }
             }
@@ -592,7 +597,7 @@ fun CustomFieldEditor(
             TextField(
                 value = field.name,
                 onValueChange = { onFieldChange(field.copy(name = it)) },
-                placeholder = { Text("フィールド名") },
+                placeholder = { Text(stringResource(R.string.custom_field_name_placeholder)) },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyMedium,
@@ -610,7 +615,7 @@ fun CustomFieldEditor(
                 color = MaterialTheme.colorScheme.secondaryContainer,
             ) {
                 Text(
-                    text = CustomFieldType.fromValue(field.fieldType)?.displayName ?: field.fieldType,
+                    text = CustomFieldType.fromValue(field.fieldType)?.let { stringResource(it.displayNameResId) } ?: field.fieldType,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
@@ -624,7 +629,7 @@ fun CustomFieldEditor(
                 ) {
                     Icon(
                         Icons.Default.KeyboardArrowUp,
-                        contentDescription = "上へ移動",
+                        contentDescription = stringResource(R.string.cd_move_up),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -635,7 +640,7 @@ fun CustomFieldEditor(
                 ) {
                     Icon(
                         Icons.Default.KeyboardArrowDown,
-                        contentDescription = "下へ移動",
+                        contentDescription = stringResource(R.string.cd_move_down),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -643,7 +648,7 @@ fun CustomFieldEditor(
             IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
                 Icon(
                     Icons.Default.RemoveCircleOutline,
-                    contentDescription = "削除",
+                    contentDescription = stringResource(R.string.cd_delete),
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(20.dp)
                 )
@@ -656,12 +661,12 @@ fun CustomFieldEditor(
             onValueChange = { onFieldChange(field.copy(value = it)) },
             modifier = Modifier.fillMaxWidth().onFocusChanged { isValueFocused = it.isFocused },
             singleLine = true,
-            placeholder = { Text(if (field.fieldType == "totp") "otpauth:// URI または Base32 シークレット" else "値") },
+            placeholder = { Text(if (field.fieldType == "totp") stringResource(R.string.field_totp_placeholder) else stringResource(R.string.field_value_placeholder)) },
             visualTransformation = if (!isValueFocused && isSecret) PasswordVisualTransformation() else VisualTransformation.None,
             trailingIcon = if (showGenerateButton) {
                 {
                     IconButton(onClick = { showGenerator = !showGenerator }) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = "生成")
+                        Icon(Icons.Default.AutoAwesome, contentDescription = stringResource(R.string.cd_generate_password))
                     }
                 }
             } else null,

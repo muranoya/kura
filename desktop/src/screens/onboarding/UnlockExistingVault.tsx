@@ -1,5 +1,6 @@
 import { Lock } from 'lucide-react'
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import { PageHeader } from '../../components/layout/PageHeader'
@@ -15,6 +16,7 @@ interface UnlockExistingVaultProps {
 }
 
 export default function UnlockExistingVault({ onUnlocked }: UnlockExistingVaultProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -22,7 +24,7 @@ export default function UnlockExistingVault({ onUnlocked }: UnlockExistingVaultP
 
   const handleUnlock = useCallback(async () => {
     if (!password) {
-      setError('パスワードを入力してください')
+      setError(t('onboarding.unlockExisting.errorRequired'))
       return
     }
 
@@ -42,16 +44,16 @@ export default function UnlockExistingVault({ onUnlocked }: UnlockExistingVaultP
       commands.syncVaultIfConfigured().catch(() => {}) // バックグラウ���ド
       onUnlocked?.()
     } catch (_err) {
-      setError('パスワードが違います')
+      setError(t('onboarding.unlockExisting.errorWrongPassword'))
       setLoading(false)
     }
-  }, [password, onUnlocked])
+  }, [password, onUnlocked, t])
 
   return (
     <div className="min-h-screen bg-bg-base">
       <PageHeader
-        title="既存のVaultを使用"
-        subtitle="このストレージには既にVaultが存在しています"
+        title={t('onboarding.unlockExisting.title')}
+        subtitle={t('onboarding.unlockExisting.subtitle')}
       />
 
       <div className="flex items-center justify-center py-12 px-4">
@@ -67,7 +69,7 @@ export default function UnlockExistingVault({ onUnlocked }: UnlockExistingVaultP
 
               {/* 説明文 */}
               <p className="text-center text-text-secondary mb-6 text-sm">
-                このVaultを使用するためには、マスターパスワードを入力してください。
+                {t('onboarding.unlockExisting.description')}
               </p>
 
               {/* エラーメッセージ */}
@@ -79,10 +81,12 @@ export default function UnlockExistingVault({ onUnlocked }: UnlockExistingVaultP
 
               {/* パスワード入力 */}
               <div className="space-y-2 mb-6">
-                <Label htmlFor="password">マスターパスワード</Label>
+                <Label htmlFor="password">
+                  {t('onboarding.unlockExisting.masterPasswordLabel')}
+                </Label>
                 <PasswordInput
                   id="password"
-                  placeholder="パスワードを入力"
+                  placeholder={t('onboarding.unlockExisting.passwordPlaceholder')}
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value)
@@ -102,7 +106,7 @@ export default function UnlockExistingVault({ onUnlocked }: UnlockExistingVaultP
                   className="flex-1"
                   disabled={loading}
                 >
-                  戻る
+                  {t('common.back')}
                 </Button>
                 <Button
                   onClick={handleUnlock}
@@ -110,7 +114,7 @@ export default function UnlockExistingVault({ onUnlocked }: UnlockExistingVaultP
                   isLoading={loading}
                   className="flex-1"
                 >
-                  このVaultを使う
+                  {t('onboarding.unlockExisting.useThis')}
                 </Button>
               </div>
             </CardContent>

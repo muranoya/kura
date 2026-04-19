@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface SecretFieldProps {
   value: string
@@ -8,6 +9,7 @@ interface SecretFieldProps {
 }
 
 export default function SecretField({ value, label, onCopy, style }: SecretFieldProps) {
+  const { t } = useTranslation()
   const [visible, setVisible] = useState(false)
 
   return (
@@ -42,7 +44,7 @@ export default function SecretField({ value, label, onCopy, style }: SecretField
               padding: 0,
             }}
           >
-            {visible ? '隠す' : '表示'}
+            {visible ? t('common.hide') : t('common.show')}
           </button>
           {onCopy && (
             <button
@@ -57,7 +59,7 @@ export default function SecretField({ value, label, onCopy, style }: SecretField
                 padding: 0,
               }}
             >
-              コピー
+              {t('common.copy')}
             </button>
           )}
         </div>

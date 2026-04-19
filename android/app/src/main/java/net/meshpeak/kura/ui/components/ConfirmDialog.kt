@@ -2,13 +2,15 @@ package net.meshpeak.kura.ui.components
 
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import net.meshpeak.kura.R
 
 @Composable
 fun ConfirmDialog(
     title: String,
     description: String,
-    confirmText: String = "確認",
-    cancelText: String = "キャンセル",
+    confirmText: String = stringResource(R.string.action_confirm),
+    cancelText: String = stringResource(R.string.action_cancel),
     isDangerous: Boolean = false,
     onConfirm: () -> Unit,
     onCancel: () -> Unit

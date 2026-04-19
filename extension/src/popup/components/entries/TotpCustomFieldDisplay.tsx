@@ -1,5 +1,6 @@
 import { Check, Maximize2 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import * as commands from '../../commands'
 import { copySensitive } from '../../lib/clipboard'
 import TotpDisplay from '../TotpDisplay'
@@ -11,6 +12,7 @@ interface TotpCustomFieldDisplayProps {
 }
 
 export default function TotpCustomFieldDisplay({ label, value }: TotpCustomFieldDisplayProps) {
+  const { t } = useTranslation()
   const [totpCode, setTotpCode] = useState<string | null>(null)
   const [period, setPeriod] = useState(30)
   const [error, setError] = useState<string | null>(null)
@@ -81,7 +83,7 @@ export default function TotpCustomFieldDisplay({ label, value }: TotpCustomField
         ) : totpCode ? (
           <TotpDisplay totp={totpCode} period={period} />
         ) : (
-          <span className="text-xs text-text-muted">読み込み中...</span>
+          <span className="text-xs text-text-muted">{t('common.loading')}</span>
         )}
       </div>
       {totpCode && (

@@ -27,7 +27,7 @@ import org.robolectric.annotation.Config
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [34], qualifiers = "ja")
 class OnboardingFlowTest {
 
     @get:Rule

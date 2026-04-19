@@ -1,5 +1,6 @@
 import { Lock } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import { useNavigate } from 'react-router-dom'
 import remarkGfm from 'remark-gfm'
@@ -38,6 +39,7 @@ const termsMarkdownComponents = {
 }
 
 export default function Welcome() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [agreed, setAgreed] = useState(false)
   const [showTerms, setShowTerms] = useState(false)
@@ -56,14 +58,10 @@ export default function Welcome() {
             <Lock className="w-8 h-8 text-accent" />
           </div>
           <h1 className="text-3xl font-bold text-text-primary mb-2">kura</h1>
-          <p className="text-sm text-text-secondary">
-            サーバ不要、自分一人のためのパスワードマネージャー
-          </p>
+          <p className="text-sm text-text-secondary">{t('onboarding.welcome.subtitle')}</p>
         </div>
 
-        {/* 利用規約 */}
         <div className="mb-4">
-          {/* 同意チェックボックス */}
           <label className="flex items-center justify-center gap-1.5 cursor-pointer">
             <input
               type="checkbox"
@@ -72,29 +70,30 @@ export default function Welcome() {
               className="w-3.5 h-3.5 rounded border-border accent-accent"
             />
             <span className="text-xs text-text-secondary">
+              {t('onboarding.welcome.agreePrefix')}
               <button
                 type="button"
                 onClick={() => setShowTerms(true)}
                 className="text-accent hover:underline"
               >
-                利用規約
+                {t('onboarding.welcome.termsLink')}
               </button>
-              に同意する
+              {t('onboarding.welcome.agreeSuffix')}
             </span>
           </label>
         </div>
 
-        {/* CTA */}
         <Button onClick={handleStart} className="w-full text-sm" size="sm" disabled={!agreed}>
-          始める
+          {t('onboarding.welcome.startButton')}
         </Button>
       </div>
 
-      {/* 利用規約ダイアログ */}
       <Dialog open={showTerms} onOpenChange={setShowTerms}>
         <DialogContent className="max-w-sm max-h-[80vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="text-sm">利用規約</DialogTitle>
+            <DialogTitle className="text-sm">
+              {t('onboarding.welcome.termsDialogTitle')}
+            </DialogTitle>
           </DialogHeader>
           <div className="flex-1 max-h-[55vh] overflow-y-auto pr-1">
             <div className="py-1">
@@ -106,7 +105,7 @@ export default function Welcome() {
           <DialogFooter>
             <DialogClose asChild>
               <Button variant="secondary" size="sm">
-                閉じる
+                {t('common.close')}
               </Button>
             </DialogClose>
           </DialogFooter>

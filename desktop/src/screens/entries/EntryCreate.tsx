@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import EntryForm from '../../components/entries/EntryForm'
@@ -9,6 +10,7 @@ import { usePushError } from '../../contexts/ErrorContext'
 import type { CustomField, Label } from '../../shared/types'
 
 export default function EntryCreate() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const pushError = usePushError()
   const [showTypeDialog, setShowTypeDialog] = useState(true)
@@ -27,15 +29,15 @@ export default function EntryCreate() {
         const labels = await commands.listLabels()
         setAllLabels(labels)
       } catch (err) {
-        console.error('ラベル読み込み失敗:', err)
+        console.error(t('entries.create.errorLabelLoad'), err)
       }
     }
     load()
-  }, [])
+  }, [t])
 
   const handleCreate = async () => {
     if (!name) {
-      alert('名前を入力してください')
+      alert(t('entries.create.errorName'))
       return
     }
 
@@ -69,7 +71,7 @@ export default function EntryCreate() {
 
       navigate('/entries')
     } catch (err) {
-      pushError(`アイテム作成失敗: ${err}`)
+      pushError(t('entries.create.errorCreate', { error: String(err) }))
     } finally {
       setLoading(false)
     }
@@ -88,7 +90,9 @@ export default function EntryCreate() {
 
       {/* sticky ヘッダー */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
-        <h1 className="text-sm font-semibold text-text-primary flex-1">新規アイテム</h1>
+        <h1 className="text-sm font-semibold text-text-primary flex-1">
+          {t('entries.create.title')}
+        </h1>
         <SyncHeaderActions />
       </div>
 
@@ -118,10 +122,10 @@ export default function EntryCreate() {
       {/* sticky ボタンバー */}
       <div className="shrink-0 sticky bottom-0 flex justify-end gap-2 px-3 py-2 border-t border-border bg-bg-surface">
         <Button variant="secondary" size="sm" onClick={() => navigate('/entries')}>
-          キャンセル
+          {t('common.cancel')}
         </Button>
         <Button size="sm" onClick={handleCreate} disabled={loading}>
-          {loading ? '作成中...' : '作成'}
+          {loading ? t('common.creating') : t('common.create')}
         </Button>
       </div>
     </div>

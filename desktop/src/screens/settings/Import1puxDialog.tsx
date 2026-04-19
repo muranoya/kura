@@ -1,6 +1,7 @@
 import { open } from '@tauri-apps/plugin-dialog'
 import { AlertTriangle, FileUp, Loader2, Search, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import * as commands from '../../commands'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
@@ -21,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select'
+import { getEntryTypeLabel } from '../../shared/constants'
 import type {
   DuplicateConfidence,
   ImportAction,
@@ -33,20 +35,6 @@ import type {
 
 type Step = 'idle' | 'loading' | 'preview' | 'executing' | 'result'
 
-const ENTRY_TYPE_LABELS: Record<string, string> = {
-  login: 'ログイン',
-  credit_card: 'クレジットカード',
-  secure_note: 'セキュアノート',
-  password: 'パスワード',
-  software_license: 'ソフトウェアライセンス',
-  bank: '銀行口座',
-  ssh_key: 'SSH鍵',
-}
-
-function getEntryTypeLabel(type_: string): string {
-  return ENTRY_TYPE_LABELS[type_] ?? type_
-}
-
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -54,6 +42,7 @@ interface Props {
 }
 
 export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportComplete }: Props) {
+  const { t } = useTranslation()
   const [step, setStep] = useState<Step>('idle')
   const [error, setError] = useState('')
   const [filePath, setFilePath] = useState<string | null>(null)
@@ -219,14 +208,12 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
         {step === 'idle' && (
           <>
             <DialogHeader>
-              <DialogTitle>1Passwordからインポート</DialogTitle>
-              <DialogDescription>
-                1Passwordからエクスポートした .1pux ファイルを選択してください。
-              </DialogDescription>
+              <DialogTitle>{t('import1pux.title')}</DialogTitle>
+              <DialogDescription>{t('import1pux.description')}</DialogDescription>
             </DialogHeader>
             <div className="flex flex-col items-center gap-4 py-8">
               <FileUp className="h-12 w-12 text-text-secondary" />
-              <Button onClick={handleSelectFile}>ファイルを選択</Button>
+              <Button onClick={handleSelectFile}>{t('import1pux.selectFile')}</Button>
             </div>
             {error && <p className="text-sm text-danger">{error}</p>}
           </>
@@ -235,11 +222,11 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
         {step === 'loading' && (
           <>
             <DialogHeader>
-              <DialogTitle>1Passwordからインポート</DialogTitle>
+              <DialogTitle>{t('import1pux.title')}</DialogTitle>
             </DialogHeader>
             <div className="flex flex-col items-center gap-4 py-8">
               <Loader2 className="h-8 w-8 animate-spin text-accent" />
-              <p className="text-sm text-text-secondary">ファイルを解析中...</p>
+              <p className="text-sm text-text-secondary">{t('import1pux.parsing')}</p>
             </div>
           </>
         )}
@@ -247,9 +234,10 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
         {step === 'preview' && preview && (
           <>
             <DialogHeader>
-              <DialogTitle>インポートプレビュー</DialogTitle>
+              <DialogTitle>{t('import1pux.previewTitle')}</DialogTitle>
               <DialogDescription>
-                {preview.source_account_name && `アカウント: ${preview.source_account_name} · `}
+                {preview.source_account_name &&
+                  t('import1pux.previewAccount', { account: preview.source_account_name })}
                 {preview.source_vault_names.join(', ')}
               </DialogDescription>
             </DialogHeader>
@@ -265,7 +253,7 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
                 }
                 onClick={clearFilters}
               >
-                合計 {preview.stats.total_items} 件
+                {t('import1pux.totalCount', { count: preview.stats.total_items })}
               </Badge>
               {preview.stats.by_target_type.map(([type_, count]) => (
                 <Badge
@@ -283,7 +271,7 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
                   variant={dupConfFilter === 'none' ? 'primary' : 'secondary'}
                   onClick={() => setDupConfFilter((prev) => (prev === 'none' ? null : 'none'))}
                 >
-                  重複なし {dupConfCounts.none} 件
+                  {t('import1pux.noDuplicates', { count: dupConfCounts.none })}
                 </Badge>
               )}
               {dupConfCounts.high > 0 && (
@@ -292,7 +280,7 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
                   variant={dupConfFilter === 'high' ? 'primary' : 'destructive'}
                   onClick={() => setDupConfFilter((prev) => (prev === 'high' ? null : 'high'))}
                 >
-                  重複(高) {dupConfCounts.high} 件
+                  {t('import1pux.duplicatesHigh', { count: dupConfCounts.high })}
                 </Badge>
               )}
               {dupConfCounts.medium > 0 && (
@@ -301,7 +289,7 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
                   variant={dupConfFilter === 'medium' ? 'primary' : 'destructive'}
                   onClick={() => setDupConfFilter((prev) => (prev === 'medium' ? null : 'medium'))}
                 >
-                  重複(中) {dupConfCounts.medium} 件
+                  {t('import1pux.duplicatesMedium', { count: dupConfCounts.medium })}
                 </Badge>
               )}
               {dupConfCounts.low > 0 && (
@@ -310,7 +298,7 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
                   variant={dupConfFilter === 'low' ? 'primary' : 'destructive'}
                   onClick={() => setDupConfFilter((prev) => (prev === 'low' ? null : 'low'))}
                 >
-                  重複(低) {dupConfCounts.low} 件
+                  {t('import1pux.duplicatesLow', { count: dupConfCounts.low })}
                 </Badge>
               )}
               {preview.stats.archived_count > 0 && (
@@ -319,12 +307,14 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
                   variant={archivedFilter ? 'primary' : 'muted'}
                   onClick={() => setArchivedFilter((prev) => !prev)}
                 >
-                  アーカイブ済み {preview.stats.archived_count} 件
+                  {t('import1pux.archived', { count: preview.stats.archived_count })}
                 </Badge>
               )}
               {preview.stats.attachment_warning_count > 0 && (
                 <Badge variant="muted">
-                  添付ファイル警告 {preview.stats.attachment_warning_count} 件
+                  {t('import1pux.attachmentWarnings', {
+                    count: preview.stats.attachment_warning_count,
+                  })}
                 </Badge>
               )}
             </div>
@@ -333,7 +323,7 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted" />
               <Input
-                placeholder="名前で検索..."
+                placeholder={t('import1pux.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-8 text-sm pl-8"
@@ -342,12 +332,12 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
 
             {/* Bulk actions */}
             <div className="flex items-center gap-2 text-sm">
-              <span className="text-text-secondary">一括操作:</span>
+              <span className="text-text-secondary">{t('import1pux.bulkActions')}</span>
               <Button variant="ghost" size="sm" onClick={() => setFilteredActions('import')}>
-                全て取り込む
+                {t('import1pux.importAll')}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setFilteredActions('skip')}>
-                全てスキップ
+                {t('import1pux.skipAll')}
               </Button>
             </div>
 
@@ -369,10 +359,10 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
 
             <DialogFooter>
               <Button variant="ghost" onClick={handleClose}>
-                キャンセル
+                {t('common.cancel')}
               </Button>
               <Button onClick={handleExecute} disabled={importCount === 0}>
-                {importCount} 件をインポート
+                {t('import1pux.importCount', { count: importCount })}
               </Button>
             </DialogFooter>
           </>
@@ -381,11 +371,11 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
         {step === 'executing' && (
           <>
             <DialogHeader>
-              <DialogTitle>インポート実行中</DialogTitle>
+              <DialogTitle>{t('import1pux.executingTitle')}</DialogTitle>
             </DialogHeader>
             <div className="flex flex-col items-center gap-4 py-8">
               <Loader2 className="h-8 w-8 animate-spin text-accent" />
-              <p className="text-sm text-text-secondary">エントリを作成しています...</p>
+              <p className="text-sm text-text-secondary">{t('import1pux.executingDescription')}</p>
             </div>
           </>
         )}
@@ -393,28 +383,36 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
         {step === 'result' && result && (
           <>
             <DialogHeader>
-              <DialogTitle>インポート完了</DialogTitle>
+              <DialogTitle>{t('import1pux.resultTitle')}</DialogTitle>
             </DialogHeader>
 
             <div className="space-y-3 py-4">
               <div className="flex flex-wrap gap-2">
                 {result.created_count > 0 && (
-                  <Badge variant="success">作成 {result.created_count} 件</Badge>
+                  <Badge variant="success">
+                    {t('import1pux.createdCount', { count: result.created_count })}
+                  </Badge>
                 )}
                 {result.overwritten_count > 0 && (
-                  <Badge variant="primary">上書き {result.overwritten_count} 件</Badge>
+                  <Badge variant="primary">
+                    {t('import1pux.overwrittenCount', { count: result.overwritten_count })}
+                  </Badge>
                 )}
                 {result.skipped_count > 0 && (
-                  <Badge variant="muted">スキップ {result.skipped_count} 件</Badge>
+                  <Badge variant="muted">
+                    {t('import1pux.skippedCount', { count: result.skipped_count })}
+                  </Badge>
                 )}
                 {result.error_count > 0 && (
-                  <Badge variant="destructive">エラー {result.error_count} 件</Badge>
+                  <Badge variant="destructive">
+                    {t('import1pux.errorCount', { count: result.error_count })}
+                  </Badge>
                 )}
               </div>
 
               {result.labels_created.length > 0 && (
                 <p className="text-sm text-text-secondary">
-                  新規作成ラベル: {result.labels_created.join(', ')}
+                  {t('import1pux.labelsCreated', { labels: result.labels_created.join(', ') })}
                 </p>
               )}
 
@@ -440,7 +438,7 @@ export default function Import1puxDialog({ open: isOpen, onOpenChange, onImportC
             </div>
 
             <DialogFooter>
-              <Button onClick={handleResultClose}>閉じる</Button>
+              <Button onClick={handleResultClose}>{t('common.close')}</Button>
             </DialogFooter>
           </>
         )}
@@ -458,6 +456,7 @@ function PreviewItemRow({
   action: ImportAction
   onActionChange: (action: ImportAction) => void
 }) {
+  const { t } = useTranslation()
   const hasDuplicates = item.duplicates.length > 0
 
   const actionValue = action === 'import' ? 'import' : action === 'skip' ? 'skip' : 'overwrite'
@@ -478,7 +477,7 @@ function PreviewItemRow({
           <span className="text-sm font-medium truncate">{item.source_name}</span>
           {item.is_archived && (
             <Badge variant="muted" className="text-[10px] px-1.5 py-0">
-              アーカイブ済み
+              {t('import1pux.itemArchived')}
             </Badge>
           )}
           {!item.source_category.is_direct_mapping && (
@@ -492,12 +491,12 @@ function PreviewItemRow({
           <span>{getEntryTypeLabel(item.target_entry_type)}</span>
           {hasDuplicates && (
             <span className="text-warning">
-              重複: {item.duplicates[0].existing_entry_name}
+              {t('import1pux.duplicateRow', { name: item.duplicates[0].existing_entry_name })}
               {item.duplicates[0].confidence === 'high'
-                ? ' (高)'
+                ? t('import1pux.confidenceHigh')
                 : item.duplicates[0].confidence === 'medium'
-                  ? ' (中)'
-                  : ' (低)'}
+                  ? t('import1pux.confidenceMedium')
+                  : t('import1pux.confidenceLow')}
             </span>
           )}
         </div>
@@ -508,11 +507,11 @@ function PreviewItemRow({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="import">取り込む</SelectItem>
-          <SelectItem value="skip">スキップ</SelectItem>
+          <SelectItem value="import">{t('import1pux.actions.import')}</SelectItem>
+          <SelectItem value="skip">{t('import1pux.actions.skip')}</SelectItem>
           {item.duplicates.map((d) => (
             <SelectItem key={d.existing_entry_id} value={`overwrite:${d.existing_entry_id}`}>
-              上書き: {d.existing_entry_name}
+              {t('import1pux.actions.overwrite', { name: d.existing_entry_name })}
             </SelectItem>
           ))}
         </SelectContent>

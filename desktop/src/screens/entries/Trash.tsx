@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import EntryCard from '../../components/entries/EntryCard'
@@ -12,6 +13,7 @@ import type { EntryRow, EntryType, SortConfig } from '../../shared/types'
 const DEFAULT_SORT: SortConfig = { field: 'created_at', order: 'desc' }
 
 export default function Trash() {
+  const { t } = useTranslation()
   const syncVersion = useSyncVersion()
   const [allEntries, setAllEntries] = useState<EntryRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,11 +42,11 @@ export default function Trash() {
       const data = await commands.listEntries({ includeTrash: true })
       setAllEntries(data.filter((e) => e.deletedAt !== null))
     } catch (err) {
-      setError(`ゴミ箱読み込み失敗: ${err}`)
+      setError(t('entries.trash.errorLoad', { error: String(err) }))
     } finally {
       setLoading(false)
     }
-  }, [syncVersion])
+  }, [syncVersion, t])
 
   useEffect(() => {
     loadTrashEntries()
@@ -89,10 +91,10 @@ export default function Trash() {
         commands.syncVaultIfConfigured().catch((e) => console.warn('Sync failed:', e))
         setAllEntries(allEntries.filter((e) => e.id !== id))
       } catch (err) {
-        setError(`復元失敗: ${err}`)
+        setError(t('entries.trash.errorRestore', { error: String(err) }))
       }
     },
-    [allEntries],
+    [allEntries, t],
   )
 
   const handlePurgeConfirmed = useCallback(async () => {
@@ -106,9 +108,9 @@ export default function Trash() {
       setPurgeDialogOpen(false)
       setPurgeTargetId(null)
     } catch (err) {
-      setError(`完全削除失敗: ${err}`)
+      setError(t('entries.trash.errorPurge', { error: String(err) }))
     }
-  }, [allEntries, purgeTargetId])
+  }, [allEntries, purgeTargetId, t])
 
   const handlePurgeClick = (id: string) => {
     setPurgeTargetId(id)
@@ -120,7 +122,9 @@ export default function Trash() {
       {/* sticky ヘッダー */}
       <div className="sticky top-0 z-10 border-b border-border bg-bg-surface shrink-0">
         <div className="flex items-center gap-2 px-3 py-2">
-          <h1 className="text-sm font-semibold text-text-primary flex-1">ゴミ箱</h1>
+          <h1 className="text-sm font-semibold text-text-primary flex-1">
+            {t('entries.trash.title')}
+          </h1>
           <SyncHeaderActions />
         </div>
         <div className="px-3 pb-2">
@@ -140,8 +144,8 @@ export default function Trash() {
         entries={entries}
         loading={loading}
         error={error}
-        emptyTitle="ゴミ箱が空です"
-        emptyDescription="削除済みエントリはありません"
+        emptyTitle={t('entries.trash.emptyTitle')}
+        emptyDescription={t('entries.trash.emptyDescription')}
         renderCard={(entry) => (
           <EntryCard
             variant="trash"
@@ -155,10 +159,10 @@ export default function Trash() {
       {/* 完全削除確認ダイアログ */}
       <ConfirmDialog
         open={purgeDialogOpen}
-        title="完全に削除"
-        description="このアイテムは完全に削除されます。この操作は取り消せません。"
-        confirmText="削除"
-        cancelText="キャンセル"
+        title={t('entries.trash.purgeDialog.title')}
+        description={t('entries.trash.purgeDialog.description')}
+        confirmText={t('common.delete')}
+        cancelText={t('common.cancel')}
         isDangerous={true}
         onConfirm={handlePurgeConfirmed}
         onCancel={() => {

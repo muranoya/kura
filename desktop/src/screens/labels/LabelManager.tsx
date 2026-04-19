@@ -1,5 +1,6 @@
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { EmptyState } from '../../components/layout/EmptyState'
@@ -12,6 +13,7 @@ import { useNotifySynced, useSyncVersion } from '../../contexts/SyncContext'
 import type { Label } from '../../shared/types'
 
 export default function LabelManager() {
+  const { t } = useTranslation()
   const syncVersion = useSyncVersion()
   const notifySynced = useNotifySynced()
   const [labels, setLabels] = useState<Label[]>([])
@@ -31,11 +33,11 @@ export default function LabelManager() {
       const data = await commands.listLabels()
       setLabels(data)
     } catch (err) {
-      setError(`ラベル読み込み失敗: ${err}`)
+      setError(t('labels.errorLoad', { error: String(err) }))
     } finally {
       setLoading(false)
     }
-  }, [syncVersion])
+  }, [syncVersion, t])
 
   useEffect(() => {
     loadLabels()
@@ -43,7 +45,7 @@ export default function LabelManager() {
 
   const handleCreateLabel = useCallback(async () => {
     if (!newLabelName.trim()) {
-      setError('ラベル名を入力してください')
+      setError(t('labels.errorRequired'))
       return
     }
 
@@ -58,11 +60,11 @@ export default function LabelManager() {
       setError('')
       notifySynced()
     } catch (err) {
-      setError(`ラベル作成失敗: ${err}`)
+      setError(t('labels.errorCreate', { error: String(err) }))
     } finally {
       setCreating(false)
     }
-  }, [newLabelName, labels, notifySynced])
+  }, [newLabelName, labels, notifySynced, t])
 
   const handleDeleteLabelConfirmed = useCallback(async () => {
     if (!deleteTargetId) return
@@ -76,9 +78,9 @@ export default function LabelManager() {
       setDeleteTargetId(null)
       notifySynced()
     } catch (err) {
-      setError(`ラベル削除失敗: ${err}`)
+      setError(t('labels.errorDelete', { error: String(err) }))
     }
-  }, [labels, deleteTargetId, notifySynced])
+  }, [labels, deleteTargetId, notifySynced, t])
 
   const handleDeleteLabelClick = (id: string) => {
     setDeleteTargetId(id)
@@ -97,7 +99,7 @@ export default function LabelManager() {
 
   const handleEditSave = useCallback(async () => {
     if (!editingLabelId || !editingName.trim()) {
-      setError('ラベル名を入力してください')
+      setError(t('labels.errorRequired'))
       return
     }
 
@@ -112,15 +114,15 @@ export default function LabelManager() {
       setError('')
       notifySynced()
     } catch (err) {
-      setError(`ラベル更新失敗: ${err}`)
+      setError(t('labels.errorUpdate', { error: String(err) }))
     }
-  }, [editingLabelId, editingName, labels, notifySynced])
+  }, [editingLabelId, editingName, labels, notifySynced, t])
 
   return (
     <div className="flex flex-col h-screen bg-bg-base">
       {/* sticky ヘッダー */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
-        <h1 className="text-sm font-semibold text-text-primary flex-1">ラベル管理</h1>
+        <h1 className="text-sm font-semibold text-text-primary flex-1">{t('labels.title')}</h1>
         <SyncHeaderActions />
       </div>
 
@@ -136,14 +138,14 @@ export default function LabelManager() {
         {/* 新規ラベル作成 */}
         <Card className="mb-3">
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-sm font-medium">新規ラベル</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('labels.newCardTitle')}</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2">
             <div className="flex gap-3">
               <Input
                 value={newLabelName}
                 onChange={(e) => setNewLabelName(e.target.value)}
-                placeholder="ラベル名を入力"
+                placeholder={t('labels.newPlaceholder')}
                 disabled={creating}
                 onKeyPress={(e) => e.key === 'Enter' && handleCreateLabel()}
               />
@@ -153,7 +155,7 @@ export default function LabelManager() {
                 className="gap-2 whitespace-nowrap"
               >
                 <Plus size={18} />
-                {creating ? '作成中...' : '作成'}
+                {creating ? t('common.creating') : t('common.create')}
               </Button>
             </div>
           </CardContent>
@@ -161,15 +163,19 @@ export default function LabelManager() {
 
         {/* ラベル一覧 */}
         <div>
-          <h2 className="text-sm font-semibold text-text-primary mb-2">ラベル一覧</h2>
+          <h2 className="text-sm font-semibold text-text-primary mb-2">{t('labels.list')}</h2>
 
           {loading ? (
-            <EmptyState icon="⏳" title="読み込み中..." description="ラベルを読み込んでいます" />
+            <EmptyState
+              icon="⏳"
+              title={t('labels.loading')}
+              description={t('labels.loadingDescription')}
+            />
           ) : labels.length === 0 ? (
             <EmptyState
               icon="🏷"
-              title="ラベルがありません"
-              description="最初のラベルを作成してください"
+              title={t('labels.emptyTitle')}
+              description={t('labels.emptyDescription')}
             />
           ) : (
             <div className="space-y-2">
@@ -191,7 +197,7 @@ export default function LabelManager() {
                         }
                       }}
                       className="flex-1 mr-2"
-                      placeholder="ラベル名"
+                      placeholder={t('labels.renamePlaceholder')}
                     />
                   ) : (
                     <Badge variant="primary">{label.name}</Badge>
@@ -204,7 +210,7 @@ export default function LabelManager() {
                           size="sm"
                           onClick={handleEditSave}
                           className="text-success hover:text-success"
-                          title="保存"
+                          title={t('common.save')}
                         >
                           <Check size={16} />
                         </Button>
@@ -213,7 +219,7 @@ export default function LabelManager() {
                           size="sm"
                           onClick={handleEditCancel}
                           className="text-text-secondary hover:text-text-primary"
-                          title="キャンセル"
+                          title={t('common.cancel')}
                         >
                           <X size={16} />
                         </Button>
@@ -225,7 +231,7 @@ export default function LabelManager() {
                           size="sm"
                           onClick={() => handleEditStart(label)}
                           className="text-accent hover:text-accent"
-                          title="編集"
+                          title={t('common.edit')}
                         >
                           <Pencil size={16} />
                         </Button>
@@ -234,7 +240,7 @@ export default function LabelManager() {
                           size="sm"
                           onClick={() => handleDeleteLabelClick(label.id)}
                           className="text-danger hover:text-danger"
-                          title="削除"
+                          title={t('common.delete')}
                         >
                           <Trash2 size={16} />
                         </Button>
@@ -251,10 +257,10 @@ export default function LabelManager() {
       {/* ラベル削除確認ダイアログ */}
       <ConfirmDialog
         open={deleteDialogOpen}
-        title="ラベルを削除"
-        description="このラベルを削除します。エントリへの割り当てのみ削除され、エントリ自体は削除されません。"
-        confirmText="削除"
-        cancelText="キャンセル"
+        title={t('labels.deleteDialog.title')}
+        description={t('labels.deleteDialog.description')}
+        confirmText={t('common.delete')}
+        cancelText={t('common.cancel')}
         isDangerous={true}
         onConfirm={handleDeleteLabelConfirmed}
         onCancel={() => {

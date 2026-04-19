@@ -1,5 +1,6 @@
 import { KeyRound, Settings, Star, Tag, Tags, Trash2, Wand2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
 import * as commands from '../commands'
 import { useSyncVersion } from '../contexts/SyncContext'
@@ -14,22 +15,31 @@ interface NavItem {
   path: string
 }
 
-const mainNavItems: NavItem[] = [
-  { icon: <KeyRound size={18} />, label: '全てのアイテム', path: '/entries' },
-  { icon: <Star size={18} />, label: 'お気に入り', path: '/favorites' },
-  { icon: <Tags size={18} />, label: 'ラベル', path: '/labels' },
-  { icon: <Wand2 size={18} />, label: 'パスワード生成', path: '/password-generator' },
-]
-
-const bottomNavItems: NavItem[] = [
-  { icon: <Settings size={18} />, label: '設定', path: '/settings' },
-]
-
 export default function Sidebar(_props: SidebarProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const syncVersion = useSyncVersion()
   const [labels, setLabels] = useState<Label[]>([])
+
+  const mainNavItems: NavItem[] = useMemo(
+    () => [
+      { icon: <KeyRound size={18} />, label: t('sidebar.allItems'), path: '/entries' },
+      { icon: <Star size={18} />, label: t('sidebar.favorites'), path: '/favorites' },
+      { icon: <Tags size={18} />, label: t('sidebar.labels'), path: '/labels' },
+      {
+        icon: <Wand2 size={18} />,
+        label: t('sidebar.passwordGenerator'),
+        path: '/password-generator',
+      },
+    ],
+    [t],
+  )
+
+  const bottomNavItems: NavItem[] = useMemo(
+    () => [{ icon: <Settings size={18} />, label: t('sidebar.settings'), path: '/settings' }],
+    [t],
+  )
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally re-fetch labels on navigation and sync
   useEffect(() => {
@@ -43,8 +53,8 @@ export default function Sidebar(_props: SidebarProps) {
     <div className="flex flex-col w-sidebar h-screen bg-bg-sidebar border-r border-border">
       {/* ロゴ・ブランドエリア */}
       <div className="px-4 py-6 border-b border-border">
-        <h1 className="text-2xl font-bold text-text-primary">kura</h1>
-        <p className="text-xs text-text-muted mt-1">パスワードマネージャー</p>
+        <h1 className="text-2xl font-bold text-text-primary">{t('sidebar.brand')}</h1>
+        <p className="text-xs text-text-muted mt-1">{t('sidebar.tagline')}</p>
       </div>
 
       {/* ナビゲーション */}
@@ -120,7 +130,7 @@ export default function Sidebar(_props: SidebarProps) {
           )}
         >
           <Trash2 size={18} />
-          <span>ゴミ箱</span>
+          <span>{t('sidebar.trash')}</span>
         </button>
 
         {/* 設定 */}

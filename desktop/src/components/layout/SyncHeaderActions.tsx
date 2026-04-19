@@ -1,22 +1,28 @@
 import { Store } from '@tauri-apps/plugin-store'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getS3ConfigSession, syncVault } from '../../commands'
 import { usePushError } from '../../contexts/ErrorContext'
 import { useNotifySynced } from '../../contexts/SyncContext'
 import { STORAGE_KEYS } from '../../shared/constants'
 import { saveToStorage } from '../../shared/storage'
 
-function formatRelativeTime(unixSecs: number): string {
-  const diffMin = Math.floor((Date.now() / 1000 - unixSecs) / 60)
-  if (diffMin < 1) return 'たった今'
-  if (diffMin < 60) return `${diffMin}分前`
-  const h = Math.floor(diffMin / 60)
-  if (h < 24) return `${h}時間前`
-  return `${Math.floor(h / 24)}日前`
+function useFormatRelativeTime() {
+  const { t } = useTranslation()
+  return (unixSecs: number): string => {
+    const diffMin = Math.floor((Date.now() / 1000 - unixSecs) / 60)
+    if (diffMin < 1) return t('sync.header.justNow')
+    if (diffMin < 60) return t('sync.header.minutesAgo', { count: diffMin })
+    const h = Math.floor(diffMin / 60)
+    if (h < 24) return t('sync.header.hoursAgo', { count: h })
+    return t('sync.header.daysAgo', { count: Math.floor(h / 24) })
+  }
 }
 
 export default function SyncHeaderActions() {
+  const { t } = useTranslation()
+  const formatRelativeTime = useFormatRelativeTime()
   const notifySynced = useNotifySynced()
   const pushError = usePushError()
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null)
@@ -95,7 +101,7 @@ export default function SyncHeaderActions() {
 
       setSyncStatus('idle')
     } catch (err) {
-      pushError(`同期に失敗しました: ${err}`, 'manual-sync')
+      pushError(t('sync.header.syncFailed', { error: String(err) }), 'manual-sync')
       setSyncStatus('error')
       setTimeout(() => {
         setSyncStatus('idle')
@@ -116,7 +122,7 @@ export default function SyncHeaderActions() {
         onClick={handleSync}
         disabled={syncStatus === 'syncing'}
         className="p-1 text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
-        title="今すぐ同期"
+        title={t('sync.header.syncNow')}
       >
         {syncStatus === 'syncing' ? (
           <Loader2 className="w-4 h-4 animate-spin" />

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { getEntryTypeLabel } from '../../shared/constants'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
 import { getEntryIcon } from './EntryCard'
@@ -23,12 +24,13 @@ export default function EntryTypeSelectDialog({
   onSelect,
   onCancel,
 }: EntryTypeSelectDialogProps) {
+  const { t } = useTranslation()
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>アイテム種別を選択</DialogTitle>
-          <DialogDescription>作成するアイテムの種別を選んでください</DialogDescription>
+          <DialogTitle>{t('entries.typeSelectDialog.title')}</DialogTitle>
+          <DialogDescription>{t('entries.typeSelectDialog.description')}</DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-2">
           {ENTRY_TYPES.map((type) => (

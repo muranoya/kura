@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import { useLocation, useNavigate } from 'react-router-dom'
 import remarkGfm from 'remark-gfm'
@@ -22,7 +23,7 @@ import { sendMessage } from '../../../shared/messages'
 import { getFromStorage, removeFromStorage, saveToStorage } from '../../../shared/storage'
 import type { Entry, EntryRow, EntryType, SortConfig } from '../../../shared/types'
 import * as commands from '../../commands'
-import EntryCard, { getTypeLabel } from '../../components/entries/EntryCard'
+import EntryCard from '../../components/entries/EntryCard'
 import EntryListPanel from '../../components/entries/EntryListPanel'
 import TotpCustomFieldDisplay from '../../components/entries/TotpCustomFieldDisplay'
 import { EmptyState } from '../../components/layout/EmptyState'
@@ -37,20 +38,19 @@ import { copySensitive } from '../../lib/clipboard'
 const DEFAULT_SORT: SortConfig = { field: 'created_at', order: 'desc' }
 
 export default function EntryList() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const [entries, setEntries] = useState<EntryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // フィルター・検索
   const [selectedType, setSelectedType] = useState<EntryType | undefined>(undefined)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedLabelId, setSelectedLabelId] = useState<string | undefined>(undefined)
   const [sortConfig, setSortConfig] = useState<SortConfig>(DEFAULT_SORT)
   const [onlyFavorites, setOnlyFavorites] = useState(false)
 
-  // フィルター・ソート設定をストレージから読み込み
   useEffect(() => {
     getFromStorage<SortConfig>(STORAGE_KEYS.SORT_CONFIG).then((saved) => {
       if (saved) setSortConfig(saved)
@@ -104,7 +104,6 @@ export default function EntryList() {
   const handleSortChange = (config: SortConfig) => {
     setSortConfig(config)
     saveToStorage(STORAGE_KEYS.SORT_CONFIG, config)
-    // ソート変更時にエントリを再読み込み
     loadEntriesWithSort(config)
   }
 
@@ -126,11 +125,9 @@ export default function EntryList() {
     }
   }
 
-  // 詳細ペイン — location state から初期選択IDを取得
   const initialSelectedId = (location.state as { selectedId?: string } | null)?.selectedId ?? null
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId)
 
-  // ストレージから選択中アイテムIDを復元（location stateがない場合のみ）
   useEffect(() => {
     if (!initialSelectedId) {
       getFromStorage<string>(STORAGE_KEYS.SELECTED_ENTRY_ID).then((saved) => {
@@ -160,14 +157,12 @@ export default function EntryList() {
     })
   }
 
-  // location state の selectedId を消費後クリア
   useEffect(() => {
     if (initialSelectedId) {
       navigate(location.pathname, { replace: true, state: {} })
     }
   }, [initialSelectedId, navigate, location.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // マウント時にラベル一覧を取得（フィルターUI用）
   useEffect(() => {
     commands.listLabels().then(setAllLabels).catch(console.error)
   }, [])
@@ -194,7 +189,6 @@ export default function EntryList() {
     loadEntries()
   }, [loadEntries])
 
-  // バックグラウンド自動同期の完了を検知してデータを再読み込み
   useEffect(() => {
     const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
       if (changes[STORAGE_KEYS.LAST_SYNC_TIME]) {
@@ -205,7 +199,6 @@ export default function EntryList() {
     return () => chrome.storage.onChanged.removeListener(listener)
   }, [loadEntries])
 
-  // 詳細ペインを読み込み
   useEffect(() => {
     if (!selectedId) {
       setSelectedEntry(null)
@@ -231,7 +224,6 @@ export default function EntryList() {
     return entries.filter((e) => !selectedType || e.entryType === selectedType)
   }, [entries, selectedType])
 
-  // 現在タブのドメインに合致するアイテムを優先セクションに表示
   const { url: currentTabUrl } = useCurrentTabUrl()
   const [matchedIds, setMatchedIds] = useState<Set<string>>(new Set())
 
@@ -268,7 +260,7 @@ export default function EntryList() {
   }, [filteredEntries, matchedIds])
 
   const handleDelete = async (id: string) => {
-    if (confirm('このエントリを削除しますか？')) {
+    if (confirm(t('entries.deleteConfirm'))) {
       try {
         await commands.deleteEntry(id)
         setEntries((prev) => prev.filter((e) => e.id !== id))
@@ -299,9 +291,7 @@ export default function EntryList() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* 全幅 sticky ヘッダー（左右ペインにまたがる） */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-surface shrink-0">
-        {/* 検索ボックス */}
         <div className="relative flex-1">
           <Search
             className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted"
@@ -309,7 +299,7 @@ export default function EntryList() {
           />
           <input
             type="text"
-            placeholder="検索..."
+            placeholder={t('entries.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-9 pr-8 py-1.5 text-sm rounded-md border border-border bg-bg-elevated text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
@@ -319,14 +309,13 @@ export default function EntryList() {
               type="button"
               onClick={() => handleSearchChange('')}
               className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
-              title="検索をクリア"
+              title={t('entries.searchClear')}
             >
               <X size={14} />
             </button>
           )}
         </div>
 
-        {/* キャプチャボタン */}
         <Button
           variant="secondary"
           size="sm"
@@ -335,12 +324,11 @@ export default function EntryList() {
             window.close()
           }}
           className="gap-1 text-sm flex-shrink-0"
-          title="このページのクレデンシャルを保存"
+          title={t('entries.captureCredentials')}
         >
           <Crosshair size={14} />
         </Button>
 
-        {/* 新規追加ボタン */}
         <Button
           variant="primary"
           size="sm"
@@ -348,25 +336,20 @@ export default function EntryList() {
           className="gap-1 text-sm flex-shrink-0"
         >
           <Plus size={14} />
-          新規追加
+          {t('entries.newAddButton')}
         </Button>
 
-        {/* 同期ボタン */}
         <SyncActions onSyncComplete={loadEntries} />
       </div>
 
-      {/* 左右分割レイアウト */}
       <div className="flex-1 flex overflow-hidden">
-        {/* 左ペイン: リスト */}
         <div className="w-60 border-r border-border bg-sidebar flex flex-col">
-          {/* エラーメッセージ */}
           {error && (
             <div className="mx-2 mt-2 p-2 rounded-md bg-danger/10 border border-danger/20">
               <p className="text-sm text-danger">{error}</p>
             </div>
           )}
 
-          {/* リストコンテンツ */}
           <EntryListPanel
             onlyFavorites={onlyFavorites}
             onFavoritesChange={handleFavoritesChange}
@@ -380,15 +363,13 @@ export default function EntryList() {
             entries={otherEntries}
             loading={loading}
             error={error ?? ''}
-            emptyTitle={onlyFavorites ? 'お気に入りがありません' : 'アイテムがありません'}
+            emptyTitle={onlyFavorites ? t('entries.emptyFavoritesTitle') : t('entries.emptyTitle')}
             emptyDescription={
-              onlyFavorites
-                ? 'お気に入りのアイテムをここに表示します'
-                : '新しいアイテムを作成してください'
+              onlyFavorites ? t('entries.emptyFavoritesDescription') : t('entries.emptyDescription')
             }
             prioritySection={
               matchedEntries.length > 0
-                ? { label: 'このサイト', entries: matchedEntries }
+                ? { label: t('entries.thisSite'), entries: matchedEntries }
                 : undefined
             }
             renderCard={(entry) => (
@@ -402,7 +383,6 @@ export default function EntryList() {
           />
         </div>
 
-        {/* 右ペイン: 詳細 */}
         <div className="flex-1 bg-bg-surface overflow-y-auto">
           {selectedId && selectedEntry ? (
             <EntryDetailPane
@@ -417,7 +397,7 @@ export default function EntryList() {
             />
           ) : (
             <div className="h-full flex items-center justify-center">
-              <EmptyState title="アイテムを選択してください" />
+              <EmptyState title={t('entries.selectEntry')} />
             </div>
           )}
         </div>
@@ -426,7 +406,6 @@ export default function EntryList() {
   )
 }
 
-// 詳細ペイン用のコンポーネント
 interface EntryDetailPaneProps {
   entry: Entry
   allLabels: Array<{ id: string; name: string }>
@@ -453,6 +432,7 @@ function PaneFieldDisplay({
   isUrl?: boolean
   onToggleMask?: () => void
 }) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
   const [largeTextOpen, setLargeTextOpen] = useState(false)
   const isEmpty = !value
@@ -499,7 +479,7 @@ function PaneFieldDisplay({
               : 'font-mono text-text-primary'
         }`}
       >
-        {isEmpty ? '未設定' : isPassword && isMasked ? '••••••••' : value}
+        {isEmpty ? t('common.notSet') : isPassword && isMasked ? '••••••••' : value}
       </span>
       {!isEmpty && isPassword && onToggleMask && (
         <button
@@ -537,7 +517,7 @@ function PaneFieldDisplay({
           className="p-0.5 text-text-muted hover:text-text-primary transition-colors shrink-0"
         >
           {copied ? (
-            <span className="text-xs text-success">コピーしました</span>
+            <span className="text-xs text-success">{t('common.copied')}</span>
           ) : (
             <Copy size={13} />
           )}
@@ -582,10 +562,12 @@ function EntryDetailPane({
   onDelete,
   onFavorite,
 }: EntryDetailPaneProps) {
+  const { t } = useTranslation()
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-text-muted">読み込み中...</div>
+        <div className="text-text-muted">{t('common.loading')}</div>
       </div>
     )
   }
@@ -594,12 +576,11 @@ function EntryDetailPane({
 
   return (
     <div className="p-3">
-      {/* ヘッダー */}
       <div className="flex items-start justify-between gap-2 mb-1">
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-bold text-text-primary truncate">{entry.name}</h2>
           <Badge variant="muted" className="text-[11px] mt-0.5">
-            {getTypeLabel(entry.entryType)}
+            {t(`entries.types.${entry.entryType}`, { defaultValue: entry.entryType })}
           </Badge>
         </div>
         <div className="flex gap-1 flex-shrink-0">
@@ -607,7 +588,9 @@ function EntryDetailPane({
             type="button"
             onClick={onFavorite}
             className="p-1 rounded-md hover:bg-bg-elevated transition-colors"
-            title={entry.isFavorite ? 'お気に入り解除' : 'お気に入り'}
+            title={
+              entry.isFavorite ? t('entries.actions.unfavorite') : t('entries.actions.favorite')
+            }
           >
             <Star
               size={14}
@@ -616,16 +599,15 @@ function EntryDetailPane({
           </button>
           <Button size="sm" variant="secondary" onClick={onEdit} className="gap-1 text-xs h-7">
             <Pencil size={12} />
-            編集
+            {t('common.edit')}
           </Button>
           <Button size="sm" variant="destructive" onClick={onDelete} className="gap-1 text-xs h-7">
             <Trash2 size={12} />
-            削除
+            {t('common.delete')}
           </Button>
         </div>
       </div>
 
-      {/* ラベル */}
       {entry.labels && entry.labels.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2">
           {entry.labels.map((labelId: string) => {
@@ -639,36 +621,34 @@ function EntryDetailPane({
         </div>
       )}
 
-      {/* ログイン情報 */}
       {entry.entryType === 'login' && (
         <>
-          <PaneSectionHeading>ログイン情報</PaneSectionHeading>
+          <PaneSectionHeading>{t('entries.detail.loginInfo')}</PaneSectionHeading>
           <div className="space-y-0">
-            <PaneFieldDisplay label="ユーザー名" value={v.username} />
+            <PaneFieldDisplay label={t('entries.fields.username')} value={v.username} />
             <PaneFieldDisplay
-              label="パスワード"
+              label={t('entries.fields.password')}
               value={v.password}
               isPassword
               isMasked={!unmaskedFields.has('password')}
               onToggleMask={() => onToggleFieldMask('password')}
             />
-            <PaneFieldDisplay label="URL" value={v.url} isUrl={true} />
+            <PaneFieldDisplay label={t('entries.fields.url')} value={v.url} isUrl={true} />
           </div>
         </>
       )}
 
-      {/* 銀行口座 */}
       {entry.entryType === 'bank' && (
         <>
-          <PaneSectionHeading>銀行口座</PaneSectionHeading>
+          <PaneSectionHeading>{t('entries.detail.bankInfo')}</PaneSectionHeading>
           <div className="space-y-0">
-            <PaneFieldDisplay label="銀行名" value={v.bank_name} />
-            <PaneFieldDisplay label="支店コード" value={v.branch_code} />
-            <PaneFieldDisplay label="口座種別" value={v.account_type} />
-            <PaneFieldDisplay label="口座名義" value={v.account_holder} />
-            <PaneFieldDisplay label="口座番号" value={v.account_number} />
+            <PaneFieldDisplay label={t('entries.fields.bankName')} value={v.bank_name} />
+            <PaneFieldDisplay label={t('entries.fields.branchCode')} value={v.branch_code} />
+            <PaneFieldDisplay label={t('entries.fields.accountType')} value={v.account_type} />
+            <PaneFieldDisplay label={t('entries.fields.accountHolder')} value={v.account_holder} />
+            <PaneFieldDisplay label={t('entries.fields.accountNumber')} value={v.account_number} />
             <PaneFieldDisplay
-              label="PIN"
+              label={t('entries.fields.pin')}
               value={v.pin}
               isPassword
               isMasked={!unmaskedFields.has('bank-pin')}
@@ -678,20 +658,18 @@ function EntryDetailPane({
         </>
       )}
 
-      {/* SSH キー */}
       {entry.entryType === 'ssh_key' && (
         <>
-          <PaneSectionHeading>SSH キー</PaneSectionHeading>
+          <PaneSectionHeading>{t('entries.detail.sshKeyInfo')}</PaneSectionHeading>
           <div className="space-y-0">
-            <PaneFieldDisplay label="秘密鍵" value={v.private_key} />
+            <PaneFieldDisplay label={t('entries.fields.privateKey')} value={v.private_key} />
           </div>
         </>
       )}
 
-      {/* セキュアノート */}
       {entry.entryType === 'secure_note' && (
         <>
-          <PaneSectionHeading>ノート</PaneSectionHeading>
+          <PaneSectionHeading>{t('entries.detail.noteSection')}</PaneSectionHeading>
           {v.content ? (
             <div className="p-2 rounded-md bg-bg-elevated border border-border text-text-primary prose prose-invert max-w-none text-xs mt-0.5">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
@@ -699,34 +677,35 @@ function EntryDetailPane({
               </ReactMarkdown>
             </div>
           ) : (
-            <div className="px-2 py-1.5 text-sm text-text-secondary italic">未設定</div>
+            <div className="px-2 py-1.5 text-sm text-text-secondary italic">
+              {t('common.notSet')}
+            </div>
           )}
         </>
       )}
 
-      {/* クレジットカード */}
       {entry.entryType === 'credit_card' && (
         <>
-          <PaneSectionHeading>クレジットカード</PaneSectionHeading>
+          <PaneSectionHeading>{t('entries.detail.creditCardInfo')}</PaneSectionHeading>
           <div className="space-y-0">
-            <PaneFieldDisplay label="カード名義" value={v.cardholder} />
+            <PaneFieldDisplay label={t('entries.fields.cardholder')} value={v.cardholder} />
             <PaneFieldDisplay
-              label="カード番号"
+              label={t('entries.fields.cardNumber')}
               value={v.number}
               isPassword
               isMasked={!unmaskedFields.has('cc-number')}
               onToggleMask={() => onToggleFieldMask('cc-number')}
             />
-            <PaneFieldDisplay label="有効期限" value={v.expiry} />
+            <PaneFieldDisplay label={t('entries.fields.expiry')} value={v.expiry} />
             <PaneFieldDisplay
-              label="CVV"
+              label={t('entries.fields.cvv')}
               value={v.cvv}
               isPassword
               isMasked={!unmaskedFields.has('cvv')}
               onToggleMask={() => onToggleFieldMask('cvv')}
             />
             <PaneFieldDisplay
-              label="暗証番号"
+              label={t('entries.fields.ccPin')}
               value={v.pin}
               isPassword
               isMasked={!unmaskedFields.has('cc-pin')}
@@ -736,14 +715,13 @@ function EntryDetailPane({
         </>
       )}
 
-      {/* パスワード */}
       {entry.entryType === 'password' && (
         <>
-          <PaneSectionHeading>パスワード情報</PaneSectionHeading>
+          <PaneSectionHeading>{t('entries.detail.passwordInfo')}</PaneSectionHeading>
           <div className="space-y-0">
-            <PaneFieldDisplay label="ユーザー名" value={v.username} />
+            <PaneFieldDisplay label={t('entries.fields.username')} value={v.username} />
             <PaneFieldDisplay
-              label="パスワード"
+              label={t('entries.fields.password')}
               value={v.password}
               isPassword
               isMasked={!unmaskedFields.has('password')}
@@ -753,17 +731,15 @@ function EntryDetailPane({
         </>
       )}
 
-      {/* ソフトウェアライセンス */}
       {entry.entryType === 'software_license' && (
         <>
-          <PaneSectionHeading>ライセンス情報</PaneSectionHeading>
+          <PaneSectionHeading>{t('entries.detail.licenseInfo')}</PaneSectionHeading>
           <div className="space-y-0">
-            <PaneFieldDisplay label="ライセンスキー" value={v.license_key} />
+            <PaneFieldDisplay label={t('entries.fields.licenseKey')} value={v.license_key} />
           </div>
         </>
       )}
 
-      {/* カスタムフィールド */}
       {entry.customFields && entry.customFields.length > 0 && (
         <div className="space-y-0">
           {entry.customFields.map(
@@ -786,20 +762,26 @@ function EntryDetailPane({
         </div>
       )}
 
-      {/* メモ */}
       {entry.notes && (
         <>
-          <PaneSectionHeading>メモ</PaneSectionHeading>
+          <PaneSectionHeading>{t('entries.detail.notesSection')}</PaneSectionHeading>
           <div className="p-2 rounded-md bg-bg-elevated border border-border text-text-primary text-xs whitespace-pre-wrap break-words mt-0.5">
             {entry.notes}
           </div>
         </>
       )}
 
-      {/* タイムスタンプ */}
       <div className="mt-4 pt-2 border-t border-border space-y-0.5 text-xs text-text-secondary">
-        {entry.updatedAt > 0 && <div>更新: {formatTimestamp(entry.updatedAt)}</div>}
-        {entry.createdAt > 0 && <div>作成: {formatTimestamp(entry.createdAt)}</div>}
+        {entry.updatedAt > 0 && (
+          <div>
+            {t('entries.detail.updatedAt')}: {formatTimestamp(entry.updatedAt)}
+          </div>
+        )}
+        {entry.createdAt > 0 && (
+          <div>
+            {t('entries.detail.createdAt')}: {formatTimestamp(entry.createdAt)}
+          </div>
+        )}
       </div>
     </div>
   )

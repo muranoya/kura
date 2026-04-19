@@ -1,5 +1,6 @@
 import { Check, X } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import type { S3Config } from '../../../shared/types'
 import { PageHeader } from '../../components/layout/PageHeader'
@@ -10,6 +11,7 @@ import { PasswordInput } from '../../components/ui/password-input'
 import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
 
 export default function MasterPassword() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { draft } = useOnboardingDraft()
   const [password, setPassword] = useState('')
@@ -19,14 +21,13 @@ export default function MasterPassword() {
 
   const handleCreate = async () => {
     if (password !== confirmPassword) {
-      setError('パスワードが一致しません')
+      setError(t('onboarding.masterPassword.passwordMismatch'))
       return
     }
 
     setError('')
     setLoading(true)
     try {
-      // オンボーディングドラフトからS3設定を構築
       const s3Config: S3Config = {
         region: draft.region,
         bucket: draft.bucket,
@@ -50,7 +51,6 @@ export default function MasterPassword() {
       })
 
       if (response?.success) {
-        // Service Worker 再起動対策: 作成直後に UNLOCK を送ってメモリにロードさせる
         await new Promise<void>((resolve) => {
           chrome.runtime.sendMessage({ type: 'UNLOCK', password: password }, () => {
             resolve()
@@ -61,7 +61,7 @@ export default function MasterPassword() {
           state: { recoveryKey: response.recoveryKey, fromOnboarding: true },
         })
       } else {
-        setError(response?.error || 'Vault作成に失敗しました')
+        setError(response?.error || t('onboarding.masterPassword.vaultCreateFailed'))
       }
     } catch (err) {
       setError(String(err))
@@ -74,7 +74,7 @@ export default function MasterPassword() {
 
   return (
     <div className="h-full overflow-y-auto pb-4 flex flex-col">
-      <PageHeader title="マスターパスワード設定" showBackButton={true} />
+      <PageHeader title={t('onboarding.masterPassword.title')} showBackButton={true} />
 
       <div className="p-4 space-y-4">
         {error && (
@@ -85,37 +85,36 @@ export default function MasterPassword() {
 
         <Card>
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-sm font-medium">パスワード設定</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {t('onboarding.masterPassword.cardTitle')}
+            </CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2 space-y-3">
-            {/* パスワード入力 */}
             <div className="space-y-1.5">
               <Label htmlFor="password" className="text-sm">
-                マスターパスワード
+                {t('onboarding.masterPassword.passwordLabel')}
               </Label>
               <PasswordInput
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="強力なパスワードを設定してください"
+                placeholder={t('onboarding.masterPassword.passwordPlaceholder')}
                 className="text-sm"
               />
             </div>
 
-            {/* パスワード確認入力 */}
             <div className="space-y-1.5">
               <Label htmlFor="confirm-password" className="text-sm">
-                パスワード確認
+                {t('onboarding.masterPassword.confirmLabel')}
               </Label>
               <PasswordInput
                 id="confirm-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="パスワードを再入力してください"
+                placeholder={t('onboarding.masterPassword.confirmPlaceholder')}
                 className="text-sm"
               />
 
-              {/* マッチング状態 */}
               {confirmPassword && (
                 <div
                   className={`flex items-center gap-1 text-sm ${
@@ -124,11 +123,11 @@ export default function MasterPassword() {
                 >
                   {passwordsMatch ? (
                     <>
-                      <Check size={14} /> 一致しています
+                      <Check size={14} /> {t('onboarding.masterPassword.passwordsMatch')}
                     </>
                   ) : (
                     <>
-                      <X size={14} /> 一致していません
+                      <X size={14} /> {t('onboarding.masterPassword.passwordsMismatch')}
                     </>
                   )}
                 </div>
@@ -137,7 +136,6 @@ export default function MasterPassword() {
           </CardContent>
         </Card>
 
-        {/* アクションボタン */}
         <div className="flex gap-2">
           <Button
             variant="secondary"
@@ -146,7 +144,7 @@ export default function MasterPassword() {
             className="flex-1 text-sm"
             size="sm"
           >
-            戻る
+            {t('common.back')}
           </Button>
           <Button
             onClick={handleCreate}
@@ -154,7 +152,9 @@ export default function MasterPassword() {
             className="flex-1 text-sm"
             size="sm"
           >
-            {loading ? '作成中...' : '作成'}
+            {loading
+              ? t('onboarding.masterPassword.creating')
+              : t('onboarding.masterPassword.createButton')}
           </Button>
         </div>
       </div>

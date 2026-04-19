@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { KeyRound, Settings, Wand2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
 import { twMerge } from 'tailwind-merge'
 
@@ -8,12 +9,13 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const TAB_ROUTES = [
-  { path: '/entries', icon: KeyRound, label: 'アイテム' },
-  { path: '/password-generator', icon: Wand2, label: '生成' },
-  { path: '/settings', icon: Settings, label: '設定' },
-]
+  { path: '/entries', icon: KeyRound, labelKey: 'components.bottomNav.entries' },
+  { path: '/password-generator', icon: Wand2, labelKey: 'components.bottomNav.passwordGenerator' },
+  { path: '/settings', icon: Settings, labelKey: 'components.bottomNav.settings' },
+] as const
 
 export function BottomNav() {
+  const { t } = useTranslation()
   const location = useLocation()
 
   const isActiveTab = (tabPath: string) => {
@@ -23,7 +25,7 @@ export function BottomNav() {
   return (
     <nav className="shrink-0 border-t border-border bg-bg-surface">
       <div className="flex w-full justify-around">
-        {TAB_ROUTES.map(({ path, icon: Icon, label }) => (
+        {TAB_ROUTES.map(({ path, icon: Icon, labelKey }) => (
           <Link
             key={path}
             to={path}
@@ -36,7 +38,7 @@ export function BottomNav() {
             )}
           >
             <Icon size={16} />
-            <span>{label}</span>
+            <span>{t(labelKey)}</span>
           </Link>
         ))}
       </div>

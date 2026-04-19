@@ -1,6 +1,7 @@
 import { Check, Copy, Eye, EyeOff, Maximize2, Pencil, Star, Trash2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { copySensitive } from '../../lib/clipboard'
@@ -28,6 +29,7 @@ function FieldDisplay({
   isUrl = false,
   onToggleMask,
 }: FieldDisplayProps) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
   const [largeTextOpen, setLargeTextOpen] = useState(false)
   const isEmpty = !value
@@ -76,7 +78,7 @@ function FieldDisplay({
         }`}
       >
         {isEmpty
-          ? '未設定'
+          ? t('common.unset')
           : isPassword && isMasked
             ? '•'.repeat(Math.max(8, value.length))
             : value}
@@ -117,7 +119,7 @@ function FieldDisplay({
           className="p-1 text-text-muted hover:text-text-primary transition-colors shrink-0"
         >
           {copied ? (
-            <span className="text-xs text-success">コピーしました</span>
+            <span className="text-xs text-success">{t('common.copied')}</span>
           ) : (
             <Copy size={14} />
           )}
@@ -242,6 +244,7 @@ export default function EntryDetailContent({
   onDelete,
   onFavorite,
 }: EntryDetailContentProps) {
+  const { t } = useTranslation()
   const [unmaskedFields, setUnmaskedFields] = useState<Set<string>>(new Set())
   const toggleFieldMask = (key: string) => {
     setUnmaskedFields((prev) => {
@@ -267,7 +270,7 @@ export default function EntryDetailContent({
             type="button"
             onClick={onFavorite}
             className="p-1 rounded-md hover:bg-bg-elevated transition-colors"
-            title={entry.isFavorite ? 'お気に入り解除' : 'お気に入り'}
+            title={entry.isFavorite ? t('entries.detail.unfavorite') : t('entries.detail.favorite')}
           >
             <Star
               size={16}
@@ -276,11 +279,11 @@ export default function EntryDetailContent({
           </button>
           <Button size="sm" variant="secondary" onClick={onEdit} className="gap-1 h-7 text-xs">
             <Pencil size={13} />
-            編集
+            {t('entries.detail.edit')}
           </Button>
           <Button size="sm" variant="destructive" onClick={onDelete} className="gap-1 h-7 text-xs">
             <Trash2 size={13} />
-            削除
+            {t('entries.detail.delete')}
           </Button>
         </div>
       </div>
@@ -304,17 +307,17 @@ export default function EntryDetailContent({
         {/* ログイン情報 */}
         {entry.entryType === 'login' && (
           <>
-            <SectionHeading>ログイン情報</SectionHeading>
+            <SectionHeading>{t('sections.login')}</SectionHeading>
             <div className="space-y-0.5">
-              <FieldDisplay label="ユーザー名" value={v.username as string} />
+              <FieldDisplay label={t('fields.username')} value={v.username as string} />
               <FieldDisplay
-                label="パスワード"
+                label={t('fields.password')}
                 value={v.password as string}
                 isPassword={true}
                 isMasked={!unmaskedFields.has('password')}
                 onToggleMask={() => toggleFieldMask('password')}
               />
-              <FieldDisplay label="URL" value={v.url as string} isUrl={true} />
+              <FieldDisplay label={t('fields.url')} value={v.url as string} isUrl={true} />
             </div>
           </>
         )}
@@ -322,15 +325,15 @@ export default function EntryDetailContent({
         {/* 銀行口座 */}
         {entry.entryType === 'bank' && (
           <>
-            <SectionHeading>銀行口座</SectionHeading>
+            <SectionHeading>{t('sections.bank')}</SectionHeading>
             <div className="space-y-0.5">
-              <FieldDisplay label="銀行名" value={v.bank_name as string} />
-              <FieldDisplay label="支店コード" value={v.branch_code as string} />
-              <FieldDisplay label="口座種別" value={v.account_type as string} />
-              <FieldDisplay label="口座名義" value={v.account_holder as string} />
-              <FieldDisplay label="口座番号" value={v.account_number as string} />
+              <FieldDisplay label={t('fields.bank_name')} value={v.bank_name as string} />
+              <FieldDisplay label={t('fields.branch_code')} value={v.branch_code as string} />
+              <FieldDisplay label={t('fields.account_type')} value={v.account_type as string} />
+              <FieldDisplay label={t('fields.account_holder')} value={v.account_holder as string} />
+              <FieldDisplay label={t('fields.account_number')} value={v.account_number as string} />
               <FieldDisplay
-                label="PIN"
+                label={t('fields.pin')}
                 value={v.pin as string}
                 isPassword={true}
                 isMasked={!unmaskedFields.has('bank-pin')}
@@ -343,9 +346,9 @@ export default function EntryDetailContent({
         {/* SSH キー */}
         {entry.entryType === 'ssh_key' && (
           <>
-            <SectionHeading>SSH キー</SectionHeading>
+            <SectionHeading>{t('sections.ssh_key')}</SectionHeading>
             <div className="space-y-0.5">
-              <FieldDisplay label="秘密鍵" value={v.private_key as string} />
+              <FieldDisplay label={t('fields.private_key')} value={v.private_key as string} />
             </div>
           </>
         )}
@@ -353,7 +356,7 @@ export default function EntryDetailContent({
         {/* セキュアノート */}
         {entry.entryType === 'secure_note' && (
           <>
-            <SectionHeading>ノート</SectionHeading>
+            <SectionHeading>{t('sections.secure_note')}</SectionHeading>
             {v.content ? (
               <div className="p-3 rounded-md bg-bg-elevated border border-border text-text-primary prose prose-invert max-w-none text-xs mt-1">
                 <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
@@ -361,7 +364,9 @@ export default function EntryDetailContent({
                 </ReactMarkdown>
               </div>
             ) : (
-              <div className="px-3 py-2 text-sm text-text-secondary italic">未設定</div>
+              <div className="px-3 py-2 text-sm text-text-secondary italic">
+                {t('common.unset')}
+              </div>
             )}
           </>
         )}
@@ -369,26 +374,26 @@ export default function EntryDetailContent({
         {/* クレジットカード */}
         {entry.entryType === 'credit_card' && (
           <>
-            <SectionHeading>クレジットカード</SectionHeading>
+            <SectionHeading>{t('sections.credit_card')}</SectionHeading>
             <div className="space-y-0.5">
-              <FieldDisplay label="カード名義" value={v.cardholder as string} />
+              <FieldDisplay label={t('fields.cardholder')} value={v.cardholder as string} />
               <FieldDisplay
-                label="カード番号"
+                label={t('fields.number')}
                 value={v.number as string}
                 isPassword={true}
                 isMasked={!unmaskedFields.has('cc-number')}
                 onToggleMask={() => toggleFieldMask('cc-number')}
               />
-              <FieldDisplay label="有効期限" value={v.expiry as string} />
+              <FieldDisplay label={t('fields.expiry')} value={v.expiry as string} />
               <FieldDisplay
-                label="CVV"
+                label={t('fields.cvv')}
                 value={v.cvv as string}
                 isPassword={true}
                 isMasked={!unmaskedFields.has('cvv')}
                 onToggleMask={() => toggleFieldMask('cvv')}
               />
               <FieldDisplay
-                label="暗証番号"
+                label={t('fields.cc_pin')}
                 value={v.pin as string}
                 isPassword={true}
                 isMasked={!unmaskedFields.has('cc-pin')}
@@ -401,11 +406,11 @@ export default function EntryDetailContent({
         {/* パスワード */}
         {entry.entryType === 'password' && (
           <>
-            <SectionHeading>パスワード情報</SectionHeading>
+            <SectionHeading>{t('sections.password')}</SectionHeading>
             <div className="space-y-0.5">
-              <FieldDisplay label="ユーザー名" value={v.username as string} />
+              <FieldDisplay label={t('fields.username')} value={v.username as string} />
               <FieldDisplay
-                label="パスワード"
+                label={t('fields.password')}
                 value={v.password as string}
                 isPassword={true}
                 isMasked={!unmaskedFields.has('password')}
@@ -418,9 +423,9 @@ export default function EntryDetailContent({
         {/* ソフトウェアライセンス */}
         {entry.entryType === 'software_license' && (
           <>
-            <SectionHeading>ライセンス情報</SectionHeading>
+            <SectionHeading>{t('sections.software_license')}</SectionHeading>
             <div className="space-y-0.5">
-              <FieldDisplay label="ライセンスキー" value={v.license_key as string} />
+              <FieldDisplay label={t('fields.license_key')} value={v.license_key as string} />
             </div>
           </>
         )}
@@ -450,7 +455,7 @@ export default function EntryDetailContent({
         {/* メモ */}
         {entry.notes && (
           <>
-            <SectionHeading>メモ</SectionHeading>
+            <SectionHeading>{t('sections.notes')}</SectionHeading>
             <div className="p-3 rounded-md bg-bg-elevated border border-border text-text-primary text-xs whitespace-pre-wrap break-words mt-1">
               {entry.notes}
             </div>
@@ -459,8 +464,16 @@ export default function EntryDetailContent({
 
         {/* タイムスタンプ */}
         <div className="mt-6 pt-3 border-t border-border space-y-0.5 text-xs text-text-secondary">
-          {entry.updatedAt > 0 && <div>更新: {formatTimestamp(entry.updatedAt)}</div>}
-          {entry.createdAt > 0 && <div>作成: {formatTimestamp(entry.createdAt)}</div>}
+          {entry.updatedAt > 0 && (
+            <div>
+              {t('entries.detail.updated')} {formatTimestamp(entry.updatedAt)}
+            </div>
+          )}
+          {entry.createdAt > 0 && (
+            <div>
+              {t('entries.detail.created')} {formatTimestamp(entry.createdAt)}
+            </div>
+          )}
         </div>
       </div>
     </div>

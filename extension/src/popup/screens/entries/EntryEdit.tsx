@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { CustomField, Entry, Label } from '../../../shared/types'
 import * as commands from '../../commands'
@@ -7,6 +8,7 @@ import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 
 export default function EntryEdit() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [entry, setEntry] = useState<Entry | null>(null)
@@ -34,18 +36,18 @@ export default function EntryEdit() {
           setSelectedLabelIds(data.labels || [])
           setAllLabels(labels)
         } catch (err) {
-          setError(`アイテム読み込み失敗: ${err}`)
+          setError(t('entries.edit.loadFailed', { error: String(err) }))
         } finally {
           setLoading(false)
         }
       }
     }
     load()
-  }, [id])
+  }, [id, t])
 
   const handleSave = async () => {
     if (!name.trim()) {
-      setError('名前を入力してください')
+      setError(t('entries.edit.nameRequired'))
       return
     }
 
@@ -72,19 +74,19 @@ export default function EntryEdit() {
       )
       navigate('/entries', { state: { selectedId: id } })
     } catch (err) {
-      setError(`保存失敗: ${err}`)
+      setError(t('entries.edit.saveFailed', { error: String(err) }))
     } finally {
       setSaving(false)
     }
   }
 
-  if (loading) return <PageHeader title="読み込み中..." showBackButton={true} />
-  if (!entry) return <PageHeader title="アイテムが見つかりません" showBackButton={true} />
+  if (loading) return <PageHeader title={t('common.loading')} showBackButton={true} />
+  if (!entry) return <PageHeader title={t('entries.edit.notFound')} showBackButton={true} />
 
   return (
     <div className="h-full overflow-y-auto flex flex-col">
       <PageHeader
-        title="アイテム編集"
+        title={t('entries.edit.title')}
         showBackButton={true}
         action={
           <Button
@@ -93,7 +95,7 @@ export default function EntryEdit() {
             disabled={saving || !name.trim()}
             className="text-sm"
           >
-            {saving ? '保存中...' : '保存'}
+            {saving ? t('entries.edit.saving') : t('entries.edit.saveButton')}
           </Button>
         }
       />

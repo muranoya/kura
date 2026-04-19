@@ -1,5 +1,6 @@
 import { Check, ChevronDown, ChevronRight, Copy, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import * as commands from '../../commands'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
@@ -11,6 +12,7 @@ interface PasswordGeneratorPanelProps {
 }
 
 export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanelProps) {
+  const { t } = useTranslation()
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -88,7 +90,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           htmlFor={`lowercase-${prefix}`}
           className={`${labelSize} text-text-primary cursor-pointer`}
         >
-          小文字 (a-z)
+          {t('passwordGenerator.lowercase')}
         </label>
       </div>
 
@@ -104,7 +106,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           htmlFor={`uppercase-${prefix}`}
           className={`${labelSize} text-text-primary cursor-pointer`}
         >
-          大文字 (A-Z)
+          {t('passwordGenerator.uppercase')}
         </label>
       </div>
 
@@ -120,7 +122,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           htmlFor={`numbers-${prefix}`}
           className={`${labelSize} text-text-primary cursor-pointer`}
         >
-          数字 (0-9)
+          {t('passwordGenerator.numbers')}
         </label>
       </div>
 
@@ -136,7 +138,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           htmlFor={`symbols1-${prefix}`}
           className={`${labelSize} text-text-primary cursor-pointer`}
         >
-          {'記号 (!@#$%^&*-_.)'}
+          {t('passwordGenerator.symbols1')}
         </label>
       </div>
 
@@ -152,7 +154,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           htmlFor={`symbols2-${prefix}`}
           className={`${labelSize} text-text-primary cursor-pointer`}
         >
-          {'記号 (()[]{}+=~/)'}
+          {t('passwordGenerator.symbols2')}
         </label>
       </div>
 
@@ -168,7 +170,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           htmlFor={`symbols3-${prefix}`}
           className={`${labelSize} text-text-primary cursor-pointer`}
         >
-          {'記号 (`<>\'"\\|;,:)'}
+          {t('passwordGenerator.symbols3')}
         </label>
       </div>
     </div>
@@ -191,7 +193,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                       type="button"
                       onClick={handleCopy}
                       className="p-1 text-text-muted hover:text-text-primary transition-colors"
-                      title="コピー"
+                      title={t('common.copy')}
                     >
                       {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
                     </button>
@@ -200,7 +202,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                       onClick={handleGenerate}
                       disabled={loading}
                       className="p-1 text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
-                      title="再生成"
+                      title={t('passwordGenerator.regenerate')}
                     >
                       <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
                     </button>
@@ -209,16 +211,16 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                         type="button"
                         onClick={() => onUse(password)}
                         className="px-2 py-1 text-xs bg-accent text-white hover:bg-accent-hover rounded transition-colors whitespace-nowrap"
-                        title="このパスワードを使用"
+                        title={t('passwordGenerator.use')}
                       >
-                        使用する
+                        {t('passwordGenerator.use')}
                       </button>
                     )}
                   </div>
                 </div>
               ) : (
                 <div className="p-2 rounded-md bg-bg-elevated border border-border text-center text-text-secondary text-xs">
-                  パスワードをまだ生成していません
+                  {t('passwordGenerator.notGenerated')}
                 </div>
               )}
             </CardContent>
@@ -228,7 +230,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           <div className="space-y-2">
             <div className="space-y-1">
               <UILabel htmlFor="length-inline" className="text-xs">
-                長さ: {length}
+                {t('passwordGenerator.length', { length })}
               </UILabel>
               <Input
                 id="length-inline"
@@ -253,7 +255,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                 className="flex items-center gap-1 text-xs text-text-secondary hover:text-text-primary transition-colors"
               >
                 {showCharOptions ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                文字種の設定
+                {t('passwordGenerator.charSettings')}
               </button>
               {showCharOptions && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
@@ -292,7 +294,9 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           {/* パスワード表示 */}
           <Card>
             <CardHeader className="px-3 py-2">
-              <CardTitle className="text-sm font-medium">生成されたパスワード</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('passwordGenerator.generated')}
+              </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2">
               {password ? (
@@ -305,7 +309,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                       type="button"
                       onClick={handleCopy}
                       className="p-1 text-text-muted hover:text-text-primary transition-colors"
-                      title="コピー"
+                      title={t('common.copy')}
                     >
                       {copied ? <Check size={16} className="text-success" /> : <Copy size={16} />}
                     </button>
@@ -314,7 +318,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                       onClick={handleGenerate}
                       disabled={loading}
                       className="p-1 text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
-                      title="再生成"
+                      title={t('passwordGenerator.regenerate')}
                     >
                       <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
                     </button>
@@ -322,7 +326,7 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
                 </div>
               ) : (
                 <div className="p-3 rounded-md bg-bg-elevated border border-border text-center text-text-secondary text-sm">
-                  パスワードをまだ生成していません
+                  {t('passwordGenerator.notGenerated')}
                 </div>
               )}
             </CardContent>
@@ -331,12 +335,14 @@ export default function PasswordGeneratorPanel({ onUse }: PasswordGeneratorPanel
           {/* 設定 */}
           <Card>
             <CardHeader className="px-3 py-2">
-              <CardTitle className="text-sm font-medium">設定</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('passwordGenerator.settings')}
+              </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2 space-y-3">
               <div className="space-y-3">
                 <UILabel htmlFor="length" className="text-xs">
-                  長さ: {length}
+                  {t('passwordGenerator.length', { length })}
                 </UILabel>
                 <div>
                   <Input

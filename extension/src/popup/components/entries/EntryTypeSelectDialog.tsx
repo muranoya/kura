@@ -1,16 +1,7 @@
-import { getEntryTypeLabel } from '../../../shared/constants'
+import { useTranslation } from 'react-i18next'
+import { ENTRY_TYPE_KEYS } from '../../../shared/constants'
 import EntryTypeIcon from '../EntryTypeIcon'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
-
-const ENTRY_TYPES = [
-  'login',
-  'bank',
-  'ssh_key',
-  'secure_note',
-  'credit_card',
-  'password',
-  'software_license',
-] as const
 
 interface EntryTypeSelectDialogProps {
   open: boolean
@@ -23,15 +14,16 @@ export default function EntryTypeSelectDialog({
   onSelect,
   onCancel,
 }: EntryTypeSelectDialogProps) {
+  const { t } = useTranslation()
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>アイテム種別を選択</DialogTitle>
-          <DialogDescription>作成するアイテムの種別を選んでください</DialogDescription>
+          <DialogTitle>{t('entries.selectTypeDialog.title')}</DialogTitle>
+          <DialogDescription>{t('entries.selectTypeDialog.description')}</DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-2">
-          {ENTRY_TYPES.map((type) => (
+          {ENTRY_TYPE_KEYS.map((type) => (
             <button
               key={type}
               type="button"
@@ -40,7 +32,7 @@ export default function EntryTypeSelectDialog({
             >
               <EntryTypeIcon type={type} size={20} />
               <span className="text-sm font-medium text-text-primary">
-                {getEntryTypeLabel(type)}
+                {t(`entries.types.${type}`)}
               </span>
             </button>
           ))}

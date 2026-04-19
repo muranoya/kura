@@ -1,5 +1,6 @@
 import { Lock } from 'lucide-react'
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -16,6 +17,7 @@ interface LockScreenProps {
 }
 
 export default function LockScreen({ onUnlocked }: LockScreenProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -24,7 +26,7 @@ export default function LockScreen({ onUnlocked }: LockScreenProps) {
 
   const handleUnlock = useCallback(async () => {
     if (!password) {
-      setError('パスワードを入力してください')
+      setError(t('auth.lock.errorRequired'))
       return
     }
 
@@ -40,10 +42,10 @@ export default function LockScreen({ onUnlocked }: LockScreenProps) {
       commands.syncVaultIfConfigured().catch(() => {}) // バックグラウンド
       onUnlocked?.()
     } catch (err) {
-      setError(`ロック解除失敗: ${err}`)
+      setError(t('auth.lock.errorUnlock', { error: String(err) }))
       setLoading(false)
     }
-  }, [password, onUnlocked])
+  }, [password, onUnlocked, t])
 
   const handleLogout = useCallback(() => {
     setShowLogoutDialog(true)
@@ -60,10 +62,10 @@ export default function LockScreen({ onUnlocked }: LockScreenProps) {
       // Page reload to reinitialize the app
       window.location.href = '/'
     } catch (err) {
-      setError(`ログアウト失敗: ${err}`)
+      setError(t('auth.lock.errorLogout', { error: String(err) }))
       setShowLogoutDialog(false)
     }
-  }, [])
+  }, [t])
 
   return (
     <div className="flex items-center justify-center h-screen bg-bg-base px-4">
@@ -73,8 +75,8 @@ export default function LockScreen({ onUnlocked }: LockScreenProps) {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-lg bg-accent/10 mb-4">
             <Lock className="w-8 h-8 text-accent" />
           </div>
-          <h1 className="text-3xl font-bold text-text-primary mb-2">kura</h1>
-          <p className="text-text-secondary">Vaultはロックされています</p>
+          <h1 className="text-3xl font-bold text-text-primary mb-2">{t('app.name')}</h1>
+          <p className="text-text-secondary">{t('auth.lock.subtitle')}</p>
         </div>
 
         <Card>
@@ -88,10 +90,10 @@ export default function LockScreen({ onUnlocked }: LockScreenProps) {
 
             {/* マスターパスワード入力 */}
             <div className="space-y-2 mb-6">
-              <Label htmlFor="password">マスターパスワード</Label>
+              <Label htmlFor="password">{t('auth.lock.masterPasswordLabel')}</Label>
               <PasswordInput
                 id="password"
-                placeholder="パスワードを入力"
+                placeholder={t('auth.lock.passwordPlaceholder')}
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value)
@@ -103,7 +105,7 @@ export default function LockScreen({ onUnlocked }: LockScreenProps) {
 
             {/* ロック解除ボタン */}
             <Button onClick={handleUnlock} disabled={loading} className="w-full mb-2">
-              {loading ? 'ロック解除中...' : 'ロック解除'}
+              {loading ? t('auth.lock.unlocking') : t('auth.lock.unlock')}
             </Button>
 
             {/* リカバリーキーボタン */}
@@ -112,7 +114,7 @@ export default function LockScreen({ onUnlocked }: LockScreenProps) {
               onClick={() => navigate('/auth/recovery')}
               className="w-full"
             >
-              リカバリーキーで復旧
+              {t('auth.lock.recoveryAction')}
             </Button>
           </CardContent>
         </Card>
@@ -121,15 +123,15 @@ export default function LockScreen({ onUnlocked }: LockScreenProps) {
         <div className="mt-8">
           <Separator className="mb-6" />
           <Button variant="destructive" onClick={handleLogout} className="w-full">
-            ログアウト
+            {t('auth.lock.logout')}
           </Button>
         </div>
 
         <ConfirmDialog
           open={showLogoutDialog}
-          title="ログアウト"
-          description="設定とローカルキャッシュを削除し、初期設定から再開します。この操作は取り消せません。よろしいですか？"
-          confirmText="ログアウト"
+          title={t('auth.lock.logoutDialog.title')}
+          description={t('auth.lock.logoutDialog.description')}
+          confirmText={t('auth.lock.logoutDialog.confirm')}
           isDangerous={true}
           onConfirm={handleLogoutConfirm}
           onCancel={() => setShowLogoutDialog(false)}

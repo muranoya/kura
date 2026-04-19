@@ -12,10 +12,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import net.meshpeak.kura.R
 import net.meshpeak.kura.data.model.EntryRow
 
 @Composable
@@ -77,7 +79,7 @@ fun EntryCard(
         if (entry.isFavorite) {
             Icon(
                 imageVector = Icons.Default.Star,
-                contentDescription = "お気に入り",
+                contentDescription = stringResource(R.string.cd_favorite),
                 tint = Color(0xFFD97706),
                 modifier = Modifier.size(18.dp)
             )
@@ -86,7 +88,7 @@ fun EntryCard(
             IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                 Icon(
                     imageVector = Icons.Default.Delete,
-                    contentDescription = "削除",
+                    contentDescription = stringResource(R.string.cd_delete),
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(18.dp)
                 )
@@ -94,14 +96,14 @@ fun EntryCard(
         }
         if (onRestore != null) {
             IconButton(onClick = onRestore, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.RestoreFromTrash, contentDescription = "復元", modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.RestoreFromTrash, contentDescription = stringResource(R.string.cd_restore), modifier = Modifier.size(18.dp))
             }
         }
         if (onPurge != null) {
             IconButton(onClick = onPurge, modifier = Modifier.size(32.dp)) {
                 Icon(
                     Icons.Default.DeleteForever,
-                    contentDescription = "完全削除",
+                    contentDescription = stringResource(R.string.cd_purge),
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(18.dp)
                 )

@@ -10,10 +10,10 @@ import {
   Trash2,
 } from 'lucide-react'
 import * as React from 'react'
+import { useTranslation } from 'react-i18next'
 import type { EntryRow } from '../../../shared/types'
 import { Button } from '../ui/button'
 
-// アイコン取得
 const getEntryIcon = (type: string) => {
   switch (type) {
     case 'login':
@@ -35,21 +35,6 @@ const getEntryIcon = (type: string) => {
   }
 }
 
-// タイプラベル取得
-const getTypeLabel = (type: string): string => {
-  const labels: Record<string, string> = {
-    login: 'ログイン',
-    bank: '銀行口座',
-    ssh_key: 'SSH キー',
-    secure_note: 'セキュアノート',
-    credit_card: 'クレジットカード',
-    password: 'パスワード',
-    software_license: 'ソフトウェアライセンス',
-  }
-  return labels[type] || type
-}
-
-// Normal variant (EntryList用)
 interface EntryCardNormalProps {
   variant: 'normal'
   entry: EntryRow
@@ -58,7 +43,6 @@ interface EntryCardNormalProps {
   isSelected?: boolean
 }
 
-// Trash variant (Trash用)
 interface EntryCardTrashProps {
   variant: 'trash'
   entry: EntryRow
@@ -69,6 +53,8 @@ interface EntryCardTrashProps {
 type EntryCardProps = EntryCardNormalProps | EntryCardTrashProps
 
 export default function EntryCard(props: EntryCardProps) {
+  const { t, i18n } = useTranslation()
+
   if (props.variant === 'normal') {
     const isSelected = props.isSelected || false
 
@@ -83,7 +69,6 @@ export default function EntryCard(props: EntryCardProps) {
         onClick={() => props.onClick(props.entry.id)}
       >
         <div className="flex items-center justify-between gap-2">
-          {/* 左側: アイコン + 名前 */}
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className="flex-shrink-0 w-6 h-6 rounded bg-accent/10 flex items-center justify-center text-accent">
               {React.cloneElement(
@@ -105,16 +90,15 @@ export default function EntryCard(props: EntryCardProps) {
     )
   }
 
-  // trash variant
   return (
     <div className="px-3 py-2 border-l-2 border-l-transparent">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold text-text-primary truncate">{props.entry.name}</h3>
           <p className="text-sm text-text-muted mt-1">
-            削除日時:{' '}
+            {t('entries.deletedAt')}:{' '}
             {props.entry.deletedAt
-              ? new Date(props.entry.deletedAt * 1000).toLocaleString('ja-JP')
+              ? new Date(props.entry.deletedAt * 1000).toLocaleString(i18n.language)
               : '-'}
           </p>
         </div>
@@ -127,7 +111,7 @@ export default function EntryCard(props: EntryCardProps) {
             className="gap-1"
           >
             <RotateCw size={16} />
-            復元
+            {t('entries.restore')}
           </Button>
           <Button
             variant="destructive"
@@ -136,7 +120,7 @@ export default function EntryCard(props: EntryCardProps) {
             className="gap-1"
           >
             <Trash2 size={16} />
-            削除
+            {t('entries.delete')}
           </Button>
         </div>
       </div>
@@ -144,5 +128,4 @@ export default function EntryCard(props: EntryCardProps) {
   )
 }
 
-// ヘルパー関数をエクスポート（他で使う場合）
-export { getEntryIcon, getTypeLabel }
+export { getEntryIcon }

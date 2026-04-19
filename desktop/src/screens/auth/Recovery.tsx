@@ -1,5 +1,6 @@
 import { ArrowLeft } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import { Button } from '../../components/ui/button'
@@ -13,6 +14,7 @@ interface RecoveryProps {
 }
 
 export default function Recovery({ onUnlocked }: RecoveryProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [recoveryKey, setRecoveryKey] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -22,12 +24,12 @@ export default function Recovery({ onUnlocked }: RecoveryProps) {
 
   const handleRecover = async () => {
     if (!recoveryKey || !newPassword || !confirmPassword) {
-      setError('すべてのフィールドを入力してください')
+      setError(t('auth.recovery.errorRequired'))
       return
     }
 
     if (newPassword !== confirmPassword) {
-      setError('パスワードが一致しません')
+      setError(t('auth.recovery.errorMismatch'))
       return
     }
 
@@ -36,7 +38,7 @@ export default function Recovery({ onUnlocked }: RecoveryProps) {
       await commands.unlockWithRecoveryKey(recoveryKey)
       onUnlocked?.()
     } catch (err) {
-      setError(`復旧失敗: ${err}`)
+      setError(t('auth.recovery.errorRecover', { error: String(err) }))
       setLoading(false)
     }
   }
@@ -51,12 +53,12 @@ export default function Recovery({ onUnlocked }: RecoveryProps) {
           className="flex items-center gap-2 text-accent hover:text-accent-hover mb-8 transition-colors"
         >
           <ArrowLeft size={18} />
-          <span className="text-sm font-medium">戻る</span>
+          <span className="text-sm font-medium">{t('auth.recovery.back')}</span>
         </button>
 
         <Card>
           <CardHeader>
-            <CardTitle>リカバリーキーで復旧</CardTitle>
+            <CardTitle>{t('auth.recovery.title')}</CardTitle>
           </CardHeader>
           <CardContent>
             {/* エラーメッセージ */}
@@ -68,11 +70,11 @@ export default function Recovery({ onUnlocked }: RecoveryProps) {
 
             {/* リカバリーキー */}
             <div className="space-y-2 mb-4">
-              <Label htmlFor="recovery-key">リカバリーキー</Label>
+              <Label htmlFor="recovery-key">{t('auth.recovery.recoveryKeyLabel')}</Label>
               <Input
                 id="recovery-key"
                 type="text"
-                placeholder="リカバリーキーを入力"
+                placeholder={t('auth.recovery.recoveryKeyPlaceholder')}
                 value={recoveryKey}
                 onChange={(e) => {
                   setRecoveryKey(e.target.value)
@@ -83,10 +85,10 @@ export default function Recovery({ onUnlocked }: RecoveryProps) {
 
             {/* 新しいパスワード */}
             <div className="space-y-2 mb-4">
-              <Label htmlFor="new-password">新しいパスワード</Label>
+              <Label htmlFor="new-password">{t('auth.recovery.newPasswordLabel')}</Label>
               <PasswordInput
                 id="new-password"
-                placeholder="新しいパスワード"
+                placeholder={t('auth.recovery.newPasswordPlaceholder')}
                 value={newPassword}
                 onChange={(e) => {
                   setNewPassword(e.target.value)
@@ -97,10 +99,10 @@ export default function Recovery({ onUnlocked }: RecoveryProps) {
 
             {/* パスワード確認 */}
             <div className="space-y-2 mb-6">
-              <Label htmlFor="confirm-password">パスワード確認</Label>
+              <Label htmlFor="confirm-password">{t('auth.recovery.confirmLabel')}</Label>
               <PasswordInput
                 id="confirm-password"
-                placeholder="パスワードを再入力"
+                placeholder={t('auth.recovery.confirmPlaceholder')}
                 value={confirmPassword}
                 onChange={(e) => {
                   setConfirmPassword(e.target.value)
@@ -111,7 +113,7 @@ export default function Recovery({ onUnlocked }: RecoveryProps) {
 
             {/* 復旧ボタン */}
             <Button onClick={handleRecover} disabled={loading} className="w-full">
-              {loading ? '復旧中...' : '復旧'}
+              {loading ? t('auth.recovery.recovering') : t('auth.recovery.recover')}
             </Button>
           </CardContent>
         </Card>

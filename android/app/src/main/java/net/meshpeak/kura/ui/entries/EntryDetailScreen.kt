@@ -27,6 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontFamily
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.outlined.StarOutline
+import net.meshpeak.kura.R
 import net.meshpeak.kura.data.model.CustomField
 import net.meshpeak.kura.data.model.Entry
 import net.meshpeak.kura.data.model.Label
@@ -72,12 +74,13 @@ fun EntryDetailScreen(
     val clipboardClearSeconds by appViewModel.preferences.clipboardClearSecondsFlow
         .collectAsState(initial = 30)
 
+    val genericErrorText = stringResource(R.string.entry_generic_error)
     LaunchedEffect(entryId) {
         try {
             entry = appViewModel.repository.getEntry(entryId)
             labels = appViewModel.repository.listLabels()
         } catch (e: Exception) {
-            error = e.message ?: "エラー"
+            error = e.message ?: genericErrorText
         }
         loading = false
     }
@@ -88,13 +91,13 @@ fun EntryDetailScreen(
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 actions = {
                     if (entry != null) {
                         IconButton(onClick = { showDeleteDialog = true }) {
-                            Icon(Icons.Default.Delete, contentDescription = "ゴミ箱に移動")
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.cd_trash))
                         }
                     }
                 }
@@ -103,7 +106,7 @@ fun EntryDetailScreen(
         floatingActionButton = {
             if (entry != null) {
                 FloatingActionButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, contentDescription = "編集")
+                    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.cd_edit))
                 }
             }
         }
@@ -167,7 +170,7 @@ fun EntryDetailScreen(
                             ) {
                                 Icon(
                                     if (e.isFavorite) Icons.Default.Star else Icons.Outlined.StarOutline,
-                                    contentDescription = "お気に入り",
+                                    contentDescription = stringResource(if (e.isFavorite) R.string.cd_favorite else R.string.cd_not_favorite),
                                     tint = if (e.isFavorite) Color(0xFFD97706) else MaterialTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.size(28.dp)
                                 )
@@ -287,10 +290,10 @@ fun EntryDetailScreen(
                         }
 
                         // Notes
-                        DetailSection(title = "メモ") {
+                        DetailSection(title = stringResource(R.string.section_notes)) {
                             val hasNotes = !e.notes.isNullOrEmpty()
                             DetailField(
-                                label = "メモ",
+                                label = stringResource(R.string.field_notes),
                                 value = e.notes ?: "",
                                 isEmpty = !hasNotes,
                                 context = context,
@@ -312,7 +315,7 @@ fun EntryDetailScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        "更新",
+                                        stringResource(R.string.entry_detail_updated),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -328,7 +331,7 @@ fun EntryDetailScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        "作成",
+                                        stringResource(R.string.entry_detail_created),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -350,9 +353,9 @@ fun EntryDetailScreen(
 
     if (showDeleteDialog) {
         ConfirmDialog(
-            title = "アイテムを削除",
-            description = "このアイテムをゴミ箱に移動しますか？",
-            confirmText = "ゴミ箱に移動",
+            title = stringResource(R.string.entry_detail_delete_title),
+            description = stringResource(R.string.entry_detail_delete_description),
+            confirmText = stringResource(R.string.action_move_to_trash),
             isDangerous = true,
             onConfirm = {
                 scope.launch {
@@ -455,7 +458,7 @@ fun DetailField(
                     if (copied) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "コピーしました",
+                            stringResource(R.string.feedback_copied),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -464,7 +467,7 @@ fun DetailField(
                 Spacer(modifier = Modifier.height(4.dp))
                 if (isEmpty) {
                     Text(
-                        "未設定",
+                        stringResource(R.string.feedback_empty_value),
                         style = MaterialTheme.typography.bodyMedium,
                         fontStyle = FontStyle.Italic,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
@@ -481,7 +484,7 @@ fun DetailField(
                 IconButton(onClick = { largeTextOpen = true }, modifier = Modifier.size(32.dp)) {
                     Icon(
                         Icons.Default.OpenInFull,
-                        contentDescription = "拡大表示",
+                        contentDescription = stringResource(R.string.cd_expand),
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -494,7 +497,7 @@ fun DetailField(
                 }, modifier = Modifier.size(32.dp)) {
                     Icon(
                         Icons.Default.ContentCopy,
-                        contentDescription = "コピー",
+                        contentDescription = stringResource(R.string.cd_copy),
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -503,7 +506,7 @@ fun DetailField(
                 IconButton(onClick = { visible = !visible }, modifier = Modifier.size(32.dp)) {
                     Icon(
                         if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = if (visible) "隠す" else "表示",
+                        contentDescription = stringResource(if (visible) R.string.cd_hide else R.string.cd_show),
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -570,7 +573,7 @@ fun TotpField(
             if (copied) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    "コピーしました",
+                    stringResource(R.string.feedback_copied),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -593,7 +596,7 @@ fun TotpField(
                 IconButton(onClick = { largeTextOpen = true }, modifier = Modifier.size(32.dp)) {
                     Icon(
                         Icons.Default.OpenInFull,
-                        contentDescription = "拡大表示",
+                        contentDescription = stringResource(R.string.cd_expand),
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -664,16 +667,19 @@ private fun TotpCountdownCircle(
     }
 }
 
-fun sectionHeaderForType(entryType: String): String = when (entryType) {
-    "login" -> "ログイン情報"
-    "bank" -> "銀行口座"
-    "credit_card" -> "クレジットカード"
-    "ssh_key" -> "SSH キー"
-    "secure_note" -> "ノート"
-    "password" -> "パスワード情報"
-    "software_license" -> "ライセンス情報"
-    else -> "基本情報"
-}
+@Composable
+fun sectionHeaderForType(entryType: String): String = stringResource(
+    when (entryType) {
+        "login" -> R.string.section_login
+        "bank" -> R.string.section_bank
+        "credit_card" -> R.string.section_credit_card
+        "ssh_key" -> R.string.section_ssh_key
+        "secure_note" -> R.string.section_secure_note
+        "password" -> R.string.section_password
+        "software_license" -> R.string.section_software_license
+        else -> R.string.section_default
+    }
+)
 
 fun typedFieldsForType(entryType: String): List<String> = when (entryType) {
     "login" -> listOf("username", "password", "url")
@@ -686,24 +692,28 @@ fun typedFieldsForType(entryType: String): List<String> = when (entryType) {
     else -> emptyList()
 }
 
-fun fieldDisplayName(key: String): String = when (key) {
-    "url" -> "URL"
-    "username" -> "ユーザー名"
-    "password" -> "パスワード"
-    "bank_name" -> "銀行名"
-    "branch_code" -> "支店コード"
-    "account_type" -> "口座種別"
-    "account_holder" -> "口座名義"
-    "account_number" -> "口座番号"
-    "pin" -> "PIN"
-    "private_key" -> "秘密鍵"
-    "content" -> "内容"
-    "cardholder" -> "カード名義"
-    "number" -> "カード番号"
-    "expiry" -> "有効期限"
-    "cvv" -> "CVV"
-    "license_key" -> "ライセンスキー"
-    else -> key
+@Composable
+fun fieldDisplayName(key: String): String {
+    val resId = when (key) {
+        "url" -> R.string.field_url
+        "username" -> R.string.field_username
+        "password" -> R.string.field_password
+        "bank_name" -> R.string.field_bank_name
+        "branch_code" -> R.string.field_branch_code
+        "account_type" -> R.string.field_account_type
+        "account_holder" -> R.string.field_account_holder
+        "account_number" -> R.string.field_account_number
+        "pin" -> R.string.field_pin
+        "private_key" -> R.string.field_private_key
+        "content" -> R.string.field_content
+        "cardholder" -> R.string.field_cardholder
+        "number" -> R.string.field_number
+        "expiry" -> R.string.field_expiry
+        "cvv" -> R.string.field_cvv
+        "license_key" -> R.string.field_license_key
+        else -> return key
+    }
+    return stringResource(resId)
 }
 
 private fun formatTimestamp(epochSeconds: Long): String {

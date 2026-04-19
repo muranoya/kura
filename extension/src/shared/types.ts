@@ -92,6 +92,7 @@ export interface AppSettings {
   clipboardClearSeconds: number
   autolockMinutes: number
   theme?: 'light' | 'dark'
+  language?: 'ja' | 'en'
 }
 
 // Autofill types

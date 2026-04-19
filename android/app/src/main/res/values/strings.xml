@@ -1,4 +1,437 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App -->
     <string name="app_name">kura</string>
+    <string name="app_subtitle">Password Manager</string>
+    <string name="app_tagline">A password manager for just yourself,\nno server required</string>
+
+    <!-- Common actions -->
+    <string name="action_ok">OK</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_confirm">Confirm</string>
+    <string name="action_save">Save</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_close">Close</string>
+    <string name="action_back">Back</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_restore">Restore</string>
+    <string name="action_add">Add</string>
+    <string name="action_purge">Purge</string>
+    <string name="action_logout">Log out</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_menu">Menu</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_unlock">Unlock</string>
+    <string name="action_regenerate">Regenerate</string>
+    <string name="action_create">Create</string>
+    <string name="action_next">Next</string>
+    <string name="action_new">New</string>
+    <string name="action_use">Use</string>
+    <string name="action_change">Change</string>
+    <string name="action_generate">Generate</string>
+    <string name="action_export">Export</string>
+    <string name="action_rename">Rename</string>
+    <string name="action_sort">Sort</string>
+    <string name="action_move_up">Move up</string>
+    <string name="action_move_down">Move down</string>
+    <string name="action_show">Show</string>
+    <string name="action_hide">Hide</string>
+    <string name="action_expand">Expand</string>
+    <string name="action_execute">Execute</string>
+    <string name="action_complete">Done</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_search">Search</string>
+    <string name="action_move_to_trash">Move to Trash</string>
+    <string name="action_purge_permanently">Delete permanently</string>
+
+    <!-- Feedback -->
+    <string name="feedback_copied">Copied</string>
+    <string name="feedback_empty_value">Not set</string>
+
+    <!-- Relative time -->
+    <string name="time_just_now">Just now</string>
+    <string name="time_minutes_ago">%1$d minutes ago</string>
+    <string name="time_hours_ago">%1$d hours ago</string>
+    <string name="time_days_ago">%1$d days ago</string>
+    <string name="time_not_synced">Not synced</string>
+
+    <!-- Navigation / Drawer -->
+    <string name="nav_entries">Items</string>
+    <string name="nav_sync">Sync</string>
+    <string name="nav_password_generator">Password Generator</string>
+    <string name="nav_label_manager">Labels</string>
+    <string name="nav_trash">Trash</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_last_synced_prefix">Last synced: %1$s</string>
+    <string name="nav_sync_error">Sync error</string>
+
+    <!-- Welcome screen -->
+    <string name="welcome_title">kura</string>
+    <string name="welcome_subtitle">Password Manager</string>
+    <string name="welcome_tagline">A password manager for just yourself,\nno server required</string>
+    <string name="welcome_terms_prefix">I agree to the </string>
+    <string name="welcome_terms_link">Terms of Service</string>
+    <string name="welcome_terms_suffix"></string>
+    <string name="welcome_get_started">Get Started</string>
+
+    <!-- Storage setup -->
+    <string name="storage_title">Storage Setup</string>
+    <string name="storage_description">Configure S3-compatible storage for your vault.</string>
+    <string name="storage_region">Region</string>
+    <string name="storage_region_hint">e.g. us-east-1, auto</string>
+    <string name="storage_bucket">Bucket</string>
+    <string name="storage_bucket_hint">Bucket name</string>
+    <string name="storage_file_path">File path</string>
+    <string name="storage_file_path_hint">vault.json</string>
+    <string name="storage_access_key">Access Key ID</string>
+    <string name="storage_secret_key">Secret Access Key</string>
+    <string name="storage_endpoint">Endpoint (optional)</string>
+    <string name="storage_endpoint_hint">https://s3.example.com</string>
+    <string name="storage_next">Next</string>
+    <string name="storage_restore_from_transfer">Import from transfer code</string>
+    <string name="storage_transfer_title">Import from transfer code</string>
+    <string name="storage_transfer_description">Enter the transfer code exported from another device.</string>
+    <string name="storage_transfer_code">Transfer code</string>
+    <string name="storage_transfer_password">Transfer password</string>
+    <string name="storage_transfer_decrypt">Decrypt</string>
+    <string name="storage_transfer_error">Failed to decrypt: %1$s</string>
+    <string name="storage_validation_required">This field is required</string>
+    <string name="storage_region_required">Region *</string>
+    <string name="storage_region_placeholder">e.g. ap-northeast-1</string>
+    <string name="storage_bucket_required">Bucket *</string>
+    <string name="storage_bucket_placeholder">e.g. my-vault</string>
+    <string name="storage_file_path_required">File path *</string>
+    <string name="storage_file_path_placeholder">vault.json</string>
+    <string name="storage_file_path_supporting">Save path inside the bucket</string>
+    <string name="storage_access_key_required">Access Key ID *</string>
+    <string name="storage_access_key_placeholder">AKIA…</string>
+    <string name="storage_secret_key_required">Secret Access Key *</string>
+    <string name="storage_endpoint_label">Endpoint (optional)</string>
+    <string name="storage_endpoint_placeholder">e.g. https://s3.example.com</string>
+    <string name="storage_endpoint_supporting">Only when using an S3-compatible server</string>
+    <string name="storage_description_generic">Configure S3-compatible cloud storage</string>
+    <string name="storage_required_all">Please fill in all required fields</string>
+    <string name="storage_access_failed">Failed to access storage: %1$s</string>
+    <string name="storage_transfer_import_title">Import from another device</string>
+    <string name="storage_transfer_import_description">Enter the transfer code and transfer password generated on a configured device.</string>
+    <string name="storage_transfer_code_placeholder">kura-config-v1$…</string>
+    <string name="storage_transfer_password_placeholder">Password you set when generating the code</string>
+    <string name="storage_transfer_load">Load configuration</string>
+    <string name="storage_transfer_import_button">Import from another device</string>
+    <string name="storage_transfer_decrypt_failed">Failed to decrypt transfer code: %1$s</string>
+
+    <!-- Master password screen -->
+    <string name="master_password_title">Master Password</string>
+    <string name="master_password_description">Set a master password. This password will encrypt your vault.</string>
+    <string name="master_password_warning">If you forget your master password, only the recovery key can restore access. Store it somewhere safe.</string>
+    <string name="master_password_label">Master password</string>
+    <string name="master_password_confirm_label">Confirm password</string>
+    <string name="master_password_min_length">Password must be at least 8 characters</string>
+    <string name="master_password_mismatch">Passwords do not match</string>
+    <string name="master_password_create_failed">Failed to create vault: %1$s</string>
+
+    <!-- Unlock existing vault -->
+    <string name="unlock_existing_title">Unlock existing vault</string>
+    <string name="unlock_existing_description">An existing vault was found on S3. Enter your master password to unlock it.</string>
+    <string name="unlock_existing_password_required">Please enter your password</string>
+    <string name="unlock_existing_failed">Failed to unlock: %1$s</string>
+
+    <!-- Recovery key screen -->
+    <string name="recovery_key_title">Recovery Key</string>
+    <string name="recovery_key_description">Store this recovery key somewhere safe. It is the only way to restore access if you forget your master password.</string>
+
+    <!-- Lock screen -->
+    <string name="lock_title">kura</string>
+    <string name="lock_subtitle">Locked</string>
+    <string name="lock_password_label">Master password</string>
+    <string name="lock_biometric_prompt">Unlock with biometrics</string>
+    <string name="lock_use_password">Use password</string>
+    <string name="lock_biometric_locked">Biometric authentication is locked. Please try again later.</string>
+    <string name="lock_biometric_disabled">Biometric authentication has been disabled. Re-enable it from settings.</string>
+    <string name="lock_unlock_with_recovery">Unlock with recovery key</string>
+    <string name="lock_logout_confirm_title">Log out</string>
+    <string name="lock_logout_confirm_description">You will need to unlock with your master password on next launch. Continue?</string>
+    <string name="lock_password_required">Please enter your password</string>
+    <string name="lock_unlock_failed">Failed to unlock</string>
+
+    <!-- Recovery screen -->
+    <string name="recovery_title">Unlock with Recovery Key</string>
+    <string name="recovery_description">Enter your recovery key to unlock the vault.</string>
+    <string name="recovery_key_label">Recovery key</string>
+    <string name="recovery_key_placeholder">XXXX-XXXX-XXXX-XXXX</string>
+    <string name="recovery_key_required">Please enter your recovery key</string>
+    <string name="recovery_unlock_failed">Failed to unlock: %1$s</string>
+
+    <!-- Home / entry list -->
+    <string name="home_search_placeholder">Search items…</string>
+    <string name="home_no_favorites">No favorites</string>
+    <string name="home_no_entries">No items</string>
+    <string name="home_no_entries_hint">Tap the + button to create a new item.</string>
+    <string name="home_all">All</string>
+    <string name="home_labels">Labels</string>
+    <string name="home_sort_title">Sort by</string>
+    <string name="sort_created_desc">Created (newest first)</string>
+    <string name="sort_created_asc">Created (oldest first)</string>
+    <string name="sort_updated_desc">Updated (newest first)</string>
+    <string name="sort_updated_asc">Updated (oldest first)</string>
+    <string name="sort_name_asc">Name (A → Z)</string>
+    <string name="sort_name_desc">Name (Z → A)</string>
+
+    <string name="entry_list_favorites">Favorites</string>
+    <string name="entry_list_by_label">Labels</string>
+    <string name="entry_list_items">Items</string>
+    <string name="entry_list_all_items">All items</string>
+    <string name="entry_list_empty">No items</string>
+    <string name="entry_list_delete_title">Delete item</string>
+    <string name="entry_list_delete_description">Move this item to trash?</string>
+
+    <!-- Trash -->
+    <string name="trash_title">Trash</string>
+    <string name="trash_empty">Trash is empty</string>
+    <string name="trash_purge_title">Delete permanently</string>
+    <string name="trash_purge_description">Permanently delete this item? This action cannot be undone.</string>
+
+    <!-- Entry create / edit -->
+    <string name="entry_create_title">Create new</string>
+    <string name="entry_create_name_required">Please enter a name</string>
+    <string name="entry_create_failed">Failed to create: %1$s</string>
+    <string name="entry_create_select_type">Select entry type</string>
+    <string name="entry_edit_title">Edit</string>
+    <string name="entry_edit_update_failed">Failed to update: %1$s</string>
+    <string name="entry_generic_error">Error</string>
+
+    <!-- Entry detail -->
+    <string name="entry_detail_updated">Updated</string>
+    <string name="entry_detail_created">Created</string>
+    <string name="entry_detail_delete_title">Delete item</string>
+    <string name="entry_detail_delete_description">Move this item to trash?</string>
+
+    <!-- Entry types -->
+    <string name="entry_type_login">Login</string>
+    <string name="entry_type_bank">Bank Account</string>
+    <string name="entry_type_ssh_key">SSH Key</string>
+    <string name="entry_type_secure_note">Secure Note</string>
+    <string name="entry_type_credit_card">Credit Card</string>
+    <string name="entry_type_password">Password</string>
+    <string name="entry_type_software_license">Software License</string>
+
+    <!-- Section headers (detail) -->
+    <string name="section_login">Login Information</string>
+    <string name="section_bank">Bank Account</string>
+    <string name="section_credit_card">Credit Card</string>
+    <string name="section_ssh_key">SSH Key</string>
+    <string name="section_secure_note">Note</string>
+    <string name="section_password">Password Information</string>
+    <string name="section_software_license">License Information</string>
+    <string name="section_default">Basic Information</string>
+    <string name="section_notes">Notes</string>
+    <string name="section_labels">Labels</string>
+
+    <!-- Fields -->
+    <string name="field_url">URL</string>
+    <string name="field_username">Username</string>
+    <string name="field_password">Password</string>
+    <string name="field_bank_name">Bank Name</string>
+    <string name="field_branch_code">Branch Code</string>
+    <string name="field_account_type">Account Type</string>
+    <string name="field_account_holder">Account Holder</string>
+    <string name="field_account_number">Account Number</string>
+    <string name="field_pin">PIN</string>
+    <string name="field_private_key">Private Key</string>
+    <string name="field_content">Content</string>
+    <string name="field_cardholder">Cardholder</string>
+    <string name="field_number">Card Number</string>
+    <string name="field_expiry">Expiry</string>
+    <string name="field_cvv">CVV</string>
+    <string name="field_license_key">License Key</string>
+    <string name="field_notes">Notes</string>
+    <string name="field_name_placeholder">Enter item name…</string>
+    <string name="field_value_placeholder">Value</string>
+    <string name="field_totp_placeholder">otpauth:// URI or Base32 secret</string>
+
+    <!-- Custom fields -->
+    <string name="custom_field_text">Text</string>
+    <string name="custom_field_password">Password</string>
+    <string name="custom_field_email">Email</string>
+    <string name="custom_field_url">URL</string>
+    <string name="custom_field_phone">Phone</string>
+    <string name="custom_field_totp">TOTP</string>
+    <string name="custom_field_select_type">Select field type</string>
+    <string name="custom_field_add">Add field</string>
+    <string name="custom_field_name_placeholder">Field name</string>
+    <string name="custom_field_totp_label">TOTP</string>
+
+    <!-- Labels (entry form) -->
+    <string name="label_new_dialog_title">New label</string>
+    <string name="label_new_name_placeholder">Label name</string>
+    <string name="label_new_chip">New</string>
+
+    <!-- Password generator -->
+    <string name="pwgen_length">Length: %1$d</string>
+    <string name="pwgen_character_settings">Character options</string>
+    <string name="pwgen_lowercase">Lowercase (a-z)</string>
+    <string name="pwgen_uppercase">Uppercase (A-Z)</string>
+    <string name="pwgen_numbers">Numbers (0-9)</string>
+    <string name="pwgen_symbols_basic">Symbols (!@#$%^&amp;*-_.)</string>
+    <string name="pwgen_symbols_brackets">Symbols (()[]{}+=~/)</string>
+    <string name="pwgen_symbols_other">Symbols (&lt;&gt;\'\"\\|;,:)</string>
+
+    <!-- Sync dialog -->
+    <string name="sync_in_progress">Syncing…</string>
+    <string name="sync_success">Sync complete</string>
+    <string name="sync_error">Sync error</string>
+    <string name="sync_failed">Sync failed</string>
+
+    <!-- Label manager -->
+    <string name="label_manager_title">Labels</string>
+    <string name="label_manager_empty">No labels</string>
+    <string name="label_manager_create_title">Create label</string>
+    <string name="label_manager_rename_title">Rename label</string>
+    <string name="label_manager_rename_label">New label name</string>
+    <string name="label_manager_delete_title">Delete label</string>
+    <string name="label_manager_delete_description">Delete this label?</string>
+
+    <!-- Settings screen -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_security">Security</string>
+    <string name="settings_section_storage">Storage</string>
+    <string name="settings_section_data">Data</string>
+    <string name="settings_section_transfer">Transfer</string>
+    <string name="settings_section_language">Language</string>
+    <string name="settings_section_about">About</string>
+
+    <string name="settings_biometric">Biometric unlock</string>
+    <string name="settings_biometric_description">Use biometrics (fingerprint, face) to unlock.</string>
+    <string name="settings_autolock">Auto-lock</string>
+    <string name="settings_autolock_description">Automatically lock after a period of inactivity.</string>
+    <string name="settings_autolock_description_background">Auto-lock time after moving to background</string>
+    <string name="settings_autolock_disabled">Disabled</string>
+    <string name="settings_autolock_1_min">1 minute</string>
+    <string name="settings_autolock_5_min">5 minutes</string>
+    <string name="settings_autolock_15_min">15 minutes</string>
+    <string name="settings_autolock_30_min">30 minutes</string>
+    <string name="settings_autolock_60_min">1 hour</string>
+    <string name="settings_autolock_minutes_format">%1$d minutes</string>
+    <string name="settings_clipboard_clear">Clipboard auto-clear</string>
+    <string name="settings_clipboard_clear_description">Automatically clear the clipboard after the specified seconds.</string>
+    <string name="settings_clipboard_clear_disabled">Disabled</string>
+    <string name="settings_clipboard_clear_seconds">%1$d seconds</string>
+    <string name="settings_clipboard_clear_30s">30 seconds</string>
+    <string name="settings_clipboard_clear_1min">1 minute</string>
+    <string name="settings_clipboard_clear_2min">2 minutes</string>
+    <string name="settings_change_master_password">Change master password</string>
+    <string name="settings_change_master_password_description">Replace your master password with a new one</string>
+    <string name="settings_argon2_upgrade">Upgrade Argon2 parameters</string>
+    <string name="settings_argon2_upgrade_description">Re-derive the KEK with stronger parameters.</string>
+    <string name="settings_recovery_key_show">Show recovery key</string>
+    <string name="settings_recovery_key_rotate">Regenerate recovery key</string>
+    <string name="settings_recovery_key_rotate_description">Generate a new recovery key and display it</string>
+    <string name="settings_dek_rotate">Rotate DEK</string>
+    <string name="settings_dek_rotate_description">Re-encrypt the vault with a new data encryption key.</string>
+    <string name="settings_dek_rotate_description_long">Update the data encryption key and regenerate the recovery key</string>
+    <string name="settings_storage_region">Region</string>
+    <string name="settings_storage_bucket">Bucket</string>
+    <string name="settings_storage_file_path">File path</string>
+    <string name="settings_storage_access_key">Access Key ID</string>
+    <string name="settings_storage_endpoint">Endpoint</string>
+    <string name="settings_storage_edit">Edit storage settings</string>
+    <string name="settings_export_vault">Export encrypted vault</string>
+    <string name="settings_export_bitwarden">Export in Bitwarden format</string>
+    <string name="settings_export_bitwarden_description">Export data to migrate to another password manager</string>
+    <string name="settings_storage_not_configured">Storage configuration not found</string>
+    <string name="settings_transfer_export">Generate transfer code</string>
+    <string name="settings_transfer_export_description">Generate a code to transfer your vault configuration to another device.</string>
+    <string name="settings_transfer_card_title">Transfer configuration to another device</string>
+    <string name="settings_transfer_card_description">Generate a transfer code with encrypted S3 configuration</string>
+    <string name="settings_transfer_password">Transfer password</string>
+    <string name="settings_language_system">Follow system</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_japanese">日本語 (Japanese)</string>
+    <string name="settings_about_version">Version</string>
+    <string name="settings_about_licenses">Open source licenses</string>
+    <string name="settings_logout_title">Log out</string>
+    <string name="settings_logout_description">Remove all local data. You will need the storage configuration and master password to log back in.</string>
+    <string name="settings_logout_description_short">Clear local cache and S3 configuration</string>
+
+    <!-- Password change dialog -->
+    <string name="password_change_title">Change master password</string>
+    <string name="password_change_description">Set a new master password.</string>
+    <string name="password_change_current">Current password</string>
+    <string name="password_change_new">New password</string>
+    <string name="password_change_confirm">Confirm new password</string>
+    <string name="password_change_incorrect">Current password is incorrect</string>
+    <string name="password_change_min_length">Password must be at least 8 characters</string>
+    <string name="password_change_mismatch">Passwords do not match</string>
+    <string name="password_change_all_required">Please fill in all fields</string>
+    <string name="password_change_same_as_old">New password must differ from the current one</string>
+    <string name="password_change_failed">Failed to change: %1$s</string>
+    <string name="password_change_failed_default">Failed to change password</string>
+    <string name="password_change_success">Password changed</string>
+
+    <!-- Single password dialog -->
+    <string name="single_password_title">Enter master password</string>
+    <string name="single_password_label">Master password</string>
+    <string name="single_password_incorrect">Incorrect password</string>
+    <string name="single_password_empty">Please enter your password</string>
+    <string name="single_password_failed">Operation failed: %1$s</string>
+
+    <!-- Transfer dialog -->
+    <string name="transfer_dialog_title">Transfer code</string>
+    <string name="transfer_dialog_description">Enter a password to encrypt the transfer code. You will need this password on the receiving device.</string>
+    <string name="transfer_dialog_password">Transfer password</string>
+    <string name="transfer_dialog_password_min">At least 8 characters</string>
+    <string name="transfer_dialog_generate">Generate</string>
+    <string name="transfer_dialog_code_label">Transfer code</string>
+    <string name="transfer_dialog_code_note">Enter this code and the password you chose on the receiving device.</string>
+    <string name="transfer_dialog_generate_failed">Failed to generate: %1$s</string>
+    <string name="transfer_config_card_title">Transfer configuration to another device</string>
+    <string name="transfer_config_description">Generate a transfer code encrypted with a transfer password. Share the password with the receiver.</string>
+    <string name="transfer_config_code_generated">A transfer code has been generated. Enter this code and the transfer password on the receiving device during setup.</string>
+    <string name="transfer_config_password_placeholder">Password to share with the receiver</string>
+    <string name="transfer_config_copy_code">Copy transfer code</string>
+    <string name="transfer_config_s3_not_found">S3 configuration not found</string>
+
+    <!-- Recovery key new dialog -->
+    <string name="recovery_key_new_title">New recovery key</string>
+    <string name="recovery_key_new_description">A new recovery key has been generated. Store it in a safe place.</string>
+    <string name="recovery_key_stored">I\'ve stored it</string>
+
+    <!-- Biometric enrollment dialog -->
+    <string name="biometric_enroll_title">Enable biometric unlock</string>
+    <string name="biometric_enroll_description">Enter your master password, then confirm with biometrics.</string>
+    <string name="biometric_enroll_prompt_subtitle">Register biometric</string>
+    <string name="biometric_enroll_failed">Failed to register biometric</string>
+
+    <!-- Reauth / export dialogs -->
+    <string name="reauth_master_password_title">Confirm master password</string>
+    <string name="reauth_master_password_description">Re-enter your master password because sensitive data will be exported.</string>
+    <string name="export_dialog_title">Export data</string>
+    <string name="export_dialog_description">Export in Bitwarden JSON format. The exported file contains passwords in plaintext. Handle it carefully.</string>
+    <string name="export_success">Export complete</string>
+    <string name="export_failed">Export failed: %1$s</string>
+
+    <!-- Content descriptions (accessibility) -->
+    <string name="cd_favorite">Favorite</string>
+    <string name="cd_not_favorite">Not favorite</string>
+    <string name="cd_delete">Delete</string>
+    <string name="cd_restore">Restore</string>
+    <string name="cd_purge">Delete permanently</string>
+    <string name="cd_copy">Copy</string>
+    <string name="cd_generate_password">Generate password</string>
+    <string name="cd_show">Show</string>
+    <string name="cd_hide">Hide</string>
+    <string name="cd_expand">Expand</string>
+    <string name="cd_move_up">Move up</string>
+    <string name="cd_move_down">Move down</string>
+    <string name="cd_add">Add</string>
+    <string name="cd_clear">Clear</string>
+    <string name="cd_back">Back</string>
+    <string name="cd_menu">Menu</string>
+    <string name="cd_edit">Edit</string>
+    <string name="cd_trash">Move to trash</string>
+    <string name="cd_close">Close</string>
+
+    <!-- Misc labels -->
+    <string name="misc_not_set">Not set</string>
+    <string name="misc_copied">Copied</string>
 </resources>

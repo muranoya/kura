@@ -6,7 +6,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import net.meshpeak.kura.R
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.launch
 
@@ -21,14 +24,15 @@ fun RecoveryScreen(
     var error by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("リカバリーキーでアンロック") },
+                title = { Text(stringResource(R.string.recovery_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 }
             )
@@ -42,7 +46,7 @@ fun RecoveryScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                "リカバリーキーを入力してVaultをアンロックします。",
+                stringResource(R.string.recovery_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -56,23 +60,23 @@ fun RecoveryScreen(
             OutlinedTextField(
                 value = recoveryKey,
                 onValueChange = { recoveryKey = it; error = "" },
-                label = { Text("リカバリーキー") },
+                label = { Text(stringResource(R.string.recovery_key_label)) },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("XXXX-XXXX-XXXX-XXXX") }
+                placeholder = { Text(stringResource(R.string.recovery_key_placeholder)) }
             )
 
             Spacer(modifier = Modifier.weight(1f))
 
             Button(
                 onClick = {
-                    if (recoveryKey.isBlank()) { error = "リカバリーキーを入力してください"; return@Button }
+                    if (recoveryKey.isBlank()) { error = context.getString(R.string.recovery_key_required); return@Button }
                     scope.launch {
                         isLoading = true
                         try {
                             appViewModel.repository.unlockWithRecoveryKey(recoveryKey.trim())
                             onUnlocked()
                         } catch (e: Exception) {
-                            error = "アンロックに失敗しました: ${e.message}"
+                            error = context.getString(R.string.recovery_unlock_failed, e.message ?: "")
                         } finally { isLoading = false }
                     }
                 },
@@ -80,7 +84,7 @@ fun RecoveryScreen(
                 enabled = !isLoading
             ) {
                 if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Text("アンロック")
+                else Text(stringResource(R.string.action_unlock))
             }
         }
     }

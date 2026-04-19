@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { copySensitive } from '../lib/clipboard'
 
 interface CopyButtonProps {
@@ -8,7 +9,8 @@ interface CopyButtonProps {
   style?: React.CSSProperties
 }
 
-export default function CopyButton({ text, label = 'コピー', className, style }: CopyButtonProps) {
+export default function CopyButton({ text, label, className, style }: CopyButtonProps) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
@@ -21,9 +23,11 @@ export default function CopyButton({ text, label = 'コピー', className, style
     }
   }
 
+  const resolvedLabel = label ?? t('common.copy')
+
   return (
     <button type="button" onClick={handleCopy} className={className} style={style}>
-      {copied ? '✓ コピーしました' : label}
+      {copied ? `✓ ${t('common.copied')}` : resolvedLabel}
     </button>
   )
 }

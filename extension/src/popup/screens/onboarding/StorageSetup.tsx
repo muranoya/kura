@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { sendMessage } from '../../../shared/messages'
 import type { S3Config } from '../../../shared/types'
@@ -11,6 +12,7 @@ import { PasswordInput } from '../../components/ui/password-input'
 import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
 
 export default function StorageSetup() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { draft, setDraft, draftLoaded } = useOnboardingDraft()
   const [loading, setLoading] = useState(false)
@@ -37,21 +39,17 @@ export default function StorageSetup() {
         accessKeyId,
         secretAccessKey,
       }
-      // S3設定はマスターパスワードで暗号化して保存するため、ここでは永続保存しない
-      // DOWNLOAD_VAULTにS3設定を渡してVault存在確認
       const response = await sendMessage({ type: 'DOWNLOAD_VAULT' as const, s3Config })
 
       if (!response.success) {
-        const errorMsg = 'error' in response ? response.error : 'Vault確認に失敗しました'
+        const errorMsg =
+          'error' in response ? response.error : t('onboarding.storage.vaultCheckFailed')
         throw new Error(errorMsg)
       }
 
-      // vaultExists の結果に基づいて分岐
       if ('vaultExists' in response && response.vaultExists) {
-        // 既存Vault使用フロー
         navigate('/onb/unlock-existing', { state: { fromOnboarding: true } })
       } else {
-        // 新規作成フロー
         navigate('/onb/password')
       }
     } catch (err) {
@@ -71,11 +69,12 @@ export default function StorageSetup() {
         transferString: transferString.trim(),
       })
       if (!response.success) {
-        const errorMsg = 'error' in response ? response.error : '転送コードの復号に失敗しました'
+        const errorMsg =
+          'error' in response ? response.error : t('onboarding.storage.transferDecryptFailed')
         throw new Error(errorMsg)
       }
       if (!('configJson' in response) || !response.configJson) {
-        throw new Error('復号結果が空です')
+        throw new Error(t('onboarding.storage.decryptResultEmpty'))
       }
       const config: S3Config = JSON.parse(response.configJson)
       setDraft({
@@ -106,48 +105,51 @@ export default function StorageSetup() {
 
   return (
     <div className="h-full overflow-y-auto pb-4 flex flex-col">
-      <PageHeader title="ストレージ設定" subtitle="S3互換のクラウドストレージを設定します" />
+      <PageHeader
+        title={t('onboarding.storage.title')}
+        subtitle={t('onboarding.storage.subtitle')}
+      />
 
       <div className="p-4 space-y-4">
-        {/* エラー表示 */}
         {error && (
           <div className="p-3 rounded-md bg-danger/10 border border-danger/20">
             <p className="text-sm text-danger">{error}</p>
           </div>
         )}
 
-        {/* 転送インポート */}
         {showTransfer ? (
           <Card>
             <CardHeader className="px-3 py-2">
-              <CardTitle className="text-sm font-medium">別の端末から設定を転送</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('onboarding.storage.transferSectionTitle')}
+              </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-2 space-y-3">
               <p className="text-sm text-text-muted">
-                設定済みの端末で生成した転送コードと転送パスワードを入力してください。
+                {t('onboarding.storage.transferSectionDesc')}
               </p>
               <div className="space-y-1">
                 <Label htmlFor="transfer-string" className="text-sm">
-                  転送コード
+                  {t('onboarding.storage.transferStringLabel')}
                 </Label>
                 <textarea
                   id="transfer-string"
                   value={transferString}
                   onChange={(e) => setTransferString(e.target.value)}
-                  placeholder="kura-config-v1$..."
+                  placeholder={t('onboarding.storage.transferStringPlaceholder')}
                   className="w-full min-h-[80px] rounded-md border border-border bg-input-bg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary resize-y"
                   disabled={loading}
                 />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="transfer-password" className="text-sm">
-                  転送パスワード
+                  {t('onboarding.storage.transferPasswordLabel')}
                 </Label>
                 <PasswordInput
                   id="transfer-password"
                   value={transferPassword}
                   onChange={(e) => setTransferPassword(e.target.value)}
-                  placeholder="転送コード生成時に設定したパスワード"
+                  placeholder={t('onboarding.storage.transferPasswordPlaceholder')}
                   className="text-sm"
                   disabled={loading}
                 />
@@ -163,7 +165,7 @@ export default function StorageSetup() {
                   className="flex-1 text-sm"
                   size="sm"
                 >
-                  キャンセル
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   onClick={handleTransferImport}
@@ -171,7 +173,9 @@ export default function StorageSetup() {
                   className="flex-1 text-sm"
                   size="sm"
                 >
-                  {loading ? '復号中...' : '設定を読み込む'}
+                  {loading
+                    ? t('onboarding.storage.decrypting')
+                    : t('onboarding.storage.loadConfigButton')}
                 </Button>
               </div>
             </CardContent>
@@ -183,85 +187,82 @@ export default function StorageSetup() {
             className="w-full text-sm"
             size="sm"
           >
-            別の端末から設定を転送
+            {t('onboarding.storage.transferModeButton')}
           </Button>
         )}
 
-        {/* 接続情報入力 */}
         <Card>
           <CardHeader className="px-3 py-2">
-            <CardTitle className="text-sm font-medium">接続情報</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {t('onboarding.storage.connectionTitle')}
+            </CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2 space-y-3">
-            {/* リージョン */}
             <div className="space-y-1">
               <Label htmlFor="region" className="text-sm">
-                リージョン <span className="text-danger">*</span>
+                {t('onboarding.storage.regionLabel')} <span className="text-danger">*</span>
               </Label>
               <Input
                 id="region"
                 type="text"
                 value={region}
                 onChange={(e) => setDraft({ region: e.target.value })}
-                placeholder="例: ap-northeast-1"
+                placeholder={t('onboarding.storage.regionPlaceholder')}
                 className="text-sm"
                 disabled={loading}
               />
             </div>
 
-            {/* バケット */}
             <div className="space-y-1">
               <Label htmlFor="bucket" className="text-sm">
-                バケット <span className="text-danger">*</span>
+                {t('onboarding.storage.bucketLabel')} <span className="text-danger">*</span>
               </Label>
               <Input
                 id="bucket"
                 type="text"
                 value={bucket}
                 onChange={(e) => setDraft({ bucket: e.target.value })}
-                placeholder="例: my-vault"
+                placeholder={t('onboarding.storage.bucketPlaceholder')}
                 className="text-sm"
                 disabled={loading}
               />
             </div>
 
-            {/* ファイルパス */}
             <div className="space-y-1">
               <Label htmlFor="key" className="text-sm">
-                ファイルパス <span className="text-danger">*</span>
+                {t('onboarding.storage.keyLabel')} <span className="text-danger">*</span>
               </Label>
               <Input
                 id="key"
                 type="text"
                 value={key}
                 onChange={(e) => setDraft({ key: e.target.value })}
-                placeholder="vault.json"
+                placeholder={t('onboarding.storage.keyPlaceholder')}
                 className="text-sm"
                 disabled={loading}
               />
-              <p className="text-sm text-text-muted mt-1">バケット内の保存パス</p>
+              <p className="text-sm text-text-muted mt-1">{t('onboarding.storage.keyDesc')}</p>
             </div>
 
-            {/* アクセスキーID */}
             <div className="space-y-1">
               <Label htmlFor="access-key" className="text-sm">
-                アクセスキーID <span className="text-danger">*</span>
+                {t('onboarding.storage.accessKeyIdLabel')} <span className="text-danger">*</span>
               </Label>
               <Input
                 id="access-key"
                 type="text"
                 value={accessKeyId}
                 onChange={(e) => setDraft({ accessKeyId: e.target.value })}
-                placeholder="AKIA..."
+                placeholder={t('onboarding.storage.accessKeyIdPlaceholder')}
                 className="text-sm"
                 disabled={loading}
               />
             </div>
 
-            {/* シークレットアクセスキー */}
             <div className="space-y-1">
               <Label htmlFor="secret-key" className="text-sm">
-                シークレットアクセスキー <span className="text-danger">*</span>
+                {t('onboarding.storage.secretAccessKeyLabel')}{' '}
+                <span className="text-danger">*</span>
               </Label>
               <PasswordInput
                 id="secret-key"
@@ -272,28 +273,25 @@ export default function StorageSetup() {
               />
             </div>
 
-            {/* エンドポイント */}
             <div className="space-y-1">
               <Label htmlFor="endpoint" className="text-sm">
-                エンドポイント <span className="text-text-muted">(オプション)</span>
+                {t('onboarding.storage.endpointLabel')}{' '}
+                <span className="text-text-muted">({t('common.optional')})</span>
               </Label>
               <Input
                 id="endpoint"
                 type="text"
                 value={endpoint}
                 onChange={(e) => setDraft({ endpoint: e.target.value })}
-                placeholder="例: https://s3.example.com"
+                placeholder={t('onboarding.storage.endpointPlaceholder')}
                 className="text-sm"
                 disabled={loading}
               />
-              <p className="text-sm text-text-muted mt-1">
-                自社ホストの S3 互換サーバーを使用する場合のみ入力
-              </p>
+              <p className="text-sm text-text-muted mt-1">{t('onboarding.storage.endpointDesc')}</p>
             </div>
           </CardContent>
         </Card>
 
-        {/* ボタン */}
         <div className="flex gap-2">
           <Button
             variant="secondary"
@@ -302,7 +300,7 @@ export default function StorageSetup() {
             className="flex-1 text-sm"
             size="sm"
           >
-            戻る
+            {t('common.back')}
           </Button>
           <Button
             onClick={handleNext}
@@ -310,7 +308,7 @@ export default function StorageSetup() {
             className="flex-1 text-sm"
             size="sm"
           >
-            {loading ? 'Vaultを確認中...' : '次へ'}
+            {loading ? t('onboarding.storage.checkingVault') : t('common.next')}
           </Button>
         </div>
       </div>

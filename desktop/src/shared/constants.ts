@@ -1,22 +1,15 @@
-// Entry type labels and icons
-export const ENTRY_TYPE_LABELS: Record<string, string> = {
-  login: 'ログイン',
-  bank: '銀行口座',
-  ssh_key: 'SSHキー',
-  secure_note: 'セキュアノート',
-  credit_card: 'クレジットカード',
-  password: 'パスワード',
-  software_license: 'ソフトウェアライセンス',
-}
+import i18n from '../i18n'
+import type { AppSettings } from './types'
 
 export function getEntryTypeLabel(type: string): string {
-  return ENTRY_TYPE_LABELS[type] ?? type
+  return i18n.t(`entryTypes.${type}`, { defaultValue: type })
 }
 
 // Default app settings
-export const DEFAULT_SETTINGS = {
+export const DEFAULT_SETTINGS: AppSettings = {
   clipboardClearSeconds: 30,
   autolockMinutes: 5,
+  language: 'system',
 }
 
 // Default vault ID (single vault for now)

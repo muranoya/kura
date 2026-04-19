@@ -8,10 +8,13 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import net.meshpeak.kura.R
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.launch
 
@@ -28,14 +31,15 @@ fun MasterPasswordScreen(
     var error by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("マスターパスワード") },
+                title = { Text(stringResource(R.string.master_password_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 }
             )
@@ -49,14 +53,14 @@ fun MasterPasswordScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                "マスターパスワードを設定してください。このパスワードでvaultを暗号化します。",
+                stringResource(R.string.master_password_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
                 Text(
-                    "マスターパスワードを忘れた場合、リカバリーキーでのみ復旧できます。安全な場所に保管してください。",
+                    stringResource(R.string.master_password_warning),
                     modifier = Modifier.padding(12.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onTertiaryContainer
@@ -72,7 +76,7 @@ fun MasterPasswordScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it; error = "" },
-                label = { Text("マスターパスワード") },
+                label = { Text(stringResource(R.string.master_password_label)) },
                 modifier = Modifier.fillMaxWidth().testTag("master_password_input"),
                 singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -85,7 +89,7 @@ fun MasterPasswordScreen(
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it; error = "" },
-                label = { Text("パスワード確認") },
+                label = { Text(stringResource(R.string.master_password_confirm_label)) },
                 modifier = Modifier.fillMaxWidth().testTag("confirm_password_input"),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation()
@@ -94,12 +98,12 @@ fun MasterPasswordScreen(
             Spacer(modifier = Modifier.weight(1f))
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f).testTag("password_back_button"), enabled = !isLoading) { Text("戻る") }
+                OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f).testTag("password_back_button"), enabled = !isLoading) { Text(stringResource(R.string.action_back)) }
                 Button(
                     onClick = {
                         when {
-                            password.length < 8 -> error = "パスワードは8文字以上必要です"
-                            password != confirmPassword -> error = "パスワードが一致しません"
+                            password.length < 8 -> error = context.getString(R.string.master_password_min_length)
+                            password != confirmPassword -> error = context.getString(R.string.master_password_mismatch)
                             else -> scope.launch {
                                 isLoading = true
                                 try {
@@ -109,7 +113,7 @@ fun MasterPasswordScreen(
                                     appViewModel.repository.writeVaultFile(vaultBytes)
                                     onVaultCreated(recoveryKey)
                                 } catch (e: Exception) {
-                                    error = "Vault作成に失敗しました: ${e.message}"
+                                    error = context.getString(R.string.master_password_create_failed, e.message ?: "")
                                 } finally {
                                     isLoading = false
                                 }
@@ -120,7 +124,7 @@ fun MasterPasswordScreen(
                     enabled = !isLoading
                 ) {
                     if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    else Text("作成")
+                    else Text(stringResource(R.string.action_create))
                 }
             }
         }

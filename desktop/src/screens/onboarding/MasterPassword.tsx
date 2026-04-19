@@ -1,5 +1,6 @@
 import { CheckCircle2 } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import * as commands from '../../commands'
 import { PageHeader } from '../../components/layout/PageHeader'
@@ -11,6 +12,7 @@ import { STORAGE_KEYS } from '../../shared/constants'
 import { saveToStorage } from '../../shared/storage'
 
 export default function MasterPassword() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -19,17 +21,17 @@ export default function MasterPassword() {
 
   const handleCreate = async () => {
     if (!password || !confirmPassword) {
-      setError('パスワードを入力してください')
+      setError(t('onboarding.masterPassword.errorRequired'))
       return
     }
 
     if (password !== confirmPassword) {
-      setError('パスワードが一致しません')
+      setError(t('onboarding.masterPassword.errorMismatch'))
       return
     }
 
     if (password.length < 8) {
-      setError('パスワードは8文字以上である必要があります')
+      setError(t('onboarding.masterPassword.errorMinLength'))
       return
     }
 
@@ -47,7 +49,7 @@ export default function MasterPassword() {
       }
       navigate('/onb/recovery', { state: { recoveryKey } })
     } catch (err) {
-      setError(`エラー: ${err}`)
+      setError(t('onboarding.masterPassword.errorGeneric', { error: String(err) }))
     } finally {
       setLoading(false)
     }
@@ -56,8 +58,8 @@ export default function MasterPassword() {
   return (
     <div className="min-h-screen bg-bg-base">
       <PageHeader
-        title="マスターパスワード設定"
-        subtitle="Vault全体を保護するパスワードを設定します"
+        title={t('onboarding.masterPassword.title')}
+        subtitle={t('onboarding.masterPassword.subtitle')}
       />
 
       <div className="max-w-2xl mx-auto p-6">
@@ -74,11 +76,12 @@ export default function MasterPassword() {
               {/* パスワード */}
               <div>
                 <Label htmlFor="password">
-                  パスワード <span className="text-danger">*</span>
+                  {t('onboarding.masterPassword.passwordLabel')}{' '}
+                  <span className="text-danger">*</span>
                 </Label>
                 <PasswordInput
                   id="password"
-                  placeholder="強力なパスワードを入力"
+                  placeholder={t('onboarding.masterPassword.passwordPlaceholder')}
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value)
@@ -86,18 +89,19 @@ export default function MasterPassword() {
                   }}
                 />
                 <p className="text-xs text-text-muted mt-1.5">
-                  8文字以上の強力なパスワードを設定してください
+                  {t('onboarding.masterPassword.passwordHelp')}
                 </p>
               </div>
 
               {/* パスワード確認 */}
               <div>
                 <Label htmlFor="confirm-password">
-                  パスワード確認 <span className="text-danger">*</span>
+                  {t('onboarding.masterPassword.confirmLabel')}{' '}
+                  <span className="text-danger">*</span>
                 </Label>
                 <PasswordInput
                   id="confirm-password"
-                  placeholder="パスワードを再入力"
+                  placeholder={t('onboarding.masterPassword.confirmPlaceholder')}
                   value={confirmPassword}
                   onChange={(e) => {
                     setConfirmPassword(e.target.value)
@@ -107,7 +111,7 @@ export default function MasterPassword() {
                 {confirmPassword && password === confirmPassword && (
                   <div className="flex items-center gap-2 mt-1.5">
                     <CheckCircle2 className="w-4 h-4 text-success" />
-                    <p className="text-xs text-success">パスワードが一致しています</p>
+                    <p className="text-xs text-success">{t('onboarding.masterPassword.matchOk')}</p>
                   </div>
                 )}
               </div>
@@ -120,14 +124,14 @@ export default function MasterPassword() {
                   className="flex-1"
                   disabled={loading}
                 >
-                  戻る
+                  {t('common.back')}
                 </Button>
                 <Button
                   onClick={handleCreate}
                   disabled={loading || !password || !confirmPassword}
                   className="flex-1"
                 >
-                  {loading ? '作成中...' : 'Vaultを作成'}
+                  {loading ? t('common.creating') : t('onboarding.masterPassword.createVault')}
                 </Button>
               </div>
             </div>

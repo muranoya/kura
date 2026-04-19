@@ -1,5 +1,6 @@
 import { CheckCircle2, Copy } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import * as commands from '../../commands'
 import { PageHeader } from '../../components/layout/PageHeader'
@@ -12,6 +13,7 @@ interface RecoveryKeyProps {
 }
 
 export default function RecoveryKey({ onComplete }: RecoveryKeyProps) {
+  const { t } = useTranslation()
   const location = useLocation()
   const recoveryKey = (location.state as { recoveryKey?: string })?.recoveryKey ?? ''
   const [copied, setCopied] = useState(false)
@@ -30,18 +32,21 @@ export default function RecoveryKey({ onComplete }: RecoveryKeyProps) {
 
       onComplete?.()
     } catch (error) {
-      alert(`エラー: ${error}`)
+      alert(t('onboarding.recoveryKey.errorGeneric', { error: String(error) }))
     }
   }
 
   return (
     <div className="min-h-screen bg-bg-base">
-      <PageHeader title="リカバリーキー" subtitle="Vaultの復旧に必要です" />
+      <PageHeader
+        title={t('onboarding.recoveryKey.title')}
+        subtitle={t('onboarding.recoveryKey.subtitle')}
+      />
 
       <div className="max-w-2xl mx-auto p-6">
         <Card>
           <CardHeader>
-            <CardTitle>あなたのリカバリーキー</CardTitle>
+            <CardTitle>{t('onboarding.recoveryKey.cardTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             {/* コードブロック */}
@@ -60,19 +65,19 @@ export default function RecoveryKey({ onComplete }: RecoveryKeyProps) {
               {copied ? (
                 <>
                   <CheckCircle2 size={18} />
-                  <span>コピーしました</span>
+                  <span>{t('onboarding.recoveryKey.copied')}</span>
                 </>
               ) : (
                 <>
                   <Copy size={18} />
-                  <span>リカバリーキーをコピー</span>
+                  <span>{t('onboarding.recoveryKey.copyAction')}</span>
                 </>
               )}
             </Button>
 
             {/* 完了ボタン */}
             <Button onClick={handleComplete} className="w-full">
-              完了
+              {t('onboarding.recoveryKey.complete')}
             </Button>
           </CardContent>
         </Card>

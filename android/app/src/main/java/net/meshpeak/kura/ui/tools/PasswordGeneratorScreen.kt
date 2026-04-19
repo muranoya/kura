@@ -8,9 +8,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import net.meshpeak.kura.R
 import net.meshpeak.kura.ui.components.PasswordGeneratorPanel
 import net.meshpeak.kura.util.ClipboardUtil
 import net.meshpeak.kura.viewmodel.AppViewModel
@@ -26,10 +28,10 @@ fun PasswordGeneratorScreen(appViewModel: AppViewModel, onOpenDrawer: () -> Unit
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("パスワード生成") },
+                title = { Text(stringResource(R.string.nav_password_generator)) },
                 navigationIcon = {
                     IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Default.Menu, contentDescription = "メニュー")
+                        Icon(Icons.Default.Menu, contentDescription = stringResource(R.string.cd_menu))
                     }
                 }
             )
