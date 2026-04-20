@@ -8,7 +8,7 @@
 // 出力: extension/kura-extension-source-<version>.zip
 
 import { spawnSync } from 'node:child_process'
-import { readFileSync, existsSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const EXTENSION_DIR = resolve(import.meta.dirname, '..')
