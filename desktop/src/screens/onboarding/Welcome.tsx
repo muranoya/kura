@@ -13,7 +13,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/select'
+import { usePushError } from '../../contexts/ErrorContext'
 import { useTerms } from '../../hooks/useTerms'
+import { setLanguage } from '../../i18n'
+import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../../shared/constants'
+import { getFromStorage, saveToStorage } from '../../shared/storage'
+import type { AppSettings, LanguageSetting } from '../../shared/types'
 
 const termsMarkdownComponents = {
   h1: ({ children }: { children?: ReactNode }) => (
@@ -37,14 +49,43 @@ const termsMarkdownComponents = {
 }
 
 export default function Welcome() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const pushError = usePushError()
   const [agreed, setAgreed] = useState(false)
   const [showTerms, setShowTerms] = useState(false)
   const terms = useTerms()
 
+  const currentLang: LanguageSetting = i18n.language === 'ja' ? 'ja' : 'en'
+
+  const handleLanguageChange = async (value: string) => {
+    const lang = value as LanguageSetting
+    try {
+      await setLanguage(lang)
+      const current = await getFromStorage<AppSettings>(STORAGE_KEYS.APP_SETTINGS)
+      const merged = { ...DEFAULT_SETTINGS, ...current, language: lang }
+      await saveToStorage(STORAGE_KEYS.APP_SETTINGS, merged)
+      window.dispatchEvent(new CustomEvent('settings-changed'))
+    } catch (err) {
+      pushError(t('settings.errors.saveSettings', { error: String(err) }))
+    }
+  }
+
   return (
     <div className="flex items-center justify-center h-screen bg-gradient-to-br from-bg-base to-bg-surface px-4">
+      {/* 言語切り替え */}
+      <div className="absolute top-4 right-4">
+        <Select value={currentLang} onValueChange={handleLanguageChange}>
+          <SelectTrigger className="w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ja">{t('settings.general.languageJa')}</SelectItem>
+            <SelectItem value="en">{t('settings.general.languageEn')}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="w-full max-w-md text-center">
         {/* ロゴ */}
         <div className="inline-flex items-center justify-center w-24 h-24 rounded-2xl bg-accent/10 mb-8">
@@ -69,14 +110,15 @@ export default function Welcome() {
               className="w-4 h-4 rounded border-border accent-accent"
             />
             <span className="text-sm text-text-secondary">
-              {t('onboarding.welcome.agreementSuffix')}
+              {t('onboarding.welcome.agreePrefix')}
               <button
                 type="button"
                 onClick={() => setShowTerms(true)}
-                className="text-accent hover:underline ml-1"
+                className="text-accent hover:underline"
               >
                 {t('onboarding.welcome.termsLink')}
               </button>
+              {t('onboarding.welcome.agreeSuffix')}
             </span>
           </label>
         </div>

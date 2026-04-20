@@ -30,6 +30,7 @@ import net.meshpeak.kura.bridge.VaultBridge
 import net.meshpeak.kura.data.model.S3Config
 import net.meshpeak.kura.ui.components.ConfirmDialog
 import net.meshpeak.kura.util.ClipboardUtil
+import net.meshpeak.kura.util.findActivity
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -411,6 +412,7 @@ fun SettingsScreen(
                                             }
                                             AppCompatDelegate.setApplicationLocales(locales)
                                             languageExpanded = false
+                                            context.findActivity()?.recreate()
                                         }
                                     )
                                 }

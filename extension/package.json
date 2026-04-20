@@ -2,6 +2,16 @@
   "name": "kura-extension",
   "version": "0.1.6",
   "description": "kura - サーバ不要のパスワードマネージャー ブラウザ拡張機能",
+  "author": "Daisuke Muraoka <daisuke.muraoka.jp@gmail.com>",
+  "homepage": "https://github.com/muranoya/kura",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/muranoya/kura.git"
+  },
+  "bugs": {
+    "url": "https://github.com/muranoya/kura/issues"
+  },
+  "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@10.30.1",
   "scripts": {

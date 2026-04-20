@@ -1,0 +1,28 @@
+name: Sync legal docs to Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/legal/**.md'
+  workflow_dispatch:
+
+# assets/legal/*.md の更新を muranoya/kura.github.io の
+# receive-legal-sync ワークフローへ repository_dispatch で通知する。
+#
+# 必要な secret: PAGES_DISPATCH_TOKEN
+#   - GitHub PAT (classic) で repo scope を付与
+#   - または fine-grained PAT で muranoya/kura.github.io の
+#     Actions: read & write 権限を付与
+#   - リポジトリ設定の Secrets and variables > Actions に登録
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Pages repo
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.PAGES_DISPATCH_TOKEN }}
+          repository: muranoya/kura.github.io
+          event-type: sync-legal

@@ -2,6 +2,11 @@
 name = "vault_jni"
 version = "0.1.6"
 edition = "2021"
+description = "JNI bindings exposing vault-core to the kura Android app"
+authors = ["Daisuke Muraoka <daisuke.muraoka.jp@gmail.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/muranoya/kura"
+homepage = "https://github.com/muranoya/kura"
 
 [lib]
 crate-type = ["cdylib"]

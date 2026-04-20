@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import { useNavigate } from 'react-router-dom'
 import remarkGfm from 'remark-gfm'
+import * as commands from '../../commands'
 import { Button } from '../../components/ui/button'
 import {
   Dialog,
@@ -13,7 +14,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog'
+import { usePushError } from '../../contexts/ErrorContext'
 import { useTerms } from '../../hooks/useTerms'
+import { SUPPORTED_LANGUAGES, type SupportedLanguage, setLanguage } from '../../i18n'
 
 const termsMarkdownComponents = {
   h1: ({ children }: { children?: ReactNode }) => (
@@ -39,18 +42,53 @@ const termsMarkdownComponents = {
 }
 
 export default function Welcome() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const pushError = usePushError()
   const [agreed, setAgreed] = useState(false)
   const [showTerms, setShowTerms] = useState(false)
   const terms = useTerms()
+
+  const currentLang = (SUPPORTED_LANGUAGES as readonly string[]).includes(i18n.language)
+    ? (i18n.language as SupportedLanguage)
+    : 'en'
+
+  const handleLanguageChange = async (lang: SupportedLanguage) => {
+    if (lang === currentLang) return
+    try {
+      await setLanguage(lang)
+      const current = await commands.getSettings()
+      await commands.saveSettings({ ...current, language: lang })
+    } catch (err) {
+      pushError(t('errors.saveSettingsFailed', { error: String(err) }))
+    }
+  }
 
   const handleStart = () => {
     navigate('/onb/storage')
   }
 
   return (
-    <div className="flex items-center justify-center h-full bg-bg-base px-4">
+    <div className="relative flex items-center justify-center h-full bg-bg-base px-4">
+      {/* 言語切り替え（右上固定） */}
+      <div className="absolute top-2 right-2 inline-flex rounded-md border border-border overflow-hidden text-xs">
+        {SUPPORTED_LANGUAGES.map((lang) => (
+          <button
+            key={lang}
+            type="button"
+            onClick={() => handleLanguageChange(lang)}
+            className={
+              currentLang === lang
+                ? 'px-2 py-1 bg-accent text-white'
+                : 'px-2 py-1 bg-bg-base text-text-secondary hover:bg-bg-surface'
+            }
+            aria-pressed={currentLang === lang}
+          >
+            {t(`language.${lang}`)}
+          </button>
+        ))}
+      </div>
+
       <div className="w-full max-w-sm">
         {/* ロゴ・タイトル */}
         <div className="text-center mb-6">
