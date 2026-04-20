@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import androidx.fragment.app.FragmentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -17,7 +17,7 @@ import net.meshpeak.kura.ui.navigation.KuraApp
 import net.meshpeak.kura.ui.theme.KuraTheme
 import net.meshpeak.kura.viewmodel.AppViewModel
 
-class MainActivity : FragmentActivity() {
+class MainActivity : AppCompatActivity() {
 
     private val appViewModel: AppViewModel by viewModels { AppViewModel.Factory }
 

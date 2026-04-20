@@ -77,4 +77,15 @@ for density in "${!ADAPTIVE_SIZES[@]}"; do
   echo "Android Adaptive Foreground ($density): ${size}x${size}"
 done
 
+# --- Store icons (Firefox AMO / Chrome Web Store listing) ---
+# 512x512 is required by Chrome Web Store and recommended by Firefox AMO.
+# locked / unlocked は両方生成し、ストア掲載時に選択する。
+for store in firefox chrome; do
+  dir="$PROJECT_ROOT/assets/store/${store}"
+  mkdir -p "$dir"
+  svg2png "$SCRIPT_DIR/locked_icon.svg"   "$dir/icon-512-locked.png"   512
+  svg2png "$SCRIPT_DIR/unlocked_icon.svg" "$dir/icon-512-unlocked.png" 512
+  echo "Store icons ($store): 512x512 (locked + unlocked)"
+done
+
 echo "Done."

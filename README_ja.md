@@ -147,6 +147,15 @@ aws iam put-user-policy \
 
 > Cloudflare R2 や MinIO など他の S3 互換ストレージを使う場合は、各サービスのドキュメントに従ってアクセスキーを発行してください。
 
+## リンク
+
+- ウェブサイト: https://muranoya.github.io/kura.github.io/
+- プライバシーポリシー: https://muranoya.github.io/kura.github.io/privacy-ja.html
+- 利用規約: https://muranoya.github.io/kura.github.io/terms-ja.html
+- セキュリティ報告: [SECURITY.md](SECURITY.md) を参照
+- 連絡先: daisuke.muraoka.jp@gmail.com
+- Issues: https://github.com/muranoya/kura/issues
+
 ## ライセンス
 
 [Apache License, Version 2.0](LICENSE) でライセンスされています。

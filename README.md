@@ -147,6 +147,15 @@ aws iam put-user-policy \
 
 > For other S3-compatible storage services like Cloudflare R2 or MinIO, follow each service's documentation to generate access keys.
 
+## Links
+
+- Website: https://muranoya.github.io/kura.github.io/
+- Privacy Policy: https://muranoya.github.io/kura.github.io/privacy-en.html
+- Terms of Use: https://muranoya.github.io/kura.github.io/terms-en.html
+- Security reports: see [SECURITY.md](SECURITY.md)
+- Contact: daisuke.muraoka.jp@gmail.com
+- Issues: https://github.com/muranoya/kura/issues
+
 ## License
 
 Licensed under the [Apache License, Version 2.0](LICENSE).

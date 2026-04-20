@@ -114,7 +114,8 @@
       "tagline1": "サーバ不要、自分一人のための",
       "tagline2": "パスワードマネージャー",
       "termsLink": "利用規約",
-      "agreementSuffix": "に同意する",
+      "agreePrefix": "",
+      "agreeSuffix": "に同意する",
       "termsTitle": "利用規約",
       "start": "始める",
       "close": "閉じる"

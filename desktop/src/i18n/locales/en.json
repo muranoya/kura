@@ -114,7 +114,8 @@
       "tagline1": "No server required.",
       "tagline2": "A password manager just for you.",
       "termsLink": "Terms of Service",
-      "agreementSuffix": "I agree to the",
+      "agreePrefix": "I agree to the ",
+      "agreeSuffix": "",
       "termsTitle": "Terms of Service",
       "start": "Get started",
       "close": "Close"

@@ -2,6 +2,11 @@
 name = "vault_core"
 version = "0.1.6"
 edition = "2021"
+description = "Core library for kura, a serverless password manager with client-side encryption"
+authors = ["Daisuke Muraoka <daisuke.muraoka.jp@gmail.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/muranoya/kura"
+homepage = "https://github.com/muranoya/kura"
 
 [dependencies]
 aes-gcm = "0.10"

@@ -125,6 +125,15 @@ default: help
 	echo "  - Chrome:  {{EXTENSION_DIR}}/kura-extension-chrome.zip"
 	echo "  - Firefox: {{EXTENSION_DIR}}/kura-extension-firefox.zip"
 
+# AMO 提出用ソースコードバンドル (git archive ベース、HEAD のみ)
+@source-bundle-extension:
+	echo ""
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "📚 Building AMO source bundle..."
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo ""
+	cd {{EXTENSION_DIR}} && pnpm exec tsx scripts/source-bundle.ts
+
 # Firefox extension - Sign with AMO (unlisted)
 @sign-firefox:
 	echo ""
@@ -241,7 +250,7 @@ default: help
 	{{ADB}} -d install -r {{ANDROID_DIR}}/app/build/outputs/apk/debug/app-debug.apk
 	echo ""
 	echo "🚀 Starting app..."
-	{{ADB}} -d shell am start -n net.meshpeak.kura/.MainActivity
+	{{ADB}} -d shell am start -n net.meshpeak.kura.debug/net.meshpeak.kura.MainActivity
 	echo ""
 	echo "✅ App is running on device! Use '{{ADB}} -d logcat | grep kura' for logs"
 
@@ -279,7 +288,7 @@ default: help
 	{{ADB}} install -r {{ANDROID_DIR}}/app/build/outputs/apk/debug/app-debug.apk
 	echo ""
 	echo "🚀 Starting app..."
-	{{ADB}} shell am start -n net.meshpeak.kura/.MainActivity
+	{{ADB}} shell am start -n net.meshpeak.kura.debug/net.meshpeak.kura.MainActivity
 	echo ""
 	echo "✅ App is running! Use '{{ADB}} logcat | grep kura' for logs"
 
@@ -487,7 +496,7 @@ test-manual-autofill:
 	find {{DESKTOP_DIR}}/src-tauri/icons/ -maxdepth 1 \( -name '*.png' -o -name '*.ico' -o -name '*.icns' \) -delete 2>/dev/null || true
 	echo "  - Extension..."
 	cd {{EXTENSION_DIR}} && rm -rf dist/ build/ node_modules/ wasm/ public/ test-pages/fixtures/ kura-extension-chrome.zip kura-extension-firefox.zip
-	find {{EXTENSION_DIR}}/ -maxdepth 1 -name '*.xpi' -delete 2>/dev/null || true
+	find {{EXTENSION_DIR}}/ -maxdepth 1 \( -name '*.xpi' -o -name 'kura-extension-source-*.zip' \) -delete 2>/dev/null || true
 	rm -f {{EXTENSION_DIR}}/src/shared/etld-data.generated.ts {{EXTENSION_DIR}}/src/shared/patterns-data.generated.ts
 	echo "  - Vault-core..."
 	rm -rf {{VAULT_CORE_DIR}}/pkg/
@@ -515,6 +524,7 @@ test-manual-autofill:
 	echo "  🔌 Extension:"
 	echo "    just dev-extension            - Start extension in dev mode (HMR)"
 	echo "    just release-extension        - Build Chrome & Firefox extensions"
+	echo "    just source-bundle-extension  - Build AMO source bundle zip"
 	echo "    just sign-firefox             - Sign Firefox extension via AMO (unlisted)"
 	echo ""
 	echo "  🧪 Test:"
