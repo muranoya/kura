@@ -134,31 +134,6 @@ default: help
 	echo ""
 	cd {{EXTENSION_DIR}} && pnpm exec tsx scripts/source-bundle.ts
 
-# Firefox extension - Sign with AMO (unlisted)
-@sign-firefox:
-	echo ""
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo "🔏 Signing Firefox extension via AMO..."
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo ""
-	if [ -z "$AMO_API_KEY" ] || [ -z "$AMO_API_SECRET" ]; then \
-		echo "❌ AMO_API_KEY and AMO_API_SECRET must be set."; \
-		echo "   Get your keys at: https://addons.mozilla.org/developers/addon/api/key/"; \
-		exit 1; \
-	fi
-	if [ ! -f {{EXTENSION_DIR}}/kura-extension-firefox.zip ]; then \
-		echo "❌ Firefox extension zip not found. Run 'just release-extension' first."; \
-		exit 1; \
-	fi
-	echo "📦 Signing extension..."
-	cd {{EXTENSION_DIR}} && pnpm web-ext sign \
-		--source-dir dist \
-		--channel unlisted \
-		--api-key "$AMO_API_KEY" \
-		--api-secret "$AMO_API_SECRET" \
-		--artifacts-dir .
-	echo ""
-	echo "✅ Signed .xpi created in {{EXTENSION_DIR}}/"
 
 # Browser extension - Development (HMR付き)
 @dev-extension: _sync-version _extension-icons
@@ -525,7 +500,6 @@ test-manual-autofill:
 	echo "    just dev-extension            - Start extension in dev mode (HMR)"
 	echo "    just release-extension        - Build Chrome & Firefox extensions"
 	echo "    just source-bundle-extension  - Build AMO source bundle zip"
-	echo "    just sign-firefox             - Sign Firefox extension via AMO (unlisted)"
 	echo ""
 	echo "  🧪 Test:"
 	echo "    just test-vault-core      - Run vault-core tests"

@@ -270,12 +270,18 @@ jobs:
       - name: Build
         run: just release-extension
 
-      - name: Sign or download Firefox extension (AMO)
+      - name: Build Firefox source bundle
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: cd extension && pnpm exec tsx scripts/source-bundle.ts
+
+      - name: Submit Firefox extension to AMO (listed)
         continue-on-error: true
         env:
           AMO_API_KEY: ${{ secrets.AMO_API_KEY }}
           AMO_API_SECRET: ${{ secrets.AMO_API_SECRET }}
           VERSION: ${{ needs.prepare.outputs.version }}
+          SOURCE_BUNDLE_PATH: extension/kura-extension-source-${{ needs.prepare.outputs.version }}.zip
         run: cd extension && pnpm exec tsx scripts/sign-or-download-firefox.ts
 
       - name: Rename extension artifacts
@@ -284,12 +290,6 @@ jobs:
         run: |
           mv extension/kura-extension-chrome.zip "extension/kura-chrome-extension-${VERSION}.zip"
           mv extension/kura-extension-firefox.zip "extension/kura-firefox-extension-${VERSION}.zip"
-          xpi_file=$(find extension -maxdepth 1 -name '*.xpi' | head -1)
-          if [ -n "$xpi_file" ]; then
-            mv "$xpi_file" "extension/kura-firefox-extension-${VERSION}.xpi"
-          else
-            echo "No signed xpi found (signing likely skipped). Nothing to rename."
-          fi
 
       - name: Upload Chrome zip
         uses: actions/upload-artifact@v7
@@ -302,13 +302,6 @@ jobs:
         with:
           name: extension-firefox
           path: extension/kura-firefox-extension-${{ needs.prepare.outputs.version }}.zip
-
-      - name: Upload Firefox signed xpi
-        uses: actions/upload-artifact@v7
-        with:
-          name: extension-firefox-signed
-          path: extension/kura-firefox-extension-${{ needs.prepare.outputs.version }}.xpi
-          if-no-files-found: ignore
 
   # ---------------------------------------------------------------------------
   # Android APK
@@ -435,7 +428,7 @@ jobs:
             artifact_dirs+=(artifacts/desktop-linux artifacts/desktop-macos artifacts/desktop-windows)
           fi
           if [ "$BUILD_EXTENSION" = "true" ]; then
-            artifact_dirs+=(artifacts/extension-chrome artifacts/extension-firefox artifacts/extension-firefox-signed)
+            artifact_dirs+=(artifacts/extension-chrome artifacts/extension-firefox)
           fi
           if [ "$BUILD_ANDROID" = "true" ]; then
             artifact_dirs+=(artifacts/android-apk)

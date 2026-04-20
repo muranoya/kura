@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { createHmac, randomBytes } from 'node:crypto'
-import { writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { basename, resolve } from 'node:path'
 
 const EXTENSION_DIR = resolve(import.meta.dirname, '..')
 const ADDON_ID = 'kura-pm@meshpeak.net'
@@ -10,14 +10,20 @@ const AMO_BASE = 'https://addons.mozilla.org'
 const apiKey = process.env.AMO_API_KEY
 const apiSecret = process.env.AMO_API_SECRET
 const version = process.env.VERSION
+const sourceBundlePath = process.env.SOURCE_BUNDLE_PATH
 
 if (!apiKey || !apiSecret) {
-  console.warn('::warning::AMO credentials not configured. Skipping Firefox signing.')
+  console.warn('::warning::AMO credentials not configured. Skipping Firefox submission.')
   process.exit(0)
 }
 
 if (!version) {
   console.error('::error::VERSION env var not set')
+  process.exit(1)
+}
+
+if (!sourceBundlePath) {
+  console.error('::error::SOURCE_BUNDLE_PATH env var not set')
   process.exit(1)
 }
 
@@ -38,35 +44,48 @@ function generateJwt(): string {
   return `${signingInput}.${signature}`
 }
 
-async function amoFetch(url: string): Promise<Response> {
-  return fetch(url, { headers: { Authorization: `JWT ${generateJwt()}` } })
-}
-
 interface AmoVersion {
+  id: number
   version: string
-  file?: { url?: string }
 }
 
-async function findExistingVersion(): Promise<AmoVersion | null> {
+async function pollForVersionId(retries = 10, intervalMs = 3000): Promise<number> {
   const url = `${AMO_BASE}/api/v5/addons/addon/${encodeURIComponent(ADDON_ID)}/versions/?filter=all_with_unlisted&page_size=50`
-  const res = await amoFetch(url)
-  if (res.status === 404) return null
-  if (!res.ok) {
-    throw new Error(`AMO versions API failed: ${res.status} ${await res.text()}`)
+  for (let i = 0; i < retries; i++) {
+    const res = await fetch(url, { headers: { Authorization: `JWT ${generateJwt()}` } })
+    if (res.ok) {
+      const data = (await res.json()) as { results?: AmoVersion[] }
+      const found = data.results?.find((v) => v.version === version)
+      if (found) return found.id
+    }
+    if (i < retries - 1) {
+      console.log(`Version ${version} not yet visible on AMO. Retrying in ${intervalMs / 1000}s...`)
+      await new Promise((r) => setTimeout(r, intervalMs))
+    }
   }
-  const data = (await res.json()) as { results?: AmoVersion[] }
-  return data.results?.find((v) => v.version === version) ?? null
+  throw new Error(`Version ${version} not found on AMO after ${retries} retries`)
 }
 
-async function download(url: string, dest: string): Promise<void> {
-  const res = await amoFetch(url)
+async function uploadSourceBundle(versionId: number): Promise<void> {
+  const absPath = resolve(sourceBundlePath as string)
+  const form = new FormData()
+  form.append('source', new Blob([readFileSync(absPath)]), basename(absPath))
+  const res = await fetch(
+    `${AMO_BASE}/api/v5/addons/addon/${encodeURIComponent(ADDON_ID)}/versions/${versionId}/`,
+    {
+      method: 'PATCH',
+      headers: { Authorization: `JWT ${generateJwt()}` },
+      body: form,
+    },
+  )
   if (!res.ok) {
-    throw new Error(`Download failed: ${res.status} ${await res.text()}`)
+    throw new Error(`Source bundle upload failed: ${res.status} ${await res.text()}`)
   }
-  writeFileSync(dest, Buffer.from(await res.arrayBuffer()))
+  console.log(`Source bundle uploaded successfully for version ${version} (id: ${versionId})`)
 }
 
-function runWebExtSign(): never {
+function submitToAmo(): void {
+  console.log(`Submitting version ${version} to AMO as listed...`)
   const result = spawnSync(
     'pnpm',
     [
@@ -75,7 +94,7 @@ function runWebExtSign(): never {
       '--source-dir',
       'dist',
       '--channel',
-      'unlisted',
+      'listed',
       '--api-key',
       apiKey as string,
       '--api-secret',
@@ -85,23 +104,13 @@ function runWebExtSign(): never {
     ],
     { cwd: EXTENSION_DIR, stdio: 'inherit' },
   )
-  process.exit(result.status ?? 1)
+  if (result.status !== 0) {
+    throw new Error(`web-ext sign exited with status ${result.status}`)
+  }
 }
 
-const existing = await findExistingVersion()
-if (existing) {
-  const fileUrl = existing.file?.url
-  if (!fileUrl) {
-    console.warn(
-      `::warning::Version ${version} exists on AMO but has no downloadable file yet. Falling back to web-ext sign (will wait for processing).`,
-    )
-    runWebExtSign()
-  }
-  const dest = resolve(EXTENSION_DIR, `kura-firefox-signed-${version}.xpi`)
-  console.log(`Version ${version} already signed on AMO. Downloading existing xpi...`)
-  await download(fileUrl, dest)
-  console.log(`Downloaded: ${dest}`)
-} else {
-  console.log(`Version ${version} not found on AMO. Signing via web-ext...`)
-  runWebExtSign()
-}
+submitToAmo()
+console.log('Waiting for version to appear on AMO...')
+const versionId = await pollForVersionId()
+console.log(`Found version ${version} on AMO (id: ${versionId}). Uploading source bundle...`)
+await uploadSourceBundle(versionId)
