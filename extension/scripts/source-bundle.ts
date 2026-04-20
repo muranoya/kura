@@ -73,7 +73,6 @@ function main(): void {
   runGitArchive(outputPath)
 
   console.log(`\n✅ AMO source bundle created: ${outputPath}`)
-  console.log(`   Build recipe: see docs/publish-amo.md`)
 }
 
 main()
