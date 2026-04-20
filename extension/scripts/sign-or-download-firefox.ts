@@ -95,6 +95,8 @@ function submitToAmo(): void {
       'dist',
       '--channel',
       'listed',
+      '--amo-metadata',
+      'amo-metadata.json',
       '--api-key',
       apiKey as string,
       '--api-secret',
