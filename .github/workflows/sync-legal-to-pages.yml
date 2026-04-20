@@ -12,8 +12,8 @@ on:
 #
 # 必要な secret: PAGES_DISPATCH_TOKEN
 #   - GitHub PAT (classic) で repo scope を付与
-#   - または fine-grained PAT で muranoya/kura.github.io の
-#     Actions: read & write 権限を付与
+#   - または fine-grained PAT で muranoya/kura.github.io に対して
+#     Contents: read & write 権限を付与（Metadata: read-only が自動付与される）
 #   - リポジトリ設定の Secrets and variables > Actions に登録
 
 jobs:
