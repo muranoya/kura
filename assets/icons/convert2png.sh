@@ -78,7 +78,7 @@ for density in "${!ADAPTIVE_SIZES[@]}"; do
 done
 
 # --- Store icons (Firefox AMO / Chrome Web Store listing) ---
-# 512x512 is required by Chrome Web Store and recommended by Firefox AMO.
+# Firefox AMO requires 512x512. Chrome Web Store requires 128x128.
 # locked / unlocked は両方生成し、ストア掲載時に選択する。
 for store in firefox chrome; do
   dir="$PROJECT_ROOT/assets/store/${store}"
@@ -87,5 +87,11 @@ for store in firefox chrome; do
   svg2png "$SCRIPT_DIR/unlocked_icon.svg" "$dir/icon-512-unlocked.png" 512
   echo "Store icons ($store): 512x512 (locked + unlocked)"
 done
+
+# Chrome Web Store requires 128x128 for the shop icon.
+CHROME_DIR="$PROJECT_ROOT/assets/store/chrome"
+svg2png "$SCRIPT_DIR/locked_icon.svg"   "$CHROME_DIR/icon-128-locked.png"   128
+svg2png "$SCRIPT_DIR/unlocked_icon.svg" "$CHROME_DIR/icon-128-unlocked.png" 128
+echo "Store icons (chrome): 128x128 (locked + unlocked)"
 
 echo "Done."
