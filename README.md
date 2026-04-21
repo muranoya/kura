@@ -120,7 +120,7 @@ Use the returned `AccessKeyId` and `SecretAccessKey` in the app's storage settin
 
 #### 3. Configure the IAM policy
 
-kura only requires `s3:GetObject` and `s3:PutObject` permissions. Create and attach the following policy:
+kura requires `s3:GetObject`, `s3:PutObject`, and `s3:ListBucket` permissions. Create and attach the following policy:
 
 ```json
 {
@@ -133,6 +133,11 @@ kura only requires `s3:GetObject` and `s3:PutObject` permissions. Create and att
         "s3:PutObject"
       ],
       "Resource": "arn:aws:s3:::your-kura-vault-bucket/vault.json"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::your-kura-vault-bucket"
     }
   ]
 }
