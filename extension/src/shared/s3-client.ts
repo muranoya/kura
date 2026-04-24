@@ -57,7 +57,6 @@ export class VaultS3Client {
 
       const rawEtag = response.ETag ?? ''
       const etag = rawEtag.replace(/"/g, '')
-      console.log('[VaultS3Client] download success, raw ETag:', rawEtag, 'parsed:', etag)
 
       return { bytes: body, etag }
     } catch (err: unknown) {
@@ -78,15 +77,8 @@ export class VaultS3Client {
         params.IfMatch = etag
       }
 
-      console.log('[VaultS3Client] upload params:', {
-        bucket: this.bucket,
-        key: this.key,
-        bodySize: data.length,
-        ifMatch: params.IfMatch ?? '(none)',
-      })
       const response = await this.client.send(new PutObjectCommand(params))
       const newEtag = response.ETag?.replace(/"/g, '') ?? ''
-      console.log('[VaultS3Client] upload success, new ETag:', newEtag)
       return newEtag
     } catch (err: unknown) {
       console.error(
