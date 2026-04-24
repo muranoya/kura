@@ -123,7 +123,6 @@
   border-radius: 8px 8px 0 0;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: different context from .kura-dropdown-locked .kura-item-icon svg */
 .kura-dropdown-warning svg {
   flex-shrink: 0;
 }
@@ -139,7 +138,6 @@
   flex-shrink: 0;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: different context from .kura-dropdown-locked .kura-item-icon svg */
 .kura-totp-timer svg {
   display: block;
 }
@@ -159,4 +157,28 @@
 
 .kura-totp-urgent .kura-totp-seconds {
   color: #ef4444;
+}
+
+.kura-inline-icon {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: rgba(79, 70, 229, 0.1);
+  border: 1px solid rgba(79, 70, 229, 0.2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background-color 0.15s;
+  color: #4f46e5;
+}
+
+.kura-inline-icon:hover {
+  background: rgba(79, 70, 229, 0.2);
+}
+
+.kura-inline-icon svg {
+  display: block;
 }

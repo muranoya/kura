@@ -7,6 +7,8 @@ const CONTAINER_ID = 'kura-autofill-dropdown'
 let shadowHost: HTMLElement | null = null
 let shadowRoot: ShadowRoot | null = null
 let dropdownEl: HTMLElement | null = null
+let iconEl: HTMLButtonElement | null = null
+let iconClickCallback: (() => void) | null = null
 let currentAnchor: HTMLInputElement | null = null
 let selectedIndex = -1
 let currentCandidates: AutofillCredentialCandidate[] = []
@@ -47,6 +49,14 @@ function positionDropdown(anchor: HTMLInputElement) {
   dropdownEl.style.left = `${rect.left}px`
   dropdownEl.style.top = `${rect.bottom + 4}px`
   dropdownEl.style.minWidth = `${Math.max(rect.width, 260)}px`
+}
+
+function positionIcon(anchor: HTMLInputElement) {
+  if (!iconEl) return
+  const rect = anchor.getBoundingClientRect()
+  const iconSize = 20
+  iconEl.style.left = `${rect.right - iconSize - 4}px`
+  iconEl.style.top = `${rect.top + (rect.height - iconSize) / 2}px`
 }
 
 function getTotpRemaining(period: number): number {
@@ -227,7 +237,7 @@ function handleKeydown(e: KeyboardEvent) {
         break
       case 'Escape':
         e.preventDefault()
-        hideDropdown()
+        closeDropdownOnly()
         break
       case 'Tab':
         hideDropdown()
@@ -257,12 +267,29 @@ function handleKeydown(e: KeyboardEvent) {
       break
     case 'Escape':
       e.preventDefault()
-      hideDropdown()
+      closeDropdownOnly()
       break
     case 'Tab':
       hideDropdown()
       break
   }
+}
+
+// ========== Escape-only close (keeps icon visible) ==========
+
+function closeDropdownOnly() {
+  stopTotpTimer()
+  if (currentAnchor) currentAnchor.removeEventListener('keydown', handleKeydown)
+  if (dropdownEl) {
+    dropdownEl.remove()
+    dropdownEl = null
+  }
+  currentCandidates = []
+  selectedIndex = -1
+  onSelectCallback = null
+  lockedMode = false
+  onUnlockCallback = null
+  currentPageProtocol = null
 }
 
 // ========== Scroll/resize handlers ==========
@@ -282,11 +309,13 @@ function handleScroll() {
 
   lastAnchorRect = { top: rect.top, left: rect.left }
   positionDropdown(currentAnchor)
+  positionIcon(currentAnchor)
 }
 
 function handleResize() {
   if (!currentAnchor) return
   positionDropdown(currentAnchor)
+  positionIcon(currentAnchor)
   const rect = currentAnchor.getBoundingClientRect()
   lastAnchorRect = { top: rect.top, left: rect.left }
 }
@@ -364,6 +393,12 @@ export function hideDropdown() {
     dropdownEl = null
   }
 
+  if (iconEl) {
+    iconEl.remove()
+    iconEl = null
+    iconClickCallback = null
+  }
+
   currentAnchor = null
   currentCandidates = []
   selectedIndex = -1
@@ -372,6 +407,83 @@ export function hideDropdown() {
   onUnlockCallback = null
   currentPageProtocol = null
   lastAnchorRect = null
+}
+
+function createKeyIconSvg(): SVGSVGElement {
+  const NS = 'http://www.w3.org/2000/svg'
+  const svg = document.createElementNS(NS, 'svg')
+  svg.setAttribute('width', '12')
+  svg.setAttribute('height', '12')
+  svg.setAttribute('viewBox', '0 0 24 24')
+  svg.setAttribute('fill', 'none')
+  svg.setAttribute('stroke', 'currentColor')
+  svg.setAttribute('stroke-width', '2.5')
+  svg.setAttribute('stroke-linecap', 'round')
+  svg.setAttribute('stroke-linejoin', 'round')
+
+  const circle = document.createElementNS(NS, 'circle')
+  circle.setAttribute('cx', '7.5')
+  circle.setAttribute('cy', '15.5')
+  circle.setAttribute('r', '5.5')
+  svg.appendChild(circle)
+
+  const path1 = document.createElementNS(NS, 'path')
+  path1.setAttribute('d', 'm21 2-9.6 9.6')
+  svg.appendChild(path1)
+
+  const path2 = document.createElementNS(NS, 'path')
+  path2.setAttribute('d', 'm15.5 7.5 3 3L22 7l-3-3')
+  svg.appendChild(path2)
+
+  return svg
+}
+
+export function showInlineIcon(anchor: HTMLInputElement, onClick: () => void) {
+  const root = ensureShadowHost()
+
+  // Same anchor with icon already shown — just update callback
+  if (currentAnchor === anchor && iconEl) {
+    iconClickCallback = onClick
+    return
+  }
+
+  // Different anchor — clean up previous state
+  if (currentAnchor && currentAnchor !== anchor) {
+    hideDropdown()
+  }
+
+  currentAnchor = anchor
+  iconClickCallback = onClick
+
+  if (iconEl) {
+    iconEl.remove()
+  }
+
+  iconEl = document.createElement('button')
+  iconEl.type = 'button'
+  iconEl.className = 'kura-inline-icon'
+  iconEl.appendChild(createKeyIconSvg())
+  root.appendChild(iconEl)
+
+  positionIcon(anchor)
+
+  const rect = anchor.getBoundingClientRect()
+  lastAnchorRect = { top: rect.top, left: rect.left }
+
+  iconEl.addEventListener('mousedown', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (blurTimeout) {
+      clearTimeout(blurTimeout)
+      blurTimeout = null
+    }
+    iconClickCallback?.()
+  })
+
+  // Idempotent: same function reference won't be registered twice
+  anchor.addEventListener('blur', handleAnchorBlur)
+  window.addEventListener('scroll', handleScroll, true)
+  window.addEventListener('resize', handleResize)
 }
 
 export function isDropdownVisible(): boolean {
