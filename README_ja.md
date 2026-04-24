@@ -3,6 +3,8 @@
 サーバ不要のパスワードマネージャー。あなた自身のS3互換ストレージにvaultを保管します。
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/bkhdjpmpbkaiafemghempeagliblhofc?label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/kura/bkhdjpmpbkaiafemghempeagliblhofc)
+[![Mozilla Add-on](https://img.shields.io/amo/v/dc747ff47c9d45f4b4fd?label=Firefox%20Add-ons)](https://addons.mozilla.org/firefox/addon/dc747ff47c9d45f4b4fd/)
 
 [English](README.md)
 
@@ -24,8 +26,8 @@
 | Windows / Linux | Tauri (Rust + React) | 利用可能 |
 | macOS (Apple Silicon) | Tauri (Rust + React) | 利用可能（[インストール手順](#macos-インストール手順)参照） |
 | Android | Kotlin + Jetpack Compose | 利用可能 |
-| Chrome 拡張機能 | React + WASM | 利用可能 |
-| Firefox 拡張機能 | React + WASM | 利用可能 |
+| Chrome 拡張機能 | React + WASM | [Chrome ウェブストアで入手](https://chromewebstore.google.com/detail/kura/bkhdjpmpbkaiafemghempeagliblhofc) |
+| Firefox 拡張機能 | React + WASM | [Firefox Add-ons で入手](https://addons.mozilla.org/firefox/addon/dc747ff47c9d45f4b4fd/) |
 
 すべてのプラットフォームでRust製のコアライブラリ（`vault-core`）を共有しており、暗号化と同期の挙動がどの環境でも同一であることを保証しています。
 

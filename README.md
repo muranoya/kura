@@ -3,6 +3,8 @@
 A serverless password manager. Your vault lives in your own S3-compatible storage.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/bkhdjpmpbkaiafemghempeagliblhofc?label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/kura/bkhdjpmpbkaiafemghempeagliblhofc)
+[![Mozilla Add-on](https://img.shields.io/amo/v/dc747ff47c9d45f4b4fd?label=Firefox%20Add-ons)](https://addons.mozilla.org/firefox/addon/dc747ff47c9d45f4b4fd/)
 
 [日本語](README_ja.md)
 
@@ -24,8 +26,8 @@ A serverless password manager. Your vault lives in your own S3-compatible storag
 | Windows / Linux | Tauri (Rust + React) | Available |
 | macOS (Apple Silicon) | Tauri (Rust + React) | Available (see [installation steps](#macos-installation)) |
 | Android | Kotlin + Jetpack Compose | Available |
-| Chrome extension | React + WASM | Available |
-| Firefox extension | React + WASM | Available |
+| Chrome extension | React + WASM | [Available on Chrome Web Store](https://chromewebstore.google.com/detail/kura/bkhdjpmpbkaiafemghempeagliblhofc) |
+| Firefox extension | React + WASM | [Available on Firefox Add-ons](https://addons.mozilla.org/firefox/addon/dc747ff47c9d45f4b4fd/) |
 
 All platforms share the same core library (`vault-core`), written in Rust, ensuring consistent encryption and sync behavior everywhere.
 
