@@ -5,8 +5,6 @@ import type { FieldClassification, FieldType } from './field-classifier'
 import { type DetectedForm, type FormType, isVisible } from './form-detector'
 import { evaluateCondition, resolveField, waitForElement } from './pattern-matcher'
 
-const LOG_PREFIX = '[kura:autofill:pd]'
-
 export interface PatternDetectionResult {
   form: DetectedForm
   strictSubdomain: boolean
@@ -32,7 +30,6 @@ export async function detectFormByPattern(
   pattern: SitePattern,
 ): Promise<PatternDetectionResult | null> {
   if (!pattern.forms || pattern.forms.length === 0) {
-    console.log(LOG_PREFIX, 'Pattern has no forms, falling back to heuristic')
     return null
   }
 
@@ -41,7 +38,6 @@ export async function detectFormByPattern(
   for (const form of pattern.forms) {
     // Evaluate condition
     if (!evaluateCondition(form.condition)) {
-      console.log(LOG_PREFIX, `Form "${form.id}": condition not met, skipping`)
       continue
     }
 
@@ -50,7 +46,6 @@ export async function detectFormByPattern(
       const timeoutMs = form.wait_for.timeout_ms ?? 5000
       const waited = await waitForElement(form.wait_for.selector, timeoutMs)
       if (!waited) {
-        console.log(LOG_PREFIX, `Form "${form.id}": wait_for element not found, skipping`)
         continue
       }
     }
@@ -63,19 +58,11 @@ export async function detectFormByPattern(
     for (const [fieldName, fieldDef] of Object.entries(form.fields)) {
       const element = resolveField(fieldDef)
       if (!element) {
-        console.log(
-          LOG_PREFIX,
-          `Form "${form.id}": field "${fieldName}" selector not found, skipping form`,
-        )
         allResolved = false
         break
       }
 
       if (!isVisible(element)) {
-        console.log(
-          LOG_PREFIX,
-          `Form "${form.id}": field "${fieldName}" not visible, skipping form`,
-        )
         allResolved = false
         break
       }
@@ -85,10 +72,6 @@ export async function detectFormByPattern(
         let skipped = false
         for (const skipSelector of form.skip_fields) {
           if (element.matches(skipSelector)) {
-            console.log(
-              LOG_PREFIX,
-              `Form "${form.id}": field "${fieldName}" matches skip selector, excluding`,
-            )
             skipped = true
             break
           }
@@ -110,28 +93,20 @@ export async function detectFormByPattern(
     if (!allResolved) continue
 
     if (fields.length === 0) {
-      console.log(LOG_PREFIX, `Form "${form.id}": no fields resolved`)
       continue
     }
 
     if (!containsFocusedInput) {
-      console.log(LOG_PREFIX, `Form "${form.id}": focused input not in this form`)
       continue
     }
 
     const formType = FORM_TYPE_MAP[form.type]
     if (!formType) {
-      console.warn(LOG_PREFIX, `Form "${form.id}": unknown form type "${form.type}"`)
       continue
     }
 
     // Find a common container for the resolved fields
     const container = findContainer(fields.map((f) => f.element))
-
-    console.log(
-      LOG_PREFIX,
-      `Form "${form.id}": matched type=${formType}, fields=${fields.map((f) => f.type).join(',')}`,
-    )
 
     return {
       form: {
@@ -143,7 +118,6 @@ export async function detectFormByPattern(
     }
   }
 
-  console.log(LOG_PREFIX, 'No pattern form matched')
   return null
 }
 

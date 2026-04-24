@@ -19,10 +19,6 @@ export async function initDevMode() {
     const patterns = await getDevModePatterns()
     if (patterns) {
       customPatterns = patterns
-      console.log(
-        '[kura:devmode]',
-        `Loaded ${customPatterns.length} custom patterns from session storage`,
-      )
     }
   }
 }
@@ -48,10 +44,6 @@ export function handleDevModeMessage(
     getDevModePatterns().then((patterns) => {
       customPatterns = patterns ?? null
       devModeEnabled = true
-      console.log(
-        '[kura:devmode]',
-        `Patterns updated: ${customPatterns?.length ?? 0} custom patterns`,
-      )
     })
     return false
   }
@@ -59,7 +51,6 @@ export function handleDevModeMessage(
   if (message.type === 'DEV_MODE_DISABLED') {
     customPatterns = null
     devModeEnabled = false
-    console.log('[kura:devmode]', 'Developer mode disabled')
     return false
   }
 

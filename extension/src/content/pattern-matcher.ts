@@ -2,8 +2,6 @@
 
 import type { FieldDef, FormCondition, SitePattern } from '../shared/pattern-types'
 
-const LOG_PREFIX = '[kura:autofill:pm]'
-
 /**
  * Find the best matching pattern for the given hostname.
  * Evaluation order: domain exact match → domain_suffix match.
@@ -16,7 +14,6 @@ export function findMatchingPattern(patterns: SitePattern[], hostname: string): 
   for (const pattern of patterns) {
     if (pattern.disabled) continue
     if (pattern.match.type === 'domain' && pattern.match.value.toLowerCase() === lowerHostname) {
-      console.log(LOG_PREFIX, `Matched domain pattern: ${pattern.match.value}`)
       return pattern
     }
   }
@@ -38,10 +35,6 @@ export function findMatchingPattern(patterns: SitePattern[], hostname: string): 
     }
   }
 
-  if (bestMatch) {
-    console.log(LOG_PREFIX, `Matched domain_suffix pattern: ${bestMatch.match.value}`)
-  }
-
   return bestMatch
 }
 
@@ -59,7 +52,6 @@ export function evaluateCondition(condition: FormCondition | undefined): boolean
         return false
       }
     } catch {
-      console.warn(LOG_PREFIX, `Invalid url_path regex: ${condition.url_path}`)
       return false
     }
   }
@@ -127,7 +119,6 @@ export function waitForElement(selector: string, timeoutMs = 5000): Promise<Elem
       if (!resolved) {
         resolved = true
         observer.disconnect()
-        console.log(LOG_PREFIX, `waitForElement timeout: ${selector} (${timeoutMs}ms)`)
         resolve(null)
       }
     }, timeoutMs)

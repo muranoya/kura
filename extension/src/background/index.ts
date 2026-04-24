@@ -130,17 +130,8 @@ async function initWasm() {
 
 function setupMessageHandlers() {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log(
-      '[SW] onMessage received:',
-      message.type,
-      'from:',
-      sender.url?.substring(0, 60) || sender.id,
-    )
     // async 処理を fire-and-forget で実行し、Promise で sendResponse を呼ぶ
     handleMessage(message, sender, sendResponse)
-      .then(() => {
-        console.log('[SW] handleMessage completed for:', message.type)
-      })
       .catch((err) => {
         console.error('[SW] Unhandled error in message handler:', message.type, err)
         try {
@@ -354,22 +345,17 @@ async function loadSettings(): Promise<AppSettings> {
 // ========== セッション復元 ==========
 
 async function tryRestoreSession(): Promise<boolean> {
-  console.log('[SW] tryRestoreSession: starting')
   const password = await getFromSessionStorage<string>(STORAGE_KEYS.SESSION_PASSWORD)
-  console.log('[SW] tryRestoreSession: password retrieved?', !!password)
   if (!password) return false
 
   try {
     await initWasm()
     const vaultBytes = await getFromStorage<number[]>(STORAGE_KEYS.VAULT_BYTES)
     const etag = await getFromStorage<string>(STORAGE_KEYS.VAULT_ETAG)
-    console.log('[SW] tryRestoreSession: vaultBytes?', !!vaultBytes, 'etag?', !!etag)
     if (!vaultBytes) return false
 
     vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
-    console.log('[SW] tryRestoreSession: vault loaded')
     vault.api_unlock(DEFAULT_VAULT_ID, password)
-    console.log('[SW] tryRestoreSession: vault unlocked')
 
     // S3設定の復号
     const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
@@ -384,7 +370,6 @@ async function tryRestoreSession(): Promise<boolean> {
 
     unlocked = true
     updateExtensionIcon(true)
-    console.log('[SW] Session restored successfully')
     return true
   } catch (e) {
     console.error('[SW] Session restore failed:', e)
@@ -407,7 +392,6 @@ async function handleMessage(
 
     // Service Worker 再起動時の vault 自動復元
     // セッションが残っていればアンロック状態まで復元、なければロック状態でvaultをロードする
-    console.log('[SW] handleMessage preamble: unlocked=', unlocked, 'type=', message.type)
     if (!unlocked) {
       const restored = await tryRestoreSession()
       if (!restored) {

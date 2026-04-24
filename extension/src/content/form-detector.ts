@@ -2,8 +2,6 @@
 
 import { classifyField, type FieldClassification, type FieldType } from './field-classifier'
 
-const LOG_PREFIX = '[kura:autofill:fd]'
-
 export type FormType = 'LOGIN' | 'LOGIN_USERNAME' | 'LOGIN_PASSWORD' | 'TOTP' | 'CREDIT_CARD'
 
 export interface DetectedForm {
@@ -121,16 +119,11 @@ export function classifyFormType(fields: FieldClassification[]): FormType | null
  */
 export function detectForm(focusedInput: HTMLInputElement): DetectedForm | null {
   if (!isVisible(focusedInput)) {
-    console.log(LOG_PREFIX, 'detectForm: focused input not visible')
     return null
   }
 
   const container = findFormContainer(focusedInput)
   const inputs = collectInputs(container)
-  console.log(
-    LOG_PREFIX,
-    `detectForm: container=${container.tagName}, ${inputs.length} visible inputs found`,
-  )
 
   if (inputs.length === 0) return null
 
@@ -139,27 +132,16 @@ export function detectForm(focusedInput: HTMLInputElement): DetectedForm | null 
   for (const input of inputs) {
     const classification = classifyField(input)
     if (classification) {
-      console.log(
-        LOG_PREFIX,
-        `detectForm: classified input name="${input.name}" id="${input.id}" → ${classification.type} (score=${classification.score})`,
-      )
       classifications.push(classification)
-    } else {
-      console.log(
-        LOG_PREFIX,
-        `detectForm: input name="${input.name}" id="${input.id}" type="${input.type}" → unclassified`,
-      )
     }
   }
 
   if (classifications.length === 0) {
-    console.log(LOG_PREFIX, 'detectForm: no fields classified')
     return null
   }
 
   // Determine form type
   const formType = classifyFormType(classifications)
-  console.log(LOG_PREFIX, `detectForm: formType=${formType}`)
   if (!formType) return null
 
   return {

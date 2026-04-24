@@ -20,15 +20,10 @@ import {
 import { detectFormByPattern } from './pattern-detector'
 import { findMatchingPattern } from './pattern-matcher'
 
-const LOG_PREFIX = '[kura:autofill:cs]'
-
 // Prevent double-initialization if injected multiple times
 if (!(window as unknown as Record<string, boolean>).__kura_autofill_initialized) {
   ;(window as unknown as Record<string, boolean>).__kura_autofill_initialized = true
-  console.log(LOG_PREFIX, 'Content script initializing on', window.location.href)
   init()
-} else {
-  console.log(LOG_PREFIX, 'Content script already initialized, skipping')
 }
 
 function init() {
@@ -38,7 +33,6 @@ function init() {
   // Listen for focus events on input fields (capture phase)
   // This handles static pages, SPAs, and dynamically added forms
   document.addEventListener('focus', onFocus, true)
-  console.log(LOG_PREFIX, 'Focus event listener registered (capture phase)')
 
   // Listen for vault lock notification from Service Worker
   // Use a separate port connection to avoid interfering with popup ↔ background messaging
@@ -51,18 +45,15 @@ function onVaultMessage(
   sendResponse: (response: unknown) => void,
 ): boolean | undefined {
   if (message.type === 'AUTOFILL_VAULT_LOCKED') {
-    console.log(LOG_PREFIX, 'Vault locked notification received')
     hideDropdown()
     onVaultLockedDuringCapture()
     return
   }
   if (message.type === 'AUTOFILL_VAULT_UNLOCKED') {
-    console.log(LOG_PREFIX, 'Vault unlocked notification received')
     hideDropdown()
     return
   }
   if (message.type === 'AUTOFILL_START_CAPTURE') {
-    console.log(LOG_PREFIX, 'Starting capture mode')
     hideDropdown()
     startCaptureMode()
     return
@@ -88,11 +79,6 @@ function onFocus(e: Event) {
   // Only handle <input>, not <textarea>
   if (target instanceof HTMLTextAreaElement) return
 
-  console.log(
-    LOG_PREFIX,
-    `Focus on input: type=${(target as HTMLInputElement).type}, name=${(target as HTMLInputElement).name}, id=${(target as HTMLInputElement).id}`,
-  )
-
   if (focusDebounceTimer) {
     clearTimeout(focusDebounceTimer)
   }
@@ -104,7 +90,6 @@ function onFocus(e: Event) {
 
 async function handleInputFocus(input: HTMLInputElement) {
   if (!isVisible(input)) {
-    console.log(LOG_PREFIX, 'handleInputFocus: input not visible, skipping')
     return
   }
 
@@ -116,7 +101,6 @@ async function handleInputFocus(input: HTMLInputElement) {
   const matchedPattern = findMatchingPattern(getEffectivePatterns(), hostname)
 
   if (matchedPattern) {
-    console.log(LOG_PREFIX, `handleInputFocus: pattern found for ${hostname}`)
     const patternResult = await detectFormByPattern(input, matchedPattern)
     if (patternResult) {
       form = patternResult.form
@@ -132,7 +116,6 @@ async function handleInputFocus(input: HTMLInputElement) {
   }
 
   if (!form) {
-    console.log(LOG_PREFIX, 'handleInputFocus: no form detected')
     hideDropdown()
     return
   }
@@ -142,15 +125,9 @@ async function handleInputFocus(input: HTMLInputElement) {
   // container would also trigger suggestions.
   const focusedField = form.fields.find((f) => f.element === input)
   if (!focusedField) {
-    console.log(LOG_PREFIX, 'handleInputFocus: focused input is not an autofill target')
     hideDropdown()
     return
   }
-
-  console.log(
-    LOG_PREFIX,
-    `handleInputFocus: detected form type=${form.formType}, focused=${focusedField.type}, fields=${form.fields.map((f) => f.type).join(',')}`,
-  )
 
   const url = window.location.href
 
@@ -159,18 +136,10 @@ async function handleInputFocus(input: HTMLInputElement) {
     // Check pending flow first (split login: use the same entry selected in username step)
     const pending = await queryPendingFlow(url)
     if (pending) {
-      console.log(
-        LOG_PREFIX,
-        `handleInputFocus: checking TOTP from pending flow entry ${pending.entryId}`,
-      )
       const totpResult = await requestTotp(url, pending.entryId)
       if (totpResult) {
         const totpField = form.fields.find((f) => f.type === 'totp')
         if (totpField && isVisible(totpField.element)) {
-          console.log(
-            LOG_PREFIX,
-            `handleInputFocus: auto-filling TOTP code from ${totpResult.totpEntryName}`,
-          )
           fillField(totpField.element, totpResult.totpCode)
         }
       }
@@ -180,15 +149,10 @@ async function handleInputFocus(input: HTMLInputElement) {
     // No pending flow — show dropdown for candidate selection
     const candidates = await requestTotpCandidates(url)
     if (candidates.length === 0) {
-      console.log(LOG_PREFIX, 'handleInputFocus: no TOTP entry found for this URL')
       hideDropdown()
       return
     }
 
-    console.log(
-      LOG_PREFIX,
-      `handleInputFocus: ${candidates.length} TOTP candidates, showing dropdown`,
-    )
     const showTotpDropdown = () => {
       showDropdown(
         input,
@@ -199,10 +163,6 @@ async function handleInputFocus(input: HTMLInputElement) {
           if (totpResult) {
             const totpField = form.fields.find((f) => f.type === 'totp')
             if (totpField && isVisible(totpField.element)) {
-              console.log(
-                LOG_PREFIX,
-                `handleInputFocus: filling TOTP code from ${totpResult.totpEntryName}`,
-              )
               fillField(totpField.element, totpResult.totpCode)
             }
           }
@@ -223,7 +183,6 @@ async function handleInputFocus(input: HTMLInputElement) {
     if (pending?.password) {
       const passwordField = form.fields.find((f) => f.type === 'password')
       if (passwordField && isVisible(passwordField.element)) {
-        console.log(LOG_PREFIX, 'handleInputFocus: auto-filling password from pending login flow')
         fillField(passwordField.element, pending.password)
         return
       }
@@ -234,7 +193,6 @@ async function handleInputFocus(input: HTMLInputElement) {
   // === Credit card: fetch credit card entries instead of login entries ===
   if (form.formType === 'CREDIT_CARD') {
     const creditCards = await requestCreditCards()
-    console.log(LOG_PREFIX, `handleInputFocus: ${creditCards.length} credit card entries`)
 
     if (creditCards.length === 0) {
       hideDropdown()
@@ -262,7 +220,6 @@ async function handleInputFocus(input: HTMLInputElement) {
   const result = await getCredentials(url, strictSubdomain)
 
   if (result.status === 'locked') {
-    console.log(LOG_PREFIX, 'handleInputFocus: vault is locked, showing locked dropdown')
     const showLocked = () => {
       showLockedDropdown(input, () => {
         hideDropdown()
@@ -277,7 +234,6 @@ async function handleInputFocus(input: HTMLInputElement) {
   }
 
   const candidates = result.credentials
-  console.log(LOG_PREFIX, `handleInputFocus: ${candidates.length} credential candidates for ${url}`)
 
   if (candidates.length === 0) {
     hideDropdown()
@@ -301,24 +257,18 @@ async function handleInputFocus(input: HTMLInputElement) {
 }
 
 async function onCandidateSelected(candidate: AutofillCredentialCandidate, form: DetectedForm) {
-  console.log(LOG_PREFIX, `Candidate selected: ${candidate.name} (${candidate.entryId})`)
   hideDropdown()
 
   // Request full credentials from Service Worker
   const fillData = await requestFillData(candidate.entryId)
   if (!fillData) {
-    console.warn(LOG_PREFIX, 'onCandidateSelected: no fill data returned')
+    console.warn('[kura:autofill:cs]', 'onCandidateSelected: no fill data returned')
     return
   }
 
   // Find the target fields from the detected form
   const usernameField = form.fields.find((f) => f.type === 'username')
   const passwordField = form.fields.find((f) => f.type === 'password')
-
-  console.log(
-    LOG_PREFIX,
-    `onCandidateSelected: formType=${form.formType}, usernameField=${!!usernameField}, passwordField=${!!passwordField}`,
-  )
 
   // For LOGIN_USERNAME forms, only fill username and store pending flow
   if (
@@ -368,7 +318,6 @@ async function onCandidateSelected(candidate: AutofillCredentialCandidate, form:
     }
 
     if (ccFields.length > 0) {
-      console.log(LOG_PREFIX, `onCandidateSelected: filling ${ccFields.length} credit card fields`)
       await fillFields(ccFields)
     }
     return
@@ -386,7 +335,6 @@ async function onCandidateSelected(candidate: AutofillCredentialCandidate, form:
   }
 
   if (toFill.length > 0) {
-    console.log(LOG_PREFIX, `onCandidateSelected: filling ${toFill.length} fields`)
     await fillFields(toFill)
   }
 }

@@ -350,8 +350,6 @@ async function onSave() {
     return
   }
 
-  console.log(LOG_PREFIX, `Saving captured credential for ${url}`)
-
   try {
     const result = await saveCapturedCredential(url, name, username, password)
     if (result.success) {
@@ -430,8 +428,6 @@ export function startCaptureMode() {
   passwordField = null
   nameInput = null
 
-  console.log(LOG_PREFIX, 'Starting capture mode')
-
   ensureShadowHost()
   renderToolbar()
 
@@ -444,8 +440,6 @@ export function startCaptureMode() {
 export function stopCaptureMode() {
   if (!isActive) return
   isActive = false
-
-  console.log(LOG_PREFIX, 'Stopping capture mode')
 
   document.removeEventListener('mouseover', onMouseOver, true)
   document.removeEventListener('mouseout', onMouseOut, true)

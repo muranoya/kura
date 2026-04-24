@@ -46,7 +46,6 @@ export function initAutofill(
   saveLocally: () => Promise<void>,
   autoSync: () => Promise<void>,
 ) {
-  console.log(LOG_PREFIX, 'Initializing autofill module')
   vaultApi = api
   isUnlocked = unlockedFn
   saveLocallyFn = saveLocally
@@ -67,7 +66,6 @@ function getCredentialsForUrl(
   strictSubdomain?: boolean,
 ): AutofillCredentialCandidate[] {
   if (!vaultApi || !isUnlocked()) {
-    console.log(LOG_PREFIX, 'getCredentialsForUrl: vault not ready or locked')
     return []
   }
 
@@ -75,23 +73,14 @@ function getCredentialsForUrl(
   try {
     pageHostname = new URL(url).hostname
   } catch {
-    console.warn(LOG_PREFIX, 'getCredentialsForUrl: invalid URL:', url)
     return []
   }
 
   const pageETld = extractETldPlus1(pageHostname)
-  console.log(
-    LOG_PREFIX,
-    `getCredentialsForUrl: url=${url}, hostname=${pageHostname}, eTLD+1=${pageETld}, strictSubdomain=${!!strictSubdomain}`,
-  )
 
   // Fetch all login entries with their URLs (no passwords)
   const result = vaultApi.api_list_login_urls(DEFAULT_VAULT_ID)
   const rawCandidates: RawAutofillCandidate[] = JSON.parse(result)
-  console.log(
-    LOG_PREFIX,
-    `getCredentialsForUrl: found ${rawCandidates.length} login entries with URLs`,
-  )
 
   const candidates: AutofillCredentialCandidate[] = []
   for (const entry of rawCandidates) {
@@ -100,10 +89,6 @@ function getCredentialsForUrl(
       const urlStr = entry.url.includes('://') ? entry.url : `https://${entry.url}`
       entryHostname = new URL(urlStr).hostname
     } catch {
-      console.warn(
-        LOG_PREFIX,
-        `getCredentialsForUrl: invalid entry URL "${entry.url}" for "${entry.name}"`,
-      )
       continue
     }
 
@@ -117,10 +102,6 @@ function getCredentialsForUrl(
       matched = pageETld === entryETld
     }
 
-    console.log(
-      LOG_PREFIX,
-      `getCredentialsForUrl: entry "${entry.name}" url=${entry.url} hostname=${entryHostname} match=${matched}`,
-    )
     if (matched) {
       candidates.push({
         entryId: entry.id,
@@ -130,7 +111,6 @@ function getCredentialsForUrl(
     }
   }
 
-  console.log(LOG_PREFIX, `getCredentialsForUrl: ${candidates.length} candidates found`)
   return candidates
 }
 
@@ -283,10 +263,6 @@ const PENDING_FLOW_TIMEOUT_MS = 5 * 60 * 1000
 
 function storePendingLoginFlow(tabId: number, domain: string, entryId: string, username: string) {
   pendingLoginFlows.set(tabId, { domain, entryId, username, timestamp: Date.now() })
-  console.log(
-    LOG_PREFIX,
-    `storePendingLoginFlow: tabId=${tabId}, domain=${domain}, entryId=${entryId}`,
-  )
 }
 
 function queryPendingLoginFlow(
@@ -297,22 +273,16 @@ function queryPendingLoginFlow(
   if (!flow) return null
 
   if (Date.now() - flow.timestamp > PENDING_FLOW_TIMEOUT_MS) {
-    console.log(LOG_PREFIX, `queryPendingLoginFlow: flow expired for tabId=${tabId}`)
     pendingLoginFlows.delete(tabId)
     return null
   }
 
   if (flow.domain !== domain) {
-    console.log(
-      LOG_PREFIX,
-      `queryPendingLoginFlow: domain mismatch for tabId=${tabId}: flow=${flow.domain}, query=${domain}`,
-    )
     return null
   }
 
   // Do not delete the flow — it remains available for the TOTP step.
   // Cleanup is handled by timeout (5 min) or tab close.
-  console.log(LOG_PREFIX, `queryPendingLoginFlow: returning flow for tabId=${tabId}`)
   return { entryId: flow.entryId, username: flow.username }
 }
 
@@ -324,7 +294,6 @@ export function cleanupPendingFlow(tabId: number) {
 
 /** Called when vault is unlocked — notify all tabs to dismiss locked UI */
 export function onVaultUnlocked() {
-  console.log(LOG_PREFIX, 'onVaultUnlocked: notifying all tabs')
   chrome.tabs.query({}, (tabs) => {
     for (const tab of tabs) {
       if (tab.id) {
@@ -338,7 +307,6 @@ export function onVaultUnlocked() {
 
 /** Called when vault is locked — notify all tabs to hide UI */
 export function onVaultLocked() {
-  console.log(LOG_PREFIX, 'onVaultLocked: notifying all tabs')
   chrome.tabs.query({}, (tabs) => {
     for (const tab of tabs) {
       if (tab.id) {
@@ -358,12 +326,9 @@ export async function handleAutofillMessage(
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies
   sendResponse: (response?: any) => void,
 ) {
-  console.log(LOG_PREFIX, `handleAutofillMessage: type=${message.type}`)
-
   switch (message.type) {
     case 'AUTOFILL_GET_CREDENTIALS': {
       if (!isUnlocked()) {
-        console.log(LOG_PREFIX, 'AUTOFILL_GET_CREDENTIALS: vault not unlocked')
         sendResponse({ success: false, error: 'Vault not unlocked' })
         break
       }
@@ -374,10 +339,6 @@ export async function handleAutofillMessage(
       }
       const strictSubdomain = message.strictSubdomain as boolean | undefined
       const credentials = getCredentialsForUrl(url, strictSubdomain)
-      console.log(
-        LOG_PREFIX,
-        `AUTOFILL_GET_CREDENTIALS: returning ${credentials.length} credentials`,
-      )
       sendResponse({ success: true, credentials })
       break
     }
@@ -397,7 +358,6 @@ export async function handleAutofillMessage(
         sendResponse({ success: false, error: 'Entry not found' })
         break
       }
-      console.log(LOG_PREFIX, `AUTOFILL_FILL_REQUEST: returning fill data for ${entryId}`)
       sendResponse({ success: true, fillData })
       break
     }
@@ -409,7 +369,6 @@ export async function handleAutofillMessage(
       }
       const totpEntryId = message.entryId as string
       const totpResult = getTotpForEntry(totpEntryId)
-      console.log(LOG_PREFIX, `AUTOFILL_GET_TOTP: entryId=${totpEntryId}, found=${!!totpResult}`)
 
       if (totpResult) {
         sendResponse({ success: true, ...totpResult })
@@ -426,10 +385,6 @@ export async function handleAutofillMessage(
       }
       const totpCandidateUrl = message.url as string
       const totpCandidates = getTotpCandidatesForUrl(totpCandidateUrl)
-      console.log(
-        LOG_PREFIX,
-        `AUTOFILL_GET_TOTP_CANDIDATES: returning ${totpCandidates.length} candidates`,
-      )
       sendResponse({ success: true, totpCandidates })
       break
     }
@@ -440,7 +395,6 @@ export async function handleAutofillMessage(
         break
       }
       const creditCards = getCreditCards()
-      console.log(LOG_PREFIX, `AUTOFILL_GET_CREDIT_CARDS: returning ${creditCards.length} cards`)
       sendResponse({ success: true, creditCards })
       break
     }
@@ -521,7 +475,6 @@ export async function handleAutofillMessage(
             .sendMessage(activeTab.id, { type: 'AUTOFILL_START_CAPTURE' })
             .then(() => sendResponse({ success: true }))
             .catch((e) => {
-              console.warn(LOG_PREFIX, 'AUTOFILL_START_CAPTURE: failed to forward:', e)
               sendResponse({ success: false, error: String(e) })
             })
         } else {
@@ -577,7 +530,6 @@ export async function handleAutofillMessage(
             syncFn().catch((e) => console.error(LOG_PREFIX, 'Sync failed:', e))
           })
           .catch((e) => console.error(LOG_PREFIX, 'Save failed:', e))
-        console.log(LOG_PREFIX, `AUTOFILL_SAVE_CAPTURED: created entry ${entryId} for ${entryName}`)
         sendResponse({ success: true, entryId })
       } catch (e) {
         console.error(LOG_PREFIX, 'AUTOFILL_SAVE_CAPTURED: error:', e)
@@ -593,14 +545,12 @@ export async function handleAutofillMessage(
           sendResponse({ success: true })
         })
         .catch((e) => {
-          console.warn(LOG_PREFIX, 'AUTOFILL_OPEN_POPUP: failed:', e)
           sendResponse({ success: false, error: String(e) })
         })
       return true // Keep message channel open for async response
     }
 
     default:
-      console.warn(LOG_PREFIX, `Unknown message type: ${message.type}`)
       sendResponse({ success: false, error: `Unknown autofill message type: ${message.type}` })
   }
 }
