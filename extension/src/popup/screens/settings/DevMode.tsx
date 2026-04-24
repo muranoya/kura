@@ -118,7 +118,7 @@ export default function DevMode() {
 
   return (
     <div className="h-full flex flex-col">
-      <PageHeader title={t('devMode.title')} />
+      <PageHeader title={t('devMode.title')} showBackButton={true} />
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {/* Toggle */}
