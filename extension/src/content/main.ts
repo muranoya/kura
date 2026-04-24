@@ -4,7 +4,7 @@
 import type { AutofillCredentialCandidate } from '../shared/types'
 import { isCaptureActive, onVaultLockedDuringCapture, startCaptureMode } from './capture'
 import { getEffectivePatterns, handleDevModeMessage, initDevMode } from './dev-mode-bridge'
-import { hideDropdown, showDropdown, showLockedDropdown } from './dropdown'
+import { hideDropdown, showDropdown, showInlineIcon, showLockedDropdown } from './dropdown'
 import { fillField, fillFields } from './filler'
 import { type DetectedForm, detectForm, isVisible } from './form-detector'
 import {
@@ -189,25 +189,31 @@ async function handleInputFocus(input: HTMLInputElement) {
       LOG_PREFIX,
       `handleInputFocus: ${candidates.length} TOTP candidates, showing dropdown`,
     )
-    showDropdown(
-      input,
-      candidates,
-      async (candidate) => {
-        hideDropdown()
-        const totpResult = await requestTotp(url, candidate.entryId)
-        if (totpResult) {
-          const totpField = form.fields.find((f) => f.type === 'totp')
-          if (totpField && isVisible(totpField.element)) {
-            console.log(
-              LOG_PREFIX,
-              `handleInputFocus: filling TOTP code from ${totpResult.totpEntryName}`,
-            )
-            fillField(totpField.element, totpResult.totpCode)
+    const showTotpDropdown = () => {
+      showDropdown(
+        input,
+        candidates,
+        async (candidate) => {
+          hideDropdown()
+          const totpResult = await requestTotp(url, candidate.entryId)
+          if (totpResult) {
+            const totpField = form.fields.find((f) => f.type === 'totp')
+            if (totpField && isVisible(totpField.element)) {
+              console.log(
+                LOG_PREFIX,
+                `handleInputFocus: filling TOTP code from ${totpResult.totpEntryName}`,
+              )
+              fillField(totpField.element, totpResult.totpCode)
+            }
           }
-        }
-      },
-      window.location.protocol,
-    )
+        },
+        window.location.protocol,
+      )
+    }
+    showInlineIcon(input, showTotpDropdown)
+    if (!input.value.trim()) {
+      showTotpDropdown()
+    }
     return
   }
 
@@ -235,14 +241,20 @@ async function handleInputFocus(input: HTMLInputElement) {
       return
     }
 
-    showDropdown(
-      input,
-      creditCards,
-      (candidate) => {
-        onCandidateSelected(candidate, form)
-      },
-      window.location.protocol,
-    )
+    const showCreditCardDropdown = () => {
+      showDropdown(
+        input,
+        creditCards,
+        (candidate) => {
+          onCandidateSelected(candidate, form)
+        },
+        window.location.protocol,
+      )
+    }
+    showInlineIcon(input, showCreditCardDropdown)
+    if (!input.value.trim()) {
+      showCreditCardDropdown()
+    }
     return
   }
 
@@ -251,10 +263,16 @@ async function handleInputFocus(input: HTMLInputElement) {
 
   if (result.status === 'locked') {
     console.log(LOG_PREFIX, 'handleInputFocus: vault is locked, showing locked dropdown')
-    showLockedDropdown(input, () => {
-      hideDropdown()
-      requestOpenPopup()
-    })
+    const showLocked = () => {
+      showLockedDropdown(input, () => {
+        hideDropdown()
+        requestOpenPopup()
+      })
+    }
+    showInlineIcon(input, showLocked)
+    if (!input.value.trim()) {
+      showLocked()
+    }
     return
   }
 
@@ -266,15 +284,20 @@ async function handleInputFocus(input: HTMLInputElement) {
     return
   }
 
-  // Show dropdown anchored to the focused input
-  showDropdown(
-    input,
-    candidates,
-    (candidate) => {
-      onCandidateSelected(candidate, form)
-    },
-    window.location.protocol,
-  )
+  const showLoginDropdown = () => {
+    showDropdown(
+      input,
+      candidates,
+      (candidate) => {
+        onCandidateSelected(candidate, form)
+      },
+      window.location.protocol,
+    )
+  }
+  showInlineIcon(input, showLoginDropdown)
+  if (!input.value.trim()) {
+    showLoginDropdown()
+  }
 }
 
 async function onCandidateSelected(candidate: AutofillCredentialCandidate, form: DetectedForm) {
