@@ -1,0 +1,8 @@
+{
+  "appName": {
+    "message": "kura"
+  },
+  "appDescription": {
+    "message": "Serverless password manager. Store your encrypted vault in your own S3-compatible storage. No subscription, no vendor lock-in."
+  }
+}
