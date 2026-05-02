@@ -1,6 +1,6 @@
 [package]
 name = "vault_jni"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 description = "JNI bindings exposing vault-core to the kura Android app"
 authors = ["Daisuke Muraoka <daisuke.muraoka.jp@gmail.com>"]
