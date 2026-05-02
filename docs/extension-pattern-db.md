@@ -64,6 +64,53 @@
        └─ 複数サイトで再現   → ヒューリスティックに除外パターン追加
 ```
 
+### 基本ロジック（field-classifier）の設計方針
+
+`field-classifier.ts` のシグナル定義（`nameIdPatterns`, `labelPatterns` 等）は、**false positive を最小化するために保守的に設計** されている。
+
+#### False Positive のリスク
+
+オートフィルで false positive が発生すると「誤った入力欄に機密情報を入力する」という致命的なバグになる。
+
+**例：**
+- パターン `/member/i` を `nameIdPatterns` に追加した場合、`member_notes`（メモ欄）や `member_count`（会員数表示）のようなフィールドまで username と誤分類される可能性がある
+- これらの誤分類を個別に対処するには「サイト別の ignore パターン」が必要になり、設計が複雑化する
+
+#### 相互補完的な設計
+
+基本ロジック（ヒューリスティック）とパターンDB の役割分担：
+
+| 層 | 優先度 | 設計思想 | 対応範囲 |
+|---|---|---|---|
+| **基本ロジック** | 高い精度重視 | false positive ゼロ、true negative はパターンDB で補完 | 標準的な HTML 属性を持つ大多数のサイト |
+| **Pattern DB** | カバレッジ | サイト固有の明示的なセレクター指定で true negative を解消 | 非標準な HTML 構造や属性を持つサイト |
+
+**設計ポリシー：** 基本ロジックを広げることで true negative を減らそうとするのではなく、むしろ基本ロジックは狭く保ち、個別サイトは `patterns/sites/*.json` で対応する。
+
+#### Pattern DB によるカバレッジ確保
+
+基本ロジックで未検出となるサイトは、パターンファイル追加で対応する：
+
+```json
+{
+  "description": "name=membercd, autocomplete=off のため heuristic では score=2 で未検出",
+  "match": { "type": "domain_suffix", "value": "sakura.ad.jp" },
+  "forms": [{
+    "id": "member-login",
+    "type": "login",
+    "fields": {
+      "username": { "selector": "input[name='membercd']" },
+      "password": { "selector": "input[name='password']" }
+    }
+  }]
+}
+```
+
+この方針により：
+- 基本ロジックは false positive のない安全な実装を維持
+- サイト固有の edge case はパターンDB で柔軟に対応
+- 複雑な ignore パターンが不要で、全体の保守性が向上
+
 ## 2. ファイル構成
 
 ```
