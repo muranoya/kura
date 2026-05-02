@@ -131,15 +131,14 @@ async function initWasm() {
 function setupMessageHandlers() {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // async 処理を fire-and-forget で実行し、Promise で sendResponse を呼ぶ
-    handleMessage(message, sender, sendResponse)
-      .catch((err) => {
-        console.error('[SW] Unhandled error in message handler:', message.type, err)
-        try {
-          sendResponse({ success: false, error: String(err) })
-        } catch (e) {
-          console.error('[SW] Failed to send error response:', e)
-        }
-      })
+    handleMessage(message, sender, sendResponse).catch((err) => {
+      console.error('[SW] Unhandled error in message handler:', message.type, err)
+      try {
+        sendResponse({ success: false, error: String(err) })
+      } catch (e) {
+        console.error('[SW] Failed to send error response:', e)
+      }
+    })
     return true // 非同期レスポンスを許可
   })
 }
