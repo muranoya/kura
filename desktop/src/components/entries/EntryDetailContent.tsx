@@ -73,7 +73,7 @@ function FieldDisplay({
           isEmpty
             ? 'text-text-secondary italic'
             : isPassword && isMasked
-              ? 'font-mono text-text-primary tracking-wider'
+              ? 'font-mono text-text-primary tracking-wider overflow-hidden'
               : 'font-mono text-text-primary'
         }`}
       >
