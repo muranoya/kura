@@ -1,5 +1,6 @@
 package net.meshpeak.kura
 
+import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
@@ -24,7 +25,10 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        val isDebuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        if (!isDebuggable) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
 
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             object : DefaultLifecycleObserver {

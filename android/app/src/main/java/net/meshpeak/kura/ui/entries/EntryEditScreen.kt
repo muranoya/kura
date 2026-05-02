@@ -121,8 +121,8 @@ fun EntryEditScreen(
             else -> {
                 Column(
                     modifier = Modifier
+                        .fillMaxSize()
                         .padding(padding)
-                        .imePadding()
                 ) {
                     if (error.isNotEmpty()) {
                         Card(
@@ -158,7 +158,8 @@ fun EntryEditScreen(
                             val newLabel = Label(id = id, name = name)
                             labels = labels + newLabel
                             newLabel
-                        }
+                        },
+                        modifier = Modifier.weight(1f, fill = true)
                     )
                 }
             }
