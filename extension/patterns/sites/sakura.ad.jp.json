@@ -1,0 +1,17 @@
+{
+  "description": "さくらインターネット 会員認証（name=membercd, autocomplete=off のため heuristic で未検出）",
+  "match": {
+    "type": "domain_suffix",
+    "value": "sakura.ad.jp"
+  },
+  "forms": [
+    {
+      "id": "sakura-member-login",
+      "type": "login",
+      "fields": {
+        "username": { "selector": "input[name='membercd']" },
+        "password": { "selector": "input[name='password']" }
+      }
+    }
+  ]
+}
