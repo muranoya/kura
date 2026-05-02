@@ -10,6 +10,7 @@ class FakePreferencesManager : IPreferencesManager {
     private val _lastSyncTimeFlow = MutableStateFlow<Long?>(null)
     private val _clipboardClearSecondsFlow = MutableStateFlow(30)
     private val _biometricEnabledFlow = MutableStateFlow(false)
+    private val _passcodeEnabledFlow = MutableStateFlow(false)
     private val _sortFieldFlow = MutableStateFlow("created_at")
     private val _sortOrderFlow = MutableStateFlow("desc")
     private val _autolockMinutesFlow = MutableStateFlow(5)
@@ -21,6 +22,7 @@ class FakePreferencesManager : IPreferencesManager {
     override val lastSyncTimeFlow: Flow<Long?> = _lastSyncTimeFlow
     override val clipboardClearSecondsFlow: Flow<Int> = _clipboardClearSecondsFlow
     override val biometricEnabledFlow: Flow<Boolean> = _biometricEnabledFlow
+    override val passcodeEnabledFlow: Flow<Boolean> = _passcodeEnabledFlow
     override val sortFieldFlow: Flow<String> = _sortFieldFlow
     override val sortOrderFlow: Flow<String> = _sortOrderFlow
     override val autolockMinutesFlow: Flow<Int> = _autolockMinutesFlow
@@ -44,6 +46,10 @@ class FakePreferencesManager : IPreferencesManager {
 
     override suspend fun setBiometricEnabled(enabled: Boolean) {
         _biometricEnabledFlow.value = enabled
+    }
+
+    override suspend fun setPasscodeEnabled(enabled: Boolean) {
+        _passcodeEnabledFlow.value = enabled
     }
 
     override suspend fun saveSortConfig(field: String, order: String) {
@@ -73,10 +79,13 @@ class FakePreferencesManager : IPreferencesManager {
 
     override fun hasBiometricData(): Boolean = false
 
+    override fun hasPasscodeData(): Boolean = false
+
     override suspend fun clearAll() {
         _s3ConfigFlow.value = null
         _lastSyncTimeFlow.value = null
         _clipboardClearSecondsFlow.value = 30
         _biometricEnabledFlow.value = false
+        _passcodeEnabledFlow.value = false
     }
 }

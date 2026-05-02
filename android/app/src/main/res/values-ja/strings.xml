@@ -144,15 +144,19 @@
     <string name="lock_title">kura</string>
     <string name="lock_subtitle">ロック中</string>
     <string name="lock_password_label">マスターパスワード</string>
+    <string name="lock_passcode_label">パスコード</string>
     <string name="lock_biometric_prompt">生体認証でアンロック</string>
     <string name="lock_use_password">パスワードを使用</string>
+    <string name="lock_use_passcode">パスコードを使用</string>
     <string name="lock_biometric_locked">生体認証がロックされました。しばらくしてからお試しください</string>
     <string name="lock_biometric_disabled">生体認証が無効になりました。設定から再度有効にしてください</string>
     <string name="lock_unlock_with_recovery">リカバリーキーでアンロック</string>
     <string name="lock_logout_confirm_title">ログアウト</string>
     <string name="lock_logout_confirm_description">次回起動時にマスターパスワードでアンロックが必要になります。続行しますか？</string>
     <string name="lock_password_required">パスワードを入力してください</string>
+    <string name="lock_passcode_required">パスコードを入力してください</string>
     <string name="lock_unlock_failed">アンロックに失敗しました</string>
+    <string name="lock_passcode_unlock_failed">パスコードでのアンロックに失敗しました</string>
 
     <!-- Recovery screen -->
     <string name="recovery_title">リカバリーキーでアンロック</string>
@@ -302,6 +306,8 @@
 
     <string name="settings_biometric">生体認証でアンロック</string>
     <string name="settings_biometric_description">指紋認証や顔認証でアンロック</string>
+    <string name="settings_passcode">パスコードでアンロック</string>
+    <string name="settings_passcode_description">生体認証が使えない場合に短いパスコードでアンロック</string>
     <string name="settings_autolock">自動ロック</string>
     <string name="settings_autolock_description">一定時間操作がない場合に自動でロックします。</string>
     <string name="settings_autolock_description_background">バックグラウンド移行後の自動ロック時間</string>
@@ -401,6 +407,16 @@
     <string name="biometric_enroll_description">マスターパスワードを入力してから、生体認証で確認します。</string>
     <string name="biometric_enroll_prompt_subtitle">生体認証を登録</string>
     <string name="biometric_enroll_failed">生体認証の登録に失敗しました</string>
+
+    <!-- Passcode setup dialog -->
+    <string name="passcode_setup_title">パスコードアンロックの有効化</string>
+    <string name="passcode_setup_description">マスターパスワードを入力し、数字のパスコードを設定します。生体認証が使えない場合、この端末をパスコードでアンロックできます。</string>
+    <string name="passcode_setup_passcode">パスコード</string>
+    <string name="passcode_setup_confirm">パスコード（確認）</string>
+    <string name="passcode_setup_all_required">すべてのフィールドを入力してください</string>
+    <string name="passcode_setup_format">パスコードは4桁以上で入力してください</string>
+    <string name="passcode_setup_mismatch">パスコードが一致しません</string>
+    <string name="passcode_setup_failed">パスコードの有効化に失敗しました: %1$s</string>
 
     <!-- Reauth / export dialogs -->
     <string name="reauth_master_password_title">マスターパスワードの確認</string>

@@ -144,15 +144,19 @@
     <string name="lock_title">kura</string>
     <string name="lock_subtitle">Locked</string>
     <string name="lock_password_label">Master password</string>
+    <string name="lock_passcode_label">Passcode</string>
     <string name="lock_biometric_prompt">Unlock with biometrics</string>
     <string name="lock_use_password">Use password</string>
+    <string name="lock_use_passcode">Use passcode</string>
     <string name="lock_biometric_locked">Biometric authentication is locked. Please try again later.</string>
     <string name="lock_biometric_disabled">Biometric authentication has been disabled. Re-enable it from settings.</string>
     <string name="lock_unlock_with_recovery">Unlock with recovery key</string>
     <string name="lock_logout_confirm_title">Log out</string>
     <string name="lock_logout_confirm_description">You will need to unlock with your master password on next launch. Continue?</string>
     <string name="lock_password_required">Please enter your password</string>
+    <string name="lock_passcode_required">Please enter your passcode</string>
     <string name="lock_unlock_failed">Failed to unlock</string>
+    <string name="lock_passcode_unlock_failed">Failed to unlock with passcode</string>
 
     <!-- Recovery screen -->
     <string name="recovery_title">Unlock with Recovery Key</string>
@@ -302,6 +306,8 @@
 
     <string name="settings_biometric">Biometric unlock</string>
     <string name="settings_biometric_description">Use biometrics (fingerprint, face) to unlock.</string>
+    <string name="settings_passcode">Passcode unlock</string>
+    <string name="settings_passcode_description">Use a short passcode when biometrics are unavailable.</string>
     <string name="settings_autolock">Auto-lock</string>
     <string name="settings_autolock_description">Automatically lock after a period of inactivity.</string>
     <string name="settings_autolock_description_background">Auto-lock time after moving to background</string>
@@ -401,6 +407,16 @@
     <string name="biometric_enroll_description">Enter your master password, then confirm with biometrics.</string>
     <string name="biometric_enroll_prompt_subtitle">Register biometric</string>
     <string name="biometric_enroll_failed">Failed to register biometric</string>
+
+    <!-- Passcode setup dialog -->
+    <string name="passcode_setup_title">Enable passcode unlock</string>
+    <string name="passcode_setup_description">Enter your master password and set a numeric passcode. The passcode can unlock this device when biometrics are unavailable.</string>
+    <string name="passcode_setup_passcode">Passcode</string>
+    <string name="passcode_setup_confirm">Confirm passcode</string>
+    <string name="passcode_setup_all_required">Please fill in all fields</string>
+    <string name="passcode_setup_format">Passcode must be at least 4 digits</string>
+    <string name="passcode_setup_mismatch">Passcodes do not match</string>
+    <string name="passcode_setup_failed">Failed to enable passcode: %1$s</string>
 
     <!-- Reauth / export dialogs -->
     <string name="reauth_master_password_title">Confirm master password</string>
