@@ -1,6 +1,8 @@
 package net.meshpeak.kura.ui.entries
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -118,7 +120,11 @@ fun EntryCreateScreen(
                 }
             }
         } else {
-            Column(modifier = Modifier.padding(padding)) {
+            Column(
+                modifier = Modifier
+                    .padding(padding)
+                    .imePadding()
+            ) {
                 if (error.isNotEmpty()) {
                     Card(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
