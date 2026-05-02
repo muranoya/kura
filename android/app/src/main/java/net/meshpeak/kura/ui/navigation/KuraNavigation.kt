@@ -16,6 +16,8 @@ import net.meshpeak.kura.R
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import net.meshpeak.kura.viewmodel.AppState
 import net.meshpeak.kura.viewmodel.AppViewModel
 import net.meshpeak.kura.ui.onboarding.*
@@ -84,7 +86,14 @@ fun LoadingScreen() {
 @Composable
 fun OnboardingNavHost(appViewModel: AppViewModel) {
     val navController = rememberNavController()
-    NavHost(navController = navController, startDestination = Routes.WELCOME) {
+    NavHost(
+        navController = navController,
+        startDestination = Routes.WELCOME,
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None }
+    ) {
         composable(Routes.WELCOME) {
             WelcomeScreen(onStart = { navController.navigate(Routes.STORAGE_SETUP) })
         }
@@ -130,7 +139,14 @@ fun OnboardingNavHost(appViewModel: AppViewModel) {
 @Composable
 fun AuthNavHost(appViewModel: AppViewModel) {
     val navController = rememberNavController()
-    NavHost(navController = navController, startDestination = Routes.LOCK) {
+    NavHost(
+        navController = navController,
+        startDestination = Routes.LOCK,
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None }
+    ) {
         composable(Routes.LOCK) {
             LockScreen(
                 appViewModel = appViewModel,
@@ -321,7 +337,11 @@ fun MainNavHost(appViewModel: AppViewModel) {
     ) {
         NavHost(
             navController = navController,
-            startDestination = Routes.HOME
+            startDestination = Routes.HOME,
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
         ) {
             composable(Routes.HOME) {
                 HomeScreen(
