@@ -95,6 +95,14 @@ describe('shouldSkipField', () => {
   it('does not skip email input', () => {
     expect(shouldSkipField(skipInput({ type: 'email' }))).toBe(false)
   })
+
+  it('skips aria-label containing Japanese "検索"', () => {
+    expect(shouldSkipField(skipInput({ ariaLabel: 'ユーザーを検索' }))).toBe(true)
+  })
+
+  it('skips aria-label "検索" alone', () => {
+    expect(shouldSkipField(skipInput({ ariaLabel: '検索' }))).toBe(true)
+  })
 })
 
 describe('computeScores', () => {
@@ -375,6 +383,22 @@ describe('computeScores', () => {
     it('label "セキュリティコード" classifies as cc_cvc', () => {
       const match = bestMatch(signals({ labelText: 'セキュリティコード' }))
       expect(match?.type).toBe('cc_cvc')
+    })
+
+    it('textSignals "ユーザーを検索" is not classified (search combobox regression)', () => {
+      // labelPatterns 修正後: ユーザー(?:名|ID) は "ユーザーを" にマッチしない
+      const result = bestMatch(signals({ inputType: 'text', textSignals: 'ユーザーを検索' }))
+      expect(result).toBeNull()
+    })
+
+    it('textSignals "ユーザー名" is still classified as username', () => {
+      const result = bestMatch(signals({ textSignals: 'ユーザー名' }))
+      expect(result?.type).toBe('username')
+    })
+
+    it('textSignals "ユーザーID" is still classified as username', () => {
+      const result = bestMatch(signals({ textSignals: 'ユーザーID' }))
+      expect(result?.type).toBe('username')
     })
   })
 

@@ -20,7 +20,7 @@ export interface FieldClassification {
 
 const SKIP_SELECTORS = ['input[type="search"]', 'input[role="searchbox"]']
 
-const SKIP_ATTR_PATTERNS = [/search/i, /query/i, /keyword/i]
+const SKIP_ATTR_PATTERNS = [/search/i, /query/i, /keyword/i, /検索/]
 
 const SKIP_INPUT_TYPES = new Set([
   'hidden',
@@ -88,7 +88,7 @@ const SIGNAL_DEFS: Record<FieldType, SignalDef> = {
     nameIdPatterns: [/^(user|email|login|account|phone|id)/i],
     labelPatterns: [
       /\b(user\s?name|email|log\s?in|account)\b/i,
-      /(ユーザー名?|メール(?:アドレス)?|アカウント|ログイン(?:ID)?)/,
+      /(ユーザー(?:名|ID)|メール(?:アドレス)?|アカウント|ログイン(?:ID)?)/,
     ],
   },
   password: {

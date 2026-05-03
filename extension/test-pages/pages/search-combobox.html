@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Search Combobox Skip - Autofill Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.25rem; }
+    nav { margin-bottom: 24px; }
+    nav a { color: #2563eb; }
+    label { display: block; margin-bottom: 4px; font-weight: 500; }
+    input { display: block; width: 100%; padding: 8px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .section { padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 24px; }
+    .section h2 { font-size: 1rem; margin-top: 0; }
+    #result { margin-top: 24px; padding: 12px; background: #f3f4f6; border-radius: 4px; white-space: pre-wrap; display: none; }
+    .expected { margin: 24px 0; padding: 12px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.9rem; }
+    .expected summary { font-weight: 600; cursor: pointer; }
+    .expected ul { margin: 8px 0 0; padding-left: 20px; }
+    .expected li { margin-bottom: 4px; }
+    code { background: #f3f4f6; padding: 2px 4px; border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <nav><a href="/">&larr; Test Pages Index</a></nav>
+  <h1>Search Combobox Skip</h1>
+  <p>Tests that search combobox fields with Japanese aria-labels are correctly skipped from autofill (regression test for role="combobox" + aria-label="ユーザーを検索" bug).</p>
+
+  <details class="expected" open>
+    <summary>Expected Behavior</summary>
+    <ul>
+      <li>Section 1 (Japanese search combobox): <code>aria-label="ユーザーを検索"</code>, <code>role="combobox"</code> → <strong>no</strong> autofill dropdown</li>
+      <li>Section 2 (ASCII search combobox): <code>aria-label="Search users"</code> → <strong>no</strong> autofill dropdown (skipped via /search/i pattern)</li>
+      <li>Section 3 (normal login form): <code>aria-label="ユーザー名"</code> → dropdown <strong>appears</strong> on focus (correctly classified as username)</li>
+      <li>Focusing search inputs should do nothing</li>
+      <li>Focusing login inputs should show autofill dropdown with candidates</li>
+    </ul>
+  </details>
+
+  <div class="section">
+    <h2>Section 1: Japanese Search Combobox</h2>
+    <p>Reproduces the bug: aria-label="ユーザーを検索", role="combobox"</p>
+    <label for="user-search-ja">ユーザーを検索</label>
+    <input type="text" id="user-search-ja" role="combobox" aria-label="ユーザーを検索"
+           aria-autocomplete="list" aria-haspopup="true" aria-expanded="false"
+           autocomplete="off" placeholder="Enter name...">
+  </div>
+
+  <div class="section">
+    <h2>Section 2: ASCII Search Combobox</h2>
+    <p>Similar combobox but with ASCII label (should be skipped by /search/i pattern)</p>
+    <label for="user-search-en">Search users</label>
+    <input type="text" id="user-search-en" role="combobox" aria-label="Search users"
+           aria-autocomplete="list" aria-haspopup="true" aria-expanded="false"
+           autocomplete="off" placeholder="Enter name...">
+  </div>
+
+  <div class="section">
+    <h2>Section 3: Normal Login Form (Control)</h2>
+    <p>Verify that normal login fields still work correctly (regression check)</p>
+    <form id="login-form" method="POST" action="#">
+      <label for="username">ユーザー名</label>
+      <input type="text" id="username" aria-label="ユーザー名" name="username"
+             autocomplete="username" placeholder="user@example.com">
+
+      <label for="password">パスワード</label>
+      <input type="password" id="password" name="password" autocomplete="current-password"
+             placeholder="Password">
+
+      <button type="submit">ログイン</button>
+    </form>
+  </div>
+
+  <pre id="result"></pre>
+
+  <script>
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const result = document.getElementById('result');
+      result.style.display = 'block';
+      result.textContent = 'Login submitted:\n  username: ' + document.getElementById('username').value + '\n  password: ' + document.getElementById('password').value;
+    });
+  </script>
+</body>
+</html>
