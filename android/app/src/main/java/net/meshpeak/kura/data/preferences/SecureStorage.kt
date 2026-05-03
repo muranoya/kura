@@ -14,6 +14,9 @@ class SecureStorage(context: Context) {
         private const val KEY_S3_CONFIG = "s3_config"
         private const val KEY_BIO_ENCRYPTED_PW = "biometric_encrypted_password"
         private const val KEY_BIO_IV = "biometric_iv"
+        private const val KEY_PASSCODE_ENCRYPTED_PW = "passcode_encrypted_password"
+        private const val KEY_PASSCODE_IV = "passcode_iv"
+        private const val KEY_PASSCODE_SALT = "passcode_salt"
     }
 
     private val masterKey = MasterKey.Builder(context)
@@ -60,6 +63,34 @@ class SecureStorage(context: Context) {
         prefs.edit()
             .remove(KEY_BIO_ENCRYPTED_PW)
             .remove(KEY_BIO_IV)
+            .apply()
+    }
+
+    fun savePasscodeData(encryptedPassword: String, iv: String, salt: String) {
+        prefs.edit()
+            .putString(KEY_PASSCODE_ENCRYPTED_PW, encryptedPassword)
+            .putString(KEY_PASSCODE_IV, iv)
+            .putString(KEY_PASSCODE_SALT, salt)
+            .apply()
+    }
+
+    fun getPasscodeEncryptedPassword(): String? =
+        prefs.getString(KEY_PASSCODE_ENCRYPTED_PW, null)
+
+    fun getPasscodeIv(): String? =
+        prefs.getString(KEY_PASSCODE_IV, null)
+
+    fun getPasscodeSalt(): String? =
+        prefs.getString(KEY_PASSCODE_SALT, null)
+
+    fun hasPasscodeData(): Boolean =
+        getPasscodeEncryptedPassword() != null && getPasscodeIv() != null && getPasscodeSalt() != null
+
+    fun clearPasscodeData() {
+        prefs.edit()
+            .remove(KEY_PASSCODE_ENCRYPTED_PW)
+            .remove(KEY_PASSCODE_IV)
+            .remove(KEY_PASSCODE_SALT)
             .apply()
     }
 

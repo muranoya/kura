@@ -19,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -51,6 +53,7 @@ fun SettingsScreen(
     var recoveryKeyValue by remember { mutableStateOf("") }
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showBiometricEnrollDialog by remember { mutableStateOf(false) }
+    var showPasscodeSetupDialog by remember { mutableStateOf(false) }
     var showTransferDialog by remember { mutableStateOf(false) }
     var showTransferPasswordConfirm by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
@@ -91,6 +94,9 @@ fun SettingsScreen(
     }
     val biometricEnabled by appViewModel.preferences.biometricEnabledFlow
         .collectAsState(initial = false)
+    val passcodeEnabled by appViewModel.preferences.passcodeEnabledFlow
+        .collectAsState(initial = false)
+    val passcodeConfigured = passcodeEnabled && appViewModel.passcodeHelper.isSetUp()
 
     val s3ConfigJson by appViewModel.preferences.s3ConfigFlow
         .collectAsState(initial = null)
@@ -270,6 +276,31 @@ fun SettingsScreen(
                         }
                     )
                 }
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_passcode)) },
+                    supportingContent = { Text(stringResource(R.string.settings_passcode_description)) },
+                    leadingContent = {
+                        Icon(Icons.Default.Pin, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = passcodeConfigured,
+                            onCheckedChange = { enabled ->
+                                if (enabled) {
+                                    showPasscodeSetupDialog = true
+                                } else {
+                                    scope.launch {
+                                        appViewModel.passcodeHelper.clearAll()
+                                        appViewModel.preferences.setPasscodeEnabled(false)
+                                    }
+                                }
+                            }
+                        )
+                    }
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -492,6 +523,8 @@ fun SettingsScreen(
                 // DEKローテーション後は生体認証を無効化
                 appViewModel.biometricHelper.clearAll()
                 appViewModel.preferences.setBiometricEnabled(false)
+                appViewModel.passcodeHelper.clearAll()
+                appViewModel.preferences.setPasscodeEnabled(false)
                 recoveryKeyValue = newKey
                 showRotateDekDialog = false
                 showRecoveryKeyDisplay = true
@@ -576,6 +609,8 @@ fun SettingsScreen(
                             val authenticatedCipher = result.cryptoObject?.cipher ?: return
                             biometricHelper.encryptAndStore(authenticatedCipher, password)
                             scope.launch {
+                                appViewModel.passcodeHelper.clearAll()
+                                appViewModel.preferences.setPasscodeEnabled(false)
                                 appViewModel.preferences.setBiometricEnabled(true)
                             }
                             showBiometricEnrollDialog = false
@@ -590,6 +625,14 @@ fun SettingsScreen(
                 biometricPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
             },
             onDismiss = { showBiometricEnrollDialog = false }
+        )
+    }
+
+    // Passcode setup dialog
+    if (showPasscodeSetupDialog) {
+        PasscodeSetupDialog(
+            appViewModel = appViewModel,
+            onDismiss = { showPasscodeSetupDialog = false }
         )
     }
 
@@ -730,6 +773,8 @@ fun PasswordChangeDialog(
                                 // マスターパスワード変更後は生体認証を無効化
                                 appViewModel.biometricHelper.clearAll()
                                 appViewModel.preferences.setBiometricEnabled(false)
+                                appViewModel.passcodeHelper.clearAll()
+                                appViewModel.preferences.setPasscodeEnabled(false)
                                 onDismiss()
                             } catch (e: Exception) {
                                 error = failedDefaultMsg
@@ -741,6 +786,91 @@ fun PasswordChangeDialog(
             ) {
                 if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 else Text(stringResource(R.string.action_change))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
+    )
+}
+
+@Composable
+fun PasscodeSetupDialog(
+    appViewModel: AppViewModel,
+    onDismiss: () -> Unit
+) {
+    var masterPassword by remember { mutableStateOf("") }
+    var passcode by remember { mutableStateOf("") }
+    var confirmPasscode by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val allRequiredMsg = stringResource(R.string.passcode_setup_all_required)
+    val formatMsg = stringResource(R.string.passcode_setup_format)
+    val mismatchMsg = stringResource(R.string.passcode_setup_mismatch)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.passcode_setup_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.passcode_setup_description), style = MaterialTheme.typography.bodySmall)
+                if (error.isNotEmpty()) {
+                    Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                OutlinedTextField(
+                    value = masterPassword,
+                    onValueChange = { masterPassword = it; error = "" },
+                    label = { Text(stringResource(R.string.single_password_label)) },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation()
+                )
+                OutlinedTextField(
+                    value = passcode,
+                    onValueChange = { passcode = it.filter(Char::isDigit); error = "" },
+                    label = { Text(stringResource(R.string.passcode_setup_passcode)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    visualTransformation = PasswordVisualTransformation()
+                )
+                OutlinedTextField(
+                    value = confirmPasscode,
+                    onValueChange = { confirmPasscode = it.filter(Char::isDigit); error = "" },
+                    label = { Text(stringResource(R.string.passcode_setup_confirm)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    visualTransformation = PasswordVisualTransformation()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    when {
+                        masterPassword.isBlank() || passcode.isBlank() || confirmPasscode.isBlank() -> error = allRequiredMsg
+                        passcode.length < 4 -> error = formatMsg
+                        passcode != confirmPasscode -> error = mismatchMsg
+                        else -> scope.launch {
+                            isLoading = true
+                            try {
+                                appViewModel.repository.verifyPassword(masterPassword)
+                                appViewModel.passcodeHelper.encryptAndStore(passcode, masterPassword)
+                                appViewModel.biometricHelper.clearAll()
+                                appViewModel.preferences.setBiometricEnabled(false)
+                                appViewModel.preferences.setPasscodeEnabled(true)
+                                onDismiss()
+                            } catch (e: Exception) {
+                                error = context.getString(R.string.passcode_setup_failed, e.message ?: "")
+                            } finally {
+                                isLoading = false
+                            }
+                        }
+                    }
+                },
+                enabled = !isLoading
+            ) {
+                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                else Text(stringResource(R.string.action_save))
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }

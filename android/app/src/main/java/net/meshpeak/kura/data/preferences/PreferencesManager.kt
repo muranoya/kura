@@ -14,6 +14,7 @@ interface IPreferencesManager {
     val lastSyncTimeFlow: Flow<Long?>
     val clipboardClearSecondsFlow: Flow<Int>
     val biometricEnabledFlow: Flow<Boolean>
+    val passcodeEnabledFlow: Flow<Boolean>
     val sortFieldFlow: Flow<String>
     val sortOrderFlow: Flow<String>
     val autolockMinutesFlow: Flow<Int>
@@ -25,6 +26,7 @@ interface IPreferencesManager {
     suspend fun getS3Config(): String?
     suspend fun saveLastSyncTime(ts: Long)
     suspend fun setBiometricEnabled(enabled: Boolean)
+    suspend fun setPasscodeEnabled(enabled: Boolean)
     suspend fun saveSortConfig(field: String, order: String)
     suspend fun saveAutolockMinutes(minutes: Int)
     suspend fun saveClipboardClearSeconds(seconds: Int)
@@ -32,6 +34,7 @@ interface IPreferencesManager {
     suspend fun saveFilterLabelId(labelId: String?)
     suspend fun saveFilterFavoritesOnly(favoritesOnly: Boolean)
     fun hasBiometricData(): Boolean
+    fun hasPasscodeData(): Boolean
     suspend fun clearAll()
 }
 
@@ -43,6 +46,7 @@ class PreferencesManager(private val context: Context) : IPreferencesManager {
         val LAST_SYNC_TIME = longPreferencesKey("last_sync_time")
         val CLIPBOARD_CLEAR_SECONDS = intPreferencesKey("clipboard_clear_seconds")
         val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
+        val PASSCODE_ENABLED = booleanPreferencesKey("passcode_enabled")
         val SORT_FIELD = stringPreferencesKey("entry_sort_field")
         val SORT_ORDER = stringPreferencesKey("entry_sort_order")
         val AUTOLOCK_MINUTES = intPreferencesKey("autolock_minutes")
@@ -55,6 +59,7 @@ class PreferencesManager(private val context: Context) : IPreferencesManager {
     override val lastSyncTimeFlow: Flow<Long?> = context.dataStore.data.map { it[LAST_SYNC_TIME] }
     override val clipboardClearSecondsFlow: Flow<Int> = context.dataStore.data.map { it[CLIPBOARD_CLEAR_SECONDS] ?: 30 }
     override val biometricEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[BIOMETRIC_ENABLED] ?: false }
+    override val passcodeEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[PASSCODE_ENABLED] ?: false }
     override val sortFieldFlow: Flow<String> = context.dataStore.data.map { it[SORT_FIELD] ?: "created_at" }
     override val sortOrderFlow: Flow<String> = context.dataStore.data.map { it[SORT_ORDER] ?: "desc" }
     override val autolockMinutesFlow: Flow<Int> = context.dataStore.data.map { it[AUTOLOCK_MINUTES] ?: 5 }
@@ -76,6 +81,10 @@ class PreferencesManager(private val context: Context) : IPreferencesManager {
 
     override suspend fun setBiometricEnabled(enabled: Boolean) {
         context.dataStore.edit { it[BIOMETRIC_ENABLED] = enabled }
+    }
+
+    override suspend fun setPasscodeEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[PASSCODE_ENABLED] = enabled }
     }
 
     override suspend fun saveSortConfig(field: String, order: String) {
@@ -110,6 +119,8 @@ class PreferencesManager(private val context: Context) : IPreferencesManager {
     }
 
     override fun hasBiometricData(): Boolean = secureStorage.hasBiometricData()
+
+    override fun hasPasscodeData(): Boolean = secureStorage.hasPasscodeData()
 
     override suspend fun clearAll() {
         context.dataStore.edit { it.clear() }

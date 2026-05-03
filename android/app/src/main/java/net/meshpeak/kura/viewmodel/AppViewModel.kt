@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewModelScope
 import net.meshpeak.kura.data.auth.BiometricHelper
+import net.meshpeak.kura.data.auth.PasscodeHelper
 import net.meshpeak.kura.data.preferences.IPreferencesManager
 import net.meshpeak.kura.data.preferences.PreferencesManager
 import net.meshpeak.kura.data.preferences.SecureStorage
@@ -30,7 +31,8 @@ class AppViewModel(
     application: Application,
     val repository: IVaultRepository = VaultRepository(application),
     val preferences: IPreferencesManager = PreferencesManager(application),
-    val biometricHelper: BiometricHelper = BiometricHelper(SecureStorage(application))
+    val biometricHelper: BiometricHelper = BiometricHelper(SecureStorage(application)),
+    val passcodeHelper: PasscodeHelper = PasscodeHelper(SecureStorage(application))
 ) : AndroidViewModel(application) {
 
     companion object {

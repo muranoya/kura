@@ -11,6 +11,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import net.meshpeak.kura.data.auth.BiometricHelper
+import net.meshpeak.kura.data.auth.PasscodeHelper
 import net.meshpeak.kura.testutil.FakePreferencesManager
 import net.meshpeak.kura.testutil.FakeVaultRepository
 import net.meshpeak.kura.ui.navigation.OnboardingNavHost
@@ -54,7 +55,8 @@ class OnboardingFlowTest {
     private fun createViewModel(): AppViewModel {
         val app = ApplicationProvider.getApplicationContext<Application>()
         val fakeBiometricHelper = mockk<BiometricHelper>(relaxed = true)
-        appViewModel = AppViewModel(app, fakeRepository, fakePreferences, fakeBiometricHelper)
+        val fakePasscodeHelper = mockk<PasscodeHelper>(relaxed = true)
+        appViewModel = AppViewModel(app, fakeRepository, fakePreferences, fakeBiometricHelper, fakePasscodeHelper)
         return appViewModel
     }
 

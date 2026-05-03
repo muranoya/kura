@@ -18,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -38,11 +40,25 @@ fun LockScreen(
 ) {
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var usePasscode by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val passcodeEnabled by appViewModel.preferences.passcodeEnabledFlow
+        .collectAsState(initial = false)
+    val passcodeAvailable = passcodeEnabled && appViewModel.passcodeHelper.isSetUp()
+
+    LaunchedEffect(passcodeAvailable) {
+        if (passcodeAvailable) {
+            usePasscode = true
+            password = ""
+            error = ""
+        } else {
+            usePasscode = false
+        }
+    }
 
     val biometricAvailable = remember {
         val canAuth = BiometricManager.from(context).canAuthenticate(
@@ -145,9 +161,10 @@ fun LockScreen(
         OutlinedTextField(
             value = password,
             onValueChange = { password = it; error = "" },
-            label = { Text(stringResource(R.string.lock_password_label)) },
+            label = { Text(if (usePasscode) stringResource(R.string.lock_passcode_label) else stringResource(R.string.lock_password_label)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            keyboardOptions = if (usePasscode) KeyboardOptions(keyboardType = KeyboardType.NumberPassword) else KeyboardOptions.Default,
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -159,14 +176,22 @@ fun LockScreen(
 
         Button(
             onClick = {
-                if (password.isBlank()) { error = context.getString(R.string.lock_password_required); return@Button }
+                if (password.isBlank()) {
+                    error = context.getString(if (usePasscode) R.string.lock_passcode_required else R.string.lock_password_required)
+                    return@Button
+                }
                 scope.launch {
                     isLoading = true
                     try {
-                        appViewModel.repository.unlock(password)
+                        val masterPassword = if (usePasscode) {
+                            appViewModel.passcodeHelper.decryptPassword(password)
+                        } else {
+                            password
+                        }
+                        appViewModel.repository.unlock(masterPassword)
                         onUnlocked()
                     } catch (e: Exception) {
-                        error = context.getString(R.string.lock_unlock_failed)
+                        error = context.getString(if (usePasscode) R.string.lock_passcode_unlock_failed else R.string.lock_unlock_failed)
                     } finally { isLoading = false }
                 }
             },
@@ -175,6 +200,20 @@ fun LockScreen(
         ) {
             if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             else Text(stringResource(R.string.action_unlock))
+        }
+
+        if (passcodeAvailable) {
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(
+                onClick = {
+                    usePasscode = !usePasscode
+                    password = ""
+                    error = ""
+                },
+                enabled = !isLoading
+            ) {
+                Text(stringResource(if (usePasscode) R.string.lock_use_password else R.string.lock_use_passcode))
+            }
         }
 
         if (biometricAvailable) {
