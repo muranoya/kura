@@ -6,7 +6,7 @@
 ## 1. 概要
 
 - 拡張機能にはビルド時の最新パターンDBを同梱する
-- 動的更新は行わない（将来的にGitHub Pages経由の定期更新を検討）
+- 動的更新は行わない
 - 各フォーム定義は独立したステップとして動作する（ステートレスモデル）。URL + DOM条件で現在の画面を認識し、フィールドを特定する。
 
 ## 1.1 ヒューリスティックとパターンDBの使い分け基準
@@ -17,7 +17,7 @@
 
 判断の軸は **「標準的なHTML属性にフィールド種別を示すシグナルが存在するか」** である。
 
-ヒューリスティックが参照する属性（参照: [extension-autofill.md](extension-autofill.md) Section 3-1.1）：
+ヒューリスティックが参照する属性（参照: [extension-autofill.md](extension-autofill.md)）：
 `autocomplete`, `type`, `name`, `id`, `aria-label`, `placeholder`, 関連する `<label>` テキスト
 
 ### ヒューリスティック修正の対象
@@ -42,27 +42,6 @@
 |------|------|
 | サイト固有の誤分類（例: そのサイト独自の "code" フィールドがTOTPと誤判定） | パターンファイルの `skip_fields` で対応 |
 | 複数サイトで起きる誤分類 | ヒューリスティックに除外パターンを追加 |
-
-### グレーゾーンの扱い
-
-属性にシグナルがあるが、そのパターンが一般的かどうか判断が難しい場合：
-
-- 1つのサイトでのみ確認 → まずパターンファイルで対応
-- 3つ以上の異なるドメインで同じ属性パターンが確認された → ヒューリスティックへ昇格を検討
-
-### 判断フロー
-
-```
-入力欄が検知できなかった
-  │
-  ├─ 標準HTML属性にフィールド種別を示すシグナルがある？
-  │    ├─ YES → ヒューリスティックの正規表現/ロジックを修正
-  │    └─ NO  → パターンファイルを追加
-  │
-  └─ 検知はされたが誤分類された？
-       ├─ そのサイト固有の問題 → パターンファイルの skip_fields で対応
-       └─ 複数サイトで再現   → ヒューリスティックに除外パターン追加
-```
 
 ### 基本ロジック（field-classifier）の設計方針
 
@@ -89,22 +68,7 @@
 
 #### Pattern DB によるカバレッジ確保
 
-基本ロジックで未検出となるサイトは、パターンファイル追加で対応する：
-
-```json
-{
-  "description": "name=membercd, autocomplete=off のため heuristic では score=2 で未検出",
-  "match": { "type": "domain_suffix", "value": "sakura.ad.jp" },
-  "forms": [{
-    "id": "member-login",
-    "type": "login",
-    "fields": {
-      "username": { "selector": "input[name='membercd']" },
-      "password": { "selector": "input[name='password']" }
-    }
-  }]
-}
-```
+基本ロジックで未検出となるサイトは、パターンファイル追加で対応する。
 
 この方針により：
 - 基本ロジックは false positive のない安全な実装を維持
@@ -135,7 +99,7 @@ extension/patterns/
 
 ```json
 {
-  "description": "string (このパターンが必要な理由)",       // Required
+  "description": "string (このパターンが必要な理由)",           // Required
   "match": {                                                // Required
     "type": "domain | domain_suffix",                       // Required
     "value": "string",                                      // Required
@@ -144,24 +108,24 @@ extension/patterns/
   "disabled": false,                                        // Optional (default: false)
   "forms": [                                                // Optional (省略時: ヒューリスティック検出にフォールバック)
     {
-      "id": "string (フォーム識別子、デバッグ・ログ用)",    // Required
+      "id": "string (フォーム識別子、デバッグ・ログ用)",         // Required
       "type": "login | login_username | login_password | totp | credit_card", // Required
-      "condition": {                                        // Optional (省略時: 常にtrue)
+      "condition": {                                       // Optional (省略時: 常にtrue)
         "url_path": "string (正規表現)",                    // Optional (省略時: 常にtrue)
         "element_exists": "string (CSSセレクタ)",           // Optional (省略時: 常にtrue)
         "element_not_exists": "string (CSSセレクタ)"        // Optional (省略時: 常にtrue)
       },
-      "wait_for": {                                         // Optional (省略時: 待機なし)
+      "wait_for": {                                        // Optional (省略時: 待機なし)
         "selector": "string (CSSセレクタ)",                 // Required (wait_for指定時)
-        "timeout_ms": 5000                                  // Optional (default: 5000)
+        "timeout_ms": 5000                                 // Optional (default: 5000)
       },
-      "fields": {                                           // Required
+      "fields": {                                          // Required
         "<field_name>": {
           "selector": "string (CSSセレクタ)",               // Required
           "fallback_selectors": ["string (CSSセレクタ)"]    // Optional (省略時: フォールバックなし)
         }
       },
-      "skip_fields": ["string (CSSセレクタ)"]              // Optional (省略時: 除外なし)
+      "skip_fields": ["string (CSSセレクタ)"]               // Optional (省略時: 除外なし)
     }
   ]
 }
@@ -194,7 +158,7 @@ extension/patterns/
 
 そのため、**より具体的な条件を持つformを配列の先頭に配置すること**。例えば `/login` 専用formと汎用formの両方を定義する場合、`/login` 用を先に書く。
 
-**matchタイプの説明：**
+**matchタイプ：**
 
 | タイプ | 値の例 | マッチ対象 |
 |--------|--------|-----------|
@@ -224,178 +188,3 @@ extension/patterns/
 2. `extension/patterns/schema.json`でバリデーション
 3. サイト固有パターンをマージして`build/patterns.json`を生成
 4. Content Scriptの静的アセットとしてバンドル
-
-## 6. 具体例
-
-### 6.1 単一画面ログイン
-
-```json
-{
-  "description": "autocomplete属性が設定されていないため、ヒューリスティック検出がスコア不足で失敗する",
-  "match": {
-    "type": "domain",
-    "value": "example.com"
-  },
-  "forms": [
-    {
-      "id": "login",
-      "type": "login",
-      "fields": {
-        "username": { "selector": "#user-input" },
-        "password": { "selector": "#pass-input" }
-      }
-    }
-  ]
-}
-```
-
-### 6.2 分割ログイン（Google）
-
-```json
-{
-  "description": "分割ログインフロー。各ステップをDOM条件で独立に認識する",
-  "match": {
-    "type": "domain",
-    "value": "accounts.google.com"
-  },
-  "forms": [
-    {
-      "id": "username-step",
-      "type": "login_username",
-      "condition": {
-        "element_exists": "#identifierId"
-      },
-      "fields": {
-        "username": { "selector": "#identifierId" }
-      }
-    },
-    {
-      "id": "password-step",
-      "type": "login_password",
-      "condition": {
-        "element_exists": "input[type='password'][name='Passwd']"
-      },
-      "fields": {
-        "password": { "selector": "input[type='password'][name='Passwd']" }
-      }
-    },
-    {
-      "id": "totp-step",
-      "type": "totp",
-      "condition": {
-        "element_exists": "#totpPin"
-      },
-      "fields": {
-        "totp": { "selector": "#totpPin" }
-      }
-    }
-  ]
-}
-```
-
-### 6.3 同一URLでの分割ステップ（否定条件の利用）
-
-```json
-{
-  "description": "同一URL /ap/signin で username → password の2段階。DOM条件で区別する",
-  "match": {
-    "type": "domain_suffix",
-    "value": "amazon.com"
-  },
-  "forms": [
-    {
-      "id": "email-step",
-      "type": "login_username",
-      "condition": {
-        "url_path": "^/ap/signin",
-        "element_exists": "#ap_email",
-        "element_not_exists": "#ap_password"
-      },
-      "fields": {
-        "username": { "selector": "#ap_email" }
-      }
-    },
-    {
-      "id": "password-step",
-      "type": "login_password",
-      "condition": {
-        "url_path": "^/ap/signin",
-        "element_exists": "#ap_password"
-      },
-      "fields": {
-        "password": { "selector": "#ap_password" }
-      }
-    }
-  ]
-}
-```
-
-### 6.4 SPA動的レンダリング（wait_forの利用）
-
-```json
-{
-  "description": "SPAでログインフォームが遅延レンダリングされる",
-  "match": {
-    "type": "domain",
-    "value": "app.example.com"
-  },
-  "forms": [
-    {
-      "id": "login",
-      "type": "login",
-      "condition": {
-        "url_path": "^/login"
-      },
-      "wait_for": {
-        "selector": "#login-form",
-        "timeout_ms": 5000
-      },
-      "fields": {
-        "username": {
-          "selector": "#login-form input[name='email']",
-          "fallback_selectors": ["#login-form input[type='email']"]
-        },
-        "password": {
-          "selector": "#login-form input[name='password']"
-        }
-      }
-    }
-  ]
-}
-```
-
-### 6.5 マッチルールのみ（フォーム検出はヒューリスティック）
-
-```json
-{
-  "description": "サブドメインごとに異なるクレデンシャルを使い分ける。フォーム検出はヒューリスティックで十分",
-  "match": {
-    "type": "domain_suffix",
-    "value": "example.com",
-    "strict_subdomain": true
-  }
-}
-```
-
-## 7. 開発者モード（パターンテスト）
-
-> **実装済み**
-
-拡張機能のポップアップ設定画面から開発者モードにアクセスでき、パターン作成・検証を支援する。
-
-**機能：**
-
-- **カスタムパターンの読み込み**：ファイルピッカーで任意の `patterns.json` を読み込み、ビルド済みのパターンDBと差し替えて動作させる。
-- **デバッグパネル**：現在のページでのマッチ結果をパネルに表示する。
-  - どの `match` タイプ（`domain` / `domain_suffix` / ヒューリスティック）で一致したか
-  - 検出されたフィールドとそのシグナルスコア（ヒューリスティックの場合）
-  - パターンDBのセレクタが実際のDOMに一致しているか
-  - 入力を実行せずにドライランで確認できるモード
-
-**セキュリティ上の注意：** 開発者モードはポップアップの設定画面からのみ有効化できる。通常の利用時は無効であり、カスタムパターンはメモリ上にのみ保持してvaultには保存しない。
-
-**実装:**
-- `extension/src/popup/screens/settings/DevMode.tsx` — 開発者モードUI（トグル、パターン読み込み、デバッグパネル）
-- `extension/src/shared/dev-mode.ts` — 開発者モード状態管理（`chrome.storage.session`ベース）
-- `extension/src/content/dev-mode-bridge.ts` — Content Scriptのパターンオーバーライドとドライラン処理
-- `extension/src/content/debug-collector.ts` — デバッグレポート収集（パターンマッチング + ヒューリスティック結果）
