@@ -3,7 +3,6 @@
 export type FieldType =
   | 'username'
   | 'password'
-  | 'new_password'
   | 'totp'
   | 'cc_number'
   | 'cc_exp'
@@ -95,19 +94,7 @@ const SIGNAL_DEFS: Record<FieldType, SignalDef> = {
     autocomplete: ['current-password'],
     typeHints: ['password'],
     nameIdPatterns: [/^(pass|pwd|senha|contrase)/i],
-    // The Japanese pattern must not match "新しいパスワード" / "パスワード確認" /
-    // "パスワード（確認）" — those belong to new_password. Excluded via
-    // lookbehind/lookahead.
     labelPatterns: [/\bpassword\b/i, /(?<!新しい)パスワード(?!\s*(?:確認|（確認）|\(確認\)))/],
-  },
-  new_password: {
-    autocomplete: ['new-password'],
-    typeHints: ['password'],
-    nameIdPatterns: [/^(new.?pass|confirm.?pass)/i],
-    labelPatterns: [
-      /\b(new\s*password|confirm\s*password)\b/i,
-      /(新しいパスワード|パスワード\s*\(?\s*確認\s*\)?|パスワード（確認）)/,
-    ],
   },
   totp: {
     autocomplete: ['one-time-code'],

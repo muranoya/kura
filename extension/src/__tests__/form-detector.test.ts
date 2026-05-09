@@ -39,15 +39,6 @@ describe('classifyFormType', () => {
     ).toBe('CREDIT_CARD')
   })
 
-  // new_password does not trigger any form type on its own
-  it('returns null for new_password only', () => {
-    expect(classifyFormType([field('new_password')])).toBeNull()
-  })
-
-  it('LOGIN_USERNAME: username + new_password (new_password ignored)', () => {
-    expect(classifyFormType([field('username'), field('new_password')])).toBe('LOGIN_USERNAME')
-  })
-
   // Credit card individual fields
   it('CREDIT_CARD: cc_name alone', () => {
     expect(classifyFormType([field('cc_name')])).toBe('CREDIT_CARD')
