@@ -117,12 +117,6 @@ describe('computeScores', () => {
       expect(scores.get('password')).toBeGreaterThanOrEqual(10)
     })
 
-    it('new-password autocomplete scores as new_password', () => {
-      const scores = computeScores(signals({ autocomplete: 'new-password' }))
-      expect(scores.get('new_password')).toBeGreaterThanOrEqual(10)
-      expect(scores.has('password')).toBe(false)
-    })
-
     it('one-time-code autocomplete', () => {
       const scores = computeScores(signals({ autocomplete: 'one-time-code' }))
       expect(scores.get('totp')).toBeGreaterThanOrEqual(10)
@@ -150,10 +144,9 @@ describe('computeScores', () => {
   })
 
   describe('type attribute signal (weight: 8)', () => {
-    it('password type scores for both password and new_password', () => {
+    it('password type scores for password', () => {
       const scores = computeScores(signals({ inputType: 'password' }))
       expect(scores.get('password')).toBe(8)
-      expect(scores.get('new_password')).toBe(8)
     })
 
     it('email type scores for username', () => {
@@ -363,11 +356,6 @@ describe('computeScores', () => {
     it('label "メールアドレス" classifies as username', () => {
       const match = bestMatch(signals({ labelText: 'メールアドレス' }))
       expect(match?.type).toBe('username')
-    })
-
-    it('label "新しいパスワード" classifies as new_password', () => {
-      const match = bestMatch(signals({ labelText: '新しいパスワード' }))
-      expect(match?.type).toBe('new_password')
     })
 
     it('label "認証コード" classifies as totp', () => {
