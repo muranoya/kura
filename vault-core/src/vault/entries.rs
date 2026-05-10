@@ -206,7 +206,8 @@ mod tests {
     fn make_vault() -> UnlockedVault {
         let dek = Dek::generate();
         let params = Argon2Params::default();
-        let kek = crate::crypto::kdf::derive_kek("test", &params).unwrap();
+        let password = crate::secret::MasterPassword::from_string("test".to_string());
+        let kek = crate::crypto::kdf::derive_kek_from_master_password(&password, &params).unwrap();
         let meta = VaultMeta::new(dek.wrap(&kek).unwrap(), dek.wrap(&kek).unwrap(), params);
         UnlockedVault {
             meta,

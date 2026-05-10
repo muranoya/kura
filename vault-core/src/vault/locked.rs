@@ -1,19 +1,23 @@
 use crate::crypto::Dek;
 use crate::error::{Result, VaultError};
 use crate::models::Argon2Params;
+use crate::secret::{MasterPassword, RecoveryKeyInput};
 use crate::store::VaultFile;
 
 use super::{LockedVault, UnlockedVault, CURRENT_SCHEMA_VERSION};
 
 impl LockedVault {
     /// Create new vault with master password, returning the vault and its recovery key.
-    pub fn create_new(master_password: &str) -> Result<(Self, crate::crypto::RecoveryKey)> {
+    pub fn create_new(
+        master_password: &MasterPassword,
+    ) -> Result<(Self, crate::crypto::RecoveryKey)> {
         let argon2_params = Argon2Params::default();
         let dek = Dek::generate();
         let recovery_key = crate::crypto::RecoveryKey::generate();
 
         // Derive KEKs
-        let kek_master = crate::crypto::kdf::derive_kek(master_password, &argon2_params)?;
+        let kek_master =
+            crate::crypto::kdf::derive_kek_from_master_password(master_password, &argon2_params)?;
         let kek_recovery = recovery_key.derive_kek(&argon2_params)?;
 
         // Wrap DEK with both KEKs
@@ -61,12 +65,14 @@ impl LockedVault {
     }
 
     /// Unlock vault with master password
-    pub fn unlock(self, master_password: &str) -> Result<UnlockedVault> {
+    pub fn unlock(self, master_password: &MasterPassword) -> Result<UnlockedVault> {
         use base64::Engine;
 
         // Derive KEK from password
-        let kek =
-            crate::crypto::kdf::derive_kek(master_password, &self.vault_file.meta.argon2_params)?;
+        let kek = crate::crypto::kdf::derive_kek_from_master_password(
+            master_password,
+            &self.vault_file.meta.argon2_params,
+        )?;
 
         // Decode and unwrap DEK
         let engine = base64::engine::general_purpose::STANDARD;
@@ -105,11 +111,16 @@ impl LockedVault {
     }
 
     /// Unlock vault with recovery key
-    pub fn unlock_with_recovery_key(self, recovery_key: &str) -> Result<UnlockedVault> {
+    pub fn unlock_with_recovery_key(
+        self,
+        recovery_key: &RecoveryKeyInput,
+    ) -> Result<UnlockedVault> {
         use base64::Engine;
 
-        let recovery_key = crate::crypto::RecoveryKey::from_display_string(recovery_key)?;
-        let kek = recovery_key.derive_kek(&self.vault_file.meta.argon2_params)?;
+        let kek = crate::crypto::RecoveryKey::derive_kek_from_input(
+            recovery_key,
+            &self.vault_file.meta.argon2_params,
+        )?;
 
         let engine = base64::engine::general_purpose::STANDARD;
         let encrypted_dek_bytes = engine
@@ -137,9 +148,17 @@ mod tests {
 
     const PASSWORD: &str = "test-master-password";
 
+    fn mp(value: &str) -> MasterPassword {
+        MasterPassword::from_string(value.to_string())
+    }
+
+    fn recovery_key_input(value: String) -> RecoveryKeyInput {
+        RecoveryKeyInput::from_string(value)
+    }
+
     #[test]
     fn test_create_new_produces_valid_vault() {
-        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(&mp(PASSWORD)).unwrap();
 
         assert_eq!(locked.vault_file.schema_version, CURRENT_SCHEMA_VERSION);
         assert!(locked.etag.is_none());
@@ -152,8 +171,8 @@ mod tests {
 
     #[test]
     fn test_create_new_each_call_produces_different_dek_and_uuid() {
-        let (locked1, _) = LockedVault::create_new(PASSWORD).unwrap();
-        let (locked2, _) = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked1, _) = LockedVault::create_new(&mp(PASSWORD)).unwrap();
+        let (locked2, _) = LockedVault::create_new(&mp(PASSWORD)).unwrap();
 
         assert_ne!(
             locked1.vault_file.meta.encrypted_dek_master,
@@ -167,8 +186,8 @@ mod tests {
 
     #[test]
     fn test_unlock_with_correct_password() {
-        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
-        let unlocked = locked.unlock(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(&mp(PASSWORD)).unwrap();
+        let unlocked = locked.unlock(&mp(PASSWORD)).unwrap();
 
         assert!(unlocked.contents.entries.is_empty());
         assert!(unlocked.contents.labels.is_empty());
@@ -176,15 +195,15 @@ mod tests {
 
     #[test]
     fn test_unlock_with_wrong_password() {
-        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
-        let result = locked.unlock("wrong-password");
+        let (locked, _) = LockedVault::create_new(&mp(PASSWORD)).unwrap();
+        let result = locked.unlock(&mp("wrong-password"));
 
         assert!(result.is_err());
     }
 
     #[test]
     fn test_open_from_serialized_bytes() {
-        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(&mp(PASSWORD)).unwrap();
         let bytes = locked.to_vault_bytes().unwrap();
 
         let reopened = LockedVault::open(bytes, Some("etag-123".to_string())).unwrap();
@@ -192,7 +211,7 @@ mod tests {
         assert_eq!(reopened.vault_file.schema_version, CURRENT_SCHEMA_VERSION);
         assert_eq!(reopened.get_etag(), Some(&"etag-123".to_string()));
 
-        let unlocked = reopened.unlock(PASSWORD).unwrap();
+        let unlocked = reopened.unlock(&mp(PASSWORD)).unwrap();
         assert!(unlocked.contents.entries.is_empty());
     }
 
@@ -204,7 +223,7 @@ mod tests {
 
     #[test]
     fn test_open_with_unsupported_schema_version() {
-        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(&mp(PASSWORD)).unwrap();
         let bytes = locked.to_vault_bytes().unwrap();
 
         let mut vault_json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
@@ -220,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_to_vault_bytes_roundtrip() {
-        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(&mp(PASSWORD)).unwrap();
         let bytes = locked.to_vault_bytes().unwrap();
 
         let parsed: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
@@ -231,28 +250,30 @@ mod tests {
 
     #[test]
     fn test_unlock_with_recovery_key() {
-        let (locked, recovery_key) = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, recovery_key) = LockedVault::create_new(&mp(PASSWORD)).unwrap();
         let recovery_str = recovery_key.to_display_string();
 
-        let unlocked = locked.unlock_with_recovery_key(&recovery_str).unwrap();
+        let unlocked = locked
+            .unlock_with_recovery_key(&recovery_key_input(recovery_str))
+            .unwrap();
 
         assert!(unlocked.contents.entries.is_empty());
     }
 
     #[test]
     fn test_unlock_with_wrong_recovery_key() {
-        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(&mp(PASSWORD)).unwrap();
 
         // create_new generates a recovery key internally, but we don't have it
         // Using a random recovery key should fail
-        let (other_locked, _) = LockedVault::create_new("other-password").unwrap();
-        let mut other_unlocked = other_locked.unlock("other-password").unwrap();
+        let (other_locked, _) = LockedVault::create_new(&mp("other-password")).unwrap();
+        let mut other_unlocked = other_locked.unlock(&mp("other-password")).unwrap();
         let other_recovery = other_unlocked
-            .regenerate_recovery_key("other-password")
+            .regenerate_recovery_key(&mp("other-password"))
             .unwrap();
         let other_recovery_str = other_recovery.to_display_string();
 
-        let result = locked.unlock_with_recovery_key(&other_recovery_str);
+        let result = locked.unlock_with_recovery_key(&recovery_key_input(other_recovery_str));
         assert!(result.is_err());
     }
 
@@ -262,8 +283,8 @@ mod tests {
 
         use zeroize::Zeroizing;
 
-        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
-        let mut unlocked = locked.unlock(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(&mp(PASSWORD)).unwrap();
+        let mut unlocked = locked.unlock(&mp(PASSWORD)).unwrap();
 
         unlocked.contents.entries.insert(
             "test-id".to_string(),
@@ -283,7 +304,7 @@ mod tests {
         );
 
         let locked_again = unlocked.lock().unwrap();
-        let unlocked_again = locked_again.unlock(PASSWORD).unwrap();
+        let unlocked_again = locked_again.unlock(&mp(PASSWORD)).unwrap();
 
         assert_eq!(unlocked_again.contents.entries.len(), 1);
         let entry = &unlocked_again.contents.entries["test-id"];
@@ -292,10 +313,10 @@ mod tests {
 
     #[test]
     fn test_vault_uuid_preserved_through_lock_unlock() {
-        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(&mp(PASSWORD)).unwrap();
         let original_uuid = locked.vault_file.meta.vault_uuid.clone();
 
-        let unlocked = locked.unlock(PASSWORD).unwrap();
+        let unlocked = locked.unlock(&mp(PASSWORD)).unwrap();
         assert_eq!(unlocked.meta.vault_uuid, original_uuid);
 
         let locked_again = unlocked.lock().unwrap();
@@ -304,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_vault_uuid_preserved_through_serialization() {
-        let (locked, _) = LockedVault::create_new(PASSWORD).unwrap();
+        let (locked, _) = LockedVault::create_new(&mp(PASSWORD)).unwrap();
         let original_uuid = locked.vault_file.meta.vault_uuid.clone();
 
         let bytes = locked.to_vault_bytes().unwrap();

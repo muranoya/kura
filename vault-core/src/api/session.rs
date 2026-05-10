@@ -1,13 +1,13 @@
+use crate::secret::{MasterPassword, RecoveryKeyInput};
 use crate::sync::engine::SessionState;
 use crate::vault::LockedVault;
-use zeroize::Zeroizing;
 
 use super::VaultManager;
 
 impl VaultManager {
     /// 新規Vaultを作成し、RecoveryKeyを返す
     pub fn api_create_new_vault(&self, master_password: String) -> Result<String, String> {
-        let master_password = Zeroizing::new(master_password);
+        let master_password = MasterPassword::from_string(master_password);
         let (locked_vault, recovery_key) = LockedVault::create_new(&master_password)
             .map_err(|e| format!("Failed to create vault: {}", e))?;
 
@@ -30,7 +30,7 @@ impl VaultManager {
 
     /// マスターパスワードでアンロック
     pub fn api_unlock(&self, master_password: String) -> Result<(), String> {
-        let master_password = Zeroizing::new(master_password);
+        let master_password = MasterPassword::from_string(master_password);
         let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
 
         let locked = match session.take() {
@@ -56,7 +56,7 @@ impl VaultManager {
 
     /// リカバリーキーでアンロック（新しいマスターパスワード設定フロー）
     pub fn api_unlock_with_recovery_key(&self, recovery_key: String) -> Result<(), String> {
-        let recovery_key = Zeroizing::new(recovery_key);
+        let recovery_key = RecoveryKeyInput::from_string(recovery_key);
         let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
 
         let locked = match session.take() {

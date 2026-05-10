@@ -2,6 +2,7 @@ use crate::codec::base32;
 use crate::crypto::kdf;
 use crate::error::{Result, VaultError};
 use crate::models::Argon2Params;
+use crate::secret::{PlaintextConfig, TransferPassword};
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
@@ -18,9 +19,12 @@ const GCM_TAG_LEN: usize = 16;
 /// Encrypt data for transfer between devices.
 /// Returns a self-contained string: `kura-config-v1$<base64(salt|iterations|memory|parallelism|iv|ciphertext|tag)>`
 /// The Argon2 params are embedded so the receiver can decrypt without a loaded vault.
-pub fn encrypt_transfer(password: &str, plaintext: &[u8]) -> Result<String> {
+pub fn encrypt_transfer(
+    password: &TransferPassword,
+    plaintext: &PlaintextConfig,
+) -> Result<String> {
     let params = Argon2Params::default();
-    let kek = kdf::derive_kek(password, &params)?;
+    let kek = kdf::derive_kek_from_transfer_password(password, &params)?;
 
     let salt_bytes = base32::decode(&params.salt)
         .ok_or_else(|| VaultError::EncryptionError("Failed to decode salt".to_string()))?;
@@ -32,7 +36,7 @@ pub fn encrypt_transfer(password: &str, plaintext: &[u8]) -> Result<String> {
         .map_err(|_| VaultError::EncryptionError("Failed to create cipher".to_string()))?;
 
     let ciphertext = cipher
-        .encrypt(nonce, plaintext)
+        .encrypt(nonce, plaintext.as_bytes())
         .map_err(|_| VaultError::EncryptionError("Encryption failed".to_string()))?;
 
     // Build binary: [salt(16) | iterations(4) | memory(4) | parallelism(4) | iv(12) | ciphertext+tag]
@@ -52,7 +56,10 @@ pub fn encrypt_transfer(password: &str, plaintext: &[u8]) -> Result<String> {
 
 /// Decrypt a transfer string produced by `encrypt_transfer`.
 /// Parses the embedded Argon2 params, derives KEK, and decrypts.
-pub fn decrypt_transfer(password: &str, transfer_string: &str) -> Result<Zeroizing<Vec<u8>>> {
+pub fn decrypt_transfer(
+    password: &TransferPassword,
+    transfer_string: &str,
+) -> Result<Zeroizing<Vec<u8>>> {
     let payload = transfer_string
         .strip_prefix(TRANSFER_PREFIX)
         .ok_or_else(|| VaultError::DecryptionError("Invalid transfer string prefix".to_string()))?;
@@ -83,7 +90,7 @@ pub fn decrypt_transfer(password: &str, transfer_string: &str) -> Result<Zeroizi
         parallelism,
     };
 
-    let kek = kdf::derive_kek(password, &params)?;
+    let kek = kdf::derive_kek_from_transfer_password(password, &params)?;
 
     let nonce = Nonce::from_slice(iv);
     let cipher = Aes256Gcm::new_from_slice(kek.as_bytes())
@@ -101,60 +108,70 @@ mod tests {
 
     #[test]
     fn test_roundtrip() {
-        let password = "test-password-123";
-        let config = br#"{"region":"ap-northeast-1","bucket":"my-vault","key":"vault.json","accessKeyId":"AKID","secretAccessKey":"secret"}"#;
+        let password = TransferPassword::from_string("test-password-123".to_string());
+        let config = PlaintextConfig::from_string(r#"{"region":"ap-northeast-1","bucket":"my-vault","key":"vault.json","accessKeyId":"AKID","secretAccessKey":"secret"}"#.to_string());
 
-        let encrypted = encrypt_transfer(password, config).unwrap();
+        let encrypted = encrypt_transfer(&password, &config).unwrap();
         assert!(encrypted.starts_with(TRANSFER_PREFIX));
 
-        let decrypted = decrypt_transfer(password, &encrypted).unwrap();
-        assert_eq!(config.as_slice(), decrypted.as_slice());
+        let decrypted = decrypt_transfer(&password, &encrypted).unwrap();
+        assert_eq!(config.as_bytes(), decrypted.as_slice());
     }
 
     #[test]
     fn test_wrong_password_fails() {
-        let config = b"secret config";
-        let encrypted = encrypt_transfer("correct", config).unwrap();
-        assert!(decrypt_transfer("wrong", &encrypted).is_err());
+        let password = TransferPassword::from_string("correct".to_string());
+        let wrong = TransferPassword::from_string("wrong".to_string());
+        let config = PlaintextConfig::from_string("secret config".to_string());
+        let encrypted = encrypt_transfer(&password, &config).unwrap();
+        assert!(decrypt_transfer(&wrong, &encrypted).is_err());
     }
 
     #[test]
     fn test_invalid_prefix_fails() {
-        assert!(decrypt_transfer("pass", "bad-prefix$AAAA").is_err());
+        let password = TransferPassword::from_string("pass".to_string());
+        assert!(decrypt_transfer(&password, "bad-prefix$AAAA").is_err());
     }
 
     #[test]
     fn test_invalid_base64_fails() {
+        let password = TransferPassword::from_string("pass".to_string());
         let bad = format!("{}!!!invalid!!!", TRANSFER_PREFIX);
-        assert!(decrypt_transfer("pass", &bad).is_err());
+        assert!(decrypt_transfer(&password, &bad).is_err());
     }
 
     #[test]
     fn test_truncated_data_fails() {
-        let encrypted = encrypt_transfer("pass", b"data").unwrap();
+        let password = TransferPassword::from_string("pass".to_string());
+        let config = PlaintextConfig::from_string("data".to_string());
+        let encrypted = encrypt_transfer(&password, &config).unwrap();
         // Truncate the base64 payload
         let truncated = &encrypted[..TRANSFER_PREFIX.len() + 10];
-        assert!(decrypt_transfer("pass", truncated).is_err());
+        assert!(decrypt_transfer(&password, truncated).is_err());
     }
 
     #[test]
     fn test_empty_plaintext() {
-        let encrypted = encrypt_transfer("pass", b"").unwrap();
-        let decrypted = decrypt_transfer("pass", &encrypted).unwrap();
+        let password = TransferPassword::from_string("pass".to_string());
+        let config = PlaintextConfig::from_string(String::new());
+        let encrypted = encrypt_transfer(&password, &config).unwrap();
+        let decrypted = decrypt_transfer(&password, &encrypted).unwrap();
         assert!(decrypted.is_empty());
     }
 
     #[test]
     fn test_different_encryptions_produce_different_output() {
-        let config = b"same data";
-        let enc1 = encrypt_transfer("pass", config).unwrap();
-        let enc2 = encrypt_transfer("pass", config).unwrap();
+        let password = TransferPassword::from_string("pass".to_string());
+        let config1 = PlaintextConfig::from_string("same data".to_string());
+        let config2 = PlaintextConfig::from_string("same data".to_string());
+        let enc1 = encrypt_transfer(&password, &config1).unwrap();
+        let enc2 = encrypt_transfer(&password, &config2).unwrap();
         // Different salt + IV each time
         assert_ne!(enc1, enc2);
         // But both decrypt to the same thing
         assert_eq!(
-            decrypt_transfer("pass", &enc1).unwrap(),
-            decrypt_transfer("pass", &enc2).unwrap()
+            decrypt_transfer(&password, &enc1).unwrap().as_slice(),
+            decrypt_transfer(&password, &enc2).unwrap().as_slice()
         );
     }
 }
