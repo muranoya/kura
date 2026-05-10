@@ -2,6 +2,7 @@ use crate::password_gen::{generate_password, PasswordOptions};
 use crate::totp::{
     generate_totp, generate_totp_default, generate_totp_from_value, parse_totp_period,
 };
+use zeroize::Zeroizing;
 
 /// パスワード生成
 pub fn api_generate_password(
@@ -32,21 +33,25 @@ pub fn api_generate_password(
 
 /// TOTP生成
 pub fn api_generate_totp(secret: String, digits: u32, period: u32) -> Result<String, String> {
+    let secret = Zeroizing::new(secret);
     generate_totp(&secret, digits, period as u64)
         .map_err(|e| format!("Failed to generate TOTP: {}", e))
 }
 
 /// TOTP生成（デフォルト）
 pub fn api_generate_totp_default(secret: String) -> Result<String, String> {
+    let secret = Zeroizing::new(secret);
     generate_totp_default(&secret).map_err(|e| format!("Failed to generate TOTP: {}", e))
 }
 
 /// TOTP生成（otpauth URI または生シークレットから）
 pub fn api_generate_totp_from_value(value: String) -> Result<String, String> {
+    let value = Zeroizing::new(value);
     generate_totp_from_value(&value).map_err(|e| format!("Failed to generate TOTP: {}", e))
 }
 
 /// TOTP周期の取得（otpauth URI から抽出、デフォルト30秒）
 pub fn api_parse_totp_period(value: String) -> u64 {
+    let value = Zeroizing::new(value);
     parse_totp_period(&value)
 }

@@ -7,6 +7,7 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
 };
 use base64::Engine;
+use zeroize::Zeroizing;
 
 const TRANSFER_PREFIX: &str = "kura-config-v1$";
 const SALT_LEN: usize = 16;
@@ -51,7 +52,7 @@ pub fn encrypt_transfer(password: &str, plaintext: &[u8]) -> Result<String> {
 
 /// Decrypt a transfer string produced by `encrypt_transfer`.
 /// Parses the embedded Argon2 params, derives KEK, and decrypts.
-pub fn decrypt_transfer(password: &str, transfer_string: &str) -> Result<Vec<u8>> {
+pub fn decrypt_transfer(password: &str, transfer_string: &str) -> Result<Zeroizing<Vec<u8>>> {
     let payload = transfer_string
         .strip_prefix(TRANSFER_PREFIX)
         .ok_or_else(|| VaultError::DecryptionError("Invalid transfer string prefix".to_string()))?;
@@ -90,6 +91,7 @@ pub fn decrypt_transfer(password: &str, transfer_string: &str) -> Result<Vec<u8>
 
     cipher
         .decrypt(nonce, ciphertext)
+        .map(Zeroizing::new)
         .map_err(|_| VaultError::DecryptionError("Decryption failed".to_string()))
 }
 
@@ -106,7 +108,7 @@ mod tests {
         assert!(encrypted.starts_with(TRANSFER_PREFIX));
 
         let decrypted = decrypt_transfer(password, &encrypted).unwrap();
-        assert_eq!(config.as_slice(), &decrypted);
+        assert_eq!(config.as_slice(), decrypted.as_slice());
     }
 
     #[test]
