@@ -57,6 +57,8 @@ export default function MasterPassword() {
           })
         })
 
+        setPassword('')
+        setConfirmPassword('')
         navigate('/onb/recovery', {
           state: { recoveryKey: response.recoveryKey, fromOnboarding: true },
         })

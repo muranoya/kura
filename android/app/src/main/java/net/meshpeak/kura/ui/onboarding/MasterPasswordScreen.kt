@@ -115,6 +115,8 @@ fun MasterPasswordScreen(
                                     appViewModel.repository.unlock(password)
                                     val vaultBytes = appViewModel.repository.getVaultBytes()
                                     appViewModel.repository.writeVaultFile(vaultBytes)
+                                    password = ""
+                                    confirmPassword = ""
                                     onVaultCreated(recoveryKey)
                                 } catch (e: Exception) {
                                     error = context.getString(R.string.master_password_create_failed, e.message ?: "")
