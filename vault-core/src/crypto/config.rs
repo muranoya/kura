@@ -1,9 +1,9 @@
 use crate::error::{Result, VaultError};
+use crate::secret::SecretBytes;
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
-use zeroize::Zeroizing;
 
 /// Encrypt arbitrary data with KEK using AES-256-GCM
 /// Returns: base64-encoded [12-byte IV | ciphertext | 16-byte GCM tag]
@@ -30,7 +30,7 @@ pub fn encrypt_with_kek(plaintext: &[u8], kek: &super::Kek) -> Result<String> {
 
 /// Decrypt data encrypted with encrypt_with_kek
 /// Input: base64-encoded [12-byte IV | ciphertext | 16-byte GCM tag]
-pub fn decrypt_with_kek(encrypted_b64: &str, kek: &super::Kek) -> Result<Zeroizing<Vec<u8>>> {
+pub fn decrypt_with_kek(encrypted_b64: &str, kek: &super::Kek) -> Result<SecretBytes> {
     use base64::Engine;
 
     let engine = base64::engine::general_purpose::STANDARD;
@@ -53,7 +53,7 @@ pub fn decrypt_with_kek(encrypted_b64: &str, kek: &super::Kek) -> Result<Zeroizi
 
     cipher
         .decrypt(nonce, ciphertext)
-        .map(Zeroizing::new)
+        .map(SecretBytes::from_vec)
         .map_err(|_| VaultError::DecryptionError("Decryption failed".to_string()))
 }
 

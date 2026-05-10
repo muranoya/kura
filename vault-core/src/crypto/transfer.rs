@@ -2,13 +2,12 @@ use crate::codec::base32;
 use crate::crypto::kdf;
 use crate::error::{Result, VaultError};
 use crate::models::Argon2Params;
-use crate::secret::{PlaintextConfig, TransferPassword};
+use crate::secret::{PlaintextConfig, SecretBytes, TransferPassword};
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
 use base64::Engine;
-use zeroize::Zeroizing;
 
 const TRANSFER_PREFIX: &str = "kura-config-v1$";
 const SALT_LEN: usize = 16;
@@ -56,10 +55,7 @@ pub fn encrypt_transfer(
 
 /// Decrypt a transfer string produced by `encrypt_transfer`.
 /// Parses the embedded Argon2 params, derives KEK, and decrypts.
-pub fn decrypt_transfer(
-    password: &TransferPassword,
-    transfer_string: &str,
-) -> Result<Zeroizing<Vec<u8>>> {
+pub fn decrypt_transfer(password: &TransferPassword, transfer_string: &str) -> Result<SecretBytes> {
     let payload = transfer_string
         .strip_prefix(TRANSFER_PREFIX)
         .ok_or_else(|| VaultError::DecryptionError("Invalid transfer string prefix".to_string()))?;
@@ -98,7 +94,7 @@ pub fn decrypt_transfer(
 
     cipher
         .decrypt(nonce, ciphertext)
-        .map(Zeroizing::new)
+        .map(SecretBytes::from_vec)
         .map_err(|_| VaultError::DecryptionError("Decryption failed".to_string()))
 }
 
