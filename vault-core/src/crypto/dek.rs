@@ -1,3 +1,4 @@
+use std::fmt;
 use crate::error::{Result, VaultError};
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -14,6 +15,12 @@ pub struct Dek {
 impl Drop for Dek {
     fn drop(&mut self) {
         self.bytes.zeroize();
+    }
+}
+
+impl fmt::Debug for Dek {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Dek([REDACTED])")
     }
 }
 

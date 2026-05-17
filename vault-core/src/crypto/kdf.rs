@@ -1,3 +1,4 @@
+use std::fmt;
 use crate::error::{Result, VaultError};
 use crate::secret::{MasterPassword, TransferPassword};
 use argon2::{Algorithm, Argon2, Params, Version};
@@ -12,6 +13,12 @@ pub struct Kek {
 impl Drop for Kek {
     fn drop(&mut self) {
         self.bytes.zeroize();
+    }
+}
+
+impl fmt::Debug for Kek {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Kek([REDACTED])")
     }
 }
 

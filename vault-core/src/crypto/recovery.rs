@@ -1,3 +1,4 @@
+use std::fmt;
 use crate::error::{Result, VaultError};
 use crate::secret::RecoveryKeyInput;
 
@@ -74,6 +75,12 @@ impl Drop for RecoveryKey {
     fn drop(&mut self) {
         use zeroize::Zeroize;
         self.bytes.zeroize();
+    }
+}
+
+impl fmt::Debug for RecoveryKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("RecoveryKey([REDACTED])")
     }
 }
 

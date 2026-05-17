@@ -2,7 +2,7 @@ use std::fmt;
 use zeroize::Zeroizing;
 
 pub struct SecretString(Zeroizing<String>);
-#[allow(dead_code)]
+
 pub struct SecretBytes(Zeroizing<Vec<u8>>);
 
 impl SecretString {
@@ -93,16 +93,17 @@ impl AsRef<str> for EntrySecretJson {
     }
 }
 
-#[allow(dead_code)]
 impl SecretBytes {
     pub fn from_vec(value: Vec<u8>) -> Self {
         Self(Zeroizing::new(value))
     }
 
+    #[allow(dead_code)]
     pub(crate) fn as_slice(&self) -> &[u8] {
         self.0.as_slice()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn to_vec(&self) -> Vec<u8> {
         self.0.to_vec()
     }
