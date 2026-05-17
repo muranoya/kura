@@ -1,4 +1,4 @@
-use crate::models::{EntryFilter, EntryType, SortField, SortOrder};
+use crate::models::{entry_data::CustomFieldType, EntryFilter, EntryType, SortField, SortOrder};
 use serde_json::Value;
 
 use super::{AutofillCandidate, EntryDetail, EntryRow, VaultManager};
@@ -127,10 +127,16 @@ impl VaultManager {
             .ok_or_else(|| format!("Invalid entry type: {}", entry_type))?;
 
         let custom_fields = if let Some(json) = custom_fields_json {
-            Some(
+            let fields: Vec<crate::models::entry_data::CustomField> =
                 serde_json::from_str(&json)
-                    .map_err(|e| format!("Invalid custom_fields JSON: {}", e))?,
-            )
+                    .map_err(|e| format!("Invalid custom_fields JSON: {}", e))?;
+            // Validate that all custom field types are known
+            for field in &fields {
+                CustomFieldType::from_str(&field.field_type).ok_or_else(|| {
+                    format!("Invalid field type: {}", field.field_type)
+                })?;
+            }
+            Some(fields)
         } else {
             None
         };
