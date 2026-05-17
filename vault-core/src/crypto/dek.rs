@@ -99,12 +99,13 @@ mod tests {
 
     #[test]
     fn test_wrap_unwrap() {
-        use crate::crypto::kdf::derive_kek;
         use crate::models::Argon2Params;
+        use crate::secret::MasterPassword;
 
         let dek = Dek::generate();
         let params = Argon2Params::default();
-        let kek = derive_kek("password123", &params).unwrap();
+        let password = MasterPassword::from_string("password123".to_string());
+        let kek = crate::crypto::kdf::derive_kek_from_master_password(&password, &params).unwrap();
 
         let wrapped = dek.wrap(&kek).unwrap();
         let unwrapped = Dek::unwrap(&wrapped, &kek).unwrap();
@@ -114,13 +115,17 @@ mod tests {
 
     #[test]
     fn test_wrong_kek_fails() {
-        use crate::crypto::kdf::derive_kek;
         use crate::models::Argon2Params;
+        use crate::secret::MasterPassword;
 
         let dek = Dek::generate();
         let params = Argon2Params::default();
-        let kek1 = derive_kek("password1", &params).unwrap();
-        let kek2 = derive_kek("password2", &params).unwrap();
+        let password1 = MasterPassword::from_string("password1".to_string());
+        let password2 = MasterPassword::from_string("password2".to_string());
+        let kek1 =
+            crate::crypto::kdf::derive_kek_from_master_password(&password1, &params).unwrap();
+        let kek2 =
+            crate::crypto::kdf::derive_kek_from_master_password(&password2, &params).unwrap();
 
         let wrapped = dek.wrap(&kek1).unwrap();
         assert!(Dek::unwrap(&wrapped, &kek2).is_err());

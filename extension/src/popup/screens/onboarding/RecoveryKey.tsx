@@ -2,6 +2,8 @@ import { Check, Copy } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { STORAGE_KEYS } from '../../../shared/constants'
+import { removeFromStorage } from '../../../shared/storage'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
@@ -25,13 +27,7 @@ export default function RecoveryKey() {
   const handleComplete = async () => {
     setCompleting(true)
     try {
-      if (typeof chrome !== 'undefined' && chrome.storage) {
-        await new Promise<void>((resolve) => {
-          chrome.storage.local.remove('onboardingDraft', () => {
-            resolve()
-          })
-        })
-      }
+      await removeFromStorage(STORAGE_KEYS.ONBOARDING_DRAFT)
 
       const isUnlocked = await new Promise<boolean>((resolve) => {
         chrome.runtime.sendMessage({ type: 'IS_UNLOCKED' }, (response: { unlocked?: boolean }) => {

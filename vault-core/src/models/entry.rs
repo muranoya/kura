@@ -179,8 +179,8 @@ impl EntryFilter {
             let name_match = entry.name.to_lowercase().contains(&q);
             let notes_match = entry
                 .notes
-                .as_deref()
-                .map(|n| n.to_lowercase().contains(&q))
+                .as_ref()
+                .map(|n| n.as_str().to_lowercase().contains(&q))
                 .unwrap_or(false);
             let custom_match = entry
                 .custom_fields
@@ -192,7 +192,7 @@ impl EntryFilter {
                         }
                         match f.field_type.as_str() {
                             "text" | "email" | "url" | "phone" => {
-                                f.value.to_lowercase().contains(&q)
+                                f.value.as_str().to_lowercase().contains(&q)
                             }
                             _ => false,
                         }
@@ -201,7 +201,7 @@ impl EntryFilter {
                 .unwrap_or(false);
             let typed_value_match = searchable_typed_value_keys(&entry.entry_type)
                 .and_then(|keys| {
-                    serde_json::from_str::<serde_json::Value>(&entry.typed_value)
+                    serde_json::from_str::<serde_json::Value>(entry.typed_value.as_str())
                         .ok()
                         .map(|v| {
                             keys.iter().any(|key| {
@@ -246,8 +246,8 @@ fn searchable_typed_value_keys(entry_type: &str) -> Option<&'static [&'static st
 mod tests {
     use super::*;
     use crate::models::entry_data::CustomField;
+    use crate::secret::{EntrySecretJson, SecretString};
     use crate::store::VaultEntry;
-    use zeroize::Zeroizing;
 
     fn make_entry(entry_type: &str, typed_value_json: &str) -> VaultEntry {
         VaultEntry {
@@ -259,7 +259,7 @@ mod tests {
             purged_at: None,
             is_favorite: false,
             label_ids: vec![],
-            typed_value: Zeroizing::new(typed_value_json.to_string()),
+            typed_value: EntrySecretJson::from_string(typed_value_json.to_string()),
             notes: None,
             custom_fields: None,
         }
@@ -356,7 +356,7 @@ mod tests {
             id: "cf1".to_string(),
             name: "Security Question".to_string(),
             field_type: "text".to_string(),
-            value: "My pet name is Max".to_string(),
+            value: SecretString::from_string("My pet name is Max".to_string()),
         }]);
         assert!(search_filter("Max").matches(&entry));
     }
@@ -369,7 +369,7 @@ mod tests {
             id: "cf1".to_string(),
             name: "API Key".to_string(),
             field_type: "password".to_string(),
-            value: "sk-abc123secret".to_string(),
+            value: SecretString::from_string("sk-abc123secret".to_string()),
         }]);
         assert!(!search_filter("abc123secret").matches(&entry));
         assert!(search_filter("API Key").matches(&entry)); // name is still searchable
@@ -383,7 +383,7 @@ mod tests {
             id: "cf1".to_string(),
             name: "Recovery Email".to_string(),
             field_type: "email".to_string(),
-            value: "recovery@example.com".to_string(),
+            value: SecretString::from_string("recovery@example.com".to_string()),
         }]);
         assert!(search_filter("recovery@example").matches(&entry));
     }
@@ -396,7 +396,7 @@ mod tests {
             id: "cf1".to_string(),
             name: "TOTP".to_string(),
             field_type: "totp".to_string(),
-            value: "JBSWY3DPEHPK3PXP".to_string(),
+            value: SecretString::from_string("JBSWY3DPEHPK3PXP".to_string()),
         }]);
         assert!(!search_filter("JBSWY3DPEHPK3PXP").matches(&entry));
     }
@@ -409,7 +409,7 @@ mod tests {
             id: "cf1".to_string(),
             name: "Custom".to_string(),
             field_type: "future_type".to_string(),
-            value: "some value".to_string(),
+            value: SecretString::from_string("some value".to_string()),
         }]);
         assert!(!search_filter("some value").matches(&entry));
     }
@@ -433,7 +433,9 @@ mod tests {
     #[test]
     fn test_search_notes_still_works() {
         let mut entry = make_entry("login", r#"{"url":"","username":"","password":""}"#);
-        entry.notes = Some("Remember to update quarterly".to_string());
+        entry.notes = Some(SecretString::from_string(
+            "Remember to update quarterly".to_string(),
+        ));
         assert!(search_filter("quarterly").matches(&entry));
     }
 }

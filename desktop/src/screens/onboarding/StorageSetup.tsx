@@ -64,8 +64,20 @@ export default function StorageSetup() {
     try {
       const vaultExists = await downloadVault(JSON.stringify(config))
       if (vaultExists) {
+        setRegion('')
+        setBucket('')
+        setKey('vault.json')
+        setAccessKeyId('')
+        setSecretAccessKey('')
+        setEndpoint('')
         navigate('/onb/unlock-existing')
       } else {
+        setRegion('')
+        setBucket('')
+        setKey('vault.json')
+        setAccessKeyId('')
+        setSecretAccessKey('')
+        setEndpoint('')
         navigate('/onb/password')
       }
     } catch (err) {

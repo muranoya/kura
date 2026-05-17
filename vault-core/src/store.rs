@@ -1,7 +1,7 @@
+use crate::secret::{EntrySecretJson, SecretString};
 /// Data structures for vault.json serialization/deserialization
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use zeroize::Zeroizing;
 
 /// Top-level vault.json structure stored in S3
 /// schema_version and meta are in plaintext, encrypted_vault is AES-256-GCM encrypted
@@ -47,11 +47,10 @@ pub struct VaultEntry {
     pub purged_at: Option<i64>,
     pub is_favorite: bool,
     pub label_ids: Vec<String>,
-    /// Stored as `Zeroizing<String>` (raw JSON) for automatic memory zeroization on drop.
+    /// Stored as `EntrySecretJson` (raw JSON, automatically zeroized on drop).
     /// In the domain layer (`EntryData`), this is represented as `serde_json::Value`.
-    #[serde(with = "crate::raw_json_serde")]
-    pub typed_value: Zeroizing<String>,
-    pub notes: Option<String>,
+    pub typed_value: EntrySecretJson,
+    pub notes: Option<SecretString>,
     pub custom_fields: Option<Vec<crate::models::entry_data::CustomField>>,
 }
 
@@ -152,7 +151,7 @@ mod tests {
         let fields = entry.custom_fields.as_ref().unwrap();
         assert_eq!(fields.len(), 2);
         assert_eq!(fields[0].field_type, "date");
-        assert_eq!(fields[0].value, "2000-01-01");
+        assert_eq!(fields[0].value.as_str(), "2000-01-01");
         assert_eq!(fields[1].field_type, "text");
     }
 

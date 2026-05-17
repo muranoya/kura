@@ -1,5 +1,6 @@
 use crate::error::{Result, VaultError};
 use crate::models::{Entry, EntryData, EntryFilter, SortField, SortOrder};
+use crate::secret::EntrySecretJson;
 use crate::store::VaultEntry;
 
 use super::UnlockedVault;
@@ -55,7 +56,7 @@ impl UnlockedVault {
             purged_at: None,
             is_favorite: false,
             label_ids: label_ids.clone(),
-            typed_value: zeroize::Zeroizing::new(data.typed_value.to_string()),
+            typed_value: EntrySecretJson::from_string(data.typed_value.to_string()),
             notes: data.notes.clone(),
             custom_fields: data.custom_fields.clone(),
         };
@@ -90,7 +91,7 @@ impl UnlockedVault {
         }
 
         entry.name = name;
-        entry.typed_value = zeroize::Zeroizing::new(data.typed_value.to_string());
+        entry.typed_value = EntrySecretJson::from_string(data.typed_value.to_string());
         entry.notes = data.notes.clone();
         entry.custom_fields = data.custom_fields.clone();
         entry.updated_at = crate::get_timestamp();
@@ -169,7 +170,7 @@ impl UnlockedVault {
         entry.purged_at = Some(now);
         entry.updated_at = now;
         entry.name = String::new();
-        entry.typed_value = zeroize::Zeroizing::new("{}".to_string());
+        entry.typed_value = EntrySecretJson::from_string("{}".to_string());
         entry.notes = None;
         entry.custom_fields = None;
         entry.label_ids.clear();
@@ -201,12 +202,14 @@ mod tests {
     use super::*;
     use crate::crypto::Dek;
     use crate::models::{Argon2Params, SortField, SortOrder, VaultMeta};
+    use crate::secret::SecretString;
     use crate::store::VaultContents;
 
     fn make_vault() -> UnlockedVault {
         let dek = Dek::generate();
         let params = Argon2Params::default();
-        let kek = crate::crypto::kdf::derive_kek("test", &params).unwrap();
+        let password = crate::secret::MasterPassword::from_string("test".to_string());
+        let kek = crate::crypto::kdf::derive_kek_from_master_password(&password, &params).unwrap();
         let meta = VaultMeta::new(dek.wrap(&kek).unwrap(), dek.wrap(&kek).unwrap(), params);
         UnlockedVault {
             meta,
@@ -238,7 +241,7 @@ mod tests {
                 purged_at: None,
                 is_favorite: false,
                 label_ids: vec![],
-                typed_value: zeroize::Zeroizing::new(data.typed_value.to_string()),
+                typed_value: EntrySecretJson::from_string(data.typed_value.to_string()),
                 notes: None,
                 custom_fields: None,
             },
@@ -292,7 +295,7 @@ mod tests {
                 purged_at: None,
                 is_favorite: false,
                 label_ids: vec![],
-                typed_value: zeroize::Zeroizing::new(data.typed_value.to_string()),
+                typed_value: EntrySecretJson::from_string(data.typed_value.to_string()),
                 notes: None,
                 custom_fields: None,
             },
@@ -431,7 +434,7 @@ mod tests {
             Some("https://updated.com".into()),
             "newuser".into(),
             "newpass".into(),
-            Some("notes".into()),
+            Some(SecretString::from_string("notes".to_string())),
         );
         vault
             .update_entry("e1", "Updated".into(), new_data)
@@ -439,7 +442,7 @@ mod tests {
 
         let entry = vault.get_entry("e1").unwrap().unwrap();
         assert_eq!(entry.name, "Updated");
-        assert_eq!(entry.data.notes, Some("notes".into()));
+        assert_eq!(entry.data.notes.as_ref().map(|n| n.as_str()), Some("notes"));
         assert!(entry.updated_at > entry.created_at);
     }
 
@@ -501,7 +504,7 @@ mod tests {
         assert!(ve.deleted_at.is_some());
         assert!(ve.purged_at.is_some());
         assert!(ve.name.is_empty());
-        assert_eq!(&*ve.typed_value, "{}");
+        assert_eq!(ve.typed_value.as_str(), "{}");
         assert!(ve.notes.is_none());
         assert!(ve.custom_fields.is_none());
         assert!(ve.label_ids.is_empty());
@@ -548,7 +551,7 @@ mod tests {
                 purged_at: None,
                 is_favorite: false,
                 label_ids: vec![],
-                typed_value: zeroize::Zeroizing::new(note_data.typed_value.to_string()),
+                typed_value: EntrySecretJson::from_string(note_data.typed_value.to_string()),
                 notes: None,
                 custom_fields: None,
             },
@@ -670,9 +673,9 @@ mod tests {
 /// Helper function to convert VaultEntry to Entry
 pub(crate) fn vault_entry_to_entry(id: String, e: &VaultEntry) -> Result<Entry> {
     // Convert typed_value back to EntryData
-    // Zeroizing<String> contains JSON that needs to be parsed
+    // EntrySecretJson contains raw JSON string that needs to be parsed
     let typed_value: serde_json::Value =
-        serde_json::from_str(e.typed_value.as_ref()).map_err(|err| {
+        serde_json::from_str(e.typed_value.as_str()).map_err(|err| {
             VaultError::InvalidInput(format!("Corrupted typed_value for entry {}: {}", id, err))
         })?;
 

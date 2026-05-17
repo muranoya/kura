@@ -353,6 +353,7 @@ export default function Settings() {
         throw new Error(t('settings.transferDialog.errorMissing'))
       }
       const result = await commands.encryptTransferConfig(transferPassword, configJson)
+      setTransferPassword('')
       setTransferString(result)
     } catch (err: unknown) {
       setTransferError(
@@ -941,7 +942,16 @@ export default function Settings() {
       </Dialog>
 
       {/* リカバリーキー表示ダイアログ */}
-      <Dialog open={recoveryKeyDisplayOpen} onOpenChange={setRecoveryKeyDisplayOpen}>
+      <Dialog
+        open={recoveryKeyDisplayOpen}
+        onOpenChange={(open) => {
+          setRecoveryKeyDisplayOpen(open)
+          if (!open) {
+            setRecoveryKeyDisplayValue('')
+            setRecoveryKeyCopied(false)
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('settings.recoveryKeyDialog.title')}</DialogTitle>

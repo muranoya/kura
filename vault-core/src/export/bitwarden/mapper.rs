@@ -28,7 +28,7 @@ fn map_custom_fields(entry: &Entry) -> Vec<BitwardenField> {
                 .iter()
                 .map(|f| BitwardenField {
                     name: f.name.clone(),
-                    value: f.value.clone(),
+                    value: f.value.as_str().to_string(),
                     field_type: map_custom_field_type(&f.field_type),
                 })
                 .collect()
@@ -54,11 +54,11 @@ fn extract_totp(entry: &Entry) -> (Option<String>, Vec<BitwardenField>) {
     if let Some(custom_fields) = &entry.data.custom_fields {
         for f in custom_fields {
             if f.field_type == "totp" && totp.is_none() {
-                totp = Some(f.value.clone());
+                totp = Some(f.value.as_str().to_string());
             } else {
                 fields.push(BitwardenField {
                     name: f.name.clone(),
-                    value: f.value.clone(),
+                    value: f.value.as_str().to_string(),
                     field_type: map_custom_field_type(&f.field_type),
                 });
             }
@@ -85,7 +85,7 @@ fn map_login(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
         folder_id,
         item_type: BITWARDEN_TYPE_LOGIN,
         name: entry.name.clone(),
-        notes: entry.data.notes.clone(),
+        notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
         favorite: entry.is_favorite,
         login: Some(BitwardenLogin {
             uris,
@@ -115,7 +115,7 @@ fn map_password(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
         folder_id,
         item_type: BITWARDEN_TYPE_LOGIN,
         name: entry.name.clone(),
-        notes: entry.data.notes.clone(),
+        notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
         favorite: entry.is_favorite,
         login: Some(BitwardenLogin {
             uris: None,
@@ -172,7 +172,7 @@ fn map_credit_card(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
         folder_id,
         item_type: BITWARDEN_TYPE_CARD,
         name: entry.name.clone(),
-        notes: entry.data.notes.clone(),
+        notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
         favorite: entry.is_favorite,
         login: None,
         secure_note: None,
@@ -202,9 +202,9 @@ fn map_secure_note(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
     // SecureNote: content goes into notes. If entry already has notes, combine them.
     let content = get_opt_str(tv, "content");
     let notes = match (&entry.data.notes, &content) {
-        (Some(n), Some(c)) => Some(format!("{}\n\n{}", c, n)),
+        (Some(n), Some(c)) => Some(format!("{}\n\n{}", c, n.as_str())),
         (None, Some(c)) => Some(c.clone()),
-        (Some(n), None) => Some(n.clone()),
+        (Some(n), None) => Some(n.as_str().to_string()),
         (None, None) => None,
     };
 
@@ -270,7 +270,7 @@ fn map_bank(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
         folder_id,
         item_type: BITWARDEN_TYPE_SECURE_NOTE,
         name: entry.name.clone(),
-        notes: entry.data.notes.clone(),
+        notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
         favorite: entry.is_favorite,
         login: None,
         secure_note: Some(BitwardenSecureNote {
@@ -307,7 +307,7 @@ fn map_ssh_key(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
         folder_id,
         item_type: BITWARDEN_TYPE_SECURE_NOTE,
         name: entry.name.clone(),
-        notes: entry.data.notes.clone(),
+        notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
         favorite: entry.is_favorite,
         login: None,
         secure_note: Some(BitwardenSecureNote {
@@ -344,7 +344,7 @@ fn map_software_license(entry: &Entry, folder_id: Option<String>) -> BitwardenIt
         folder_id,
         item_type: BITWARDEN_TYPE_SECURE_NOTE,
         name: entry.name.clone(),
-        notes: entry.data.notes.clone(),
+        notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
         favorite: entry.is_favorite,
         login: None,
         secure_note: Some(BitwardenSecureNote {
@@ -391,7 +391,7 @@ fn map_unknown(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
         folder_id,
         item_type: BITWARDEN_TYPE_SECURE_NOTE,
         name: entry.name.clone(),
-        notes: entry.data.notes.clone(),
+        notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
         favorite: entry.is_favorite,
         login: None,
         secure_note: Some(BitwardenSecureNote {
@@ -464,7 +464,9 @@ mod tests {
             Some("https://example.com".into()),
             "user@example.com".into(),
             "secret123".into(),
-            Some("my notes".into()),
+            Some(crate::secret::SecretString::from_string(
+                "my notes".to_string(),
+            )),
         );
         let entry = make_entry("login", "Example Login", data, vec![]);
         let item = map_entry(&entry, None);
@@ -493,13 +495,15 @@ mod tests {
                 id: "cf1".to_string(),
                 name: "TOTP".to_string(),
                 field_type: "totp".to_string(),
-                value: "otpauth://totp/test?secret=ABC".to_string(),
+                value: crate::secret::SecretString::from_string(
+                    "otpauth://totp/test?secret=ABC".to_string(),
+                ),
             },
             CustomField {
                 id: "cf2".to_string(),
                 name: "Extra".to_string(),
                 field_type: "text".to_string(),
-                value: "some value".to_string(),
+                value: crate::secret::SecretString::from_string("some value".to_string()),
             },
         ]);
         let entry = make_entry("login", "With TOTP", data, vec![]);
@@ -578,8 +582,12 @@ mod tests {
 
     #[test]
     fn test_map_secure_note() {
-        let data =
-            EntryData::new_secure_note("Important content".into(), Some("extra notes".into()));
+        let data = EntryData::new_secure_note(
+            "Important content".into(),
+            Some(crate::secret::SecretString::from_string(
+                "extra notes".to_string(),
+            )),
+        );
         let entry = make_entry("secure_note", "My Note", data, vec![]);
         let item = map_entry(&entry, None);
 

@@ -61,6 +61,7 @@ export default function UnlockExistingVault() {
       }
 
       await removeFromStorage(STORAGE_KEYS.ONBOARDING_DRAFT)
+      setPassword('')
       navigate('/entries')
     } catch (err) {
       setError(String(err) || t('onboarding.unlockExisting.invalidPassword'))

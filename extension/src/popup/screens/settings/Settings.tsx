@@ -362,6 +362,7 @@ export default function Settings() {
       if (!('transferString' in response) || !response.transferString) {
         throw new Error(t('settings.storage.transferCodeEmpty'))
       }
+      setTransferPassword('')
       setTransferString(response.transferString)
     } catch (err) {
       setTransferError(err instanceof Error ? err.message : String(err))
@@ -835,7 +836,16 @@ export default function Settings() {
       </Dialog>
 
       {/* リカバリーキー表示ダイアログ */}
-      <Dialog open={recoveryKeyDisplayOpen} onOpenChange={setRecoveryKeyDisplayOpen}>
+      <Dialog
+        open={recoveryKeyDisplayOpen}
+        onOpenChange={(open) => {
+          setRecoveryKeyDisplayOpen(open)
+          if (!open) {
+            setRecoveryKeyDisplayValue('')
+            setRecoveryKeyCopied(false)
+          }
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-sm">
