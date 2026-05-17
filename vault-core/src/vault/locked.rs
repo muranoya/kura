@@ -279,9 +279,8 @@ mod tests {
 
     #[test]
     fn test_lock_unlock_preserves_data() {
+        use crate::secret::EntrySecretJson;
         use crate::store::VaultEntry;
-
-        use zeroize::Zeroizing;
 
         let (locked, _) = LockedVault::create_new(&mp(PASSWORD)).unwrap();
         let mut unlocked = locked.unlock(&mp(PASSWORD)).unwrap();
@@ -297,7 +296,7 @@ mod tests {
                 purged_at: None,
                 is_favorite: false,
                 label_ids: vec![],
-                typed_value: Zeroizing::new(r#"{"content":"hello"}"#.to_string()),
+                typed_value: EntrySecretJson::from_string(r#"{"content":"hello"}"#.to_string()),
                 notes: None,
                 custom_fields: None,
             },

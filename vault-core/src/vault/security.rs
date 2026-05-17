@@ -145,11 +145,10 @@ impl UnlockedVault {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vault::LockedVault;
-
+    use crate::secret::EntrySecretJson;
     use crate::secret::RecoveryKeyInput;
     use crate::store::VaultEntry;
-    use zeroize::Zeroizing;
+    use crate::vault::LockedVault;
 
     const PASSWORD: &str = "test-master-password";
 
@@ -219,7 +218,7 @@ mod tests {
                 purged_at: None,
                 is_favorite: false,
                 label_ids: vec![],
-                typed_value: Zeroizing::new(r#"{"content":"secret"}"#.to_string()),
+                typed_value: EntrySecretJson::from_string(r#"{"content":"secret"}"#.to_string()),
                 notes: None,
                 custom_fields: None,
             },

@@ -105,6 +105,7 @@ impl UnlockedVault {
 mod tests {
     use crate::crypto::Dek;
     use crate::models::{Argon2Params, VaultMeta};
+    use crate::secret::EntrySecretJson;
     use crate::store::{VaultContents, VaultEntry};
 
     fn make_vault() -> super::super::UnlockedVault {
@@ -133,7 +134,7 @@ mod tests {
                 purged_at: None,
                 is_favorite: false,
                 label_ids: vec![],
-                typed_value: zeroize::Zeroizing::new("{}".to_string()),
+                typed_value: EntrySecretJson::from_string("{}".to_string()),
                 notes: None,
                 custom_fields: None,
             },

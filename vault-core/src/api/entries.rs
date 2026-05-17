@@ -2,6 +2,7 @@ use crate::models::{EntryFilter, EntryType, SortField, SortOrder};
 use serde_json::Value;
 
 use super::{AutofillCandidate, EntryDetail, EntryRow, VaultManager};
+use crate::secret::SecretString;
 
 /// エントリタイプに応じてサブタイトルを抽出する
 fn extract_subtitle(entry_type: &str, typed_value: &Value) -> Option<String> {
@@ -99,7 +100,7 @@ impl VaultManager {
                 created_at: entry.created_at,
                 updated_at: entry.updated_at,
                 deleted_at: entry.deleted_at,
-                notes: entry.data.notes.clone(),
+                notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
                 typed_value: serde_json::to_string(&entry.data.typed_value)
                     .unwrap_or_else(|_| "{}".to_string()),
                 labels: entry.labels,
@@ -137,7 +138,7 @@ impl VaultManager {
         let data = crate::models::EntryData {
             entry_type: entry_type.clone(),
             typed_value,
-            notes,
+            notes: notes.map(SecretString::from_string),
             custom_fields,
         };
 
@@ -187,7 +188,7 @@ impl VaultManager {
                 if n.is_empty() {
                     None
                 } else {
-                    Some(n)
+                    Some(SecretString::from_string(n))
                 }
             } else {
                 current.data.notes.clone()
