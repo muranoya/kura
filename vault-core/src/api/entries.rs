@@ -1,22 +1,47 @@
-use crate::models::{entry_data::CustomFieldType, EntryFilter, EntryType, SortField, SortOrder};
-use serde_json::Value;
+use crate::models::{
+    entry_data::CustomFieldType, EntryFilter, EntryType, SortField, SortOrder, TypedValue,
+};
 
 use super::{AutofillCandidate, EntryDetail, EntryRow, VaultManager};
 use crate::secret::SecretString;
 
 /// エントリタイプに応じてサブタイトルを抽出する
-fn extract_subtitle(entry_type: &str, typed_value: &Value) -> Option<String> {
-    let key = match entry_type {
-        "login" | "password" => "username",
-        "bank" => "bank_name",
-        "credit_card" => "cardholder",
-        _ => return None,
-    };
-    typed_value
-        .get(key)
-        .and_then(|v| v.as_str())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
+fn extract_subtitle(typed_value: &TypedValue) -> Option<String> {
+    match typed_value {
+        TypedValue::Login(d) => {
+            let username = d.username.as_str();
+            if username.is_empty() {
+                None
+            } else {
+                Some(username.to_string())
+            }
+        }
+        TypedValue::Password(d) => {
+            let username = d.username.as_str();
+            if username.is_empty() {
+                None
+            } else {
+                Some(username.to_string())
+            }
+        }
+        TypedValue::Bank(d) => {
+            let bank_name = d.bank_name.as_str();
+            if bank_name.is_empty() {
+                None
+            } else {
+                Some(bank_name.to_string())
+            }
+        }
+        TypedValue::CreditCard(d) => {
+            let cardholder = d.cardholder.as_str();
+            if cardholder.is_empty() {
+                None
+            } else {
+                Some(cardholder.to_string())
+            }
+        }
+        _ => None,
+    }
 }
 
 impl VaultManager {
@@ -63,7 +88,7 @@ impl VaultManager {
             Ok(entries
                 .into_iter()
                 .map(|entry| {
-                    let subtitle = extract_subtitle(&entry.entry_type, &entry.data.typed_value);
+                    let subtitle = extract_subtitle(&entry.data.typed_value);
                     EntryRow {
                         id: entry.id,
                         entry_type: entry.entry_type,
@@ -119,12 +144,16 @@ impl VaultManager {
         label_ids: Vec<String>,
         custom_fields_json: Option<String>,
     ) -> Result<String, String> {
-        let typed_value: Value = serde_json::from_str(&typed_value_json)
+        // Validate JSON format
+        serde_json::from_str::<serde_json::Value>(&typed_value_json)
             .map_err(|e| format!("Invalid typed_value JSON: {}", e))?;
 
         // Validate that the entry type is known (refuse to create unknown types)
         EntryType::from_str(&entry_type)
             .ok_or_else(|| format!("Invalid entry type: {}", entry_type))?;
+
+        let typed_value = TypedValue::parse(&entry_type, &typed_value_json)
+            .map_err(|e| format!("Failed to parse typed_value: {}", e))?;
 
         let custom_fields = if let Some(json) = custom_fields_json {
             let fields: Vec<crate::models::entry_data::CustomField> =
@@ -132,9 +161,8 @@ impl VaultManager {
                     .map_err(|e| format!("Invalid custom_fields JSON: {}", e))?;
             // Validate that all custom field types are known
             for field in &fields {
-                CustomFieldType::from_str(&field.field_type).ok_or_else(|| {
-                    format!("Invalid field type: {}", field.field_type)
-                })?;
+                CustomFieldType::from_str(&field.field_type)
+                    .ok_or_else(|| format!("Invalid field type: {}", field.field_type))?;
             }
             Some(fields)
         } else {
@@ -174,8 +202,11 @@ impl VaultManager {
                 .ok_or_else(|| format!("Entry not found: {}", id))?;
 
             let typed_value = if let Some(json) = typed_value_json {
-                serde_json::from_str(&json)
-                    .map_err(|e| format!("Invalid typed_value JSON: {}", e))?
+                // Validate JSON format
+                serde_json::from_str::<serde_json::Value>(&json)
+                    .map_err(|e| format!("Invalid typed_value JSON: {}", e))?;
+                TypedValue::parse(&current.entry_type, &json)
+                    .map_err(|e| format!("Failed to parse typed_value: {}", e))?
             } else {
                 current.data.typed_value.clone()
             };
@@ -275,29 +306,34 @@ impl VaultManager {
 
             Ok(entries
                 .into_iter()
-                .filter_map(|entry| {
-                    let url = entry
-                        .data
-                        .typed_value
-                        .get("url")
-                        .and_then(|v| v.as_str())
-                        .filter(|s| !s.is_empty())
-                        .map(|s| s.to_string())?;
+                .filter_map(|entry| match &entry.data.typed_value {
+                    TypedValue::Login(d) => {
+                        let url = d.url.as_ref().and_then(|u| {
+                            let url_str = u.as_str();
+                            if url_str.is_empty() {
+                                None
+                            } else {
+                                Some(url_str.to_string())
+                            }
+                        })?;
 
-                    let username = entry
-                        .data
-                        .typed_value
-                        .get("username")
-                        .and_then(|v| v.as_str())
-                        .filter(|s| !s.is_empty())
-                        .map(|s| s.to_string());
+                        let username = {
+                            let username_str = d.username.as_str();
+                            if username_str.is_empty() {
+                                None
+                            } else {
+                                Some(username_str.to_string())
+                            }
+                        };
 
-                    Some(AutofillCandidate {
-                        id: entry.id,
-                        name: entry.name,
-                        url,
-                        username,
-                    })
+                        Some(AutofillCandidate {
+                            id: entry.id,
+                            name: entry.name,
+                            url,
+                            username,
+                        })
+                    }
+                    _ => None,
                 })
                 .collect())
         })

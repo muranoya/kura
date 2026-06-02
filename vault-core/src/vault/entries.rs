@@ -1,5 +1,5 @@
 use crate::error::{Result, VaultError};
-use crate::models::{Entry, EntryData, EntryFilter, SortField, SortOrder};
+use crate::models::{Entry, EntryData, EntryFilter, SortField, SortOrder, TypedValue};
 use crate::secret::EntrySecretJson;
 use crate::store::VaultEntry;
 
@@ -56,7 +56,7 @@ impl UnlockedVault {
             purged_at: None,
             is_favorite: false,
             label_ids: label_ids.clone(),
-            typed_value: EntrySecretJson::from_string(data.typed_value.to_string()),
+            typed_value: EntrySecretJson::from_string(data.typed_value.to_json_string()),
             notes: data.notes.clone(),
             custom_fields: data.custom_fields.clone(),
         };
@@ -91,7 +91,7 @@ impl UnlockedVault {
         }
 
         entry.name = name;
-        entry.typed_value = EntrySecretJson::from_string(data.typed_value.to_string());
+        entry.typed_value = EntrySecretJson::from_string(data.typed_value.to_json_string());
         entry.notes = data.notes.clone();
         entry.custom_fields = data.custom_fields.clone();
         entry.updated_at = crate::get_timestamp();
@@ -241,7 +241,7 @@ mod tests {
                 purged_at: None,
                 is_favorite: false,
                 label_ids: vec![],
-                typed_value: EntrySecretJson::from_string(data.typed_value.to_string()),
+                typed_value: EntrySecretJson::from_string(data.typed_value.to_json_string()),
                 notes: None,
                 custom_fields: None,
             },
@@ -295,7 +295,7 @@ mod tests {
                 purged_at: None,
                 is_favorite: false,
                 label_ids: vec![],
-                typed_value: EntrySecretJson::from_string(data.typed_value.to_string()),
+                typed_value: EntrySecretJson::from_string(data.typed_value.to_json_string()),
                 notes: None,
                 custom_fields: None,
             },
@@ -517,6 +517,197 @@ mod tests {
     }
 
     #[test]
+    fn test_purge_entry_clears_notes() {
+        let mut vault = make_vault();
+        let data = EntryData::new_login(
+            Some("https://example.com".into()),
+            "user".into(),
+            "pass".into(),
+            Some(SecretString::from_string("secret note".to_string())),
+        );
+        vault
+            .create_entry("TestWithNotes".into(), "login".to_string(), data, vec![])
+            .unwrap();
+
+        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entry_id = entries[0].clone();
+
+        vault.purge_entry(&entry_id).unwrap();
+
+        let ve = &vault.contents.entries[&entry_id];
+        assert!(ve.notes.is_none());
+        assert_eq!(ve.typed_value.as_str(), "{}");
+    }
+
+    #[test]
+    fn test_purge_entry_clears_custom_fields() {
+        let mut vault = make_vault();
+        let mut data = EntryData::new_login(
+            Some("https://example.com".into()),
+            "user".into(),
+            "pass".into(),
+            None,
+        );
+        data.custom_fields = Some(vec![crate::models::CustomField {
+            id: "f1".to_string(),
+            name: "Custom".to_string(),
+            field_type: "text".to_string(),
+            value: SecretString::from_string("value".to_string()),
+        }]);
+
+        vault
+            .create_entry("TestWithFields".into(), "login".to_string(), data, vec![])
+            .unwrap();
+
+        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entry_id = entries[0].clone();
+
+        vault.purge_entry(&entry_id).unwrap();
+
+        let ve = &vault.contents.entries[&entry_id];
+        assert!(ve.custom_fields.is_none());
+        assert_eq!(ve.typed_value.as_str(), "{}");
+    }
+
+    #[test]
+    fn test_purge_bank_entry() {
+        let mut vault = make_vault();
+        let data = EntryData::new_bank(
+            "Bank Name".to_string(),
+            "Account Holder".to_string(),
+            "001".to_string(),
+            "Checking".to_string(),
+            "1234567890".to_string(),
+            "1234".to_string(),
+            None,
+        );
+        vault
+            .create_entry("BankAccount".into(), "bank".to_string(), data, vec![])
+            .unwrap();
+
+        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entry_id = entries[0].clone();
+
+        vault.purge_entry(&entry_id).unwrap();
+
+        let ve = &vault.contents.entries[&entry_id];
+        assert!(ve.deleted_at.is_some());
+        assert!(ve.purged_at.is_some());
+        assert!(ve.name.is_empty());
+        assert_eq!(ve.typed_value.as_str(), "{}");
+        assert!(ve.notes.is_none());
+        assert!(ve.custom_fields.is_none());
+        assert!(ve.label_ids.is_empty());
+    }
+
+    #[test]
+    fn test_purge_ssh_key_entry() {
+        let mut vault = make_vault();
+        let data = EntryData::new_ssh_key(
+            "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkq\n-----END PRIVATE KEY-----".to_string(),
+            None,
+        );
+        vault
+            .create_entry("SSHKey".into(), "ssh_key".to_string(), data, vec![])
+            .unwrap();
+
+        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entry_id = entries[0].clone();
+
+        vault.purge_entry(&entry_id).unwrap();
+
+        let ve = &vault.contents.entries[&entry_id];
+        assert_eq!(ve.typed_value.as_str(), "{}");
+    }
+
+    #[test]
+    fn test_purge_secure_note_entry() {
+        let mut vault = make_vault();
+        let data = EntryData::new_secure_note("Secret note content".to_string(), None);
+        vault
+            .create_entry("SecureNote".into(), "secure_note".to_string(), data, vec![])
+            .unwrap();
+
+        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entry_id = entries[0].clone();
+
+        vault.purge_entry(&entry_id).unwrap();
+
+        let ve = &vault.contents.entries[&entry_id];
+        assert_eq!(ve.typed_value.as_str(), "{}");
+    }
+
+    #[test]
+    fn test_purge_credit_card_entry() {
+        let mut vault = make_vault();
+        let data = EntryData::new_credit_card(
+            "John Doe".to_string(),
+            "4532015112830366".to_string(),
+            "12/25".to_string(),
+            "123".to_string(),
+            "5678".to_string(),
+            None,
+        );
+        vault
+            .create_entry("CreditCard".into(), "credit_card".to_string(), data, vec![])
+            .unwrap();
+
+        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entry_id = entries[0].clone();
+
+        vault.purge_entry(&entry_id).unwrap();
+
+        let ve = &vault.contents.entries[&entry_id];
+        assert_eq!(ve.typed_value.as_str(), "{}");
+    }
+
+    #[test]
+    fn test_purge_password_entry() {
+        let mut vault = make_vault();
+        let data = EntryData::new_password(
+            "username123".to_string(),
+            "securepassword".to_string(),
+            None,
+        );
+        vault
+            .create_entry("Password".into(), "password".to_string(), data, vec![])
+            .unwrap();
+
+        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entry_id = entries[0].clone();
+
+        vault.purge_entry(&entry_id).unwrap();
+
+        let ve = &vault.contents.entries[&entry_id];
+        assert_eq!(ve.typed_value.as_str(), "{}");
+    }
+
+    #[test]
+    fn test_purge_software_license_entry() {
+        let mut vault = make_vault();
+        let data = EntryData::new_software_license(
+            "XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX".to_string(),
+            None,
+        );
+        vault
+            .create_entry(
+                "SoftwareLicense".into(),
+                "software_license".to_string(),
+                data,
+                vec![],
+            )
+            .unwrap();
+
+        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entry_id = entries[0].clone();
+
+        vault.purge_entry(&entry_id).unwrap();
+
+        let ve = &vault.contents.entries[&entry_id];
+        assert_eq!(ve.typed_value.as_str(), "{}");
+    }
+
+    #[test]
     fn test_set_favorite() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "Test", 1000);
@@ -551,7 +742,7 @@ mod tests {
                 purged_at: None,
                 is_favorite: false,
                 label_ids: vec![],
-                typed_value: EntrySecretJson::from_string(note_data.typed_value.to_string()),
+                typed_value: EntrySecretJson::from_string(note_data.typed_value.to_json_string()),
                 notes: None,
                 custom_fields: None,
             },
@@ -674,10 +865,9 @@ mod tests {
 pub(crate) fn vault_entry_to_entry(id: String, e: &VaultEntry) -> Result<Entry> {
     // Convert typed_value back to EntryData
     // EntrySecretJson contains raw JSON string that needs to be parsed
-    let typed_value: serde_json::Value =
-        serde_json::from_str(e.typed_value.as_str()).map_err(|err| {
-            VaultError::InvalidInput(format!("Corrupted typed_value for entry {}: {}", id, err))
-        })?;
+    let typed_value = TypedValue::parse(&e.entry_type, e.typed_value.as_str()).map_err(|err| {
+        VaultError::InvalidInput(format!("Invalid typed_value for entry {}: {:?}", id, err))
+    })?;
 
     let data = EntryData {
         entry_type: e.entry_type.clone(),

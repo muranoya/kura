@@ -92,17 +92,18 @@ fn test_entry_encryption_decryption() {
         .expect("Entry not found");
 
     // Check that the decrypted content matches original
-    if let vault_core::serde_json::Value::Object(ref retrieved_obj) = retrieved.data.typed_value {
-        if let Some(vault_core::serde_json::Value::String(content)) = retrieved_obj.get("content") {
+    use vault_core::models::TypedValue;
+    match &retrieved.data.typed_value {
+        TypedValue::SecureNote(d) => {
             assert_eq!(
-                content, original_content,
+                d.content.as_str(),
+                original_content,
                 "Content should match after encryption/decryption"
             );
-        } else {
-            panic!("Content field not found or not a string");
         }
-    } else {
-        panic!("Expected object value");
+        _ => {
+            panic!("Expected SecureNote type");
+        }
     }
 }
 

@@ -1,3 +1,4 @@
+use crate::models::TypedValue;
 use crate::store::VaultEntry;
 
 use super::onepux::types::ParsedItem;
@@ -97,20 +98,20 @@ fn check_high_confidence(
         return None;
     }
 
-    let typed_value: serde_json::Value = serde_json::from_str(entry.typed_value.as_ref()).ok()?;
+    let typed_value = TypedValue::parse(target_type, entry.typed_value.as_ref()).ok()?;
 
-    match target_type {
-        "login" | "password" => {
-            let entry_url = typed_value.get("url").and_then(|v| v.as_str());
-            let entry_username = typed_value.get("username").and_then(|v| v.as_str());
+    match &typed_value {
+        TypedValue::Login(d) => {
+            let entry_url = d.url.as_ref().map(|u| u.as_str());
+            let entry_username = d.username.as_str();
 
             let item_domain = item.url.as_deref().and_then(|u| extract_domain(u));
             let entry_domain = entry_url.and_then(|u| extract_domain(u));
 
             if let (Some(id), Some(ed)) = (&item_domain, &entry_domain) {
                 if id == ed {
-                    if let (Some(iu), Some(eu)) = (&item.username, entry_username) {
-                        if iu == eu {
+                    if let Some(iu) = &item.username {
+                        if iu == entry_username && !entry_username.is_empty() {
                             return Some(format!("URL + ユーザー名一致: {}@{}", iu, id));
                         }
                     }
@@ -118,15 +119,19 @@ fn check_high_confidence(
             }
             None
         }
-        "credit_card" => {
-            let entry_number = typed_value
-                .get("number")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            let entry_holder = typed_value
-                .get("cardholder")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+        TypedValue::Password(d) => {
+            let entry_username = d.username.as_str();
+
+            if let Some(iu) = &item.username {
+                if iu == entry_username && !entry_username.is_empty() {
+                    return Some(format!("ユーザー名一致: {}", iu));
+                }
+            }
+            None
+        }
+        TypedValue::CreditCard(d) => {
+            let entry_number = d.number.as_str();
+            let entry_holder = d.cardholder.as_str();
 
             let item_number =
                 find_field(item, &["card number", "number", "ccnum"]).unwrap_or_default();
@@ -145,15 +150,9 @@ fn check_high_confidence(
             }
             None
         }
-        "bank" => {
-            let entry_account = typed_value
-                .get("account_number")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            let entry_branch = typed_value
-                .get("branch_code")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+        TypedValue::Bank(d) => {
+            let entry_account = d.account_number.as_str();
+            let entry_branch = d.branch_code.as_str();
 
             let item_account = find_field(item, &["account number"]).unwrap_or_default();
             let item_branch = find_field(item, &["routing number", "branch code", "sort code"])
@@ -168,11 +167,8 @@ fn check_high_confidence(
             }
             None
         }
-        "ssh_key" => {
-            let entry_key = typed_value
-                .get("private_key")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+        TypedValue::SshKey(d) => {
+            let entry_key = d.private_key.as_str();
             let item_key = find_field(item, &["private key"]).unwrap_or_default();
 
             let entry_prefix = &entry_key[..entry_key.len().min(64)];
@@ -183,11 +179,8 @@ fn check_high_confidence(
             }
             None
         }
-        "software_license" => {
-            let entry_key = typed_value
-                .get("license_key")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+        TypedValue::SoftwareLicense(d) => {
+            let entry_key = d.license_key.as_str();
             let item_key = find_field(item, &["license key", "reg code", "product key", "key"])
                 .unwrap_or_default();
 
@@ -260,9 +253,11 @@ pub fn extract_domain(url: &str) -> Option<String> {
 }
 
 fn get_entry_url_domain(entry: &VaultEntry) -> Option<String> {
-    let typed_value: serde_json::Value = serde_json::from_str(entry.typed_value.as_ref()).ok()?;
-    let url = typed_value.get("url").and_then(|v| v.as_str())?;
-    extract_domain(url)
+    let typed_value = TypedValue::parse(&entry.entry_type, entry.typed_value.as_ref()).ok()?;
+    match typed_value {
+        TypedValue::Login(d) => d.url.as_ref().and_then(|u| extract_domain(u.as_str())),
+        _ => None,
+    }
 }
 
 fn last_n(s: &str, n: usize) -> String {

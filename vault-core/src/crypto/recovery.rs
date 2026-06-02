@@ -1,6 +1,6 @@
-use std::fmt;
 use crate::error::{Result, VaultError};
 use crate::secret::RecoveryKeyInput;
+use std::fmt;
 
 /// Recovery Key - 128-bit random value
 /// Displayed as base32 for human readability

@@ -1,7 +1,7 @@
-use std::fmt;
 use crate::error::{Result, VaultError};
 use crate::secret::{MasterPassword, TransferPassword};
 use argon2::{Algorithm, Argon2, Params, Version};
+use std::fmt;
 use zeroize::Zeroize;
 
 /// Key Encryption Key - 32 bytes, automatically zeroized on drop

@@ -1,9 +1,9 @@
-use std::fmt;
 use crate::error::{Result, VaultError};
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
+use std::fmt;
 use zeroize::{Zeroize, Zeroizing};
 
 /// Data Encryption Key - 32 bytes, automatically zeroized on drop
