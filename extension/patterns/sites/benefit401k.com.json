@@ -1,0 +1,17 @@
+{
+  "description": "SBIベネフィット・システムズ ログインフォーム（name=txtUserID の txt プレフィックスにより heuristic で未検出）",
+  "match": {
+    "type": "domain_suffix",
+    "value": "benefit401k.com"
+  },
+  "forms": [
+    {
+      "id": "benefit401k-login",
+      "type": "login",
+      "fields": {
+        "username": { "selector": "input[name='txtUserID']" },
+        "password": { "selector": "input[name='txtPassword']" }
+      }
+    }
+  ]
+}
