@@ -1,6 +1,7 @@
 use std::path::Path;
 use vault_core::crypto::transfer::encrypt_transfer;
 use vault_core::models::CustomField;
+use vault_core::secret::{MasterPassword, PlaintextConfig, TransferPassword};
 use vault_core::{EntryData, LockedVault};
 
 /// Generate test vault fixture for manual testing of the browser extension.
@@ -12,12 +13,12 @@ use vault_core::{EntryData, LockedVault};
 #[test]
 #[ignore]
 fn generate_test_vault_fixture() {
-    let master_password = "kura-test";
+    let master_password = MasterPassword::from_string("kura-test".to_string());
 
     // Create new vault and unlock
-    let (locked, _) = LockedVault::create_new(master_password).expect("Failed to create vault");
+    let (locked, _) = LockedVault::create_new(&master_password).expect("Failed to create vault");
     let mut unlocked = locked
-        .unlock(master_password)
+        .unlock(&master_password)
         .expect("Failed to unlock vault");
 
     // Entry 1: Test Login 1
@@ -61,7 +62,7 @@ fn generate_test_vault_fixture() {
         id: "totp-field-1".to_string(),
         name: "TOTP".to_string(),
         field_type: "totp".to_string(),
-        value: "JBSWY3DPEHPK3PXP".to_string(),
+        value: vault_core::secret::SecretString::from_string("JBSWY3DPEHPK3PXP".to_string()),
     }]);
     unlocked
         .create_entry(
@@ -118,8 +119,9 @@ fn generate_test_vault_fixture() {
     println!("Generated test vault fixture at: {}", output_path.display());
 
     // Generate transfer config string for easy setup
-    let config_json = r#"{"region":"ap-northeast-1","bucket":"kura-test","key":"vault.json","accessKeyId":"minioadmin","secretAccessKey":"minioadmin","endpoint":"http://localhost:9000"}"#;
-    let transfer_string = encrypt_transfer(master_password, config_json.as_bytes())
+    let transfer_password = TransferPassword::from_string("kura-test".to_string());
+    let config_json = PlaintextConfig::from_string(r#"{"region":"ap-northeast-1","bucket":"kura-test","key":"vault.json","accessKeyId":"minioadmin","secretAccessKey":"minioadmin","endpoint":"http://localhost:9000"}"#.to_string());
+    let transfer_string = encrypt_transfer(&transfer_password, &config_json)
         .expect("Failed to encrypt transfer config");
 
     let transfer_path = Path::new(env!("CARGO_MANIFEST_DIR"))

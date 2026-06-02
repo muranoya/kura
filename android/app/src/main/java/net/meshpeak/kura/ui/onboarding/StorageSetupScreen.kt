@@ -230,6 +230,12 @@ fun StorageSetupScreen(
                                 appViewModel.preferences.saveS3Config(configJson)
 
                                 val exists = appViewModel.repository.downloadVault(configJson)
+                                region = ""
+                                bucket = ""
+                                key = "vault.json"
+                                accessKeyId = ""
+                                secretAccessKey = ""
+                                endpoint = ""
                                 if (exists) onExistingVault() else onNewVault()
                             } catch (e: Exception) {
                                 Log.e("StorageSetup", "S3 access failed", e)

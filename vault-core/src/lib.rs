@@ -4,7 +4,7 @@ pub mod crypto;
 pub mod error;
 pub mod models;
 pub mod password_gen;
-mod raw_json_serde;
+pub mod secret;
 pub mod storage;
 pub mod store;
 pub mod sync;

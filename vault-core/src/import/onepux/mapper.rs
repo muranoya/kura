@@ -1,4 +1,5 @@
 use crate::models::{CustomField, EntryData};
+use crate::secret::SecretString;
 
 use super::types::{ParsedFieldValue, ParsedItem};
 
@@ -145,7 +146,7 @@ fn map_to_credit_card(item: &ParsedItem) -> (EntryData, Option<String>) {
 
 fn map_to_secure_note(item: &ParsedItem) -> (EntryData, Option<String>) {
     let content = item.notes.clone().unwrap_or_default();
-    let notes: Option<String> = None;
+    let notes: Option<SecretString> = None;
 
     let custom_fields = build_all_custom_fields(item);
 
@@ -160,11 +161,7 @@ fn map_to_secure_note(item: &ParsedItem) -> (EntryData, Option<String>) {
             "\n\n[添付ファイル: {} - kuraは添付ファイルをサポートしていません]",
             item.attachment_file_name.as_deref().unwrap_or("unknown")
         );
-        if let Some(ref mut n) = data.notes {
-            n.push_str(&attachment_note);
-        } else {
-            data.notes = Some(attachment_note);
-        }
+        data.notes = Some(SecretString::from_string(attachment_note));
     }
 
     (data, None)
@@ -289,8 +286,8 @@ fn map_to_ssh_key(item: &ParsedItem) -> (EntryData, Option<String>) {
 // Helper functions
 // ============================================================================
 
-fn build_notes(item: &ParsedItem) -> Option<String> {
-    item.notes.clone()
+fn build_notes(item: &ParsedItem) -> Option<SecretString> {
+    item.notes.clone().map(SecretString::from_string)
 }
 
 /// Search by field ID first, then fall back to title matching.
@@ -344,7 +341,7 @@ fn build_all_custom_fields(item: &ParsedItem) -> Vec<CustomField> {
             id: uuid::Uuid::new_v4().to_string(),
             name: f.field_title.clone(),
             field_type: f.value.custom_field_type().to_string(),
-            value: f.value.to_string_value(),
+            value: SecretString::from_string(f.value.to_string_value()),
         })
         .collect()
 }
@@ -372,7 +369,7 @@ fn build_filtered_fields(
             id: uuid::Uuid::new_v4().to_string(),
             name: f.field_title.clone(),
             field_type: f.value.custom_field_type().to_string(),
-            value: f.value.to_string_value(),
+            value: SecretString::from_string(f.value.to_string_value()),
         })
         .collect()
 }

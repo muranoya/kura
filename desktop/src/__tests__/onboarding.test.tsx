@@ -217,6 +217,7 @@ describe('MasterPassword - validation', () => {
 describe('MasterPassword - vault creation', () => {
   it('should create vault and navigate to recovery key screen', async () => {
     mockedCommands.createVault.mockResolvedValueOnce('test-recovery-key-abc123')
+    sessionStorage.setItem('pendingS3Config', '{"region":"us-east-1"}')
     const user = userEvent.setup()
     renderOnboarding('/onb/password')
 
@@ -228,6 +229,7 @@ describe('MasterPassword - vault creation', () => {
       expect(screen.getByText('リカバリーキー')).toBeInTheDocument()
     })
     expect(mockedCommands.createVault).toHaveBeenCalledWith('test-password-123')
+    expect(sessionStorage.getItem('pendingS3Config')).toBeNull()
   })
 
   it('should show error when createVault fails', async () => {
@@ -325,6 +327,7 @@ describe('UnlockExistingVault', () => {
     mockedCommands.getVaultBytes.mockResolvedValueOnce([4, 5, 6])
     mockedCommands.writeVaultFile.mockResolvedValueOnce(undefined)
     mockedCommands.syncVaultIfConfigured.mockResolvedValueOnce(false)
+    sessionStorage.setItem('pendingS3Config', '{"region":"us-east-1"}')
 
     const reloadMock = vi.fn()
     Object.defineProperty(window, 'location', {
@@ -343,6 +346,7 @@ describe('UnlockExistingVault', () => {
       expect(mockedCommands.getVaultBytes).toHaveBeenCalled()
       expect(mockedCommands.writeVaultFile).toHaveBeenCalledWith([4, 5, 6])
     })
+    expect(sessionStorage.getItem('pendingS3Config')).toBeNull()
   })
 })
 

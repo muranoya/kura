@@ -47,6 +47,8 @@ export default function MasterPassword() {
         // 復号済みS3設定をRustプロセスメモリに保持（同期で使用）
         await commands.setS3ConfigSession(pendingConfig)
       }
+      setPassword('')
+      setConfirmPassword('')
       navigate('/onb/recovery', { state: { recoveryKey } })
     } catch (err) {
       setError(t('onboarding.masterPassword.errorGeneric', { error: String(err) }))

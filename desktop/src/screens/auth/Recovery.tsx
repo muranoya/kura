@@ -36,6 +36,9 @@ export default function Recovery({ onUnlocked }: RecoveryProps) {
     setLoading(true)
     try {
       await commands.unlockWithRecoveryKey(recoveryKey)
+      setRecoveryKey('')
+      setNewPassword('')
+      setConfirmPassword('')
       onUnlocked?.()
     } catch (err) {
       setError(t('auth.recovery.errorRecover', { error: String(err) }))

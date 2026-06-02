@@ -42,6 +42,7 @@ export default function UnlockExistingVault({ onUnlocked }: UnlockExistingVaultP
       const vaultBytes = await commands.getVaultBytes()
       await commands.writeVaultFile(vaultBytes)
       commands.syncVaultIfConfigured().catch(() => {}) // バックグラウ���ド
+      setPassword('')
       onUnlocked?.()
     } catch (_err) {
       setError(t('onboarding.unlockExisting.errorWrongPassword'))

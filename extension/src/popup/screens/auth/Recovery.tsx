@@ -32,6 +32,9 @@ export default function Recovery() {
     setError('')
     try {
       await commands.recoverWithRecoveryKey(recoveryKey, newPassword)
+      setRecoveryKey('')
+      setNewPassword('')
+      setConfirmPassword('')
       window.location.reload()
     } catch (err) {
       setError(`${t('auth.recovery.submitting')}: ${err}`)

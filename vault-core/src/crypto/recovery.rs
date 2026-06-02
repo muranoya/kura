@@ -1,4 +1,6 @@
 use crate::error::{Result, VaultError};
+use crate::secret::RecoveryKeyInput;
+use std::fmt;
 
 /// Recovery Key - 128-bit random value
 /// Displayed as base32 for human readability
@@ -41,7 +43,7 @@ impl RecoveryKey {
 
     /// Parse from display string (with or without dashes)
     pub fn from_display_string(s: &str) -> Result<Self> {
-        let clean = s.replace('-', "").to_uppercase();
+        let clean = zeroize::Zeroizing::new(s.replace('-', "").to_uppercase());
         let bytes = crate::codec::base32::decode(&clean).ok_or(VaultError::InvalidRecoveryKey)?;
 
         if bytes.len() != 16 {
@@ -57,7 +59,15 @@ impl RecoveryKey {
     /// Derive KEK from recovery key using Argon2
     pub fn derive_kek(&self, params: &crate::models::Argon2Params) -> Result<super::Kek> {
         let recovery_key_str = zeroize::Zeroizing::new(self.to_display_string());
-        super::kdf::derive_kek(&recovery_key_str, params)
+        super::kdf::derive_kek_from_secret_bytes(recovery_key_str.as_bytes(), params)
+    }
+
+    pub(crate) fn derive_kek_from_input(
+        recovery_key: &RecoveryKeyInput,
+        params: &crate::models::Argon2Params,
+    ) -> Result<super::Kek> {
+        let recovery_key = Self::from_display_string(recovery_key.as_str())?;
+        recovery_key.derive_kek(params)
     }
 }
 
@@ -65,6 +75,12 @@ impl Drop for RecoveryKey {
     fn drop(&mut self) {
         use zeroize::Zeroize;
         self.bytes.zeroize();
+    }
+}
+
+impl fmt::Debug for RecoveryKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("RecoveryKey([REDACTED])")
     }
 }
 

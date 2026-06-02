@@ -1,4 +1,4 @@
-use crate::models::{Entry, Label};
+use crate::models::{Entry, Label, TypedValue};
 
 use super::types::*;
 
@@ -28,21 +28,12 @@ fn map_custom_fields(entry: &Entry) -> Vec<BitwardenField> {
                 .iter()
                 .map(|f| BitwardenField {
                     name: f.name.clone(),
-                    value: f.value.clone(),
+                    value: f.value.as_str().to_string(),
                     field_type: map_custom_field_type(&f.field_type),
                 })
                 .collect()
         })
         .unwrap_or_default()
-}
-
-/// Get an optional string field from typed_value JSON.
-fn get_opt_str(value: &serde_json::Value, key: &str) -> Option<String> {
-    value
-        .get(key)
-        .and_then(|v| v.as_str())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
 }
 
 /// Extract TOTP value from custom fields, removing it from the fields list.
@@ -54,11 +45,11 @@ fn extract_totp(entry: &Entry) -> (Option<String>, Vec<BitwardenField>) {
     if let Some(custom_fields) = &entry.data.custom_fields {
         for f in custom_fields {
             if f.field_type == "totp" && totp.is_none() {
-                totp = Some(f.value.clone());
+                totp = Some(f.value.as_str().to_string());
             } else {
                 fields.push(BitwardenField {
                     name: f.name.clone(),
-                    value: f.value.clone(),
+                    value: f.value.as_str().to_string(),
                     field_type: map_custom_field_type(&f.field_type),
                 });
             }
@@ -70,316 +61,542 @@ fn extract_totp(entry: &Entry) -> (Option<String>, Vec<BitwardenField>) {
 
 /// Map a kura login entry to a Bitwarden login item.
 fn map_login(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
-    let tv = &entry.data.typed_value;
     let (totp, fields) = extract_totp(entry);
 
-    let uris = get_opt_str(tv, "url").map(|url| {
-        vec![BitwardenUri {
-            uri: url,
-            match_type: None,
-        }]
-    });
+    match &entry.data.typed_value {
+        TypedValue::Login(d) => {
+            let uris = d.url.as_ref().map(|u| {
+                vec![BitwardenUri {
+                    uri: u.as_str().to_string(),
+                    match_type: None,
+                }]
+            });
 
-    BitwardenItem {
-        id: entry.id.clone(),
-        folder_id,
-        item_type: BITWARDEN_TYPE_LOGIN,
-        name: entry.name.clone(),
-        notes: entry.data.notes.clone(),
-        favorite: entry.is_favorite,
-        login: Some(BitwardenLogin {
-            uris,
-            username: get_opt_str(tv, "username"),
-            password: get_opt_str(tv, "password"),
-            totp,
-        }),
-        secure_note: None,
-        card: None,
-        fields: if fields.is_empty() {
-            None
-        } else {
-            Some(fields)
-        },
-        creation_date: unix_to_iso8601(entry.created_at),
-        revision_date: unix_to_iso8601(entry.updated_at),
+            BitwardenItem {
+                id: entry.id.clone(),
+                folder_id,
+                item_type: BITWARDEN_TYPE_LOGIN,
+                name: entry.name.clone(),
+                notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
+                favorite: entry.is_favorite,
+                login: Some(BitwardenLogin {
+                    uris,
+                    username: Some(d.username.as_str().to_string()),
+                    password: Some(d.password.as_str().to_string()),
+                    totp,
+                }),
+                secure_note: None,
+                card: None,
+                fields: if fields.is_empty() {
+                    None
+                } else {
+                    Some(fields)
+                },
+                creation_date: unix_to_iso8601(entry.created_at),
+                revision_date: unix_to_iso8601(entry.updated_at),
+            }
+        }
+        _ => {
+            // Fallback for non-login types
+            BitwardenItem {
+                id: entry.id.clone(),
+                folder_id,
+                item_type: BITWARDEN_TYPE_LOGIN,
+                name: entry.name.clone(),
+                notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
+                favorite: entry.is_favorite,
+                login: Some(BitwardenLogin {
+                    uris: None,
+                    username: None,
+                    password: None,
+                    totp,
+                }),
+                secure_note: None,
+                card: None,
+                fields: if fields.is_empty() {
+                    None
+                } else {
+                    Some(fields)
+                },
+                creation_date: unix_to_iso8601(entry.created_at),
+                revision_date: unix_to_iso8601(entry.updated_at),
+            }
+        }
     }
 }
 
 /// Map a kura password entry to a Bitwarden login item (no URI).
 fn map_password(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
-    let tv = &entry.data.typed_value;
     let fields = map_custom_fields(entry);
 
-    BitwardenItem {
-        id: entry.id.clone(),
-        folder_id,
-        item_type: BITWARDEN_TYPE_LOGIN,
-        name: entry.name.clone(),
-        notes: entry.data.notes.clone(),
-        favorite: entry.is_favorite,
-        login: Some(BitwardenLogin {
-            uris: None,
-            username: get_opt_str(tv, "username"),
-            password: get_opt_str(tv, "password"),
-            totp: None,
-        }),
-        secure_note: None,
-        card: None,
-        fields: if fields.is_empty() {
-            None
-        } else {
-            Some(fields)
+    match &entry.data.typed_value {
+        TypedValue::Password(d) => BitwardenItem {
+            id: entry.id.clone(),
+            folder_id,
+            item_type: BITWARDEN_TYPE_LOGIN,
+            name: entry.name.clone(),
+            notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
+            favorite: entry.is_favorite,
+            login: Some(BitwardenLogin {
+                uris: None,
+                username: Some(d.username.as_str().to_string()),
+                password: Some(d.password.as_str().to_string()),
+                totp: None,
+            }),
+            secure_note: None,
+            card: None,
+            fields: if fields.is_empty() {
+                None
+            } else {
+                Some(fields)
+            },
+            creation_date: unix_to_iso8601(entry.created_at),
+            revision_date: unix_to_iso8601(entry.updated_at),
         },
-        creation_date: unix_to_iso8601(entry.created_at),
-        revision_date: unix_to_iso8601(entry.updated_at),
+        _ => {
+            // Fallback for non-password types
+            BitwardenItem {
+                id: entry.id.clone(),
+                folder_id,
+                item_type: BITWARDEN_TYPE_LOGIN,
+                name: entry.name.clone(),
+                notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
+                favorite: entry.is_favorite,
+                login: Some(BitwardenLogin {
+                    uris: None,
+                    username: None,
+                    password: None,
+                    totp: None,
+                }),
+                secure_note: None,
+                card: None,
+                fields: if fields.is_empty() {
+                    None
+                } else {
+                    Some(fields)
+                },
+                creation_date: unix_to_iso8601(entry.created_at),
+                revision_date: unix_to_iso8601(entry.updated_at),
+            }
+        }
     }
 }
 
 /// Map a kura credit_card entry to a Bitwarden card item.
 fn map_credit_card(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
-    let tv = &entry.data.typed_value;
     let mut fields = map_custom_fields(entry);
 
-    // PIN goes into a hidden custom field
-    if let Some(pin) = get_opt_str(tv, "pin") {
-        fields.push(BitwardenField {
-            name: "PIN".to_string(),
-            value: pin,
-            field_type: BITWARDEN_FIELD_HIDDEN,
-        });
-    }
-
-    // Parse expiry "MM/YY" or "MM/YYYY" into separate month/year
-    let (exp_month, exp_year) = get_opt_str(tv, "expiry")
-        .and_then(|expiry| {
-            let parts: Vec<&str> = expiry.split('/').collect();
-            if parts.len() == 2 {
-                let month = parts[0].to_string();
-                let year = if parts[1].len() == 2 {
-                    format!("20{}", parts[1])
-                } else {
-                    parts[1].to_string()
-                };
-                Some((Some(month), Some(year)))
-            } else {
-                None
+    match &entry.data.typed_value {
+        TypedValue::CreditCard(d) => {
+            // PIN goes into a hidden custom field
+            let pin_str = d.pin.as_str();
+            if !pin_str.is_empty() {
+                fields.push(BitwardenField {
+                    name: "PIN".to_string(),
+                    value: pin_str.to_string(),
+                    field_type: BITWARDEN_FIELD_HIDDEN,
+                });
             }
-        })
-        .unwrap_or((None, None));
 
-    BitwardenItem {
-        id: entry.id.clone(),
-        folder_id,
-        item_type: BITWARDEN_TYPE_CARD,
-        name: entry.name.clone(),
-        notes: entry.data.notes.clone(),
-        favorite: entry.is_favorite,
-        login: None,
-        secure_note: None,
-        card: Some(BitwardenCard {
-            cardholder_name: get_opt_str(tv, "cardholder"),
-            brand: None,
-            number: get_opt_str(tv, "number"),
-            exp_month,
-            exp_year,
-            code: get_opt_str(tv, "cvv"),
-        }),
-        fields: if fields.is_empty() {
-            None
-        } else {
-            Some(fields)
-        },
-        creation_date: unix_to_iso8601(entry.created_at),
-        revision_date: unix_to_iso8601(entry.updated_at),
+            // Parse expiry "MM/YY" or "MM/YYYY" into separate month/year
+            let expiry_str = d.expiry.as_str();
+            let (exp_month, exp_year) = if !expiry_str.is_empty() {
+                let parts: Vec<&str> = expiry_str.split('/').collect();
+                if parts.len() == 2 {
+                    let month = parts[0].to_string();
+                    let year = if parts[1].len() == 2 {
+                        format!("20{}", parts[1])
+                    } else {
+                        parts[1].to_string()
+                    };
+                    (Some(month), Some(year))
+                } else {
+                    (None, None)
+                }
+            } else {
+                (None, None)
+            };
+
+            BitwardenItem {
+                id: entry.id.clone(),
+                folder_id,
+                item_type: BITWARDEN_TYPE_CARD,
+                name: entry.name.clone(),
+                notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
+                favorite: entry.is_favorite,
+                login: None,
+                secure_note: None,
+                card: Some(BitwardenCard {
+                    cardholder_name: {
+                        let ch = d.cardholder.as_str();
+                        if ch.is_empty() {
+                            None
+                        } else {
+                            Some(ch.to_string())
+                        }
+                    },
+                    brand: None,
+                    number: {
+                        let num = d.number.as_str();
+                        if num.is_empty() {
+                            None
+                        } else {
+                            Some(num.to_string())
+                        }
+                    },
+                    exp_month,
+                    exp_year,
+                    code: {
+                        let cvv = d.cvv.as_str();
+                        if cvv.is_empty() {
+                            None
+                        } else {
+                            Some(cvv.to_string())
+                        }
+                    },
+                }),
+                fields: if fields.is_empty() {
+                    None
+                } else {
+                    Some(fields)
+                },
+                creation_date: unix_to_iso8601(entry.created_at),
+                revision_date: unix_to_iso8601(entry.updated_at),
+            }
+        }
+        _ => {
+            // Fallback for non-credit_card types
+            BitwardenItem {
+                id: entry.id.clone(),
+                folder_id,
+                item_type: BITWARDEN_TYPE_CARD,
+                name: entry.name.clone(),
+                notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
+                favorite: entry.is_favorite,
+                login: None,
+                secure_note: None,
+                card: Some(BitwardenCard {
+                    cardholder_name: None,
+                    brand: None,
+                    number: None,
+                    exp_month: None,
+                    exp_year: None,
+                    code: None,
+                }),
+                fields: if fields.is_empty() {
+                    None
+                } else {
+                    Some(fields)
+                },
+                creation_date: unix_to_iso8601(entry.created_at),
+                revision_date: unix_to_iso8601(entry.updated_at),
+            }
+        }
     }
 }
 
 /// Map a kura secure_note entry to a Bitwarden secure note item.
 fn map_secure_note(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
-    let tv = &entry.data.typed_value;
     let fields = map_custom_fields(entry);
 
-    // SecureNote: content goes into notes. If entry already has notes, combine them.
-    let content = get_opt_str(tv, "content");
-    let notes = match (&entry.data.notes, &content) {
-        (Some(n), Some(c)) => Some(format!("{}\n\n{}", c, n)),
-        (None, Some(c)) => Some(c.clone()),
-        (Some(n), None) => Some(n.clone()),
-        (None, None) => None,
-    };
+    match &entry.data.typed_value {
+        TypedValue::SecureNote(d) => {
+            // SecureNote: content goes into notes. If entry already has notes, combine them.
+            let content_str = d.content.as_str();
+            let notes = match (&entry.data.notes, content_str.is_empty()) {
+                (Some(n), false) => Some(format!("{}\n\n{}", content_str, n.as_str())),
+                (None, false) => Some(content_str.to_string()),
+                (Some(n), true) => Some(n.as_str().to_string()),
+                (None, true) => None,
+            };
 
-    BitwardenItem {
-        id: entry.id.clone(),
-        folder_id,
-        item_type: BITWARDEN_TYPE_SECURE_NOTE,
-        name: entry.name.clone(),
-        notes,
-        favorite: entry.is_favorite,
-        login: None,
-        secure_note: Some(BitwardenSecureNote {
-            note_type: BITWARDEN_SECURE_NOTE_GENERIC,
-        }),
-        card: None,
-        fields: if fields.is_empty() {
-            None
-        } else {
-            Some(fields)
-        },
-        creation_date: unix_to_iso8601(entry.created_at),
-        revision_date: unix_to_iso8601(entry.updated_at),
+            BitwardenItem {
+                id: entry.id.clone(),
+                folder_id,
+                item_type: BITWARDEN_TYPE_SECURE_NOTE,
+                name: entry.name.clone(),
+                notes,
+                favorite: entry.is_favorite,
+                login: None,
+                secure_note: Some(BitwardenSecureNote {
+                    note_type: BITWARDEN_SECURE_NOTE_GENERIC,
+                }),
+                card: None,
+                fields: if fields.is_empty() {
+                    None
+                } else {
+                    Some(fields)
+                },
+                creation_date: unix_to_iso8601(entry.created_at),
+                revision_date: unix_to_iso8601(entry.updated_at),
+            }
+        }
+        _ => {
+            // Fallback for non-secure_note types
+            BitwardenItem {
+                id: entry.id.clone(),
+                folder_id,
+                item_type: BITWARDEN_TYPE_SECURE_NOTE,
+                name: entry.name.clone(),
+                notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
+                favorite: entry.is_favorite,
+                login: None,
+                secure_note: Some(BitwardenSecureNote {
+                    note_type: BITWARDEN_SECURE_NOTE_GENERIC,
+                }),
+                card: None,
+                fields: if fields.is_empty() {
+                    None
+                } else {
+                    Some(fields)
+                },
+                creation_date: unix_to_iso8601(entry.created_at),
+                revision_date: unix_to_iso8601(entry.updated_at),
+            }
+        }
     }
 }
 
 /// Map a kura bank entry to a Bitwarden secure note with typed fields as custom fields.
 fn map_bank(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
-    let tv = &entry.data.typed_value;
     let mut fields = Vec::new();
 
-    // Add bank-specific fields as Bitwarden custom fields
-    let text_fields = [
-        ("bank_name", "Bank Name"),
-        ("account_holder", "Account Holder"),
-        ("branch_code", "Branch Code"),
-        ("account_type", "Account Type"),
-        ("account_number", "Account Number"),
-    ];
-    for (key, name) in &text_fields {
-        if let Some(val) = get_opt_str(tv, key) {
-            fields.push(BitwardenField {
-                name: name.to_string(),
-                value: val,
-                field_type: BITWARDEN_FIELD_TEXT,
-            });
+    match &entry.data.typed_value {
+        TypedValue::Bank(d) => {
+            // Add bank-specific fields as Bitwarden custom fields
+            let field_mapping = [
+                (d.bank_name.as_str(), "Bank Name"),
+                (d.account_holder.as_str(), "Account Holder"),
+                (d.branch_code.as_str(), "Branch Code"),
+                (d.account_type.as_str(), "Account Type"),
+                (d.account_number.as_str(), "Account Number"),
+            ];
+            for (val, name) in &field_mapping {
+                if !val.is_empty() {
+                    fields.push(BitwardenField {
+                        name: name.to_string(),
+                        value: val.to_string(),
+                        field_type: BITWARDEN_FIELD_TEXT,
+                    });
+                }
+            }
+
+            // PIN as hidden field
+            let pin_str = d.pin.as_str();
+            if !pin_str.is_empty() {
+                fields.push(BitwardenField {
+                    name: "PIN".to_string(),
+                    value: pin_str.to_string(),
+                    field_type: BITWARDEN_FIELD_HIDDEN,
+                });
+            }
+
+            // Append original custom fields
+            fields.extend(map_custom_fields(entry));
+
+            BitwardenItem {
+                id: entry.id.clone(),
+                folder_id,
+                item_type: BITWARDEN_TYPE_SECURE_NOTE,
+                name: entry.name.clone(),
+                notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
+                favorite: entry.is_favorite,
+                login: None,
+                secure_note: Some(BitwardenSecureNote {
+                    note_type: BITWARDEN_SECURE_NOTE_GENERIC,
+                }),
+                card: None,
+                fields: if fields.is_empty() {
+                    None
+                } else {
+                    Some(fields)
+                },
+                creation_date: unix_to_iso8601(entry.created_at),
+                revision_date: unix_to_iso8601(entry.updated_at),
+            }
         }
-    }
+        _ => {
+            // Fallback for non-bank types
+            fields.extend(map_custom_fields(entry));
 
-    // PIN as hidden field
-    if let Some(pin) = get_opt_str(tv, "pin") {
-        fields.push(BitwardenField {
-            name: "PIN".to_string(),
-            value: pin,
-            field_type: BITWARDEN_FIELD_HIDDEN,
-        });
-    }
-
-    // Append original custom fields
-    fields.extend(map_custom_fields(entry));
-
-    BitwardenItem {
-        id: entry.id.clone(),
-        folder_id,
-        item_type: BITWARDEN_TYPE_SECURE_NOTE,
-        name: entry.name.clone(),
-        notes: entry.data.notes.clone(),
-        favorite: entry.is_favorite,
-        login: None,
-        secure_note: Some(BitwardenSecureNote {
-            note_type: BITWARDEN_SECURE_NOTE_GENERIC,
-        }),
-        card: None,
-        fields: if fields.is_empty() {
-            None
-        } else {
-            Some(fields)
-        },
-        creation_date: unix_to_iso8601(entry.created_at),
-        revision_date: unix_to_iso8601(entry.updated_at),
+            BitwardenItem {
+                id: entry.id.clone(),
+                folder_id,
+                item_type: BITWARDEN_TYPE_SECURE_NOTE,
+                name: entry.name.clone(),
+                notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
+                favorite: entry.is_favorite,
+                login: None,
+                secure_note: Some(BitwardenSecureNote {
+                    note_type: BITWARDEN_SECURE_NOTE_GENERIC,
+                }),
+                card: None,
+                fields: if fields.is_empty() {
+                    None
+                } else {
+                    Some(fields)
+                },
+                creation_date: unix_to_iso8601(entry.created_at),
+                revision_date: unix_to_iso8601(entry.updated_at),
+            }
+        }
     }
 }
 
 /// Map a kura ssh_key entry to a Bitwarden secure note with private_key as hidden field.
 fn map_ssh_key(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
-    let tv = &entry.data.typed_value;
     let mut fields = Vec::new();
 
-    if let Some(key) = get_opt_str(tv, "private_key") {
-        fields.push(BitwardenField {
-            name: "Private Key".to_string(),
-            value: key,
-            field_type: BITWARDEN_FIELD_HIDDEN,
-        });
-    }
+    match &entry.data.typed_value {
+        TypedValue::SshKey(d) => {
+            let key_str = d.private_key.as_str();
+            if !key_str.is_empty() {
+                fields.push(BitwardenField {
+                    name: "Private Key".to_string(),
+                    value: key_str.to_string(),
+                    field_type: BITWARDEN_FIELD_HIDDEN,
+                });
+            }
 
-    fields.extend(map_custom_fields(entry));
+            fields.extend(map_custom_fields(entry));
 
-    BitwardenItem {
-        id: entry.id.clone(),
-        folder_id,
-        item_type: BITWARDEN_TYPE_SECURE_NOTE,
-        name: entry.name.clone(),
-        notes: entry.data.notes.clone(),
-        favorite: entry.is_favorite,
-        login: None,
-        secure_note: Some(BitwardenSecureNote {
-            note_type: BITWARDEN_SECURE_NOTE_GENERIC,
-        }),
-        card: None,
-        fields: if fields.is_empty() {
-            None
-        } else {
-            Some(fields)
-        },
-        creation_date: unix_to_iso8601(entry.created_at),
-        revision_date: unix_to_iso8601(entry.updated_at),
+            BitwardenItem {
+                id: entry.id.clone(),
+                folder_id,
+                item_type: BITWARDEN_TYPE_SECURE_NOTE,
+                name: entry.name.clone(),
+                notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
+                favorite: entry.is_favorite,
+                login: None,
+                secure_note: Some(BitwardenSecureNote {
+                    note_type: BITWARDEN_SECURE_NOTE_GENERIC,
+                }),
+                card: None,
+                fields: if fields.is_empty() {
+                    None
+                } else {
+                    Some(fields)
+                },
+                creation_date: unix_to_iso8601(entry.created_at),
+                revision_date: unix_to_iso8601(entry.updated_at),
+            }
+        }
+        _ => {
+            // Fallback for non-ssh_key types
+            fields.extend(map_custom_fields(entry));
+
+            BitwardenItem {
+                id: entry.id.clone(),
+                folder_id,
+                item_type: BITWARDEN_TYPE_SECURE_NOTE,
+                name: entry.name.clone(),
+                notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
+                favorite: entry.is_favorite,
+                login: None,
+                secure_note: Some(BitwardenSecureNote {
+                    note_type: BITWARDEN_SECURE_NOTE_GENERIC,
+                }),
+                card: None,
+                fields: if fields.is_empty() {
+                    None
+                } else {
+                    Some(fields)
+                },
+                creation_date: unix_to_iso8601(entry.created_at),
+                revision_date: unix_to_iso8601(entry.updated_at),
+            }
+        }
     }
 }
 
 /// Map a kura software_license entry to a Bitwarden secure note.
 fn map_software_license(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
-    let tv = &entry.data.typed_value;
     let mut fields = Vec::new();
 
-    if let Some(key) = get_opt_str(tv, "license_key") {
-        fields.push(BitwardenField {
-            name: "License Key".to_string(),
-            value: key,
-            field_type: BITWARDEN_FIELD_TEXT,
-        });
-    }
+    match &entry.data.typed_value {
+        TypedValue::SoftwareLicense(d) => {
+            let key_str = d.license_key.as_str();
+            if !key_str.is_empty() {
+                fields.push(BitwardenField {
+                    name: "License Key".to_string(),
+                    value: key_str.to_string(),
+                    field_type: BITWARDEN_FIELD_TEXT,
+                });
+            }
 
-    fields.extend(map_custom_fields(entry));
+            fields.extend(map_custom_fields(entry));
 
-    BitwardenItem {
-        id: entry.id.clone(),
-        folder_id,
-        item_type: BITWARDEN_TYPE_SECURE_NOTE,
-        name: entry.name.clone(),
-        notes: entry.data.notes.clone(),
-        favorite: entry.is_favorite,
-        login: None,
-        secure_note: Some(BitwardenSecureNote {
-            note_type: BITWARDEN_SECURE_NOTE_GENERIC,
-        }),
-        card: None,
-        fields: if fields.is_empty() {
-            None
-        } else {
-            Some(fields)
-        },
-        creation_date: unix_to_iso8601(entry.created_at),
-        revision_date: unix_to_iso8601(entry.updated_at),
+            BitwardenItem {
+                id: entry.id.clone(),
+                folder_id,
+                item_type: BITWARDEN_TYPE_SECURE_NOTE,
+                name: entry.name.clone(),
+                notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
+                favorite: entry.is_favorite,
+                login: None,
+                secure_note: Some(BitwardenSecureNote {
+                    note_type: BITWARDEN_SECURE_NOTE_GENERIC,
+                }),
+                card: None,
+                fields: if fields.is_empty() {
+                    None
+                } else {
+                    Some(fields)
+                },
+                creation_date: unix_to_iso8601(entry.created_at),
+                revision_date: unix_to_iso8601(entry.updated_at),
+            }
+        }
+        _ => {
+            // Fallback for non-software_license types
+            fields.extend(map_custom_fields(entry));
+
+            BitwardenItem {
+                id: entry.id.clone(),
+                folder_id,
+                item_type: BITWARDEN_TYPE_SECURE_NOTE,
+                name: entry.name.clone(),
+                notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
+                favorite: entry.is_favorite,
+                login: None,
+                secure_note: Some(BitwardenSecureNote {
+                    note_type: BITWARDEN_SECURE_NOTE_GENERIC,
+                }),
+                card: None,
+                fields: if fields.is_empty() {
+                    None
+                } else {
+                    Some(fields)
+                },
+                creation_date: unix_to_iso8601(entry.created_at),
+                revision_date: unix_to_iso8601(entry.updated_at),
+            }
+        }
     }
 }
 
 /// Map an unknown entry type to a Bitwarden secure note.
 /// All typed_value fields become custom fields for data preservation.
 fn map_unknown(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
-    let tv = &entry.data.typed_value;
     let mut fields = Vec::new();
 
     // Serialize all typed_value fields as text custom fields
-    if let Some(obj) = tv.as_object() {
-        for (key, val) in obj {
-            let value_str = match val {
-                serde_json::Value::String(s) => s.clone(),
-                other => other.to_string(),
-            };
-            if !value_str.is_empty() {
-                fields.push(BitwardenField {
-                    name: key.clone(),
-                    value: value_str,
-                    field_type: BITWARDEN_FIELD_TEXT,
-                });
+    if let TypedValue::Unknown(raw) = &entry.data.typed_value {
+        if let Ok(obj) = serde_json::from_str::<serde_json::Value>(raw.as_str()) {
+            if let Some(obj_map) = obj.as_object() {
+                for (key, val) in obj_map {
+                    let value_str = match val {
+                        serde_json::Value::String(s) => s.clone(),
+                        other => other.to_string(),
+                    };
+                    if !value_str.is_empty() {
+                        fields.push(BitwardenField {
+                            name: key.clone(),
+                            value: value_str,
+                            field_type: BITWARDEN_FIELD_TEXT,
+                        });
+                    }
+                }
             }
         }
     }
@@ -391,7 +608,7 @@ fn map_unknown(entry: &Entry, folder_id: Option<String>) -> BitwardenItem {
         folder_id,
         item_type: BITWARDEN_TYPE_SECURE_NOTE,
         name: entry.name.clone(),
-        notes: entry.data.notes.clone(),
+        notes: entry.data.notes.as_ref().map(|n| n.as_str().to_string()),
         favorite: entry.is_favorite,
         login: None,
         secure_note: Some(BitwardenSecureNote {
@@ -464,7 +681,9 @@ mod tests {
             Some("https://example.com".into()),
             "user@example.com".into(),
             "secret123".into(),
-            Some("my notes".into()),
+            Some(crate::secret::SecretString::from_string(
+                "my notes".to_string(),
+            )),
         );
         let entry = make_entry("login", "Example Login", data, vec![]);
         let item = map_entry(&entry, None);
@@ -493,13 +712,15 @@ mod tests {
                 id: "cf1".to_string(),
                 name: "TOTP".to_string(),
                 field_type: "totp".to_string(),
-                value: "otpauth://totp/test?secret=ABC".to_string(),
+                value: crate::secret::SecretString::from_string(
+                    "otpauth://totp/test?secret=ABC".to_string(),
+                ),
             },
             CustomField {
                 id: "cf2".to_string(),
                 name: "Extra".to_string(),
                 field_type: "text".to_string(),
-                value: "some value".to_string(),
+                value: crate::secret::SecretString::from_string("some value".to_string()),
             },
         ]);
         let entry = make_entry("login", "With TOTP", data, vec![]);
@@ -578,8 +799,12 @@ mod tests {
 
     #[test]
     fn test_map_secure_note() {
-        let data =
-            EntryData::new_secure_note("Important content".into(), Some("extra notes".into()));
+        let data = EntryData::new_secure_note(
+            "Important content".into(),
+            Some(crate::secret::SecretString::from_string(
+                "extra notes".to_string(),
+            )),
+        );
         let entry = make_entry("secure_note", "My Note", data, vec![]);
         let item = map_entry(&entry, None);
 
@@ -651,13 +876,12 @@ mod tests {
 
     #[test]
     fn test_map_unknown_type() {
+        use crate::secret::EntrySecretJson;
+        let json_str = r#"{"ssid":"MyNetwork","password":"wifipass"}"#;
         let data = EntryData {
             entry_type: "wifi_password".to_string(),
             notes: None,
-            typed_value: serde_json::json!({
-                "ssid": "MyNetwork",
-                "password": "wifipass"
-            }),
+            typed_value: TypedValue::Unknown(EntrySecretJson::from_string(json_str.to_string())),
             custom_fields: None,
         };
         let entry = make_entry("wifi_password", "WiFi", data, vec![]);

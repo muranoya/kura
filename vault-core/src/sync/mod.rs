@@ -246,7 +246,7 @@ fn apply_gc_labels(labels: &mut HashMap<String, LabelValue>, now: i64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zeroize::Zeroizing;
+    use crate::secret::EntrySecretJson;
 
     fn create_entry(id: &str, name: &str, timestamp: i64) -> (String, VaultEntry) {
         (
@@ -260,7 +260,7 @@ mod tests {
                 purged_at: None,
                 is_favorite: false,
                 label_ids: vec![],
-                typed_value: Zeroizing::new("{}".to_string()),
+                typed_value: EntrySecretJson::from_string("{}".to_string()),
                 notes: None,
                 custom_fields: None,
             },
@@ -289,7 +289,7 @@ mod tests {
         entry.updated_at = updated_at;
         entry.deleted_at = Some(deleted_at);
         entry.purged_at = Some(purged_at);
-        entry.typed_value = Zeroizing::new(String::new());
+        entry.typed_value = EntrySecretJson::from_string(String::new());
         (id, entry)
     }
 

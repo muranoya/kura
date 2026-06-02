@@ -282,6 +282,10 @@ describe('RecoveryKey', () => {
     await waitFor(() => {
       expect(screen.getByText('Entries Page')).toBeInTheDocument()
     })
+    expect(chrome.storage.local.remove).toHaveBeenCalledWith(
+      ['onboardingDraft'],
+      expect.any(Function),
+    )
   })
 })
 
@@ -344,6 +348,10 @@ describe('UnlockExistingVault', () => {
     await waitFor(() => {
       expect(screen.getByText('Entries Page')).toBeInTheDocument()
     })
+    expect(chrome.storage.local.remove).toHaveBeenCalledWith(
+      ['onboardingDraft'],
+      expect.any(Function),
+    )
   })
 })
 

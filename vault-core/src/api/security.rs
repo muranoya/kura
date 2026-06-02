@@ -1,4 +1,5 @@
 use crate::crypto;
+use crate::secret::{MasterPassword, PlaintextConfig};
 use crate::sync::engine::SessionState;
 
 use super::VaultManager;
@@ -11,6 +12,8 @@ impl VaultManager {
         password: String,
         plaintext: String,
     ) -> Result<String, String> {
+        let password = MasterPassword::from_string(password);
+        let plaintext = PlaintextConfig::from_string(plaintext);
         let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
 
         let argon2_params = match session.as_ref() {
@@ -19,7 +22,7 @@ impl VaultManager {
             None => return Err("Vault not loaded".to_string()),
         };
 
-        let kek = crypto::kdf::derive_kek(&password, argon2_params)
+        let kek = crypto::kdf::derive_kek_from_master_password(&password, argon2_params)
             .map_err(|e| format!("Failed to derive KEK: {}", e))?;
 
         crypto::config::encrypt_with_kek(plaintext.as_bytes(), &kek)
@@ -33,6 +36,7 @@ impl VaultManager {
         password: String,
         encrypted_b64: String,
     ) -> Result<String, String> {
+        let password = MasterPassword::from_string(password);
         let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
 
         let argon2_params = match session.as_ref() {
@@ -41,24 +45,28 @@ impl VaultManager {
             None => return Err("Vault not loaded".to_string()),
         };
 
-        let kek = crypto::kdf::derive_kek(&password, argon2_params)
+        let kek = crypto::kdf::derive_kek_from_master_password(&password, argon2_params)
             .map_err(|e| format!("Failed to derive KEK: {}", e))?;
 
         let decrypted_bytes = crypto::config::decrypt_with_kek(&encrypted_b64, &kek)
             .map_err(|e| format!("Failed to decrypt config: {}", e))?;
 
-        String::from_utf8(decrypted_bytes)
+        String::from_utf8(decrypted_bytes.to_vec())
             .map_err(|e| format!("Decrypted config is not valid UTF-8: {}", e))
     }
 
     /// マスターパスワードの検証（KEK導出→DEK復号を試みる）
     pub fn api_verify_password(&self, password: String) -> Result<(), String> {
+        let password = MasterPassword::from_string(password);
         self.with_unlocked(|unlocked| {
             use base64::Engine;
             let engine = base64::engine::general_purpose::STANDARD;
 
-            let kek = crypto::kdf::derive_kek(&password, &unlocked.meta.argon2_params)
-                .map_err(|e| format!("Failed to derive KEK: {}", e))?;
+            let kek = crypto::kdf::derive_kek_from_master_password(
+                &password,
+                &unlocked.meta.argon2_params,
+            )
+            .map_err(|e| format!("Failed to derive KEK: {}", e))?;
             let encrypted_dek_bytes = engine
                 .decode(&unlocked.meta.encrypted_dek_master)
                 .map_err(|_| "Invalid base64".to_string())?;
@@ -74,6 +82,8 @@ impl VaultManager {
         old_password: String,
         new_password: String,
     ) -> Result<(), String> {
+        let old_password = MasterPassword::from_string(old_password);
+        let new_password = MasterPassword::from_string(new_password);
         self.with_unlocked_mut(|unlocked| {
             unlocked
                 .change_master_password(&old_password, &new_password)
@@ -89,6 +99,7 @@ impl VaultManager {
         memory: u32,
         parallelism: u32,
     ) -> Result<String, String> {
+        let password = MasterPassword::from_string(password);
         let new_params = crate::models::Argon2Params {
             salt: crate::codec::base32::encode(&rand::random::<[u8; 16]>()),
             iterations,
@@ -106,6 +117,7 @@ impl VaultManager {
 
     /// DEK ローテーション（新しいリカバリーキーを返す）
     pub fn api_rotate_dek(&self, password: String) -> Result<String, String> {
+        let password = MasterPassword::from_string(password);
         self.with_unlocked_mut(|unlocked| {
             let recovery_key = unlocked
                 .rotate_dek(&password)
@@ -116,6 +128,7 @@ impl VaultManager {
 
     /// リカバリーキー再発行
     pub fn api_regenerate_recovery_key(&self, password: String) -> Result<String, String> {
+        let password = MasterPassword::from_string(password);
         self.with_unlocked_mut(|unlocked| {
             let recovery_key = unlocked
                 .regenerate_recovery_key(&password)

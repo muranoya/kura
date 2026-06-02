@@ -1,5 +1,7 @@
 use crate::error::{Result, VaultError};
+use crate::secret::{MasterPassword, TransferPassword};
 use argon2::{Algorithm, Argon2, Params, Version};
+use std::fmt;
 use zeroize::Zeroize;
 
 /// Key Encryption Key - 32 bytes, automatically zeroized on drop
@@ -11,6 +13,12 @@ pub struct Kek {
 impl Drop for Kek {
     fn drop(&mut self) {
         self.bytes.zeroize();
+    }
+}
+
+impl fmt::Debug for Kek {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Kek([REDACTED])")
     }
 }
 
@@ -30,7 +38,24 @@ const MIN_ARGON2_MEMORY: u32 = 65536; // 64 MiB
 const MIN_SALT_LENGTH: usize = 16;
 
 /// Derive KEK from password using Argon2
-pub fn derive_kek(password: &str, params: &crate::models::Argon2Params) -> Result<Kek> {
+pub(crate) fn derive_kek_from_master_password(
+    password: &MasterPassword,
+    params: &crate::models::Argon2Params,
+) -> Result<Kek> {
+    derive_kek_from_secret_bytes(password.as_bytes(), params)
+}
+
+pub(crate) fn derive_kek_from_transfer_password(
+    password: &TransferPassword,
+    params: &crate::models::Argon2Params,
+) -> Result<Kek> {
+    derive_kek_from_secret_bytes(password.as_bytes(), params)
+}
+
+pub(crate) fn derive_kek_from_secret_bytes(
+    secret: &[u8],
+    params: &crate::models::Argon2Params,
+) -> Result<Kek> {
     let salt_bytes = base32_decode(&params.salt)
         .ok_or_else(|| VaultError::InvalidConfiguration("Invalid salt encoding".to_string()))?;
 
@@ -64,7 +89,7 @@ pub fn derive_kek(password: &str, params: &crate::models::Argon2Params) -> Resul
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, argon2_params);
 
     argon2
-        .hash_password_into(password.as_bytes(), &salt_bytes, &mut hash_output)
+        .hash_password_into(secret, &salt_bytes, &mut hash_output)
         .map_err(|e| VaultError::EncryptionError(format!("Argon2 hashing failed: {}", e)))?;
 
     Ok(Kek { bytes: hash_output })
@@ -80,9 +105,13 @@ mod tests {
 
     #[test]
     fn test_kek_derivation_same_params() {
+        use crate::secret::MasterPassword;
+
         let params = crate::models::Argon2Params::default();
-        let kek1 = derive_kek("password123", &params).unwrap();
-        let kek2 = derive_kek("password123", &params).unwrap();
+        let password1 = MasterPassword::from_string("password123".to_string());
+        let password2 = MasterPassword::from_string("password123".to_string());
+        let kek1 = derive_kek_from_master_password(&password1, &params).unwrap();
+        let kek2 = derive_kek_from_master_password(&password2, &params).unwrap();
 
         // Same password and params should derive same KEK
         assert_eq!(kek1.as_bytes(), kek2.as_bytes());
@@ -90,9 +119,13 @@ mod tests {
 
     #[test]
     fn test_different_passwords() {
+        use crate::secret::MasterPassword;
+
         let params = crate::models::Argon2Params::default();
-        let kek1 = derive_kek("password1", &params).unwrap();
-        let kek2 = derive_kek("password2", &params).unwrap();
+        let password1 = MasterPassword::from_string("password1".to_string());
+        let password2 = MasterPassword::from_string("password2".to_string());
+        let kek1 = derive_kek_from_master_password(&password1, &params).unwrap();
+        let kek2 = derive_kek_from_master_password(&password2, &params).unwrap();
 
         // Different passwords should derive different KEKs
         assert_ne!(kek1.as_bytes(), kek2.as_bytes());

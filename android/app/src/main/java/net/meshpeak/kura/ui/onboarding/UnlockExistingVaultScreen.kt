@@ -95,6 +95,7 @@ fun UnlockExistingVaultScreen(
                             appViewModel.repository.unlock(password)
                             val vaultBytes = appViewModel.repository.getVaultBytes()
                             appViewModel.repository.writeVaultFile(vaultBytes)
+                            password = ""
                             onUnlocked()
                         } catch (e: Exception) {
                             error = context.getString(R.string.unlock_existing_failed, e.message ?: "")
