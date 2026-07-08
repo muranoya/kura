@@ -6,6 +6,7 @@ interface SuccessResponse {
   success: true
   credentials?: AutofillCredentialCandidate[]
   fillData?: AutofillFillData
+  password?: string
 }
 
 interface ErrorResponse {
@@ -112,6 +113,31 @@ export async function queryPendingFlow(url: string): Promise<PendingFlowResult |
   const response = await sendMessage({ type: 'AUTOFILL_PENDING_FLOW_QUERY', url })
   if (response.success && 'pendingFlow' in response && response.pendingFlow) {
     return response.pendingFlow as PendingFlowResult
+  }
+  return null
+}
+
+export async function generatePassword(
+  length: number,
+  includeLowercase: boolean,
+  includeUppercase: boolean,
+  includeNumbers: boolean,
+  includeSymbols1: boolean,
+  includeSymbols2: boolean,
+  includeSymbols3: boolean,
+): Promise<string | null> {
+  const response = await sendMessage({
+    type: 'GENERATE_PASSWORD',
+    length,
+    includeLowercase,
+    includeUppercase,
+    includeNumbers,
+    includeSymbols1,
+    includeSymbols2,
+    includeSymbols3,
+  })
+  if (response.success && response.password) {
+    return response.password
   }
   return null
 }
