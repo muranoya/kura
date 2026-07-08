@@ -30,13 +30,19 @@
     <summary>Expected Behavior</summary>
     <ul>
       <li>Click the capture button (crosshair icon) in the extension popup</li>
-      <li>Floating toolbar appears at top-right: "kura: フィールドを選択"</li>
+      <li>Floating toolbar appears at top-right: "kura: クレデンシャルキャプチャ"</li>
       <li>Hover over input fields → indigo highlight border appears</li>
-      <li>Click a field → popover with "ユーザー名" / "パスワード" / "スキップ" buttons</li>
+      <li>Click a field → popover with "ユーザー名" / "パスワード" / "パスワードを生成" / "閉じる" buttons</li>
       <li>Assigned fields get badges showing their role</li>
       <li>Toolbar shows summary of selected fields</li>
+      <li>Click "パスワードを生成" on a field → the field is assigned the "パスワード" role AND a password generator popover appears at the same position</li>
+      <li>Generator popover has no plaintext password preview (avoids overflow in the small popover) — it shows a length slider (1-128), collapsible charset chips (a-z / A-Z / 0-9 / !@#$%^&amp;* / ()[]{}+= / `&lt;&gt;'"\|), a copy button, a regenerate button, and a "この値を使う" button</li>
+      <li>Adjusting the length slider or toggling charset chips automatically regenerates the password (dragging the slider must not get interrupted)</li>
+      <li>"コピー" copies the generated password to the clipboard (and starts the clipboard-clear timer)</li>
+      <li>"この値を使う" fills the generated password into the target field and closes the generator popover</li>
+      <li>"閉じる" in the generator popover closes it without clearing the field's assigned role</li>
       <li>"保存する" button saves credentials to vault → success toast</li>
-      <li>Escape key cancels capture mode</li>
+      <li>Escape key cancels capture mode (closing any open generator popover as well)</li>
       <li>Only input fields are selectable (not buttons, divs, etc.)</li>
     </ul>
   </details>

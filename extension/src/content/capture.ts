@@ -1,7 +1,8 @@
 // Manual credential capture mode (design doc Sections 1-6, 3-7)
 // Allows users to select fields on a page and save credentials to vault.
 
-import { saveCapturedCredential } from './messaging'
+import { fillField } from './filler'
+import { generatePassword, saveCapturedCredential } from './messaging'
 
 const LOG_PREFIX = '[kura:autofill:capture]'
 const CONTAINER_ID = 'kura-capture-overlay'
@@ -20,6 +21,28 @@ let currentHoverTarget: HTMLInputElement | null = null
 let nameInput: HTMLInputElement | null = null
 // Badge elements attached to page DOM
 const badges = new Map<HTMLInputElement, HTMLElement>()
+
+// ========== Password generator popover state ==========
+
+let generatorPopoverEl: HTMLElement | null = null
+let generatorTargetField: HTMLInputElement | null = null
+let generatedPassword = ''
+let generatorLoading = false
+let generatorLength = 16
+let generatorIncludeLowercase = true
+let generatorIncludeUppercase = true
+let generatorIncludeNumbers = true
+let generatorIncludeSymbols1 = true
+let generatorIncludeSymbols2 = true
+let generatorIncludeSymbols3 = true
+let generatorShowCharOptions = false
+let generatorRequestSeq = 0
+let generatorDebounceTimer: ReturnType<typeof setTimeout> | null = null
+// Element refs kept for targeted (non-destructive) updates so an in-progress
+// range slider drag is never interrupted by a full re-render.
+let generatorCopyBtn: HTMLButtonElement | null = null
+let generatorRegenBtn: HTMLButtonElement | null = null
+let generatorUseBtn: HTMLButtonElement | null = null
 
 // ========== Shadow DOM host ==========
 
@@ -198,6 +221,7 @@ function onFieldClick(e: Event) {
 function showPopover(anchor: HTMLInputElement) {
   if (!shadowRoot) return
   hidePopover()
+  hideGeneratorPopover()
 
   const field = anchor
 
@@ -233,6 +257,13 @@ function showPopover(anchor: HTMLInputElement) {
       hidePopover()
     }),
   )
+  popoverEl.appendChild(
+    makeBtn('パスワードを生成', () => {
+      assignRole(field, 'password')
+      hidePopover()
+      showGeneratorPopover(field)
+    }),
+  )
   const divider = document.createElement('div')
   divider.className = 'kura-capture-popover-divider'
   popoverEl.appendChild(divider)
@@ -251,6 +282,303 @@ function hidePopover() {
     popoverEl.remove()
     popoverEl = null
   }
+}
+
+// ========== Password generator popover ==========
+
+function showGeneratorPopover(anchor: HTMLInputElement) {
+  if (!shadowRoot) return
+  hidePopover()
+  hideGeneratorPopover()
+
+  generatorTargetField = anchor
+  generatedPassword = ''
+  generatorLoading = false
+
+  generatorPopoverEl = document.createElement('div')
+  generatorPopoverEl.className = 'kura-capture-generator-popover'
+  generatorPopoverEl.style.pointerEvents = 'auto'
+
+  const rect = anchor.getBoundingClientRect()
+  generatorPopoverEl.style.left = `${rect.left}px`
+  generatorPopoverEl.style.top = `${rect.bottom + 4}px`
+
+  shadowRoot.appendChild(generatorPopoverEl)
+
+  renderGeneratorPopover()
+  requestGeneratePassword()
+}
+
+function hideGeneratorPopover() {
+  if (generatorDebounceTimer) {
+    clearTimeout(generatorDebounceTimer)
+    generatorDebounceTimer = null
+  }
+  // Invalidate any in-flight generate request so a late response can't
+  // resurrect state after the popover has been torn down.
+  generatorRequestSeq++
+
+  if (generatorPopoverEl) {
+    generatorPopoverEl.remove()
+    generatorPopoverEl = null
+  }
+  generatorTargetField = null
+  generatedPassword = ''
+  generatorLoading = false
+  generatorCopyBtn = null
+  generatorRegenBtn = null
+  generatorUseBtn = null
+}
+
+function renderGeneratorPopover() {
+  if (!generatorPopoverEl) return
+
+  while (generatorPopoverEl.firstChild) {
+    generatorPopoverEl.removeChild(generatorPopoverEl.firstChild)
+  }
+
+  const title = document.createElement('div')
+  title.className = 'kura-capture-generator-title'
+  title.textContent = 'パスワードを生成'
+  generatorPopoverEl.appendChild(title)
+
+  // Result row: copy / regenerate / use buttons (no plaintext preview —
+  // showing the generated value tends to overflow this small popover,
+  // especially at longer lengths)
+  const resultRow = document.createElement('div')
+  resultRow.className = 'kura-capture-generator-result'
+
+  generatorCopyBtn = document.createElement('button')
+  generatorCopyBtn.type = 'button'
+  generatorCopyBtn.className = 'kura-capture-generator-icon-btn'
+  generatorCopyBtn.textContent = 'コピー'
+  generatorCopyBtn.disabled = !generatedPassword
+  generatorCopyBtn.addEventListener('click', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onCopyGeneratedPassword()
+  })
+  resultRow.appendChild(generatorCopyBtn)
+
+  generatorRegenBtn = document.createElement('button')
+  generatorRegenBtn.type = 'button'
+  generatorRegenBtn.className = 'kura-capture-generator-icon-btn'
+  generatorRegenBtn.textContent = generatorLoading ? '生成中…' : '再生成'
+  generatorRegenBtn.disabled = generatorLoading
+  generatorRegenBtn.addEventListener('click', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    requestGeneratePassword()
+  })
+  resultRow.appendChild(generatorRegenBtn)
+
+  generatorUseBtn = document.createElement('button')
+  generatorUseBtn.type = 'button'
+  generatorUseBtn.className = 'kura-capture-generator-use-btn'
+  generatorUseBtn.textContent = 'この値を使う'
+  generatorUseBtn.disabled = !generatedPassword
+  generatorUseBtn.addEventListener('click', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onUseGeneratedPassword()
+  })
+  resultRow.appendChild(generatorUseBtn)
+
+  generatorPopoverEl.appendChild(resultRow)
+
+  // Length slider — the range input itself must never be recreated while
+  // the popover is open, or an in-progress drag gets cut off by the browser.
+  const lengthRow = document.createElement('div')
+  lengthRow.className = 'kura-capture-generator-length-row'
+
+  const lengthLabel = document.createElement('label')
+  lengthLabel.className = 'kura-capture-generator-length-label'
+  lengthLabel.textContent = `長さ: ${generatorLength}`
+
+  const lengthInput = document.createElement('input')
+  lengthInput.type = 'range'
+  lengthInput.min = '1'
+  lengthInput.max = '128'
+  lengthInput.value = String(generatorLength)
+  lengthInput.className = 'kura-capture-generator-range'
+  lengthInput.addEventListener('input', (e) => {
+    e.stopPropagation()
+    generatorLength = Number.parseInt((e.target as HTMLInputElement).value, 10)
+    lengthLabel.textContent = `長さ: ${generatorLength}`
+    scheduleGeneratePassword()
+  })
+
+  lengthRow.appendChild(lengthLabel)
+  lengthRow.appendChild(lengthInput)
+  generatorPopoverEl.appendChild(lengthRow)
+
+  // Charset settings (collapsible)
+  const toggleBtn = document.createElement('button')
+  toggleBtn.type = 'button'
+  toggleBtn.className = 'kura-capture-generator-charset-toggle'
+  toggleBtn.textContent = `${generatorShowCharOptions ? '▾' : '▸'} 文字種の設定`
+  toggleBtn.addEventListener('click', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    generatorShowCharOptions = !generatorShowCharOptions
+    renderGeneratorPopover()
+  })
+  generatorPopoverEl.appendChild(toggleBtn)
+
+  if (generatorShowCharOptions) {
+    const chipsRow = document.createElement('div')
+    chipsRow.className = 'kura-capture-generator-chips'
+
+    const chipDefs: Array<[boolean, () => void, string]> = [
+      [
+        generatorIncludeLowercase,
+        () => {
+          generatorIncludeLowercase = !generatorIncludeLowercase
+        },
+        'a-z',
+      ],
+      [
+        generatorIncludeUppercase,
+        () => {
+          generatorIncludeUppercase = !generatorIncludeUppercase
+        },
+        'A-Z',
+      ],
+      [
+        generatorIncludeNumbers,
+        () => {
+          generatorIncludeNumbers = !generatorIncludeNumbers
+        },
+        '0-9',
+      ],
+      [
+        generatorIncludeSymbols1,
+        () => {
+          generatorIncludeSymbols1 = !generatorIncludeSymbols1
+        },
+        '!@#$%^&*',
+      ],
+      [
+        generatorIncludeSymbols2,
+        () => {
+          generatorIncludeSymbols2 = !generatorIncludeSymbols2
+        },
+        '()[]{}+=',
+      ],
+      [
+        generatorIncludeSymbols3,
+        () => {
+          generatorIncludeSymbols3 = !generatorIncludeSymbols3
+        },
+        '`<>\'"\\|',
+      ],
+    ]
+
+    for (const [checked, toggle, label] of chipDefs) {
+      const chip = document.createElement('button')
+      chip.type = 'button'
+      chip.className = checked
+        ? 'kura-capture-generator-chip kura-capture-generator-chip-active'
+        : 'kura-capture-generator-chip'
+      chip.textContent = label
+      chip.addEventListener('click', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        toggle()
+        renderGeneratorPopover()
+        requestGeneratePassword()
+      })
+      chipsRow.appendChild(chip)
+    }
+
+    generatorPopoverEl.appendChild(chipsRow)
+  }
+
+  const divider = document.createElement('div')
+  divider.className = 'kura-capture-popover-divider'
+  generatorPopoverEl.appendChild(divider)
+
+  const closeBtn = document.createElement('button')
+  closeBtn.type = 'button'
+  closeBtn.className = 'kura-capture-popover-btn kura-capture-popover-btn-secondary'
+  closeBtn.textContent = '閉じる'
+  closeBtn.addEventListener('click', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    hideGeneratorPopover()
+  })
+  generatorPopoverEl.appendChild(closeBtn)
+}
+
+function scheduleGeneratePassword() {
+  if (generatorDebounceTimer) clearTimeout(generatorDebounceTimer)
+  generatorDebounceTimer = setTimeout(() => {
+    generatorDebounceTimer = null
+    requestGeneratePassword()
+  }, 150)
+}
+
+async function requestGeneratePassword() {
+  const seq = ++generatorRequestSeq
+  generatorLoading = true
+  updateGeneratorResultView()
+
+  try {
+    const password = await generatePassword(
+      generatorLength,
+      generatorIncludeLowercase,
+      generatorIncludeUppercase,
+      generatorIncludeNumbers,
+      generatorIncludeSymbols1,
+      generatorIncludeSymbols2,
+      generatorIncludeSymbols3,
+    )
+    if (seq !== generatorRequestSeq) return
+    generatedPassword = password || ''
+  } catch (e) {
+    if (seq !== generatorRequestSeq) return
+    generatedPassword = ''
+    console.error(LOG_PREFIX, 'Generate password error:', e)
+  } finally {
+    if (seq === generatorRequestSeq) {
+      generatorLoading = false
+      updateGeneratorResultView()
+    }
+  }
+}
+
+// Targeted update of the result row only — avoids recreating the length
+// slider element, which would interrupt an in-progress drag.
+function updateGeneratorResultView() {
+  if (generatorCopyBtn) {
+    generatorCopyBtn.disabled = !generatedPassword
+  }
+  if (generatorRegenBtn) {
+    generatorRegenBtn.textContent = generatorLoading ? '生成中…' : '再生成'
+    generatorRegenBtn.disabled = generatorLoading
+  }
+  if (generatorUseBtn) {
+    generatorUseBtn.disabled = !generatedPassword
+  }
+}
+
+async function onCopyGeneratedPassword() {
+  if (!generatedPassword) return
+  try {
+    await navigator.clipboard.writeText(generatedPassword)
+    chrome.runtime.sendMessage({ type: 'CLIPBOARD_COPIED', text: generatedPassword })
+    showToast('コピーしました', true)
+  } catch (e) {
+    console.error(LOG_PREFIX, 'Clipboard write failed:', e)
+    showToast('コピーに失敗しました', false)
+  }
+}
+
+function onUseGeneratedPassword() {
+  if (!generatorTargetField || !generatedPassword) return
+  fillField(generatorTargetField, generatedPassword)
+  hideGeneratorPopover()
+  showToast('パスワードを入力欄に反映しました', true)
 }
 
 // ========== Role assignment ==========
@@ -466,6 +794,7 @@ export function stopCaptureMode() {
 
   removeAllBadges()
   hidePopover()
+  hideGeneratorPopover()
 
   usernameField = null
   passwordField = null
