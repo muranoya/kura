@@ -7,6 +7,7 @@ import {
   getFromSessionStorage,
   getFromStorage,
   removeFromSessionStorage,
+  removeFromStorage,
   saveToSessionStorage,
   saveToStorage,
 } from '../shared/storage'
@@ -236,6 +237,17 @@ let syncing = false
 const MAX_SYNC_RETRIES = 5
 
 /**
+ * 同期中（S3通信のawait中）にオートロックが割り込み、Vaultがロックされたことを示すマーカーエラー。
+ * ユーザーへのエラー表示は行わず、静かに同期を中断するために使う。
+ */
+class VaultLockedDuringSyncError extends Error {
+  constructor() {
+    super('Vault locked during sync (autolock race)')
+    this.name = 'VaultLockedDuringSyncError'
+  }
+}
+
+/**
  * S3との同期（ダウンロード→マージ→アップロード、リトライ付き）
  */
 async function syncWithS3(s3Config: S3Config): Promise<void> {
@@ -254,6 +266,11 @@ async function syncWithS3(s3Config: S3Config): Promise<void> {
       }
 
       // リモート存在 → Rust側でマージ（復号→auto_merge→GC→セッション更新）
+      // download() の await 中にオートロックが発火した場合、ここで検知して中断する
+      // （チェック直後に同期的にWASMを呼ぶため、JSのシングルスレッド性によりTOCTOUは発生しない）
+      if (!vault.api_is_unlocked(DEFAULT_VAULT_ID)) {
+        throw new VaultLockedDuringSyncError()
+      }
       vault.api_merge_remote_vault(DEFAULT_VAULT_ID, remote.bytes, remote.etag)
 
       // マージ済みvaultをアップロード
@@ -288,6 +305,23 @@ async function saveLocally() {
 }
 
 /**
+ * オートロックとの競合によりVaultがロックされたことが原因の同期失敗かどうかを判定する。
+ * 事前チェックをすり抜けてRust側の "Vault not unlocked" がそのままthrowされた
+ * ケースも保険的に同一視する（このパスで他の原因によりこの文字列が発生することはない）。
+ */
+function isVaultLockRaceDuringSync(err: unknown): boolean {
+  return err instanceof VaultLockedDuringSyncError || String(err).includes('Vault not unlocked')
+}
+
+/** LAST_ERROR が同期関連キー（'auto-sync' / 'periodic-sync'）の場合のみクリアする */
+async function clearSyncErrorIfPresent() {
+  const stored = await getFromStorage<{ key: string }>(STORAGE_KEYS.LAST_ERROR)
+  if (stored && (stored.key === 'auto-sync' || stored.key === 'periodic-sync')) {
+    await removeFromStorage(STORAGE_KEYS.LAST_ERROR)
+  }
+}
+
+/**
  * 自動同期（リモートとマージしてアップロード）
  */
 async function autoSync() {
@@ -310,7 +344,15 @@ async function autoSync() {
     await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
     const syncTime = Math.floor(Date.now() / 1000)
     await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, syncTime)
+    await clearSyncErrorIfPresent()
   } catch (err) {
+    if (isVaultLockRaceDuringSync(err)) {
+      // オートロックとの正常な競合。ユーザーにエラー表示はしない。
+      // 次回の 'autosync' アラーム、または次回アンロック時の再同期で解消される。
+      console.info('[SW] autoSync aborted: vault was locked during sync (autolock race)')
+      await clearSyncErrorIfPresent()
+      return
+    }
     console.error('[SW] autoSync failed:', err)
     await saveToStorage(STORAGE_KEYS.LAST_ERROR, {
       key: 'auto-sync',
@@ -1249,6 +1291,7 @@ async function handleAutolockAlarm() {
     updateExtensionIcon(false)
     decryptedS3Config = null
     await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
+    chrome.alarms.clear('autosync')
     onVaultLocked()
   } catch (err) {
     console.error('[SW] Autolock failed:', err)
@@ -1340,12 +1383,5 @@ async function handleAutosyncAlarm() {
     await tryRestoreSession()
   }
   if (!unlocked) return
-  autoSync().catch((e) => {
-    console.error('[SW] Periodic sync failed:', e)
-    saveToStorage(STORAGE_KEYS.LAST_ERROR, {
-      key: 'periodic-sync',
-      message: `同期に失敗しました: ${e}`,
-      timestamp: Date.now(),
-    })
-  })
+  await autoSync()
 }
