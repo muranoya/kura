@@ -1,0 +1,17 @@
+{
+  "description": "IIJmio 会員ログイン（name=j_username/j_password が Java form-based auth 由来のため heuristic で未検出）",
+  "match": {
+    "type": "domain",
+    "value": "www.iijmio.jp"
+  },
+  "forms": [
+    {
+      "id": "iijmio-member-login",
+      "type": "login",
+      "fields": {
+        "username": { "selector": "input[name='j_username']" },
+        "password": { "selector": "input[name='j_password']" }
+      }
+    }
+  ]
+}
