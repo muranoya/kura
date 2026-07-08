@@ -155,10 +155,7 @@ export default function EntryForm({
                     setFocusedPasswordFieldId('password')
                     if (!v.password) setActiveGeneratorFieldId('password')
                   }}
-                  onBlur={() => {
-                    setFocusedPasswordFieldId(null)
-                    setActiveGeneratorFieldId(null)
-                  }}
+                  onBlur={() => setFocusedPasswordFieldId(null)}
                   className="pr-9"
                 />
                 {focusedPasswordFieldId === 'password' && !!v.password && (
@@ -178,7 +175,7 @@ export default function EntryForm({
                 )}
               </div>
               {activeGeneratorFieldId === 'password' && (
-                <div role="presentation" onMouseDown={(e) => e.preventDefault()}>
+                <div role="presentation">
                   <PasswordGeneratorPanel
                     onUse={(pw) => {
                       updateTypedValue('password', pw)
@@ -269,10 +266,7 @@ export default function EntryForm({
                     setFocusedPasswordFieldId('pin')
                     if (!v.pin) setActiveGeneratorFieldId('pin')
                   }}
-                  onBlur={() => {
-                    setFocusedPasswordFieldId(null)
-                    setActiveGeneratorFieldId(null)
-                  }}
+                  onBlur={() => setFocusedPasswordFieldId(null)}
                   className="pr-9"
                 />
                 {focusedPasswordFieldId === 'pin' && !!v.pin && (
@@ -290,7 +284,7 @@ export default function EntryForm({
                 )}
               </div>
               {activeGeneratorFieldId === 'pin' && (
-                <div role="presentation" onMouseDown={(e) => e.preventDefault()}>
+                <div role="presentation">
                   <PasswordGeneratorPanel
                     onUse={(pw) => {
                       updateTypedValue('pin', pw)
@@ -431,10 +425,7 @@ export default function EntryForm({
                     setFocusedPasswordFieldId('cc_pin')
                     if (!v.pin) setActiveGeneratorFieldId('cc_pin')
                   }}
-                  onBlur={() => {
-                    setFocusedPasswordFieldId(null)
-                    setActiveGeneratorFieldId(null)
-                  }}
+                  onBlur={() => setFocusedPasswordFieldId(null)}
                   className="pr-9"
                 />
                 {focusedPasswordFieldId === 'cc_pin' && !!v.pin && (
@@ -454,7 +445,7 @@ export default function EntryForm({
                 )}
               </div>
               {activeGeneratorFieldId === 'cc_pin' && (
-                <div role="presentation" onMouseDown={(e) => e.preventDefault()}>
+                <div role="presentation">
                   <PasswordGeneratorPanel
                     onUse={(pw) => {
                       updateTypedValue('pin', pw)
@@ -493,10 +484,7 @@ export default function EntryForm({
                     setFocusedPasswordFieldId('password')
                     if (!v.password) setActiveGeneratorFieldId('password')
                   }}
-                  onBlur={() => {
-                    setFocusedPasswordFieldId(null)
-                    setActiveGeneratorFieldId(null)
-                  }}
+                  onBlur={() => setFocusedPasswordFieldId(null)}
                   className="pr-9"
                 />
                 {focusedPasswordFieldId === 'password' && !!v.password && (
@@ -516,7 +504,7 @@ export default function EntryForm({
                 )}
               </div>
               {activeGeneratorFieldId === 'password' && (
-                <div role="presentation" onMouseDown={(e) => e.preventDefault()}>
+                <div role="presentation">
                   <PasswordGeneratorPanel
                     onUse={(pw) => {
                       updateTypedValue('password', pw)
@@ -601,7 +589,6 @@ export default function EntryForm({
                   onBlur={() => {
                     if (field.fieldType === 'password' || field.fieldType === 'totp')
                       setFocusedPasswordFieldId(null)
-                    if (field.fieldType === 'password') setActiveGeneratorFieldId(null)
                   }}
                 />
                 {field.fieldType === 'password' &&
@@ -653,7 +640,7 @@ export default function EntryForm({
               </button>
             </div>
             {field.fieldType === 'password' && activeGeneratorFieldId === `custom-${field.id}` && (
-              <div onMouseDown={(e) => e.preventDefault()}>
+              <div>
                 <PasswordGeneratorPanel
                   onUse={(pw) => {
                     updateCustomField(field.id, { value: pw })
