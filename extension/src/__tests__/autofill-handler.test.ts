@@ -54,8 +54,18 @@ function createMockVaultApi(entries: MockEntry[]): VaultApi {
         return JSON.stringify(filtered)
       },
     ),
-    api_generate_totp_from_value: vi.fn((_value: string) => '123456'),
-    api_parse_totp_period: vi.fn((_value: string) => 30),
+    api_get_totp_code: vi.fn((_vaultId: string, id: string) => {
+      const entry = entries.find((e) => e.id === id)
+      const hasTotp = entry?.custom_fields?.some((f) => f.field_type === 'totp')
+      return hasTotp ? '123456' : null
+    }),
+    api_list_totp_periods: vi.fn((_vaultId: string, ids: string[]) => {
+      const periods = ids
+        .map((id) => entries.find((e) => e.id === id))
+        .filter((e): e is MockEntry => !!e?.custom_fields?.some((f) => f.field_type === 'totp'))
+        .map((e) => ({ entry_id: e.id, period: 30 }))
+      return JSON.stringify(periods)
+    }),
     api_create_entry: vi.fn(
       (
         _vaultId: string,
@@ -379,11 +389,10 @@ describe('handleAutofillMessage', () => {
         type: 'AUTOFILL_GET_TOTP',
         url: 'https://example.com',
         entryId: 'entry-totp',
-      })) as { success: boolean; totpCode: string; totpEntryName: string }
+      })) as { success: boolean; totpCode: string }
 
       expect(result.success).toBe(true)
       expect(result.totpCode).toBe('123456')
-      expect(result.totpEntryName).toBe('TOTP Entry')
     })
 
     it('returns null when entry has no TOTP field', async () => {

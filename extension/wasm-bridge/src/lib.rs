@@ -236,6 +236,19 @@ pub fn api_list_login_urls(vault_id: String) -> Result<String, JsValue> {
     serde_json::to_string(&candidates).map_err(|e| to_js_err(format!("Serialization error: {}", e)))
 }
 
+/// エントリのTOTPコードを生成する（フルEntryDetailを取得せずTOTP値のみ扱う）
+#[wasm_bindgen]
+pub fn api_get_totp_code(vault_id: String, id: String) -> Result<Option<String>, JsValue> {
+    with_manager(&vault_id, |m| m.api_get_totp_code(id)).map_err(to_js_err)
+}
+
+/// 複数エントリのTOTP周期をまとめて取得する（N+1回避）
+#[wasm_bindgen]
+pub fn api_list_totp_periods(vault_id: String, ids: Vec<String>) -> Result<String, JsValue> {
+    let periods = with_manager(&vault_id, |m| m.api_list_totp_periods(ids)).map_err(to_js_err)?;
+    serde_json::to_string(&periods).map_err(|e| to_js_err(format!("Serialization error: {}", e)))
+}
+
 // ============================================================================
 // ラベル操作API
 // ============================================================================

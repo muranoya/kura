@@ -43,12 +43,10 @@ pub fn generate_preview(
 
         let is_archived = parsed.is_archived || parsed.is_trashed;
 
-        let default_action = if is_archived {
-            ImportAction::Skip
-        } else if duplicates
+        let has_high_confidence_duplicate = duplicates
             .iter()
-            .any(|d| d.confidence == DuplicateConfidence::High)
-        {
+            .any(|d| d.confidence == DuplicateConfidence::High);
+        let default_action = if is_archived || has_high_confidence_duplicate {
             ImportAction::Skip
         } else {
             ImportAction::Import

@@ -1,5 +1,7 @@
 use crate::error::{Result, VaultError};
-use crate::models::{Entry, EntryData, EntryFilter, SortField, SortOrder, TypedValue};
+use crate::models::{
+    Entry, EntryData, EntryFilter, EntrySummary, SortField, SortOrder, TypedValue,
+};
 use crate::secret::EntrySecretJson;
 use crate::store::VaultEntry;
 
@@ -28,12 +30,64 @@ impl UnlockedVault {
         Ok(result)
     }
 
+    /// エントリのサマリ一覧をcreated_at降順で返す（一覧表示・オートフィル候補抽出用）。
+    /// `list_entries`と異なり、password/cvv/pin/notes/custom_fields等の秘匿値は
+    /// 一切パース・cloneしない。typed_valueからはsubtitle/URL抽出に必要な
+    /// 非秘匿フィールドのみを読む。
+    pub fn list_entry_summaries(&self, filter: &EntryFilter) -> Vec<EntrySummary> {
+        let mut result = Vec::new();
+        for (id, vault_entry) in &self.contents.entries {
+            if filter.matches(vault_entry) {
+                result.push(vault_entry_to_summary(id.clone(), vault_entry));
+            }
+        }
+        result.sort_by(|a, b| {
+            let cmp = match filter.sort_field {
+                SortField::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                SortField::CreatedAt => a.created_at.cmp(&b.created_at),
+                SortField::UpdatedAt => a.updated_at.cmp(&b.updated_at),
+            };
+            match filter.sort_order {
+                SortOrder::Asc => cmp,
+                SortOrder::Desc => cmp.reverse(),
+            }
+        });
+        result
+    }
+
     /// Get single entry (decrypted)
     pub fn get_entry(&self, id: &str) -> Result<Option<Entry>> {
         match self.contents.entries.get(id) {
             Some(e) => Ok(Some(vault_entry_to_entry(id.to_string(), e)?)),
             None => Ok(None),
         }
+    }
+
+    /// 指定エントリのTOTPカスタムフィールドからTOTPコードを生成する。
+    /// `vault_entry_to_entry`（password等を含む全フィールド変換）を経由せず、
+    /// custom_fieldsのtotpフィールドのみを直接参照するため、他の秘匿フィールドは
+    /// 一切パース・cloneされない。
+    /// エントリが存在しない、またはtotpカスタムフィールドを持たない場合は`Ok(None)`。
+    pub fn get_totp_code(&self, id: &str) -> Result<Option<String>> {
+        let Some(vault_entry) = self.contents.entries.get(id) else {
+            return Ok(None);
+        };
+        match find_totp_value(vault_entry) {
+            Some(value) => crate::totp::generate_totp_from_value(value).map(Some),
+            None => Ok(None),
+        }
+    }
+
+    /// 複数エントリのTOTP周期をまとめて取得する（オートフィル候補一覧のN+1回避用）。
+    /// 存在しないID・totpカスタムフィールドを持たないエントリは結果から除外する。
+    pub fn list_totp_periods(&self, ids: &[String]) -> Vec<(String, u64)> {
+        ids.iter()
+            .filter_map(|id| {
+                let vault_entry = self.contents.entries.get(id)?;
+                let value = find_totp_value(vault_entry)?;
+                Some((id.clone(), crate::totp::parse_totp_period(value)))
+            })
+            .collect()
     }
 
     /// Create entry
@@ -426,6 +480,89 @@ mod tests {
     }
 
     #[test]
+    fn test_list_entry_summaries_login_subtitle_and_url() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "GitHub", 1000);
+
+        let filter = EntryFilter::new();
+        let summaries = vault.list_entry_summaries(&filter);
+
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].id, "e1");
+        assert_eq!(summaries[0].subtitle.as_deref(), Some("user"));
+        assert_eq!(
+            summaries[0].login_url.as_deref(),
+            Some("https://example.com")
+        );
+    }
+
+    #[test]
+    fn test_list_entry_summaries_bank_subtitle_no_login_url() {
+        let mut vault = make_vault();
+        let data = EntryData::new_bank(
+            "My Bank".to_string(),
+            "Account Holder".to_string(),
+            "001".to_string(),
+            "Checking".to_string(),
+            "1234567890".to_string(),
+            "1234".to_string(),
+            None,
+        );
+        vault
+            .create_entry("Bank".into(), "bank".to_string(), data, vec![])
+            .unwrap();
+
+        let filter = EntryFilter::new();
+        let summaries = vault.list_entry_summaries(&filter);
+
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].subtitle.as_deref(), Some("My Bank"));
+        // bankエントリはlogin_urlの対象外
+        assert_eq!(summaries[0].login_url, None);
+    }
+
+    #[test]
+    fn test_list_entry_summaries_credit_card_subtitle() {
+        let mut vault = make_vault();
+        let data = EntryData::new_credit_card(
+            "John Doe".to_string(),
+            "4532015112830366".to_string(),
+            "12/25".to_string(),
+            "123".to_string(),
+            "5678".to_string(),
+            None,
+        );
+        vault
+            .create_entry("Card".into(), "credit_card".to_string(), data, vec![])
+            .unwrap();
+
+        let filter = EntryFilter::new();
+        let summaries = vault.list_entry_summaries(&filter);
+
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].subtitle.as_deref(), Some("John Doe"));
+        assert_eq!(summaries[0].login_url, None);
+    }
+
+    #[test]
+    fn test_list_entry_summaries_sort_and_filter_match_list_entries() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "old", "Old", 1000);
+        insert_entry(&mut vault, "mid", "Mid", 2000);
+        insert_entry(&mut vault, "new", "New", 3000);
+        vault.contents.entries.get_mut("mid").unwrap().deleted_at = Some(2000);
+
+        let filter = EntryFilter::new();
+        let summaries = vault.list_entry_summaries(&filter);
+
+        // 削除済みはデフォルトで除外され、created_at降順でソートされる
+        // （list_entriesと同じフィルタ/ソートロジックを共有しているため一致するはず）
+        assert_eq!(summaries.len(), 2);
+        assert_eq!(summaries[0].id, "new");
+        assert_eq!(summaries[1].id, "old");
+    }
+
+    #[test]
     fn test_update_entry() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "Original", 1000);
@@ -567,6 +704,44 @@ mod tests {
         let ve = &vault.contents.entries[&entry_id];
         assert!(ve.custom_fields.is_none());
         assert_eq!(ve.typed_value.as_str(), "{}");
+    }
+
+    #[test]
+    fn test_get_totp_code_and_list_totp_periods() {
+        let mut vault = make_vault();
+        let mut data = EntryData::new_login(
+            Some("https://example.com".into()),
+            "user".into(),
+            "pass".into(),
+            None,
+        );
+        data.custom_fields = Some(vec![crate::models::CustomField {
+            id: "f1".to_string(),
+            name: "TOTP".to_string(),
+            field_type: "totp".to_string(),
+            value: SecretString::from_string("JBSWY3DPEHPK3PXP".to_string()),
+        }]);
+        let created = vault
+            .create_entry("WithTotp".into(), "login".to_string(), data, vec![])
+            .unwrap();
+
+        insert_entry(&mut vault, "no_totp", "NoTotp", 1000);
+
+        // get_totp_code: totpフィールドを持つエントリはコードを返す
+        let code = vault.get_totp_code(&created.id).unwrap();
+        assert!(code.is_some());
+        assert_eq!(code.unwrap().len(), 6);
+
+        // get_totp_code: totpフィールドを持たないエントリはNone
+        assert_eq!(vault.get_totp_code("no_totp").unwrap(), None);
+
+        // get_totp_code: 存在しないIDもNone（エラーにしない）
+        assert_eq!(vault.get_totp_code("nonexistent").unwrap(), None);
+
+        // list_totp_periods: totpを持つものだけ返す
+        let ids = vec![created.id.clone(), "no_totp".to_string()];
+        let periods = vault.list_totp_periods(&ids);
+        assert_eq!(periods, vec![(created.id.clone(), 30)]);
     }
 
     #[test]
@@ -858,6 +1033,45 @@ mod tests {
 
         let result = vault.set_favorite("e1", true);
         assert!(result.is_err());
+    }
+}
+
+/// VaultEntryのcustom_fieldsからfield_type=="totp"の値を取り出す。
+/// custom_fields全体をcloneせず参照のみ返す。
+fn find_totp_value(e: &VaultEntry) -> Option<&str> {
+    e.custom_fields
+        .as_ref()?
+        .iter()
+        .find(|f| f.field_type == "totp")
+        .map(|f| f.value.as_str())
+}
+
+/// VaultEntryから一覧表示用の軽量サマリを作る。
+/// typed_valueは`TypedValuePreviewFields`（非秘匿フィールドのみ）へdeserializeするため、
+/// password/cvv/pin等は`SecretString`としてすら構築されない。
+pub(crate) fn vault_entry_to_summary(id: String, e: &VaultEntry) -> EntrySummary {
+    let preview = serde_json::from_str::<crate::models::entry::TypedValuePreviewFields>(
+        e.typed_value.as_str(),
+    )
+    .ok();
+
+    let subtitle = preview.as_ref().and_then(|p| p.subtitle(&e.entry_type));
+    let login_url = if e.entry_type == "login" {
+        preview.and_then(|p| p.login_url())
+    } else {
+        None
+    };
+
+    EntrySummary {
+        id,
+        name: e.name.clone(),
+        entry_type: e.entry_type.clone(),
+        is_favorite: e.is_favorite,
+        created_at: e.created_at,
+        updated_at: e.updated_at,
+        deleted_at: e.deleted_at,
+        subtitle,
+        login_url,
     }
 }
 

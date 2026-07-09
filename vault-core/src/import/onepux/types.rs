@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use crate::secret::SecretString;
+
 // ============================================================================
 // 1pux JSON schema types (mirrors export.data structure)
 // ============================================================================
@@ -155,7 +157,9 @@ pub struct ParsedItem {
     pub url: Option<String>,
     pub urls: Vec<String>,
     pub username: Option<String>,
-    pub password: Option<String>,
+    /// import プレビュー〜取り込み確定までの間、平文のまま長時間保持されないよう
+    /// `SecretString`（Drop時にゼロ化）で保持する
+    pub password: Option<SecretString>,
     pub notes: Option<String>,
     pub tags: Vec<String>,
     pub fields: Vec<ParsedField>,
@@ -179,11 +183,14 @@ pub struct ParsedField {
 #[derive(Debug, Clone)]
 pub enum ParsedFieldValue {
     Text(String),
-    Concealed(String),
+    /// cvv/pin/カード番号等、1Password側で「concealed」と分類された値。
+    /// `SecretString`で保持し、Drop時にゼロ化する。
+    Concealed(SecretString),
     Email(String),
     Url(String),
     Phone(String),
-    Totp(String),
+    /// TOTPシークレット。concealedと同等の機密性のため`SecretString`で保持する。
+    Totp(SecretString),
     Date(i64),
     MonthYear(i64),
     Address(String),
@@ -193,12 +200,11 @@ impl ParsedFieldValue {
     pub fn as_str(&self) -> &str {
         match self {
             ParsedFieldValue::Text(s)
-            | ParsedFieldValue::Concealed(s)
             | ParsedFieldValue::Email(s)
             | ParsedFieldValue::Url(s)
             | ParsedFieldValue::Phone(s)
-            | ParsedFieldValue::Totp(s)
             | ParsedFieldValue::Address(s) => s,
+            ParsedFieldValue::Concealed(s) | ParsedFieldValue::Totp(s) => s.as_str(),
             ParsedFieldValue::Date(_) | ParsedFieldValue::MonthYear(_) => "",
         }
     }

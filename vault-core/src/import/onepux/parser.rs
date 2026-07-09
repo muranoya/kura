@@ -1,6 +1,7 @@
 use std::io::Read;
 
 use crate::error::{Result, VaultError};
+use crate::secret::SecretString;
 
 use super::types::*;
 
@@ -96,7 +97,7 @@ fn convert_item(item: &OnePuxItem, vault_name: &str, _has_files_dir: bool) -> Pa
                 "password" => {
                     if let Some(ref v) = lf.value {
                         if !v.is_empty() {
-                            password = Some(v.clone());
+                            password = Some(SecretString::from_string(v.clone()));
                         }
                     }
                 }
@@ -175,10 +176,14 @@ fn parse_section_field_value(value: &serde_json::Value) -> Option<ParsedFieldVal
     let obj = value.as_object()?;
 
     if let Some(v) = obj.get("concealed").and_then(|v| v.as_str()) {
-        return Some(ParsedFieldValue::Concealed(v.to_string()));
+        return Some(ParsedFieldValue::Concealed(SecretString::from_string(
+            v.to_string(),
+        )));
     }
     if let Some(v) = obj.get("totp").and_then(|v| v.as_str()) {
-        return Some(ParsedFieldValue::Totp(v.to_string()));
+        return Some(ParsedFieldValue::Totp(SecretString::from_string(
+            v.to_string(),
+        )));
     }
     if let Some(v) = obj.get("email") {
         // email can be an object with {email_address, provider} or a string
@@ -343,7 +348,10 @@ mod tests {
         assert_eq!(login.title, "Example Login");
         assert_eq!(login.category_uuid, "001");
         assert_eq!(login.username.as_deref(), Some("user@example.com"));
-        assert_eq!(login.password.as_deref(), Some("secret123"));
+        assert_eq!(
+            login.password.as_ref().map(|p| p.as_str()),
+            Some("secret123")
+        );
         assert_eq!(login.url.as_deref(), Some("https://example.com"));
         assert!(login.is_favorite);
         assert!(!login.is_archived);

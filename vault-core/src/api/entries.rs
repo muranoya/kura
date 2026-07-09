@@ -2,50 +2,13 @@ use crate::models::{
     entry_data::CustomFieldType, EntryFilter, EntryType, SortField, SortOrder, TypedValue,
 };
 
-use super::{AutofillCandidate, EntryDetail, EntryRow, VaultManager};
+use super::{AutofillCandidate, EntryDetail, EntryRow, TotpPeriodRow, VaultManager};
 use crate::secret::SecretString;
-
-/// エントリタイプに応じてサブタイトルを抽出する
-fn extract_subtitle(typed_value: &TypedValue) -> Option<String> {
-    match typed_value {
-        TypedValue::Login(d) => {
-            let username = d.username.as_str();
-            if username.is_empty() {
-                None
-            } else {
-                Some(username.to_string())
-            }
-        }
-        TypedValue::Password(d) => {
-            let username = d.username.as_str();
-            if username.is_empty() {
-                None
-            } else {
-                Some(username.to_string())
-            }
-        }
-        TypedValue::Bank(d) => {
-            let bank_name = d.bank_name.as_str();
-            if bank_name.is_empty() {
-                None
-            } else {
-                Some(bank_name.to_string())
-            }
-        }
-        TypedValue::CreditCard(d) => {
-            let cardholder = d.cardholder.as_str();
-            if cardholder.is_empty() {
-                None
-            } else {
-                Some(cardholder.to_string())
-            }
-        }
-        _ => None,
-    }
-}
 
 impl VaultManager {
     /// エントリ一覧（フィルター付き）
+    /// FFI境界越しに構造体を渡す設計にしていないため引数がフラットになっている
+    #[allow(clippy::too_many_arguments)]
     pub fn api_list_entries(
         &self,
         search_query: Option<String>,
@@ -81,24 +44,22 @@ impl VaultManager {
                 filter = filter.favorites_only();
             }
 
-            let entries = unlocked
-                .list_entries(&filter)
-                .map_err(|e| format!("Failed to list entries: {}", e))?;
+            // password/cvv/pin等の秘匿値は一覧表示に不要なため、list_entry_summariesで
+            // 復号・cloneを避ける（メモリ安全性の設計方針は docs/architecture.md の
+            // 「メモリ安全性」セクション参照）
+            let entries = unlocked.list_entry_summaries(&filter);
 
             Ok(entries
                 .into_iter()
-                .map(|entry| {
-                    let subtitle = extract_subtitle(&entry.data.typed_value);
-                    EntryRow {
-                        id: entry.id,
-                        entry_type: entry.entry_type,
-                        name: entry.name,
-                        subtitle,
-                        is_favorite: entry.is_favorite,
-                        created_at: entry.created_at,
-                        updated_at: entry.updated_at,
-                        deleted_at: entry.deleted_at,
-                    }
+                .map(|entry| EntryRow {
+                    id: entry.id,
+                    entry_type: entry.entry_type,
+                    name: entry.name,
+                    subtitle: entry.subtitle,
+                    is_favorite: entry.is_favorite,
+                    created_at: entry.created_at,
+                    updated_at: entry.updated_at,
+                    deleted_at: entry.deleted_at,
                 })
                 .collect())
         })
@@ -300,41 +261,40 @@ impl VaultManager {
         self.with_unlocked(|unlocked| {
             let filter = EntryFilter::new().with_type("login".to_string());
 
-            let entries = unlocked
-                .list_entries(&filter)
-                .map_err(|e| format!("Failed to list entries: {}", e))?;
+            // password等の秘匿値は不要なため、list_entry_summariesで復号・cloneを避ける
+            let entries = unlocked.list_entry_summaries(&filter);
 
             Ok(entries
                 .into_iter()
-                .filter_map(|entry| match &entry.data.typed_value {
-                    TypedValue::Login(d) => {
-                        let url = d.url.as_ref().and_then(|u| {
-                            let url_str = u.as_str();
-                            if url_str.is_empty() {
-                                None
-                            } else {
-                                Some(url_str.to_string())
-                            }
-                        })?;
-
-                        let username = {
-                            let username_str = d.username.as_str();
-                            if username_str.is_empty() {
-                                None
-                            } else {
-                                Some(username_str.to_string())
-                            }
-                        };
-
-                        Some(AutofillCandidate {
-                            id: entry.id,
-                            name: entry.name,
-                            url,
-                            username,
-                        })
-                    }
-                    _ => None,
+                .filter_map(|entry| {
+                    let url = entry.login_url?;
+                    Some(AutofillCandidate {
+                        id: entry.id,
+                        name: entry.name,
+                        url,
+                        username: entry.subtitle,
+                    })
                 })
+                .collect())
+        })
+    }
+
+    /// エントリのTOTPコードを生成する（password等の他フィールドは取得しない）
+    pub fn api_get_totp_code(&self, id: String) -> Result<Option<String>, String> {
+        self.with_unlocked(|unlocked| {
+            unlocked
+                .get_totp_code(&id)
+                .map_err(|e| format!("Failed to generate TOTP: {}", e))
+        })
+    }
+
+    /// 複数エントリのTOTP周期をまとめて取得する（オートフィル候補抽出用のN+1回避）
+    pub fn api_list_totp_periods(&self, ids: Vec<String>) -> Result<Vec<TotpPeriodRow>, String> {
+        self.with_unlocked(|unlocked| {
+            Ok(unlocked
+                .list_totp_periods(&ids)
+                .into_iter()
+                .map(|(entry_id, period)| TotpPeriodRow { entry_id, period })
                 .collect())
         })
     }

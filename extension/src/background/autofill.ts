@@ -23,8 +23,8 @@ export interface VaultApi {
     sortField: string | null,
     sortOrder: string | null,
   ): string
-  api_generate_totp_from_value(value: string): string
-  api_parse_totp_period(value: string): number
+  api_get_totp_code(vaultId: string, id: string): string | null
+  api_list_totp_periods(vaultId: string, ids: string[]): string
   api_create_entry(
     vaultId: string,
     entryType: string,
@@ -168,53 +168,43 @@ function getFillData(entryId: string): AutofillFillData | null {
 
 interface TotpResult {
   totpCode: string
-  totpEntryName: string
+}
+
+interface RawTotpPeriod {
+  entry_id: string
+  period: number
 }
 
 function getTotpCandidatesForUrl(url: string): AutofillCredentialCandidate[] {
   if (!vaultApi || !isUnlocked()) return []
 
   const candidates = getCredentialsForUrl(url)
-  const totpCandidates: AutofillCredentialCandidate[] = []
-  for (const candidate of candidates) {
-    try {
-      const result = vaultApi.api_get_entry(DEFAULT_VAULT_ID, candidate.entryId)
-      const raw = JSON.parse(result)
-      const customFieldsRaw = raw.custom_fields
-      const customFields = (
-        typeof customFieldsRaw === 'string' ? JSON.parse(customFieldsRaw) : customFieldsRaw
-      ) as Array<{ field_type: string; value: string }> | null
-      if (!customFields) continue
+  if (candidates.length === 0) return []
 
-      const totpField = customFields.find((f) => f.field_type === 'totp')
-      if (!totpField?.value) continue
+  try {
+    const result = vaultApi.api_list_totp_periods(
+      DEFAULT_VAULT_ID,
+      candidates.map((c) => c.entryId),
+    )
+    const periods: RawTotpPeriod[] = JSON.parse(result)
+    const periodByEntryId = new Map(periods.map((p) => [p.entry_id, p.period]))
 
-      const period = vaultApi.api_parse_totp_period(totpField.value)
-      totpCandidates.push({ ...candidate, totpPeriod: period })
-    } catch (e) {
-      console.error(LOG_PREFIX, `getTotpCandidatesForUrl: error for entry ${candidate.entryId}:`, e)
-    }
+    return candidates
+      .filter((c) => periodByEntryId.has(c.entryId))
+      .map((c) => ({ ...c, totpPeriod: periodByEntryId.get(c.entryId) }))
+  } catch (e) {
+    console.error(LOG_PREFIX, 'getTotpCandidatesForUrl: error:', e)
+    return []
   }
-  return totpCandidates
 }
 
 function getTotpForEntry(entryId: string): TotpResult | null {
   if (!vaultApi || !isUnlocked()) return null
 
   try {
-    const result = vaultApi.api_get_entry(DEFAULT_VAULT_ID, entryId)
-    const raw = JSON.parse(result)
-    const customFieldsRaw = raw.custom_fields
-    const customFields = (
-      typeof customFieldsRaw === 'string' ? JSON.parse(customFieldsRaw) : customFieldsRaw
-    ) as Array<{ field_type: string; value: string }> | null
-    if (!customFields) return null
-
-    const totpField = customFields.find((f) => f.field_type === 'totp')
-    if (!totpField?.value) return null
-
-    const code = vaultApi.api_generate_totp_from_value(totpField.value)
-    return { totpCode: code, totpEntryName: raw.name || '' }
+    const code = vaultApi.api_get_totp_code(DEFAULT_VAULT_ID, entryId)
+    if (!code) return null
+    return { totpCode: code }
   } catch (e) {
     console.error(LOG_PREFIX, `getTotpForEntry: error for entry ${entryId}:`, e)
     return null

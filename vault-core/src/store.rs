@@ -2,6 +2,7 @@ use crate::secret::{EntrySecretJson, SecretString};
 /// Data structures for vault.json serialization/deserialization
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use zeroize::Zeroizing;
 
 /// Top-level vault.json structure stored in S3
 /// schema_version and meta are in plaintext, encrypted_vault is AES-256-GCM encrypted
@@ -60,9 +61,13 @@ impl VaultContents {
         Self::default()
     }
 
-    /// Convert to JSON bytes
-    pub fn to_bytes(&self) -> crate::error::Result<Vec<u8>> {
-        serde_json::to_vec(self).map_err(crate::error::VaultError::JsonError)
+    /// JSONバイト列に変換する。
+    /// `Zeroizing`バッファへ直接シリアライズすることで、平文（全エントリの
+    /// 秘匿値を含む）が非保護の`Vec<u8>`として一瞬たりとも存在しないようにする。
+    pub fn to_bytes(&self) -> crate::error::Result<Zeroizing<Vec<u8>>> {
+        let mut buf = Zeroizing::new(Vec::new());
+        serde_json::to_writer(&mut *buf, self).map_err(crate::error::VaultError::JsonError)?;
+        Ok(buf)
     }
 
     /// Create from JSON bytes

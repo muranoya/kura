@@ -59,6 +59,13 @@ pub struct AutofillCandidate {
     pub username: Option<String>,
 }
 
+/// TOTP周期データ（オートフィル候補一覧のカウントダウン表示用、コード本体は含まない）
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TotpPeriodRow {
+    pub entry_id: String,
+    pub period: u64,
+}
+
 /// ラベルデータ
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct LabelRow {

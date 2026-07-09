@@ -68,6 +68,8 @@ interface WasmApi {
   api_purge_entry(vaultId: string, id: string): void
   api_set_favorite(vaultId: string, id: string, isFavorite: boolean): void
   api_list_login_urls(vaultId: string): string
+  api_get_totp_code(vaultId: string, id: string): string | null
+  api_list_totp_periods(vaultId: string, ids: string[]): string
   api_list_labels(vaultId: string): string
   api_create_label(vaultId: string, name: string): string
   api_delete_label(vaultId: string, id: string): void

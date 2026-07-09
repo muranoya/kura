@@ -114,3 +114,12 @@ export interface AutofillFillData {
   ccCvc?: string | null
   ccName?: string | null
 }
+
+// Sync conflict reported after a merge
+export interface SyncConflict {
+  entryId: string
+  entryName: string
+  conflictType: 'local_modified_remote_deleted' | 'remote_modified_local_deleted' | 'both_modified'
+  localValue?: unknown
+  remoteValue?: unknown
+}
