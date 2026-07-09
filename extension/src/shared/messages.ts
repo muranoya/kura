@@ -7,7 +7,7 @@ import type {
   EntryRow,
   Label,
   SyncConflict,
-} from '../vault/types'
+} from './types'
 
 export type Message =
   // Auth
@@ -180,7 +180,6 @@ export type MessageResponse =
       credentials?: AutofillCredentialCandidate[]
       fillData?: AutofillFillData
       totpCode?: string
-      totpEntryName?: string
       creditCards?: AutofillCredentialCandidate[]
       totpCandidates?: AutofillCredentialCandidate[]
       pendingFlow?: { entryId: string; username: string; password: string } | null

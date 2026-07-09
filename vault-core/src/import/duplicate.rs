@@ -13,7 +13,7 @@ pub fn detect_duplicates(
     let mut candidates = Vec::new();
 
     let item_name_normalized = normalize_name(&item.title);
-    let item_url_domain = item.url.as_deref().and_then(|u| extract_domain(u));
+    let item_url_domain = item.url.as_deref().and_then(extract_domain);
 
     for &(id, entry) in existing_entries {
         // Skip deleted/purged entries
@@ -105,8 +105,8 @@ fn check_high_confidence(
             let entry_url = d.url.as_ref().map(|u| u.as_str());
             let entry_username = d.username.as_str();
 
-            let item_domain = item.url.as_deref().and_then(|u| extract_domain(u));
-            let entry_domain = entry_url.and_then(|u| extract_domain(u));
+            let item_domain = item.url.as_deref().and_then(extract_domain);
+            let entry_domain = entry_url.and_then(extract_domain);
 
             if let (Some(id), Some(ed)) = (&item_domain, &entry_domain) {
                 if id == ed {

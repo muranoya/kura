@@ -11,7 +11,7 @@ use zeroize::Zeroizing;
 pub fn encrypt_vault(contents: &VaultContents, dek: &super::Dek) -> Result<String> {
     use base64::Engine;
 
-    let json_bytes: Zeroizing<Vec<u8>> = Zeroizing::new(contents.to_bytes()?);
+    let json_bytes: Zeroizing<Vec<u8>> = contents.to_bytes()?;
 
     let iv_bytes: [u8; 12] = rand::random();
     let nonce = Nonce::from_slice(&iv_bytes);

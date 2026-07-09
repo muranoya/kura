@@ -91,7 +91,10 @@ fn map_to_login(item: &ParsedItem) -> (EntryData, Option<String>) {
     let mut data = EntryData::new_login(
         item.url.clone(),
         item.username.clone().unwrap_or_default(),
-        item.password.clone().unwrap_or_default(),
+        item.password
+            .as_ref()
+            .map(|p| p.as_str().to_string())
+            .unwrap_or_default(),
         build_notes(item),
     );
     if !extra_fields.is_empty() {
@@ -170,7 +173,8 @@ fn map_to_secure_note(item: &ParsedItem) -> (EntryData, Option<String>) {
 fn map_to_password(item: &ParsedItem) -> (EntryData, Option<String>) {
     let password = item
         .password
-        .clone()
+        .as_ref()
+        .map(|p| p.as_str().to_string())
         .or_else(|| find_field(item, &["password"], &["password", "ssn"]))
         .unwrap_or_default();
     let username = item.username.clone().unwrap_or_default();
@@ -378,6 +382,7 @@ fn build_filtered_fields(
 mod tests {
     use super::super::types::*;
     use super::*;
+    use crate::models::TypedValue;
 
     fn make_login_item() -> ParsedItem {
         ParsedItem {
@@ -388,7 +393,7 @@ mod tests {
             url: Some("https://example.com".into()),
             urls: vec!["https://example.com".into()],
             username: Some("user@example.com".into()),
-            password: Some("secret123".into()),
+            password: Some(SecretString::from_string("secret123".to_string())),
             notes: Some("My notes".into()),
             tags: vec!["work".into()],
             fields: vec![ParsedField {
@@ -416,10 +421,17 @@ mod tests {
         assert_eq!(mapped.name, "Example Login");
         assert!(mapped.is_favorite);
 
-        let tv = &mapped.data.typed_value;
-        assert_eq!(tv["username"], "user@example.com");
-        assert_eq!(tv["password"], "secret123");
-        assert_eq!(tv["url"], "https://example.com");
+        match &mapped.data.typed_value {
+            TypedValue::Login(d) => {
+                assert_eq!(d.username.as_str(), "user@example.com");
+                assert_eq!(d.password.as_str(), "secret123");
+                assert_eq!(
+                    d.url.as_ref().map(|u| u.as_str()),
+                    Some("https://example.com")
+                );
+            }
+            other => panic!("expected TypedValue::Login, got {:?}", other),
+        }
 
         // Extra field should be in custom_fields
         let cf = mapped.data.custom_fields.as_ref().unwrap();
@@ -467,8 +479,10 @@ mod tests {
         let mapped = map_item(&item, "secure_note");
         assert_eq!(mapped.entry_type, "secure_note");
 
-        let content = mapped.data.typed_value["content"].as_str().unwrap();
-        assert_eq!(content, "Original notes");
+        match &mapped.data.typed_value {
+            TypedValue::SecureNote(d) => assert_eq!(d.content.as_str(), "Original notes"),
+            other => panic!("expected TypedValue::SecureNote, got {:?}", other),
+        }
 
         // notes should be None (content has the notes)
         assert!(mapped.data.notes.is_none());
@@ -543,18 +557,22 @@ mod tests {
         assert_eq!(mapped.entry_type, "bank");
         assert_eq!(mapped.name, "ソニー銀行");
 
-        let tv = &mapped.data.typed_value;
-        assert_eq!(tv["bank_name"], "ソニー銀行");
-        assert_eq!(tv["account_holder"], "山田太郎");
-        assert_eq!(tv["account_type"], "savings");
-        assert_eq!(tv["branch_code"], "001");
-        assert_eq!(tv["account_number"], "5880798");
+        match &mapped.data.typed_value {
+            TypedValue::Bank(d) => {
+                assert_eq!(d.bank_name.as_str(), "ソニー銀行");
+                assert_eq!(d.account_holder.as_str(), "山田太郎");
+                assert_eq!(d.account_type.as_str(), "savings");
+                assert_eq!(d.branch_code.as_str(), "001");
+                assert_eq!(d.account_number.as_str(), "5880798");
+            }
+            other => panic!("expected TypedValue::Bank, got {:?}", other),
+        }
 
         // User-added field should be in custom_fields
         let cf = mapped.data.custom_fields.as_ref().unwrap();
         assert_eq!(cf.len(), 1);
         assert_eq!(cf[0].name, "銀行支店名");
-        assert_eq!(cf[0].value, "本店営業部");
+        assert_eq!(cf[0].value.as_str(), "本店営業部");
     }
 
     #[test]

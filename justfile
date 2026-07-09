@@ -284,17 +284,23 @@ default: help
 	echo "╚━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╝"
 
 # vault-core のテスト
+# --all-features必須: api/importモジュールはdesktop/android/wasm featureでgateされており、
+# feature指定なしだとコンパイル・テストされずに素通りしてしまう
 @test-vault-core:
 	echo "🧪 Testing vault-core..."
-	cargo test --manifest-path {{VAULT_CORE_DIR}}/Cargo.toml
+	cargo test --manifest-path {{VAULT_CORE_DIR}}/Cargo.toml --all-features
 	echo "✅ vault-core tests passed!"
 
 # extension のテスト（wasm-bridge + TypeScript）
+# generate-etld/generate-patternsはgitignore対象の自動生成ファイルを作るため、
+# check-extensionを経ずに単体実行してもtestが通るようここで明示的に生成する
 @test-extension:
 	echo "🧪 Testing extension (wasm-bridge)..."
 	cargo test --manifest-path {{EXTENSION_DIR}}/wasm-bridge/Cargo.toml
+	echo "🔧 Generating code (eTLD + patterns)..."
+	cd {{EXTENSION_DIR}} && pnpm install --silent && pnpm run generate-etld && pnpm run generate-patterns
 	echo "🧪 Testing extension (TypeScript)..."
-	cd {{EXTENSION_DIR}} && pnpm install --silent && pnpm test
+	cd {{EXTENSION_DIR}} && pnpm test
 	echo "✅ extension tests passed!"
 
 # Android のテスト
@@ -366,7 +372,7 @@ test-manual-autofill:
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo ""
 	echo "🦀 Cargo clippy (vault-core)..."
-	cargo clippy --manifest-path {{VAULT_CORE_DIR}}/Cargo.toml -- -D warnings
+	cargo clippy --manifest-path {{VAULT_CORE_DIR}}/Cargo.toml --all-features -- -D warnings
 	echo ""
 	echo "🦀 Cargo fmt check (vault-core)..."
 	cargo fmt --manifest-path {{VAULT_CORE_DIR}}/Cargo.toml -- --check

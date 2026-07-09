@@ -179,7 +179,7 @@ impl VaultManager {
             .lock()
             .unwrap_or_else(|p| p.into_inner())
             .as_ref()
-            .map_or(false, |s| matches!(s, SessionState::Unlocked(_)))
+            .is_some_and(|s| matches!(s, SessionState::Unlocked(_)))
     }
 
     /// 最終同期時刻を取得（UNIXタイムスタンプ、秒）

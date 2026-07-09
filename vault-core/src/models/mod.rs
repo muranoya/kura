@@ -6,7 +6,7 @@ pub mod typed_value;
 pub mod vault_meta;
 
 pub use argon2_params::Argon2Params;
-pub use entry::{Entry, EntryFilter, EntryType, SortField, SortOrder};
+pub use entry::{Entry, EntryFilter, EntrySummary, EntryType, SortField, SortOrder};
 pub use entry_data::{CustomField, CustomFieldType, EntryData};
 pub use label::Label;
 pub use typed_value::{

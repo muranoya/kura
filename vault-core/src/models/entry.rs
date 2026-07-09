@@ -105,6 +105,26 @@ pub struct Entry {
     pub labels: Vec<String>,
 }
 
+/// 一覧表示・オートフィル候補抽出に必要な最小限の情報のみを持つエントリサマリ。
+/// password/cvv/pin/notes/custom_fields等の秘匿値は含まない。
+/// `typed_value`はサブタイトル抽出に必要な非秘匿フィールドのみを部分的に読むため、
+/// `Entry`と異なり秘匿フィールドの復号・cloneが発生しない。
+#[derive(Debug, Clone)]
+pub struct EntrySummary {
+    pub id: String,
+    pub name: String,
+    pub entry_type: String,
+    pub is_favorite: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub deleted_at: Option<i64>,
+    /// login: username, password: username, bank: bank_name, credit_card: cardholderなど、
+    /// エントリタイプごとの非秘匿な代表フィールド
+    pub subtitle: Option<String>,
+    /// entry_type == "login"の場合のみ設定されるURL（オートフィル候補抽出用）
+    pub login_url: Option<String>,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct EntryFilter {
     pub include_trash: bool,
@@ -201,16 +221,13 @@ impl EntryFilter {
                 .unwrap_or(false);
             let typed_value_match = searchable_typed_value_keys(&entry.entry_type)
                 .and_then(|keys| {
-                    serde_json::from_str::<serde_json::Value>(entry.typed_value.as_str())
+                    // 検索可能な（非秘匿）フィールドのみを持つ構造体へdeserializeする。
+                    // ここに列挙していないフィールド（password, cvv, pin,
+                    // ssh秘密鍵等）はserdeの未知フィールド無視により、
+                    // `serde_json::Value`として所有コピーを持つことなく破棄される。
+                    serde_json::from_str::<TypedValuePreviewFields>(entry.typed_value.as_str())
                         .ok()
-                        .map(|v| {
-                            keys.iter().any(|key| {
-                                v.get(key)
-                                    .and_then(|val| val.as_str())
-                                    .map(|s| s.to_lowercase().contains(&q))
-                                    .unwrap_or(false)
-                            })
-                        })
+                        .map(|fields| keys.iter().any(|key| fields.matches(key, &q)))
                 })
                 .unwrap_or(false);
             if !name_match && !notes_match && !custom_match && !typed_value_match {
@@ -218,6 +235,83 @@ impl EntryFilter {
             }
         }
         true
+    }
+}
+
+/// 全エントリタイプを通して検索・一覧表示に使いうる`typed_value`フィールドのサブセット。
+/// 秘匿フィールド（password, cvv, pin, ssh秘密鍵等）は意図的に含めておらず、
+/// 読み取らない値のために所有コピーを確保することなく、deserialize時にserdeが
+/// 無視するようにしている。検索（`EntryFilter::matches`）と一覧表示のsubtitle/
+/// オートフィル用URL抽出（`vault_entry_to_summary`）の両方から利用される。
+#[derive(Deserialize)]
+pub(crate) struct TypedValuePreviewFields {
+    #[serde(default)]
+    url: Option<String>,
+    #[serde(default)]
+    username: Option<String>,
+    #[serde(default)]
+    bank_name: Option<String>,
+    #[serde(default)]
+    branch_code: Option<String>,
+    #[serde(default)]
+    account_type: Option<String>,
+    #[serde(default)]
+    account_holder: Option<String>,
+    #[serde(default)]
+    account_number: Option<String>,
+    #[serde(default)]
+    content: Option<String>,
+    #[serde(default)]
+    cardholder: Option<String>,
+    #[serde(default)]
+    expiry: Option<String>,
+    #[serde(default)]
+    license_key: Option<String>,
+}
+
+impl TypedValuePreviewFields {
+    fn matches(&self, key: &str, query_lower: &str) -> bool {
+        let value = match key {
+            "url" => self.url.as_deref(),
+            "username" => self.username.as_deref(),
+            "bank_name" => self.bank_name.as_deref(),
+            "branch_code" => self.branch_code.as_deref(),
+            "account_type" => self.account_type.as_deref(),
+            "account_holder" => self.account_holder.as_deref(),
+            "account_number" => self.account_number.as_deref(),
+            "content" => self.content.as_deref(),
+            "cardholder" => self.cardholder.as_deref(),
+            "expiry" => self.expiry.as_deref(),
+            "license_key" => self.license_key.as_deref(),
+            _ => None,
+        };
+        value
+            .map(|s| s.to_lowercase().contains(query_lower))
+            .unwrap_or(false)
+    }
+
+    /// エントリ一覧のsubtitleとして表示する非秘匿な代表フィールドを返す。
+    /// `api/entries.rs`の旧`extract_subtitle`（`TypedValue`版）と同じ対応関係。
+    pub(crate) fn subtitle(&self, entry_type: &str) -> Option<String> {
+        let s = match entry_type {
+            "login" | "password" => self.username.as_deref(),
+            "bank" => self.bank_name.as_deref(),
+            "credit_card" => self.cardholder.as_deref(),
+            _ => None,
+        }?;
+        if s.is_empty() {
+            None
+        } else {
+            Some(s.to_string())
+        }
+    }
+
+    /// entry_type == "login" のオートフィル候補抽出用URL
+    pub(crate) fn login_url(&self) -> Option<String> {
+        self.url
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
     }
 }
 
