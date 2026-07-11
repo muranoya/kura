@@ -12,11 +12,6 @@ export interface FormCondition {
   element_not_exists?: string
 }
 
-export interface WaitFor {
-  selector: string
-  timeout_ms?: number
-}
-
 export interface FieldDef {
   selector: string
   fallback_selectors?: string[]
@@ -26,7 +21,6 @@ export interface PatternForm {
   id: string
   type: string
   condition?: FormCondition
-  wait_for?: WaitFor
   fields: Record<string, FieldDef>
   skip_fields?: string[]
 }

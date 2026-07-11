@@ -39,6 +39,8 @@ vault-core（Rust）
     └── WASM（wasm-pack）              → ブラウザ拡張
 ```
 
+Android向けJNIの活用先の一つであるAutofillService（システム標準のオートフィル機能への対応）については[`docs/android-autofillservice.md`](android-autofillservice.md)を参照。
+
 ---
 
 ## Data Design

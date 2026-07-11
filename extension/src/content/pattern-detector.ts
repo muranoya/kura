@@ -3,7 +3,7 @@
 import type { SitePattern } from '../shared/pattern-types'
 import type { FieldClassification, FieldType } from './field-classifier'
 import { type DetectedForm, type FormType, isVisible } from './form-detector'
-import { evaluateCondition, resolveField, waitForElement } from './pattern-matcher'
+import { evaluateCondition, resolveField } from './pattern-matcher'
 
 export interface PatternDetectionResult {
   form: DetectedForm
@@ -25,10 +25,10 @@ const FORM_TYPE_MAP: Record<string, FormType> = {
  * - No form's condition matches
  * - No form contains the focused input
  */
-export async function detectFormByPattern(
+export function detectFormByPattern(
   focusedInput: HTMLInputElement,
   pattern: SitePattern,
-): Promise<PatternDetectionResult | null> {
+): PatternDetectionResult | null {
   if (!pattern.forms || pattern.forms.length === 0) {
     return null
   }
@@ -39,15 +39,6 @@ export async function detectFormByPattern(
     // Evaluate condition
     if (!evaluateCondition(form.condition)) {
       continue
-    }
-
-    // Wait for element if specified
-    if (form.wait_for) {
-      const timeoutMs = form.wait_for.timeout_ms ?? 5000
-      const waited = await waitForElement(form.wait_for.selector, timeoutMs)
-      if (!waited) {
-        continue
-      }
     }
 
     // Resolve all fields
