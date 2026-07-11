@@ -450,4 +450,11 @@
     <!-- Misc labels -->
     <string name="misc_not_set">未設定</string>
     <string name="misc_copied">コピーしました</string>
+
+    <!-- Autofill -->
+    <string name="autofill_unlock_prompt">kuraのロックを解除してオートフィル</string>
+    <string name="autofill_save_not_supported">オートフィル経由での新規ログイン保存には対応していません</string>
+    <string name="settings_autofill">自動入力サービス</string>
+    <string name="settings_autofill_enabled">有効</string>
+    <string name="settings_autofill_disabled">タップしてkuraを自動入力サービスに設定</string>
 </resources>

@@ -1,7 +1,11 @@
 package net.meshpeak.kura.ui.settings
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.security.keystore.KeyPermanentlyInvalidatedException
+import android.view.autofill.AutofillManager
 import android.widget.Toast
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -18,6 +22,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
@@ -87,6 +94,21 @@ fun SettingsScreen(
         .collectAsState(initial = 30)
     var clipboardClearExpanded by remember { mutableStateOf(false) }
 
+    val autofillManager = remember { context.getSystemService(AutofillManager::class.java) }
+    var autofillEnabled by remember {
+        mutableStateOf(autofillManager?.hasEnabledAutofillServices() == true)
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                autofillEnabled = autofillManager?.hasEnabledAutofillServices() == true
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val canUseBiometric = remember {
         BiometricManager.from(context).canAuthenticate(
             BiometricManager.Authenticators.BIOMETRIC_STRONG
@@ -131,6 +153,33 @@ fun SettingsScreen(
             // セキュリティセクション
             Text(stringResource(R.string.settings_section_security), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(4.dp))
+
+            Card(
+                onClick = {
+                    if (!autofillEnabled) {
+                        val intent = Intent(
+                            Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE,
+                            Uri.parse("package:${context.packageName}")
+                        )
+                        context.startActivity(intent)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_autofill)) },
+                    supportingContent = {
+                        Text(
+                            if (autofillEnabled) stringResource(R.string.settings_autofill_enabled)
+                            else stringResource(R.string.settings_autofill_disabled)
+                        )
+                    },
+                    leadingContent = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = if (!autofillEnabled) {
+                        { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    } else null
+                )
+            }
 
             Card(onClick = { showChangePasswordDialog = true }, modifier = Modifier.fillMaxWidth()) {
                 ListItem(

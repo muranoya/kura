@@ -20,6 +20,7 @@ class FakeVaultRepository : IVaultRepository {
     var decryptTransferConfigResult: String = "{}"
     var decryptTransferConfigError: Exception? = null
     var lastSyncTimeResult: Long = 0L
+    var listLoginUrlsResult: List<AutofillCandidate> = emptyList()
 
     // Tracking calls for assertions
     var writeVaultFileCalled = false
@@ -74,6 +75,8 @@ class FakeVaultRepository : IVaultRepository {
     override suspend fun getEntry(id: String): Entry {
         throw NotImplementedError("Not used in onboarding tests")
     }
+
+    override suspend fun listLoginUrls(): List<AutofillCandidate> = listLoginUrlsResult
 
     override suspend fun createEntry(
         entryType: String,
