@@ -88,39 +88,3 @@ export function resolveField(fieldDef: FieldDef): HTMLInputElement | null {
 
   return null
 }
-
-/**
- * Wait for an element matching the CSS selector to appear in the DOM.
- * Returns the element if found, null on timeout.
- */
-export function waitForElement(selector: string, timeoutMs = 5000): Promise<Element | null> {
-  // Check immediately
-  const existing = document.querySelector(selector)
-  if (existing) return Promise.resolve(existing)
-
-  return new Promise((resolve) => {
-    let resolved = false
-
-    const observer = new MutationObserver(() => {
-      const el = document.querySelector(selector)
-      if (el && !resolved) {
-        resolved = true
-        observer.disconnect()
-        resolve(el)
-      }
-    })
-
-    observer.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-    })
-
-    setTimeout(() => {
-      if (!resolved) {
-        resolved = true
-        observer.disconnect()
-        resolve(null)
-      }
-    }, timeoutMs)
-  })
-}

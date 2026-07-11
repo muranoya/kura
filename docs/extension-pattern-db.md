@@ -95,7 +95,7 @@ extension/patterns/
 
 ## 3. サイト固有パターンのスキーマ
 
-スキーマ内の全セレクター値（`selector`, `fallback_selectors`, `element_exists`, `element_not_exists`, `wait_for.selector`, `skip_fields`）はCSSセレクターとして解釈される。
+スキーマ内の全セレクター値（`selector`, `fallback_selectors`, `element_exists`, `element_not_exists`, `skip_fields`）はCSSセレクターとして解釈される。
 
 ```json
 {
@@ -114,10 +114,6 @@ extension/patterns/
         "url_path": "string (正規表現)",                    // Optional (省略時: 常にtrue)
         "element_exists": "string (CSSセレクタ)",           // Optional (省略時: 常にtrue)
         "element_not_exists": "string (CSSセレクタ)"        // Optional (省略時: 常にtrue)
-      },
-      "wait_for": {                                        // Optional (省略時: 待機なし)
-        "selector": "string (CSSセレクタ)",                 // Required (wait_for指定時)
-        "timeout_ms": 5000                                 // Optional (default: 5000)
       },
       "fields": {                                          // Required
         "<field_name>": {
@@ -152,9 +148,8 @@ extension/patterns/
 **複数フォームのマッチ：** `forms` 配列は先頭から順に評価され、以下を全て満たした **最初の1つのform** が採用される（First-Match-Wins）。後続のformは評価されない。
 
 1. `condition`（`url_path`、`element_exists`、`element_not_exists`）が全て真
-2. `wait_for` のセレクタが指定時間内に出現
-3. `fields` の全セレクタがDOMに存在し、かつ可視である
-4. フォーカス中のinput要素が解決した `fields` のいずれかと一致する
+2. `fields` の全セレクタがDOMに存在し、かつ可視である
+3. フォーカス中のinput要素が解決した `fields` のいずれかと一致する
 
 そのため、**より具体的な条件を持つformを配列の先頭に配置すること**。例えば `/login` 専用formと汎用formの両方を定義する場合、`/login` 用を先に書く。
 

@@ -98,17 +98,6 @@ export function validate(data: unknown, file: string): ValidationError[] {
         }
       }
 
-      // wait_for
-      if (form.wait_for !== undefined) {
-        const wf = form.wait_for as Record<string, unknown>
-        if (typeof wf.selector !== 'string' || !wf.selector) {
-          err(`${prefix}.wait_for.selector is required`)
-        }
-        if (wf.timeout_ms !== undefined && typeof wf.timeout_ms !== 'number') {
-          err(`${prefix}.wait_for.timeout_ms must be a number`)
-        }
-      }
-
       // fields
       if (typeof form.fields !== 'object' || form.fields === null) {
         err(`${prefix}.fields is required and must be an object`)

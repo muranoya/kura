@@ -101,7 +101,7 @@ async function handleInputFocus(input: HTMLInputElement) {
   const matchedPattern = findMatchingPattern(getEffectivePatterns(), hostname)
 
   if (matchedPattern) {
-    const patternResult = await detectFormByPattern(input, matchedPattern)
+    const patternResult = detectFormByPattern(input, matchedPattern)
     if (patternResult) {
       form = patternResult.form
       strictSubdomain = patternResult.strictSubdomain

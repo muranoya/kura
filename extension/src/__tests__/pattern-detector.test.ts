@@ -19,7 +19,7 @@ function makeVisible(el: HTMLElement) {
 }
 
 describe('detectFormByPattern', () => {
-  it('returns null when pattern has no forms', async () => {
+  it('returns null when pattern has no forms', () => {
     const pattern: SitePattern = {
       description: 'No forms',
       match: { type: 'domain', value: 'example.com' },
@@ -27,13 +27,13 @@ describe('detectFormByPattern', () => {
     const input = createInput({ id: 'user' })
     document.body.appendChild(input)
 
-    const result = await detectFormByPattern(input, pattern)
+    const result = detectFormByPattern(input, pattern)
     expect(result).toBeNull()
 
     input.remove()
   })
 
-  it('returns null when pattern has empty forms array', async () => {
+  it('returns null when pattern has empty forms array', () => {
     const pattern: SitePattern = {
       description: 'Empty forms',
       match: { type: 'domain', value: 'example.com' },
@@ -42,13 +42,13 @@ describe('detectFormByPattern', () => {
     const input = createInput({ id: 'user' })
     document.body.appendChild(input)
 
-    const result = await detectFormByPattern(input, pattern)
+    const result = detectFormByPattern(input, pattern)
     expect(result).toBeNull()
 
     input.remove()
   })
 
-  it('detects login form with matching selectors', async () => {
+  it('detects login form with matching selectors', () => {
     const usernameInput = createInput({ id: 'user-input' })
     const passwordInput = createInput({ id: 'pass-input', type: 'password' })
     makeVisible(passwordInput)
@@ -70,7 +70,7 @@ describe('detectFormByPattern', () => {
       ],
     }
 
-    const result = await detectFormByPattern(usernameInput, pattern)
+    const result = detectFormByPattern(usernameInput, pattern)
     expect(result).not.toBeNull()
     expect(result?.form.formType).toBe('LOGIN')
     expect(result?.form.fields).toHaveLength(2)
@@ -82,7 +82,7 @@ describe('detectFormByPattern', () => {
     passwordInput.remove()
   })
 
-  it('returns strict_subdomain from pattern match', async () => {
+  it('returns strict_subdomain from pattern match', () => {
     const input = createInput({ id: 'strict-user' })
     document.body.appendChild(input)
 
@@ -100,14 +100,14 @@ describe('detectFormByPattern', () => {
       ],
     }
 
-    const result = await detectFormByPattern(input, pattern)
+    const result = detectFormByPattern(input, pattern)
     expect(result).not.toBeNull()
     expect(result?.strictSubdomain).toBe(true)
 
     input.remove()
   })
 
-  it('skips form when condition element_exists fails', async () => {
+  it('skips form when condition element_exists fails', () => {
     const input = createInput({ id: 'cond-user' })
     document.body.appendChild(input)
 
@@ -126,13 +126,13 @@ describe('detectFormByPattern', () => {
       ],
     }
 
-    const result = await detectFormByPattern(input, pattern)
+    const result = detectFormByPattern(input, pattern)
     expect(result).toBeNull()
 
     input.remove()
   })
 
-  it('selects correct form based on condition', async () => {
+  it('selects correct form based on condition', () => {
     const marker = document.createElement('div')
     marker.id = 'password-marker'
     document.body.appendChild(marker)
@@ -163,7 +163,7 @@ describe('detectFormByPattern', () => {
       ],
     }
 
-    const result = await detectFormByPattern(passwordInput, pattern)
+    const result = detectFormByPattern(passwordInput, pattern)
     expect(result).not.toBeNull()
     expect(result?.form.formType).toBe('LOGIN_PASSWORD')
 
@@ -171,7 +171,7 @@ describe('detectFormByPattern', () => {
     passwordInput.remove()
   })
 
-  it('returns null when focused input is not in any form fields', async () => {
+  it('returns null when focused input is not in any form fields', () => {
     const usernameInput = createInput({ id: 'form-user' })
     const unrelatedInput = createInput({ id: 'unrelated' })
     document.body.appendChild(usernameInput)
@@ -191,14 +191,14 @@ describe('detectFormByPattern', () => {
       ],
     }
 
-    const result = await detectFormByPattern(unrelatedInput, pattern)
+    const result = detectFormByPattern(unrelatedInput, pattern)
     expect(result).toBeNull()
 
     usernameInput.remove()
     unrelatedInput.remove()
   })
 
-  it('skips form when field selector does not resolve', async () => {
+  it('skips form when field selector does not resolve', () => {
     const input = createInput({ id: 'existing-input' })
     document.body.appendChild(input)
 
@@ -217,13 +217,13 @@ describe('detectFormByPattern', () => {
       ],
     }
 
-    const result = await detectFormByPattern(input, pattern)
+    const result = detectFormByPattern(input, pattern)
     expect(result).toBeNull()
 
     input.remove()
   })
 
-  it('excludes fields matching skip_fields', async () => {
+  it('excludes fields matching skip_fields', () => {
     const userInput = createInput({ id: 'skip-user', class: 'skip-me' })
     const passInput = createInput({ id: 'skip-pass', type: 'password' })
     makeVisible(passInput)
@@ -247,7 +247,7 @@ describe('detectFormByPattern', () => {
     }
 
     // Focus on password field — username is skipped, but password resolves
-    const result = await detectFormByPattern(passInput, pattern)
+    const result = detectFormByPattern(passInput, pattern)
     expect(result).not.toBeNull()
     expect(result?.form.fields).toHaveLength(1)
     expect(result?.form.fields[0].type).toBe('password')
@@ -256,7 +256,7 @@ describe('detectFormByPattern', () => {
     passInput.remove()
   })
 
-  it('returns the first form when multiple forms all satisfy their conditions', async () => {
+  it('returns the first form when multiple forms all satisfy their conditions', () => {
     // 2つのformが両方とも、condition・全フィールド解決・focusedInput包含を満たす場合、
     // 配列先頭のformが採用される（First-Match-Wins）ことを保証する。
     const sharedInput = createInput({ id: 'shared-user' })
@@ -283,14 +283,14 @@ describe('detectFormByPattern', () => {
       ],
     }
 
-    const result = await detectFormByPattern(sharedInput, pattern)
+    const result = detectFormByPattern(sharedInput, pattern)
     expect(result).not.toBeNull()
     expect(result?.form.formType).toBe('LOGIN_USERNAME')
 
     sharedInput.remove()
   })
 
-  it('maps all form types correctly', async () => {
+  it('maps all form types correctly', () => {
     const typeMap: Record<string, string> = {
       login: 'LOGIN',
       login_username: 'LOGIN_USERNAME',
@@ -320,7 +320,7 @@ describe('detectFormByPattern', () => {
         ],
       }
 
-      const result = await detectFormByPattern(input, pattern)
+      const result = detectFormByPattern(input, pattern)
       expect(result).not.toBeNull()
       expect(result?.form.formType).toBe(expectedFormType)
 
