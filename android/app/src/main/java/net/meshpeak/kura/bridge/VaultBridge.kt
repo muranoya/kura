@@ -30,6 +30,7 @@ object VaultBridge {
     ): String
 
     external fun getEntry(vaultId: String, id: String): String
+    external fun listLoginUrls(vaultId: String): String
     external fun createEntry(
         vaultId: String,
         entryType: String,

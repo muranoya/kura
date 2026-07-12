@@ -33,6 +33,14 @@ data class Entry(
 )
 
 @Serializable
+data class AutofillCandidate(
+    val id: String,
+    val name: String,
+    val url: String,
+    val username: String? = null
+)
+
+@Serializable
 data class Label(
     val id: String,
     val name: String

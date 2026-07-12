@@ -450,4 +450,12 @@
     <!-- Misc labels -->
     <string name="misc_not_set">Not set</string>
     <string name="misc_copied">Copied</string>
+
+    <!-- Autofill -->
+    <string name="autofill_unlock_prompt">Unlock kura to autofill</string>
+    <string name="autofill_save_not_supported">Saving new logins via autofill is not supported yet</string>
+    <string name="autofill_totp_dataset_label">%1$s - 2FA code</string>
+    <string name="settings_autofill">Autofill service</string>
+    <string name="settings_autofill_enabled">Enabled</string>
+    <string name="settings_autofill_disabled">Tap to set kura as your autofill service</string>
 </resources>
