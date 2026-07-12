@@ -382,6 +382,7 @@ private fun CustomFieldsSection(
         }
         if (customFields.isNotEmpty()) SectionDivider()
 
+        val totpFieldName = stringResource(R.string.custom_field_totp_label)
         if (showTypeSelector) {
             // Type selection chips
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -409,7 +410,7 @@ private fun CustomFieldsSection(
                             onClick = {
                                 val newField = CustomField(
                                     id = UUID.randomUUID().toString(),
-                                    name = "",
+                                    name = if (type == CustomFieldType.TOTP) totpFieldName else "",
                                     fieldType = type.value,
                                     value = ""
                                 )
@@ -595,20 +596,24 @@ fun CustomFieldEditor(
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         // Row 1: Field name + type badge (read-only) + delete
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TextField(
-                value = field.name,
-                onValueChange = { onFieldChange(field.copy(name = it)) },
-                placeholder = { Text(stringResource(R.string.custom_field_name_placeholder)) },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodyMedium,
-                colors = TextFieldDefaults.colors(
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent
+            if (field.fieldType == "totp") {
+                Spacer(modifier = Modifier.weight(1f))
+            } else {
+                TextField(
+                    value = field.name,
+                    onValueChange = { onFieldChange(field.copy(name = it)) },
+                    placeholder = { Text(stringResource(R.string.custom_field_name_placeholder)) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    colors = TextFieldDefaults.colors(
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent
+                    )
                 )
-            )
+            }
             Spacer(modifier = Modifier.width(4.dp))
             // Read-only type badge
             Surface(
