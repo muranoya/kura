@@ -22,11 +22,18 @@ object FieldClassifier {
     private val PASSWORD_HINT_REGEX = Regex("password|パスワード", RegexOption.IGNORE_CASE)
     private val USERNAME_HINT_REGEX = Regex("username|email|user id|ユーザー|メール|アカウント", RegexOption.IGNORE_CASE)
 
+    // TOTP（2段階認証コード）用の識別子・プレースホルダー文字列。password/username用の正規表現とは
+    // 語彙が重ならないよう独立させる（例: "token"はAPIキー等の別カスタムフィールドと将来衝突しうるため
+    // TOTP文脈限定で扱う）。
+    private val TOTP_ID_REGEX = Regex("otp|totp|verification.?code|verify.?code|auth.?code|mfa|2fa|security.?code", RegexOption.IGNORE_CASE)
+    private val TOTP_HINT_REGEX = Regex("otp|verification code|認証コード|確認コード|確認番号|ワンタイム", RegexOption.IGNORE_CASE)
+
     fun classify(signals: ViewNodeSignals): DetectedFieldType {
         classifyByAutofillHints(signals.autofillHints)?.let { return it }
 
         var passwordScore = 0
         var usernameScore = 0
+        var totpScore = 0
 
         // variationの値域はクラス（TYPE_CLASS_TEXT/TYPE_CLASS_NUMBER等）を跨いで共有されており、
         // 例えばTYPE_NUMBER_VARIATION_PASSWORDとTYPE_TEXT_VARIATION_URIはビット値が衝突する。
@@ -47,10 +54,19 @@ object FieldClassifier {
         ) {
             usernameScore += 8
         }
+        // TOTPフィールドはTYPE_CLASS_NUMBER（またはvariationなしのTEXT）であることが多いが、
+        // これは電話番号・郵便番号等の一般的な数値入力欄と区別がつかない極めて弱いシグナル。
+        // 単独では閾値に届かせず、idEntry/hintのいずれかと組み合わさった場合のみ後押しする程度に留める。
+        if ((fieldClass == InputType.TYPE_CLASS_NUMBER && variation == 0) ||
+            (fieldClass == InputType.TYPE_CLASS_TEXT && variation == InputType.TYPE_TEXT_VARIATION_NORMAL)
+        ) {
+            totpScore += 2
+        }
 
         signals.idEntry?.let { id ->
             if (PASSWORD_ID_REGEX.containsMatchIn(id)) passwordScore += 6
             if (USERNAME_ID_REGEX.containsMatchIn(id)) usernameScore += 6
+            if (TOTP_ID_REGEX.containsMatchIn(id)) totpScore += 8
         }
 
         signals.hint?.let { hint ->
@@ -59,11 +75,14 @@ object FieldClassifier {
             // idEntry一致と同格の重みとし、hint単独でも閾値を超えられるようにする。
             if (PASSWORD_HINT_REGEX.containsMatchIn(hint)) passwordScore += 6
             if (USERNAME_HINT_REGEX.containsMatchIn(hint)) usernameScore += 6
+            if (TOTP_HINT_REGEX.containsMatchIn(hint)) totpScore += 8
         }
 
         return when {
-            passwordScore >= SCORE_THRESHOLD && passwordScore >= usernameScore -> DetectedFieldType.PASSWORD
-            usernameScore >= SCORE_THRESHOLD -> DetectedFieldType.USERNAME
+            passwordScore >= SCORE_THRESHOLD && passwordScore >= usernameScore && passwordScore >= totpScore ->
+                DetectedFieldType.PASSWORD
+            usernameScore >= SCORE_THRESHOLD && usernameScore >= totpScore -> DetectedFieldType.USERNAME
+            totpScore >= SCORE_THRESHOLD -> DetectedFieldType.TOTP
             else -> DetectedFieldType.NONE
         }
     }
@@ -72,6 +91,9 @@ object FieldClassifier {
         if (hints.any { it == View.AUTOFILL_HINT_PASSWORD }) return DetectedFieldType.PASSWORD
         if (hints.any { it == View.AUTOFILL_HINT_USERNAME }) return DetectedFieldType.USERNAME
         if (hints.any { it == View.AUTOFILL_HINT_EMAIL_ADDRESS }) return DetectedFieldType.EMAIL
+        // TOTP用の標準autofillHint（Android FrameworkにはUSERNAME/PASSWORD/EMAIL等はあるが
+        // ワンタイムコード用のヒント定数は存在しない）はないため、TOTPはヒューリスティック
+        // スコアリングのみで判定する。
         return null
     }
 }

@@ -59,8 +59,8 @@ class KuraAutofillService : AutofillService() {
             callback.onSuccess(null)
             return
         }
-        if (parsed.usernameFieldId == null && parsed.passwordFieldId == null) {
-            if (BuildConfig.DEBUG) Log.d(TAG, "skipping: no username/password field detected")
+        if (parsed.usernameFieldId == null && parsed.passwordFieldId == null && parsed.totpFieldId == null) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "skipping: no username/password/totp field detected")
             callback.onSuccess(null)
             return
         }

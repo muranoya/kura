@@ -6,26 +6,10 @@ import android.view.autofill.AutofillManager
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.launch
 import net.meshpeak.kura.autofill.model.ParsedLoginForm
 import net.meshpeak.kura.autofill.model.getParsedLoginForm
-import net.meshpeak.kura.ui.auth.LockScreen
-import net.meshpeak.kura.ui.auth.RecoveryScreen
-import net.meshpeak.kura.ui.navigation.LoadingScreen
-import net.meshpeak.kura.ui.theme.KuraTheme
-import net.meshpeak.kura.viewmodel.AppState
 import net.meshpeak.kura.viewmodel.AppViewModel
 
 /**
@@ -42,31 +26,17 @@ class AutofillUnlockActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         val parsed = intent.getParsedLoginForm()
-        if (parsed.usernameFieldId == null && parsed.passwordFieldId == null) {
+        if (parsed.usernameFieldId == null && parsed.passwordFieldId == null && parsed.totpFieldId == null) {
             finishCanceled()
             return
         }
 
         setContent {
-            KuraTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    val appState by appViewModel.appState.collectAsState()
-                    when (appState) {
-                        AppState.LOADING -> LoadingScreen()
-                        AppState.LOCKED -> AutofillAuthNavHost(
-                            appViewModel = appViewModel,
-                            onUnlocked = { finishWithFillResponse(parsed) },
-                            onLogout = { finishCanceled() }
-                        )
-                        AppState.UNLOCKED -> {
-                            LaunchedEffect(Unit) { finishWithFillResponse(parsed) }
-                        }
-                        AppState.ONBOARDING -> {
-                            LaunchedEffect(Unit) { finishCanceled() }
-                        }
-                    }
-                }
-            }
+            AutofillAuthScreen(
+                appViewModel = appViewModel,
+                onUnlocked = { finishWithFillResponse(parsed) },
+                onLogout = { finishCanceled() }
+            )
         }
     }
 
@@ -90,31 +60,5 @@ class AutofillUnlockActivity : AppCompatActivity() {
     private fun finishCanceled() {
         setResult(RESULT_CANCELED)
         finish()
-    }
-}
-
-@Composable
-private fun AutofillAuthNavHost(
-    appViewModel: AppViewModel,
-    onUnlocked: () -> Unit,
-    onLogout: () -> Unit
-) {
-    val navController = rememberNavController()
-    NavHost(navController = navController, startDestination = "lock") {
-        composable("lock") {
-            LockScreen(
-                appViewModel = appViewModel,
-                onUnlocked = onUnlocked,
-                onRecovery = { navController.navigate("recovery") },
-                onLogout = onLogout
-            )
-        }
-        composable("recovery") {
-            RecoveryScreen(
-                appViewModel = appViewModel,
-                onUnlocked = onUnlocked,
-                onBack = { navController.popBackStack() }
-            )
-        }
     }
 }

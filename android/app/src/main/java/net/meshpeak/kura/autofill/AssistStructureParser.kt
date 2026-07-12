@@ -22,6 +22,7 @@ object AssistStructureParser {
         var isBrowserRequest = false
         var usernameFieldId: AutofillId? = null
         var passwordFieldId: AutofillId? = null
+        var totpFieldId: AutofillId? = null
 
         fun walk(node: AssistStructure.ViewNode) {
             if (isBrowserRequest) return
@@ -50,6 +51,7 @@ object AssistStructureParser {
                     DetectedFieldType.PASSWORD -> if (passwordFieldId == null) passwordFieldId = autofillId
                     DetectedFieldType.USERNAME, DetectedFieldType.EMAIL ->
                         if (usernameFieldId == null) usernameFieldId = autofillId
+                    DetectedFieldType.TOTP -> if (totpFieldId == null) totpFieldId = autofillId
                     DetectedFieldType.NONE -> {}
                 }
             }
@@ -79,14 +81,16 @@ object AssistStructureParser {
             packageName = structure.activityComponent?.packageName,
             isBrowserRequest = isBrowserRequest,
             usernameFieldId = usernameFieldId,
-            passwordFieldId = passwordFieldId
+            passwordFieldId = passwordFieldId,
+            totpFieldId = totpFieldId
         )
 
         if (BuildConfig.DEBUG) {
             Log.d(
                 TAG,
                 "parse result: packageName=${result.packageName} isBrowserRequest=${result.isBrowserRequest} " +
-                    "usernameFieldFound=${result.usernameFieldId != null} passwordFieldFound=${result.passwordFieldId != null}"
+                    "usernameFieldFound=${result.usernameFieldId != null} passwordFieldFound=${result.passwordFieldId != null} " +
+                    "totpFieldFound=${result.totpFieldId != null}"
             )
         }
 

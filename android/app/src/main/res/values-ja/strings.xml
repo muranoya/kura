@@ -454,6 +454,7 @@
     <!-- Autofill -->
     <string name="autofill_unlock_prompt">kuraのロックを解除してオートフィル</string>
     <string name="autofill_save_not_supported">オートフィル経由での新規ログイン保存には対応していません</string>
+    <string name="autofill_totp_dataset_label">%1$s - 認証コード</string>
     <string name="settings_autofill">自動入力サービス</string>
     <string name="settings_autofill_enabled">有効</string>
     <string name="settings_autofill_disabled">タップしてkuraを自動入力サービスに設定</string>

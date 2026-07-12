@@ -109,4 +109,54 @@ class FieldClassifierTest {
         )
         assertEquals(DetectedFieldType.PASSWORD, result)
     }
+
+    @Test
+    fun `idEntry に otp を含むとtotpと判定される`() {
+        val result = FieldClassifier.classify(signals(idEntry = "otp_input"))
+        assertEquals(DetectedFieldType.TOTP, result)
+    }
+
+    @Test
+    fun `idEntry に verification_code を含むとtotpと判定される`() {
+        val result = FieldClassifier.classify(signals(idEntry = "verification_code_input"))
+        assertEquals(DetectedFieldType.TOTP, result)
+    }
+
+    @Test
+    fun `hint のみでも認証コードでtotpと判定される`() {
+        val result = FieldClassifier.classify(signals(hint = "認証コード"))
+        assertEquals(DetectedFieldType.TOTP, result)
+    }
+
+    @Test
+    fun `hint のみでも確認コードでtotpと判定される`() {
+        val result = FieldClassifier.classify(signals(hint = "確認コードを入力してください"))
+        assertEquals(DetectedFieldType.TOTP, result)
+    }
+
+    @Test
+    fun `inputType numberのみでは単独でtotp閾値に届かずNONE`() {
+        // 電話番号・郵便番号等の一般的な数値入力欄と区別がつかないため、
+        // idEntry/hintの裏付けなしにTOTPと判定してはならない
+        val result = FieldClassifier.classify(
+            signals(inputType = InputType.TYPE_CLASS_NUMBER)
+        )
+        assertEquals(DetectedFieldType.NONE, result)
+    }
+
+    @Test
+    fun `inputType numberとidEntryのotpが組み合わさるとtotpと判定される`() {
+        val result = FieldClassifier.classify(
+            signals(inputType = InputType.TYPE_CLASS_NUMBER, idEntry = "otp_code")
+        )
+        assertEquals(DetectedFieldType.TOTP, result)
+    }
+
+    @Test
+    fun `idEntry password と idEntry otp相当の語が競合しないことを確認する`() {
+        // "code"のような汎用的すぎる語をTOTP正規表現に含めていないため、
+        // password関連のidEntryがTOTPと誤検出されない
+        val result = FieldClassifier.classify(signals(idEntry = "password_input"))
+        assertEquals(DetectedFieldType.PASSWORD, result)
+    }
 }
