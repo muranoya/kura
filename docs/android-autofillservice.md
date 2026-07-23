@@ -60,7 +60,7 @@ Vault エントリに `associated_packages` フィールドが設定されてい
 
 リクエスト元パッケージ名からドメインを解決し、Vault エントリのURLとドメインを照合する。以下の2段階で解決を試みる：
 
-1. **`DomainVerificationManager`**（API 30+、主解決手段）: Android標準の`androidx.core.content.pm.DomainVerificationManager`を使用し、アプリが所有権を宣言した検証済みホスト一覧を取得する。アプリがApp Linksを宣言していれば、システムがホストの検証状態を管理しており、これを利用する。1アプリが複数ドメインを検証済みの場合、全ドメインでマッチングを行う。未宣言のアプリは空集合を返す。
+1. **`DomainVerificationManager`**（API 31+、主解決手段）: Android標準の`android.content.pm.verify.domain.DomainVerificationManager`を使用し、アプリが所有権を宣言した検証済みホスト一覧を取得する。アプリがApp Linksを宣言していれば、システムがホストの検証状態を管理しており、これを利用する。1アプリが複数ドメインを検証済みの場合、全ドメインでマッチングを行う。未宣言のアプリは空集合を返す。`PackageDomainResolver`がこの解決を封装する。
 
 2. **`package_domains.json`**（フォールバック）: `DomainVerificationManager` でドメインが解決できなかった場合にのみ試行する。リポジトリで管理するパッケージ名⇔ドメインの手動キュレーションDBであり、App Links未宣言だがウェブサイトとID/Passwordを共通するアプリ向けの補助手段である。
 
@@ -142,7 +142,7 @@ Android OSのAutofillフレームワークから呼び出される`AutofillServi
 
 ### 2-1-1. Manifest宣言
 
-`AutofillService`はシステムのAutofillフレームワークからバインドされるコンポーネントであり、`BIND_AUTOFILL_SERVICE`権限の指定がシステム以外からのバインドを拒否するために必須となる。`minSdk 30`のため、`DomainVerificationManager`（API 30+）やAutofillFrameworkの可用性チェック（バージョン分岐）は不要。
+`AutofillService`はシステムのAutofillフレームワークからバインドされるコンポーネントであり、`BIND_AUTOFILL_SERVICE`権限の指定がシステム以外からのバインドを拒否するために必須となる。`minSdk 26`であるため、`DomainVerificationManager`（API 31+）利用時にはバージョン分岐によるガードが必要である（`PackageDomainResolver`で実装）。
 
 ### 2-1-2. プロセスモデル
 
@@ -211,7 +211,9 @@ Section 1-3の3層解決に対応する実装設計。
 
 ### 3-2-1. `DomainVerificationManager`による検証済みホスト解決
 
-`androidx.core.content.pm.DomainVerificationManager`（API 30+）を使用し、リクエスト元パッケージ名の検証済みホスト一覧を取得する。アプリがApp Linksを宣言し、Google Playでドメイン検証が完了していれば、システムがホストの検証状態を管理しており、`getVerifiedHosts()`で取得できる。
+`android.content.pm.verify.domain.DomainVerificationManager`（API 31+）を使用し、リクエスト元パッケージ名の検証済みホスト一覧を取得する。アプリがApp Linksを宣言し、Google Playでドメイン検証が完了していれば、システムがホストの検証状態を管理しており、`getDomainVerificationUserState()`→`getHostToStateMap()`で取得できる。`DOMAIN_STATE_VERIFIED`の状態を持つホストのみを対象とする。
+
+`PackageDomainResolver`がこの解決を封装し、結果をプロセス生存中にキャッシュする。
 
 - 1アプリが複数ドメインを検証済みの場合、全ドメインでマッチングを行う
 - App Links未宣言のアプリは空集合を返す（安全側デフォルト）

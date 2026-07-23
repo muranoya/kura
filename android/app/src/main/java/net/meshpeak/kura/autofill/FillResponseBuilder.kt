@@ -50,12 +50,12 @@ object FillResponseBuilder {
         parsed: ParsedLoginForm
     ): FillResponse? {
         val packageName = parsed.packageName ?: return null
-        val domain = PackageDomainMap.domainFor(context, packageName)
+        val domains = PackageDomainResolver.resolveDomains(context, packageName)
         if (BuildConfig.DEBUG) {
-            Log.d(TAG, "buildUnlocked: packageName=$packageName -> domain=$domain")
+            Log.d(TAG, "buildUnlocked: packageName=$packageName -> domains=$domains")
         }
-        if (domain == null) {
-            if (BuildConfig.DEBUG) Log.d(TAG, "packageName=$packageName not in package_domains.json -> no candidates")
+        if (domains.isEmpty()) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "packageName=$packageName no domain resolved -> no candidates")
             return null
         }
 
@@ -65,9 +65,14 @@ object FillResponseBuilder {
             if (BuildConfig.DEBUG) Log.d(TAG, "listLoginUrls failed", e)
             return null
         }
-        val matched = LoginCandidateMatcher.filter(allCandidates, domain)
+
+        // 各ドメインでマッチングを行い、重複を排除してマージする
+        val matched = linkedSetOf<AutofillCandidate>()
+        for (domain in domains) {
+            matched.addAll(LoginCandidateMatcher.filter(allCandidates, domain))
+        }
         if (BuildConfig.DEBUG) {
-            Log.d(TAG, "listLoginUrls returned ${allCandidates.size} entries, ${matched.size} matched domain=$domain")
+            Log.d(TAG, "listLoginUrls returned ${allCandidates.size} entries, ${matched.size} matched domains=$domains")
         }
         if (matched.isEmpty()) return null
 
