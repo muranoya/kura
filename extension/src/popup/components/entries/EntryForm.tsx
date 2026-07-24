@@ -87,7 +87,7 @@ export default function EntryForm({
     (fieldType: CustomFieldType) => {
       const newField: CustomField = {
         id: Math.random().toString(36).substring(7),
-        name: '',
+        name: fieldType === 'totp' ? 'TOTP' : '',
         fieldType,
         value: '',
       }
@@ -555,14 +555,16 @@ export default function EntryForm({
                   defaultValue: field.fieldType,
                 })}
               </Badge>
-              <Input
-                id={`field-name-${field.id}`}
-                value={field.name}
-                onChange={(e) => updateCustomField(field.id, { name: e.target.value })}
-                placeholder={t('entries.fields.fieldName')}
-                className="h-8 text-sm flex-[2] min-w-0"
-              />
-              <div className="relative flex-[3]">
+              {field.fieldType !== 'totp' && (
+                <Input
+                  id={`field-name-${field.id}`}
+                  value={field.name}
+                  onChange={(e) => updateCustomField(field.id, { name: e.target.value })}
+                  placeholder={t('entries.fields.fieldName')}
+                  className="h-8 text-sm flex-[2] min-w-0"
+                />
+              )}
+              <div className={cn('relative', field.fieldType === 'totp' ? 'flex-1' : 'flex-[3]')}>
                 <Input
                   id={`field-value-${field.id}`}
                   type={
