@@ -62,15 +62,14 @@ object FillResponseBuilder {
             return null
         }
 
-        val allCandidates = try {
-            repository.listLoginUrls()
+        val matched = try {
+            repository.listLoginCandidates(domain)
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.d(TAG, "listLoginUrls failed", e)
+            if (BuildConfig.DEBUG) Log.d(TAG, "listLoginCandidates failed", e)
             return null
         }
-        val matched = LoginCandidateMatcher.filter(allCandidates, domain)
         if (BuildConfig.DEBUG) {
-            Log.d(TAG, "listLoginUrls returned ${allCandidates.size} entries, ${matched.size} matched domain=$domain")
+            Log.d(TAG, "listLoginCandidates matched ${matched.size} entries for domain=$domain")
         }
         if (matched.isEmpty()) return null
 

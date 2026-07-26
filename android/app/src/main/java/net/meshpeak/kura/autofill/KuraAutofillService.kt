@@ -21,7 +21,7 @@ private const val TAG = "KuraAutofill"
 
 /**
  * ネイティブアプリおよびブラウザ（Chrome/Firefox/WebView）双方のログインフォームに対応する
- * （docs/android-autofillservice.md 1-1）。onSaveRequest（新規ログイン保存提案）は将来課題として未対応。
+ * （docs/android-autofillservice.md 1-1）。onSaveRequest（新規ログイン保存提案）は方針として非対応。
  */
 class KuraAutofillService : AutofillService() {
 

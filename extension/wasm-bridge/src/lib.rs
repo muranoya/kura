@@ -229,10 +229,17 @@ pub fn api_set_favorite(vault_id: String, id: String, is_favorite: bool) -> Resu
     with_manager(&vault_id, |m| m.api_set_favorite(id, is_favorite)).map_err(to_js_err)
 }
 
-/// オートフィル候補を返す（全loginエントリのid, name, url, usernameを取��）
+/// ドメインにマッチするオートフィル候補を返す（id, name, url, usernameを取得）
 #[wasm_bindgen]
-pub fn api_list_login_urls(vault_id: String) -> Result<String, JsValue> {
-    let candidates = with_manager(&vault_id, |m| m.api_list_login_urls()).map_err(to_js_err)?;
+pub fn api_list_login_candidates(
+    vault_id: String,
+    page_hostname: String,
+    strict_subdomain: bool,
+) -> Result<String, JsValue> {
+    let candidates = with_manager(&vault_id, |m| {
+        m.api_list_login_candidates(&page_hostname, strict_subdomain)
+    })
+    .map_err(to_js_err)?;
     serde_json::to_string(&candidates).map_err(|e| to_js_err(format!("Serialization error: {}", e)))
 }
 

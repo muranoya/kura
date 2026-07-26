@@ -11,7 +11,7 @@ let vaultApi: VaultApi | null = null
 let isUnlocked: () => boolean = () => false
 
 export interface VaultApi {
-  api_list_login_urls(vaultId: string): string
+  api_list_login_candidates(vaultId: string, pageHostname: string, strictSubdomain: boolean): string
   api_get_entry(vaultId: string, id: string): string
   api_list_entries(
     vaultId: string,
@@ -76,42 +76,20 @@ function getCredentialsForUrl(
     return []
   }
 
-  const pageETld = extractETldPlus1(pageHostname)
-
-  // Fetch all login entries with their URLs (no passwords)
-  const result = vaultApi.api_list_login_urls(DEFAULT_VAULT_ID)
+  // Domain matching (eTLD+1 based by default, exact match when strictSubdomain)
+  // is done in vault-core so Android and the extension share identical behavior.
+  const result = vaultApi.api_list_login_candidates(
+    DEFAULT_VAULT_ID,
+    pageHostname,
+    strictSubdomain ?? false,
+  )
   const rawCandidates: RawAutofillCandidate[] = JSON.parse(result)
 
-  const candidates: AutofillCredentialCandidate[] = []
-  for (const entry of rawCandidates) {
-    let entryHostname: string
-    try {
-      const urlStr = entry.url.includes('://') ? entry.url : `https://${entry.url}`
-      entryHostname = new URL(urlStr).hostname
-    } catch {
-      continue
-    }
-
-    let matched: boolean
-    if (strictSubdomain) {
-      // Exact hostname match when strict_subdomain is enabled
-      matched = pageHostname.toLowerCase() === entryHostname.toLowerCase()
-    } else {
-      // Default: eTLD+1 match
-      const entryETld = extractETldPlus1(entryHostname)
-      matched = pageETld === entryETld
-    }
-
-    if (matched) {
-      candidates.push({
-        entryId: entry.id,
-        name: entry.name,
-        username: entry.username,
-      })
-    }
-  }
-
-  return candidates
+  return rawCandidates.map((entry) => ({
+    entryId: entry.id,
+    name: entry.name,
+    username: entry.username,
+  }))
 }
 
 /**

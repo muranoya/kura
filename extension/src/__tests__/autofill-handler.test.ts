@@ -5,6 +5,7 @@ import {
   initAutofill,
   type VaultApi,
 } from '../background/autofill'
+import { extractETldPlus1 } from '../shared/etld'
 
 // ========== Test helpers ==========
 
@@ -21,17 +22,38 @@ interface MockEntry {
 
 function createMockVaultApi(entries: MockEntry[]): VaultApi {
   return {
-    api_list_login_urls: vi.fn((_vaultId: string) => {
-      const loginEntries = entries
-        .filter((e) => e.entry_type === 'login' && e.url)
-        .map((e) => ({
-          id: e.id,
-          name: e.name,
-          url: e.url,
-          username: e.username ?? null,
-        }))
-      return JSON.stringify(loginEntries)
-    }),
+    // Domain matching is performed inside vault-core in production. This mock
+    // stands in for the FFI boundary, so it replicates that matching here
+    // (eTLD+1 by default, exact hostname when strictSubdomain is set) to keep
+    // these tests exercising the same end-to-end behavior.
+    api_list_login_candidates: vi.fn(
+      (_vaultId: string, pageHostname: string, strictSubdomain: boolean) => {
+        const pageETld = extractETldPlus1(pageHostname)
+        const loginEntries = entries
+          .filter((e) => e.entry_type === 'login' && e.url)
+          .filter((e) => {
+            const url = e.url as string
+            let entryHostname: string
+            try {
+              const urlStr = url.includes('://') ? url : `https://${url}`
+              entryHostname = new URL(urlStr).hostname
+            } catch {
+              return false
+            }
+            if (strictSubdomain) {
+              return pageHostname.toLowerCase() === entryHostname.toLowerCase()
+            }
+            return extractETldPlus1(entryHostname) === pageETld
+          })
+          .map((e) => ({
+            id: e.id,
+            name: e.name,
+            url: e.url,
+            username: e.username ?? null,
+          }))
+        return JSON.stringify(loginEntries)
+      },
+    ),
     api_get_entry: vi.fn((_vaultId: string, id: string) => {
       const entry = entries.find((e) => e.id === id)
       if (!entry) throw new Error('Entry not found')

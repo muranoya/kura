@@ -1,4 +1,4 @@
-<!-- doc-status: partial -->
+<!-- doc-status: implemented -->
 
 # Android AutofillService 実装方針
 
@@ -174,7 +174,7 @@ vault IDは既存実装同様、固定値を用いる。複数vault対応は現�
 
 ## 2-3. データフロー・セキュリティ
 
-「クレデンシャルの最小露出」原則を維持する。候補リスト取得の時点ではパスワードを含まない情報（URL・ユーザー名等）のみを扱い、絞り込み（ネイティブアプリはパッケージ名⇔ドメインマッピングファイル。ブラウザは`webDomain`の直接一致）を行った上で、実際にマッチしたエントリについてのみ個別に復号する。
+「クレデンシャルの最小露出」原則を維持する。候補リスト取得の時点ではパスワードを含まない情報（URL・ユーザー名等）のみを扱う。マッチング対象のドメイン文字列自体の解決（ネイティブアプリはパッケージ名⇔ドメインマッピングファイル。ブラウザは`webDomain`の直接一致）はAndroidアプリ内で行うが、解決したドメインに対する実際のエントリ絞り込みはvault-core側の`api_list_login_candidates(domain, strict_subdomain)`（PSL/eTLD+1ベース）に委ねる。拡張機能も同一のvault-core関数を経由するため、Android・拡張機能で候補マッチングの挙動が一致する。実際にマッチしたエントリについてのみ個別に復号する。
 
 Autofillフレームワークの`Dataset`はフィールド値を`onFillRequest`のレスポンス構築時点で確定させる必要があり、ブラウザ拡張のように「候補表示後、選択された1件のみ復号する」という二段階を素朴には実現できない（`Dataset`ごとに個別の認証を設定し、選択時に値を確定させることも可能だが、都度認証を要求するとUXが悪化する）。そのため、**vaultアンロック済みの場合は候補提示の時点で全マッチ候補のパスワードをまとめて復号し`Dataset`に埋め込む方式を採用した**（ドメインベースの絞り込みで該当件数は通常少数のため許容）。選択時に個別復号する方式は、都度認証によるUX悪化を避けるため採用しなかった。
 
@@ -217,8 +217,8 @@ extension側の重み付きシグナル方式と同じ**考え方**（複数シ�
 
 Section 1-6-3の方針に基づき、拡張機能のパターンファイルとは別ファイル・別スキーマとして、Android専用のサイト別フィールド検出パターンファイルを新設した。
 
-- **データ形式**: ドメインをキーとし、値は`username`/`password`/`totp`のフィールド種別ごとに`htmlAttributes`の`name`または`id`属性値のリストを直接指定する辞書形式（`SiteFieldPatternMap.kt`の`SitePatternEntry`）。CSSセレクタは扱わない（子孫結合子等を要するセレクタはAndroid側の`AssistStructure`では原理的に再現できないため）。ドメインの引き当ては完全一致 or サブドメイン許容のサフィックス一致（`www.`除去込み）とし、複数キーがマッチする場合は最長一致を採用する（`HostMatcher.kt`。3-2-1のパッケージ名⇔ドメインマッチングと同じ考え方で、`LoginCandidateMatcher`と実装を共有する）
-- **配置場所**: `android/app/src/main/assets/site_field_patterns.json`。3-2-1のパッケージ名⇔ドメインファイル（`package_domains.json`）と同様、Androidアプリ内リソースとして配置する。初期状態は空オブジェクト（実データのキュレーションは別途行う）
+- **データ形式**: ドメインをキーとし、値は`username`/`password`/`totp`のフィールド種別ごとに`htmlAttributes`の`name`または`id`属性値のリストを直接指定する辞書形式（`SiteFieldPatternMap.kt`の`SitePatternEntry`）。CSSセレクタは扱わない（子孫結合子等を要するセレクタはAndroid側の`AssistStructure`では原理的に再現できないため）。ドメインの引き当ては完全一致 or サブドメイン許容のサフィックス一致（`www.`除去込み）とし、複数キーがマッチする場合は最長一致を採用する（`HostMatcher.kt`）。これはフィールド検出専用の軽量な文字列比較であり、PSL/eTLD+1は使わない。vaultエントリ自体のドメインマッチング（ログイン候補検索）はvault-core側の`api_list_login_candidates`に一元化されており、`HostMatcher.kt`はそちらとは独立している
+- **配置場所**: `android/app/src/main/assets/site_field_patterns.json`。3-2-1のパッケージ名⇔ドメインファイル（`package_domains.json`）と同様、Androidアプリ内リソースとして配置する。初期状態は空オブジェクトからスタートしており、標準シグナル（Chromium独自キー/`autofillHints`/`type`属性）だけでは検出できないサイトを実機検証で洗い出し、随時追加していく（拡張機能側の`extension/patterns/`と同様、継続的なキュレーション運用が前提のデータであり、実装の完成度とは切り離して扱う）。
 - **拡張機能側パターンファイルとの関係**: 同一サイトについて拡張機能用・Android用それぞれにデータを持つことになり重複管理コストが発生するが、CSSセレクタの表現力の前提が両プラットフォームで根本的に異なるため、共有パターンファイルとしてスキーマを歩み寄らせるより、各プラットフォームの実データに即した専用フォーマットを優先する
 - **判定優先順位における位置づけ**: `BrowserFieldClassifier.kt`が1-6-2/1-5の優先順位に従い、Chromium独自キー・`autofillHints`・`type`属性・TOTPシグナル（`autocomplete="one-time-code"`/name・id正規表現）のいずれでも判定できなかった場合の最終フォールバックとして本パターンファイルを参照する
 
@@ -228,9 +228,3 @@ Androidの「自動入力サービス」設定でkuraを選択してもらうた
 
 - `Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE`インテントを起動し、システム設定でkuraを選択できるようにする
 - `AutofillManager.hasEnabledAutofillServices()`で現在の設定状態を表示する
-
-# Part 4: 将来課題
-
-- **Save対応**: `onSaveRequest`実装。新規ログイン検知後、既存`EntryCreateScreen`へ遷移し確認・保存させるフロー設計が必要
-- **Android向けサイト別パターンファイルの実データ拡充**: `site_field_patterns.json`は初期状態が空オブジェクトのため、標準シグナル（Chromium独自キー/autofillHints/type属性）だけでは検出できないサイトを実機検証で洗い出し、随時追加していく運用が必要
-
