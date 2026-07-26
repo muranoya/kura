@@ -14,10 +14,8 @@ object LoginCandidateMatcher {
         candidates.filter { matches(it.url, domain) }
 
     fun matches(candidateUrl: String, domain: String): Boolean {
-        val host = extractHost(candidateUrl)?.removePrefix("www.")?.lowercase() ?: return false
-        val normalizedDomain = domain.removePrefix("www.").lowercase()
-        if (normalizedDomain.isEmpty()) return false
-        return host == normalizedDomain || host.endsWith(".$normalizedDomain")
+        val host = extractHost(candidateUrl) ?: return false
+        return HostMatcher.matches(host, domain)
     }
 
     private fun extractHost(url: String): String? = runCatching {

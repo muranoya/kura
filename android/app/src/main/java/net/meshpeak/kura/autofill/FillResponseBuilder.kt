@@ -49,13 +49,16 @@ object FillResponseBuilder {
         repository: IVaultRepository,
         parsed: ParsedLoginForm
     ): FillResponse? {
-        val packageName = parsed.packageName ?: return null
-        val domain = PackageDomainMap.domainFor(context, packageName)
+        val domain = if (parsed.isBrowserRequest) {
+            parsed.webDomain
+        } else {
+            parsed.packageName?.let { PackageDomainMap.domainFor(context, it) }
+        }
         if (BuildConfig.DEBUG) {
-            Log.d(TAG, "buildUnlocked: packageName=$packageName -> domain=$domain")
+            Log.d(TAG, "buildUnlocked: packageName=${parsed.packageName} webDomain=${parsed.webDomain} -> domain=$domain")
         }
         if (domain == null) {
-            if (BuildConfig.DEBUG) Log.d(TAG, "packageName=$packageName not in package_domains.json -> no candidates")
+            if (BuildConfig.DEBUG) Log.d(TAG, "no domain resolved (packageName=${parsed.packageName}) -> no candidates")
             return null
         }
 

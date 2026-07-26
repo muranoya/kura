@@ -12,18 +12,30 @@ data class ViewNodeSignals(
     val inputType: Int
 )
 
+/**
+ * ブラウザ由来ViewNodeのシグナル。ネイティブ向け[ViewNodeSignals]とはデータ源が異なるため
+ * 別建てとする（docs/android-autofillservice.md 1-6-2, 3-1）。
+ */
+data class BrowserViewNodeSignals(
+    val htmlAttributes: Map<String, String>,
+    val autofillHints: List<String>
+)
+
 enum class DetectedFieldType { USERNAME, PASSWORD, EMAIL, TOTP, NONE }
 
-/** AssistStructure解析結果。ブラウザ由来リクエストの場合はフィールドID系は空になる */
+/** AssistStructure解析結果。ネイティブ由来リクエストの場合はwebDomainはnullになる */
 data class ParsedLoginForm(
     val packageName: String?,
     val isBrowserRequest: Boolean,
+    val webDomain: String? = null,
     val usernameFieldId: AutofillId?,
     val passwordFieldId: AutofillId?,
     val totpFieldId: AutofillId? = null
 )
 
 private const val EXTRA_PACKAGE_NAME = "net.meshpeak.kura.autofill.EXTRA_PACKAGE_NAME"
+private const val EXTRA_IS_BROWSER_REQUEST = "net.meshpeak.kura.autofill.EXTRA_IS_BROWSER_REQUEST"
+private const val EXTRA_WEB_DOMAIN = "net.meshpeak.kura.autofill.EXTRA_WEB_DOMAIN"
 private const val EXTRA_USERNAME_FIELD_ID = "net.meshpeak.kura.autofill.EXTRA_USERNAME_FIELD_ID"
 private const val EXTRA_PASSWORD_FIELD_ID = "net.meshpeak.kura.autofill.EXTRA_PASSWORD_FIELD_ID"
 private const val EXTRA_TOTP_FIELD_ID = "net.meshpeak.kura.autofill.EXTRA_TOTP_FIELD_ID"
@@ -34,6 +46,8 @@ private const val EXTRA_TOTP_FIELD_ID = "net.meshpeak.kura.autofill.EXTRA_TOTP_F
  */
 fun Intent.putParsedLoginForm(parsed: ParsedLoginForm) {
     putExtra(EXTRA_PACKAGE_NAME, parsed.packageName)
+    putExtra(EXTRA_IS_BROWSER_REQUEST, parsed.isBrowserRequest)
+    putExtra(EXTRA_WEB_DOMAIN, parsed.webDomain)
     parsed.usernameFieldId?.let { putExtra(EXTRA_USERNAME_FIELD_ID, it) }
     parsed.passwordFieldId?.let { putExtra(EXTRA_PASSWORD_FIELD_ID, it) }
     parsed.totpFieldId?.let { putExtra(EXTRA_TOTP_FIELD_ID, it) }
@@ -41,7 +55,8 @@ fun Intent.putParsedLoginForm(parsed: ParsedLoginForm) {
 
 fun Intent.getParsedLoginForm(): ParsedLoginForm = ParsedLoginForm(
     packageName = getStringExtra(EXTRA_PACKAGE_NAME),
-    isBrowserRequest = false,
+    isBrowserRequest = getBooleanExtra(EXTRA_IS_BROWSER_REQUEST, false),
+    webDomain = getStringExtra(EXTRA_WEB_DOMAIN),
     usernameFieldId = IntentCompat.getParcelableExtra(this, EXTRA_USERNAME_FIELD_ID, AutofillId::class.java),
     passwordFieldId = IntentCompat.getParcelableExtra(this, EXTRA_PASSWORD_FIELD_ID, AutofillId::class.java),
     totpFieldId = IntentCompat.getParcelableExtra(this, EXTRA_TOTP_FIELD_ID, AutofillId::class.java)
