@@ -496,6 +496,21 @@ mod tests {
     }
 
     #[test]
+    fn test_search_custom_field_value_passkey_excluded() {
+        let mut entry = make_entry("login", r#"{"url":"","username":"","password":""}"#);
+        entry.name = "Something".to_string();
+        entry.custom_fields = Some(vec![CustomField {
+            id: "cf1".to_string(),
+            name: "Passkey".to_string(),
+            field_type: "passkey".to_string(),
+            value: SecretString::from_string(
+                r#"{"rp_id":"example.com","private_key":"secret"}"#.to_string(),
+            ),
+        }]);
+        assert!(!search_filter("example.com").matches(&entry));
+    }
+
+    #[test]
     fn test_search_custom_field_unknown_type_excluded() {
         let mut entry = make_entry("login", r#"{"url":"","username":"","password":""}"#);
         entry.name = "Something".to_string();

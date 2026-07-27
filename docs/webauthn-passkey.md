@@ -1,4 +1,4 @@
-<!-- doc-status: design -->
+<!-- doc-status: partial -->
 # ブラウザ拡張 Passkey (WebAuthn) 対応
 
 ---
@@ -81,7 +81,9 @@ CustomField {
 
 ## 2-2. Passkeyフィールドのデータ構造
 
-`CustomField.value`にJSON文字列として格納する構造（vault-core内では`PasskeyFieldData`として扱う）:
+> **実装済み**: この節の構造体・JSON変換ロジックは`vault-core/src/models/passkey_data.rs`に実装済み。
+
+`CustomField.value`にJSON文字列として格納する構造（`PasskeyFieldData`）:
 
 ```rust
 // value: SecretString の中身をこの形にJSONシリアライズ/デシリアライズする
@@ -95,6 +97,10 @@ pub struct PasskeyFieldData {
     pub private_key: String,         // P-256秘密鍵（32byte rawスカラー値）をbase64標準エンコード
 }
 ```
+
+実装場所は当初案の`src/webauthn/mod.rs`（Part 7参照）ではなく、`vault-core/src/models/passkey_data.rs`とした。理由：`models/typed_value.rs`が`LoginData`/`BankData`等の「種別ごとの複合データ構造体＋JSON変換ロジック」を`EntryData`本体とは別ファイルに切り出しているのと同じパターンであり、`CustomField`の汎用コンテナ定義（`entry_data.rs`）や鍵生成・署名処理（`webauthn/mod.rs`、未実装）とは責務が異なるため。鍵生成・署名を実装するPart 3のコードは、この構造体を`crate::models::PasskeyFieldData`として参照する形になる想定。
+
+**`CustomFieldType` enumへの追加は現時点では見送っている**（`vault-core/src/models/entry_data.rs`の`CustomFieldType`に`Passkey`バリアントは未追加）。このenumは`api_create_entry`/`api_update_entry`での作成・編集時バリデーション専用（前方互換性ポリシー）だが、passkeyフィールドを作成する専用API（Part 3、未実装）がまだ存在しないため、バリデーション対象に加える必要がない。また、汎用の自由テキスト入力経路でpasskeyの値を人間が手打ちできてしまう状態を避ける意味もある。専用の作成APIを実装する段階で、必要に応じて追加を検討する。
 
 `CustomField.value`全体が`SecretString`（Zeroizing）でラップされているため、このJSON文字列全体が既存の秘密値と同じメモリ安全性（ロック時ゼロ化）の恩恵を受ける。個々のフィールドをさらに`SecretString`で二重ラップする必要はない。
 
@@ -126,6 +132,8 @@ authenticatorData構築時、signCountフィールド（4byte）には常に`0u3
 ---
 
 # Part 3: アーキテクチャ
+
+> **未実装（将来対応予定）**: このPart全体（鍵生成・署名・CBOR構築を含むvault-core側の暗号処理、およびブラウザ拡張側のWebAuthn横取り機構）は未実装。実装済みなのはPart 2のデータ構造のみ。
 
 ## 3-1. 全体構成
 
@@ -264,6 +272,8 @@ Service Worker background/webauthn.ts
 
 # Part 4: UI設計
 
+> **未実装（将来対応予定）**: ブラウザ拡張・デスクトップ・Androidいずれのクライアントコードも未変更。
+
 ## 4-1. 儀式ウィンドウ
 
 Passkeyの作成確認・複数候補選択は、既存popup（`action.default_popup`）とは別に`chrome.windows.create({ type: 'popup', ... })`で独立ウィンドウを開く方式を採る。
@@ -345,9 +355,11 @@ CLAUDE.mdの制約（拡張ポップアップのisolated DOMではRadix UIのPor
 
 ### vault-core
 
+> **実装済み**: `src/models/passkey_data.rs`（Part 2-2参照。`PasskeyFieldData`構造体とJSON変換）と、`src/models/entry.rs`への検索除外リグレッションテスト追加。以下の表は残り（未実装）の新規ファイル。
+
 | 新規ファイル | 対応する既存ファイル | 内容 |
 |---|---|---|
-| `src/webauthn/mod.rs` | `src/crypto/encryption.rs`と並列 | 鍵生成、authenticatorData/attestationObject構築、COSE_Key構築、ECDSA署名、`PasskeyFieldData`のJSON変換、固定AAGUID定数 |
+| `src/webauthn/mod.rs` | `src/crypto/encryption.rs`と並列 | 鍵生成、authenticatorData/attestationObject構築、COSE_Key構築、ECDSA署名、固定AAGUID定数（`PasskeyFieldData`は`src/models/passkey_data.rs`から参照する） |
 | `src/api/webauthn.rs` | `src/api/entries.rs`と並列 | `api_webauthn_find_credentials`（`login`エントリのcustom_fieldsを横断的に走査、非機密候補一覧を返す）、`api_webauthn_create_credential`（対象entry_id指定 or 新規login作成 + `passkey`カスタムフィールド追加）、`api_webauthn_get_assertion`（entry_id + custom_field_id指定で署名） |
 | `tests/webauthn_test.rs` | 既存`tests/`配下の統合テスト群と並列 | バイト単位のラウンドトリップ・ゴールデンベクタテスト |
 
@@ -377,7 +389,7 @@ CLAUDE.mdの制約（拡張ポップアップのisolated DOMではRadix UIのPor
 | フェーズ | 範囲 | 成果物 |
 |---|---|---|
 | **Phase 0（スパイク・検証）** | 実装なし。(a) manifest宣言`world:MAIN`と`chrome.scripting.registerContentScripts`の信頼性比較、(b) `PublicKeyCredential`ライクなオブジェクトが実サイト（webauthn.io、GitHub等）のJSで`instanceof`チェック等に耐えるかの検証、(c) ページCSPとの相互作用検証 | 検証結果メモ。以降のフェーズの設計を必要に応じて修正 |
-| **Phase 1** | vault-coreの暗号処理+`login`エントリへの`passkey`カスタムフィールド読み書きAPIのみ。UI・拡張側の配線なし | `src/webauthn/`モジュール、`api/webauthn.rs`の3関数、Rustユニットテスト（バイト単位ゴールデンベクタ） |
+| **Phase 1** | vault-coreの暗号処理+`login`エントリへの`passkey`カスタムフィールド読み書きAPIのみ。UI・拡張側の配線なし | `src/webauthn/`モジュール、`api/webauthn.rs`の3関数、Rustユニットテスト（バイト単位ゴールデンベクタ）。**うちデータ構造（`PasskeyFieldData`、`src/models/passkey_data.rs`）のみ実装済み。鍵生成・署名・API層は未実装** |
 | **Phase 2** | wasm-bridgeラッパー、MAIN/ISOLATED注入、Service Workerのメッセージハンドリングと儀式ウィンドウ管理、最小限の儀式UI（作成確認・紐付け先選択・候補選択）。設定画面に「Passkey対応（β）」トグルを追加しデフォルトOFFで段階的に有効化 | manifest変更、`webauthn-main.ts`/`webauthn-bridge.ts`/`background/webauthn.ts`/儀式用ポップアップ画面。doc-statusを`partial`に更新 |
 | **Phase 3** | `login`エントリ一覧・詳細・編集画面でのPasskey表示対応（バッジ・専用カード表示・i18n）、カスタムフィールド追加UIの種別制限対応 | UI touch point一式。doc-statusを`implemented`に更新 |
 | **Phase 4（将来・任意・スコープ外）** | Conditional Mediation対応、Bitwarden JSON export/importでのfido2Credentials互換、デスクトップ/Android側のUI対応 | 本ドキュメントでは設計しない |
