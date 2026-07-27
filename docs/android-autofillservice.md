@@ -2,33 +2,27 @@
 
 # Android AutofillService 実装方針
 
----
-
 # Part 1: 機能仕様
 
 ## 1-1. 概要
 
-Android標準の[AutofillFramework](https://developer.android.com/guide/topics/text/autofill)（API 26以上）に対応する`AutofillService`をAndroidアプリに実装し、**他アプリ（ネイティブアプリ）のログインフォーム**に対してvault内のクレデンシャルを自動入力できるようにする。
-
-**本フェーズ（v1）の対象は、ネイティブアプリのオートフィルのみ**とする。Chrome/Firefox等のブラウザで表示中のウェブサイトへのオートフィルは、検証すべき技術的な不確定要素があるため今回は対象外とし、将来のフェーズで改めて検討する（理由と必要な検証はSection 1-6を参照）。
-
-既存の`android/rust-jni`は既にログイン一覧取得・アンロック・エントリ復号等のJNIブリッジを備えており、AutofillServiceはこの上に構築する。vault-core本体への変更は不要（Section 2-4参照）。
+AndroidのAutofillFrameworkに対応する`AutofillService`を実装し、**他アプリ（ネイティブアプリ）およびブラウザで表示中のウェブサイト**のログインフォームに対してvault内のクレデンシャルを自動入力できるようにする。ただしログインフォームに限定されており、クレジットカード等の他フォーム種別については未対応。
 
 ### 対応範囲
 
 **対応する機能：**
 
 - ネイティブアプリのログインフォーム（username + password）の検出
-- ネイティブアプリのTOTP（2段階認証コード）フィールドの検出とオートフィル（同一フォーム内のusername/password同居ケース、ログイン後に出るTOTP専用画面の両方に対応。Section 1-5参照）
-- パッケージ名ベースのマッチング（Section 1-3）
+- ブラウザ（Chrome/Firefox/WebView）で表示中のウェブサイトのログインフォーム（username + password）の検出
+- ネイティブアプリ・ブラウザ双方のTOTP（2段階認証コード）フィールドの検出とオートフィル（同一フォーム内のusername/password同居ケース、ログイン後に出るTOTP専用画面の両方に対応。
+- パッケージ名ベースのマッチング／`webDomain`ベースのマッチング
 - vaultロック中の認証プロンプト経由でのオートフィル
 - クレデンシャル候補の選択・自動入力
 
-**対応しない機能（将来課題、Section 3-4参照）：**
+**対応しない機能：**
 
-- ブラウザで表示中のウェブサイトへのオートフィル — Section 1-6参照
-- 新規ログイン情報の保存提案（`onSaveRequest`） — フォーム送信を検知して「このパスワードをkuraに保存しますか？」と提案する機能は今回は実装しない
-- クレジットカード等、login以外のエントリタイプのオートフィル
+- 新規ログイン情報の保存提案（`onSaveRequest`） — フォーム送信を検知して「このパスワードをkuraに保存しますか？」と提案する機能は実装しない
+- クレジットカード等、login以外のエントリタイプのオートフィル（ネイティブアプリ・ブラウザ共通）
 - 分割ログインフロー（usernameとpasswordが別画面）の引き継ぎ — ブラウザ拡張のような画面間の状態引き継ぎは行わず、各`onFillRequest`は独立して処理する
 
 ## 1-2. 対応フォームタイプ
@@ -44,88 +38,117 @@ Android標準の[AutofillFramework](https://developer.android.com/guide/topics/t
 
 ## 1-3. マッチング方式（パッケージ名ベース）
 
+**本セクションはネイティブアプリ由来リクエスト（`structure.getWebDomain()`が全ノードでnullの場合）にのみ適用される。** ブラウザ由来リクエストは`getWebDomain()`から直接ドメインが取得できるため、本セクションのパッケージ名⇔ドメインマッピングファイルは不要であり、別の方式を取る。
+
 ネイティブアプリからのリクエストでは、`AssistStructure.getActivityComponent().getPackageName()`からリクエスト元のパッケージ名が分かる。
 
-Android標準のベストプラクティスである[Digital Asset Links](https://developers.google.com/digital-asset-links)（`assetlinks.json`によるアプリ⇔ウェブサイトの検証）は、**対象ウェブサイト側が`assetlinks.json`を用意している必要があり、kura側だけでは網羅・制御できない**ため採用しない。
+Android標準のベストプラクティスであるDigital Asset Links（`assetlinks.json`によるアプリ⇔ウェブサイトの検証）は、対象ウェブサイト側が`assetlinks.json`を用意している必要があり、定期的に全パスワードエントリを走査して、`assetlinks.json`を収集し保持する必要がある。`assetlinks.json`の管理と定期更新処理は煩雑なため採用しない。
 
-また、Android 12 (API 31) で導入された`DomainVerificationManager` APIを使用してパッケージ名とドメインの検証済み関連付けを動的に取得することも検討したが、**自分自身以外のアプリのドメイン情報を取得するには`QUERY_ALL_PACKAGES`権限が必要**となる。この権限はGoogle Play Storeで厳しく制限されており、承認されるのはファイルマネージャーやブラウザなど限られたユースケースのみである。KuraはGoogle Play Storeでの配布は予定していないため技術的には問題ないが、**インストール済みアプリ一覧は機微な情報であるため、アプリの信頼性を保つ観点から、この仕組みを使わずに引き続きパターンファイルに依存する実装を選択した**。
+また、Android 12 (API 31) で導入された`DomainVerificationManager` APIを使用してパッケージ名とドメインの検証済み関連付けを動的に取得することも検討したが、**自分自身以外のアプリのドメイン情報を取得するには`QUERY_ALL_PACKAGES`権限が必要**となる。この権限はGoogle Play Storeで厳しく制限されている。KuraはGoogle Play Storeでの配布は予定していないため技術的には問題ないが、**インストール済みアプリ一覧は機微な情報であるため、アプリの信頼性を保つ観点から、この仕組みを使わずに引き続きパターンファイルに依存する実装を選択した**。
 
-代わりに、**リポジトリで管理するパッケージ名⇔ドメインの手動マッピングDB**を新設する（Section 3-2）。これはウェブブラウザ拡張のパターンDBファイルと同じ思想であり、外部の検証情報や機微な権限に依存せず、既知の主要アプリについて確実なマッチングを提供する。
+代わりに、**リポジトリで管理するパッケージ名⇔ドメインの手動マッピングファイル**を新設する。これはウェブブラウザ拡張のパターンファイルと同じ思想であり、外部の検証情報や機微な権限に依存せず、既知の主要アプリについて確実なマッチングを提供する。
 
 - 未登録パッケージは候補を一切表示しない（誤マッチより「候補なし」を優先する安全側デフォルト）
 - ヒューリスティックな推測（パッケージ名からドメインを機械的に導出する等）は行わない。`com.example.android` → `example.com`のような単純な変換は誤マッチが多く、field-classifierを保守的に保つという既存の設計方針と同様の考え方に反するため
-- データ形式・配置場所はSection 3-2で詳述
 
 ## 1-4. オートフィルUI
 
 `FillResponse`に候補（`Dataset`）を積んで返す。各`Dataset`はエントリ名を表示ラベルとし、選択されるとusername/passwordフィールドに値が入力される。
 
 - vaultがアンロック済みの場合: マッチしたエントリをそのまま`Dataset`として提示する
-- vaultがロック中の場合: 認証プレースホルダーの`Dataset`を1件提示し、選択すると認証フローに入る（Section 2-2）
+- vaultがロック中の場合: 認証プレースホルダーの`Dataset`を1件提示し、選択すると認証フローに入る
 - マッチする候補が0件（アンロック済みで該当エントリなし、またはロック中でも該当なしと判定できない場合を除く）の場合、候補自体を提示しない
 
-TOTPフィールドを含む候補は、username/password用の`Dataset`とは**別の`Dataset`**として1件追加で提示する（1候補につき最大2つの`Dataset`が並ぶ）。理由と詳細はSection 1-5参照。
+TOTPフィールドを含む候補は、username/password用の`Dataset`とは**別の`Dataset`**として1件追加で提示する（1候補につき最大2つの`Dataset`が並ぶ）。
 
-## 1-5. TOTP（2段階認証コード）オートフィルの詳細
+## 1-5. TOTPオートフィルの詳細
 
-TOTPコードは既定30秒（エントリのotpauth設定次第で変動）で失効するため、username/passwordのように`onFillRequest`時点でまとめて生成・埋め込む方式（Section 2-3）はそのまま使えない。ユーザーが候補を選ぶまでの間にコードが失効している恐れがあるためである。
+TOTPコードは既定30秒で失効するため、username/passwordのように`onFillRequest`時点でまとめて生成・埋め込む方式はそのまま使えない。ユーザーが候補を選ぶまでの間にコードが失効している恐れがあるためである。
 
 そのため、TOTP用の`Dataset`はAndroid Autofillの**Dataset単位認証**（`Dataset.Builder.setAuthentication(IntentSender)`）を利用し、コード自体は`onFillRequest`時点では生成しない。ユーザーがTOTP候補をタップした瞬間に`AutofillTotpResolveActivity`（トランポリンActivity）が起動し、その場で最新のコードを生成した`Dataset`を返す。
 
-- `onFillRequest`時点では、対象エントリがTOTPカスタムフィールド（`CustomFieldType.Totp`）を持つかどうかのみを確認する（コードそのものは生成しない。クレデンシャル最小露出の原則、Section 2-3）
+- `onFillRequest`時点では、対象エントリがTOTPカスタムフィールド（`CustomFieldType.Totp`）を持つかどうかのみを確認する（コードそのものは生成しない。クレデンシャル最小露出の原則）
 - `AutofillTotpResolveActivity`は選択の瞬間に`generateTotpFromValue`（vault-core、既存API）でコードを生成し、`Dataset`を`EXTRA_AUTHENTICATION_RESULT`として返す（`AutofillUnlockActivity`が`FillResponse`を返すのとは型が異なる点に注意）
-- `onFillRequest`時点でvaultがアンロック済みでも、ユーザーが候補をタップするまでの間に自動ロックタイマーで再ロックされている可能性があるため、`AutofillTotpResolveActivity`は`AutofillUnlockActivity`と同じ認証フロー（`AutofillAuthScreen`、Section 2-2）を経由してから解決する
-- TOTPフィールドの検出は`FieldClassifier`のヒューリスティックスコアリングに委ねる。Android Autofillフレームワークにはワンタイムコード専用の`autofillHints`定数は存在しないため、`idEntry`/`hint`の正規表現（`otp`, `totp`, `verification code`, `認証コード`等）を主要シグナルとし、`inputType`（数値クラス等）は単独では判定に使わない弱いシグナルとして扱う（詳細はSection 3-1、`FieldClassifier.kt`参照）
+- `onFillRequest`時点でvaultがアンロック済みでも、ユーザーが候補をタップするまでの間に自動ロックタイマーで再ロックされている可能性があるため、`AutofillTotpResolveActivity`は`AutofillUnlockActivity`と同じ認証フロー（`AutofillAuthScreen`）を経由してから解決する
+- TOTPフィールドの検出は`FieldClassifier`のヒューリスティックスコアリングに委ねる。Android Autofillフレームワークにはワンタイムコード専用の`autofillHints`定数は存在しないため、`idEntry`/`hint`の正規表現（`otp`, `totp`, `verification code`, `認証コード`等）を主要シグナルとし、`inputType`（数値クラス等）は単独では判定に使わない弱いシグナルとして扱う。**この判定シグナルはネイティブアプリの`ViewNode`属性が前提であり、ブラウザ由来リクエストでは`idEntry`は意味を持たない。** ブラウザ由来リクエストでのTOTPフィールド検出は`htmlAttributes`（`name`/`id`/`autocomplete="one-time-code"`等）を対象とする必要があり、シグナルの一覧・優先順位はネイティブアプリとは別建てで扱う。なお、選択時にコードを生成する`AutofillTotpResolveActivity`によるDataset単位認証の仕組み自体は、リクエスト元によらず共通のアーキテクチャとして再利用できる
 
-**対応しない機能の詳細:**
+## 1-6. ブラウザ経由のウェブサイトオートフィル
 
-- **Save機能**: `onSaveRequest`の実装（新規ログイン検知・保存提案）は、既存の`EntryCreateScreen`との連携やUI設計を要する別スコープの作業として今回は扱わない
+### 1-6-1. 実機検証で判明した事実
 
-## 1-6. ブラウザ経由のウェブサイトオートフィルを対象外とする理由
+以下4パターンの`AssistStructure`をJSONダンプし解析した
 
-### 1-6-1. 検討の経緯（要約）
+* ネイティブアプリのログイン画面
+* アプリ内WebView、Chromiumベース
+* Firefoxでログイン画面を開いたケース
+* Chromeでログイン画面を開いたケース
 
-設計初期には、ブラウザ拡張と同水準の体験（`ViewNode.getWebDomain()`が取得できるブラウザ由来リクエストに対する、eTLD+1判定・サイト別パターンDBを使ったログインフォーム検出）をAndroidでも実現する方向で検討していた。具体的には以下を検討し、いずれも次点の課題に突き当たった。
+**(a) フォームの祖先構造 — 3ブラウザ共通でほぼフラット**
 
-1. **eTLD+1判定ロジックのvault-core集約**: ブラウザ拡張が持つ`extractETldPlus1`をvault-core（Rust）に移植し、WASM/JNI双方から呼び出す案。ロジック自体は移植可能だが、後述のパターンDBの課題と合わせて検討した結果、単独で進める意義が薄れた
-2. **サイト別パターンDB（CSSセレクタベース）の共有**: ブラウザ拡張の`extension/patterns/sites/*.json`は、ヒューリスティックで検出できない一部サイト（現状3件）に対するCSSセレクタベースの個別対応。これをAndroidでも使えなければ、「同じサイトなのに拡張機能では検出できてAndroidでは検出できない」というズレが、まさにこの3サイトで発生する
-3. **パターンDBをvault-core側で解決する案**: セレクタ解決ロジック自体をvault-core（Rust）に実装し共有する案を検討したが、拡張機能は`document.querySelector`というブラウザネイティブのCSSエンジンを無償で使っており、これと同等の表現力をvault-core側で持たせるには、vault-core自身がCSSセレクタエンジンを実装する必要がある。将来的な結合子（子孫セレクタ等）や疑似クラスへの対応を考えると、これは現実的な投資対効果とは言えない
-4. **セレクタ解決をアプリ側に残し、Android側にCSSエンジンを追加する案**: vault-coreにエンジンを持たせる代わりに、拡張機能は従来通り`document.querySelector`を使い、Androidは独自にCSSセレクタエンジン（例: jsoup等の既存ライブラリをViewNodeツリーから合成した疑似DOMに適用する）を持つ、という案。CSSエンジン自体の実装コストは現実的な範囲に収まりそうだが、次項の理由でこの案の有効性自体が未検証
+Chrome/WebViewは`htmlTag="form"`のノード直下に`input`（username, password）が直接の子として並ぶ。中間の`<div>`等の祖先要素は一切現れない。Firefoxに至っては`<form>`タグ自体が存在せず、`htmlTag="html"`のノード直下に`input`が直接並ぶ。
 
-### 1-6-2. 対象外とする理由
+```
+Chrome:   (Androidネイティブビュー) → form → input, input
+WebView:  (Androidネイティブビュー) → form(WebViewノード) → input, input
+Firefox:  (Androidネイティブビュー) → html → input, input
+```
 
-上記の検討を通じて分かったのは、**Androidの`AssistStructure`はページのHTMLをそのまま渡してくれるわけではない**という点である。ブラウザ（Chrome/Firefox等）が、自分の内部DOMを「Autofillに関係しそうな範囲」で`ViewNode`ツリーへ**独自に翻訳・要約したもの**を受け取るに過ぎない。この翻訳の忠実度は、kura側では制御できないブラウザ実装依存の要素であり、具体的には以下が不明である：
+つまり3ブラウザとも「文脈ノード（form/html）1つ→inputが直下」という2階層のみで、子孫結合子（`div.foo input`等）を要するCSSセレクタは原理的に再現不可能なデータしか得られない。
 
-- フォーム要素（`<input>`等）だけでなく、その祖先要素（`<form>`, `<div>`等）が`ViewNode`として公開されるのか、それとも末端の入力要素だけをフラットに公開しているのか。後者の場合、CSSエンジンをAndroid側に持たせても、子孫セレクタのような祖先関係を要求するセレクタは原理的に解決不可能（データが無い）
-- `ViewNode.getHtmlInfo()`が返す属性（`name`/`id`/`class`/`type`/`autocomplete`等）がどこまで正確・網羅的か
-- Chrome / Firefox / Samsung Internet等、ブラウザごとにこの精度が異なるか。異なる場合、「Android版で揃える」対象が「拡張機能 vs Android」の2軸ではなく「拡張機能 vs Android+Chrome vs Android+Firefox」という多軸の整合性問題になる
-- Android OSバージョン・ブラウザバージョンによる差異
+**(b) `htmlAttributes`の正確性・網羅性 — 高い**
 
-これらは実機で検証しない限り分からない。**技術的な実現可能性そのものが不明な状態でCSSエンジンの実装やvault-core側の共通化に投資するのはリスクが高い**ため、ブラウザ経由のウェブサイトオートフィルは本フェーズの対象外とし、まずはこの不確定要素のないネイティブアプリのオートフィルから着手する。
+Chrome/WebView(Chromium系)は`name`/`type`/`id`等の生HTML属性に加え、独自キー`ua-autofill-hints`/`computed-autofill-hints`/`crowdsourcing-autofill-hints`（値: `"USERNAME"`/`"PASSWORD"`、大文字）を持つ。
 
-なお、ネイティブアプリオートフィルの実装方針（Section 3-1）は、上記のブラウザ固有の課題（`getWebDomain()`が返る = ブラウザ由来のリクエストである場合）とは無関係であり、この決定による影響を受けない。`KuraAutofillService`は`getWebDomain()`が非nullのリクエストを検出した場合、候補を返さない（`FillCallback.onSuccess(null)`）ことを明示的な仕様とする。
+```json
+"htmlAttributes": {
+  "name": "pass", "type": "password", "label": "パスワード",
+  "ua-autofill-hints": "PASSWORD", "id": "m_login_password",
+  "computed-autofill-hints": "PASSWORD", "crowdsourcing-autofill-hints": "PASSWORD"
+}
+```
 
-### 1-6-3. 将来対応に向けて必要な検証
+Firefoxは生HTML属性（`name`/`type`/`autocomplete`/`aria-label`等）のみで、Chromium系のような独自キーは持たない。ただし`type`属性自体は両エンジンとも正確。
 
-ブラウザ経由のオートフィル対応を将来検討する際は、着手前に以下を実機で検証する：
+**(c) ブラウザエンジン間の差異 — 最重要の発見**
 
-1. `**AssistStructure`のダンプ調査**: 最小限のAutofillServiceを実装し、複数の実サイト（できればヒューリスティックで検出できない、パターンDB相当の個別対応が必要そうな複雑なフォームを持つサイトを含む）に対して、Chrome・Firefox for Androidそれぞれで`onFillRequest`時の`AssistStructure`をログ出力する
-2. 上記のログから、以下を確認する：
-  - フォーム要素の祖先構造（`<form>`等）が`ViewNode`として保持されているか、フラットな構造か
-  - `ViewNode.getHtmlInfo()`の属性の正確性・網羅性
-  - ブラウザ間・OSバージョン間での差異の有無
-  - `ViewNode.getWebDomain()`自体の正確性・一貫性（サブドメイン、ポート番号の扱い等）
-3. 検証結果に応じて対応方針を評価し直す：
-  - 祖先構造が十分に保持されているなら、Android側にCSSセレクタエンジン（jsoup等）を導入し、パターンDBのデータ（`.json`）をそのまま活用する設計（Section 1-6-1の案4）が現実的な選択肢になる
-  - フラットな構造しか得られない場合、複合セレクタ・結合子を要するパターンはAndroidでは原理的に再現不可能という前提を受け入れた上で、単純な属性一致のみサポートする、または対応自体を見送るかを判断する
+標準Android API `View.getAutofillHints()`（`AssistStructure`上は`ViewNode.getAutofillHints()`）の信頼性が、ブラウザエンジンによって非対称であることが判明した：
+
+- **Firefox(Gecko)**: `getAutofillHints()`に正しく`["username"]`/`["password"]`が入る。標準APIがそのまま機能する
+- **Chrome/WebView(Chromium)**: usernameフィールドは`["username","webauthn"]`（正しい値に加えて`webauthn`が混入）。**passwordフィールドは`["on"]`（`autocomplete`属性値がそのまま入る）としか返らず、標準APIだけではpasswordフィールドを検出できない**。Chromium系ではフィールド種別の判定に`htmlAttributes`の独自キーを見る必要がある
+
+つまり「ブラウザエンジンごとに使うべき最優先シグナルが異なる」。単一の判定ロジックでは両エンジンを正しく扱えず、優先順位付きのシグナル設計が必要になる。
+
+**(d) `webDomain`の正確性**
+
+サブドメインまで含めて正確に取得できていた。ただし祖先ノード（form/htmlの親等）では`webDomain`が空文字列やnullになるケースがあり、既存の「いずれかのノードで取得できればブラウザ由来と判定する」という方針はこの実態を踏まえたものとして、そのまま維持できる。
+
+### 1-6-2. フィールド検出方針
+
+`structure.getWebDomain()`が非nullの場合のフィールド検出は、ネイティブアプリ向けとは**独立したロジック**として扱う。ネイティブアプリ向けロジックは`ViewNode`のAndroidネイティブ属性（`idEntry`, `inputType`等）を前提としており、ブラウザ由来の`htmlTag`/`htmlAttributes`とはデータ源が全く異なるため、無理に一本化しない。
+
+ブラウザ由来リクエストのシグナル優先順位（案）：
+
+1. `htmlAttributes`の独自キー（`ua-autofill-hints`/`computed-autofill-hints`、値`"USERNAME"`/`"PASSWORD"`）が存在すれば最優先で採用する。存在する場合、そのノードはChromium系ブラウザ（Chrome・WebViewとも同一エンジン）由来と判定できる
+2. 上記が存在しない場合、`ViewNode.getAutofillHints()`（`hints`）を見る。Firefoxではここに`"username"`/`"password"`が正確に入る
+3. 上記いずれでも判定できない場合、`htmlAttributes.type`（`"password"`/`"email"`）をfallbackとして使う。両エンジン共通で正確なシグナルである
+4. さらに個別サイト対応として、Android向けサイト別パターンファイルによる`name`/`id`属性の直接一致を用いる
+
+### 1-6-3. Android向けサイト別パターンファイル
+
+拡張機能のパターンファイルとは**別ファイル・別スキーマとして、Android専用のサイト別パターンファイルを新設する**方針とする。このパターンデータは共有しない。
+
+**共有しない理由**: 拡張機能は`document.querySelector`というブラウザネイティブのCSSエンジンを前提に、任意の複雑なCSSセレクタ（子孫結合子・疑似クラス等）を許容するスキーマ（`extension/patterns/schema.json`）を持つ。一方Androidは祖先構造がほぼフラットであり、複雑なセレクタを原理的に再現できない。無理に共有スキーマにすると、以下のいずれかの問題を抱える：
+
+- スキーマを単純な属性一致に制約すると、拡張機能側の将来の表現力を制限してしまう
+- スキーマを任意のCSSセレクタのまま許容すると、Android側でパースできないパターンが将来紛れ込むリスクが残り続ける
+
+そのため、Android向けパターンファイルは**単純な属性一致（`name`/`id`等のキーバリュー比較）のみをサポートする専用フォーマット**とし、CSSセレクタは扱わない。データの重複管理（同一サイトについて拡張機能用・Android用の2箇所に記述する手間）は許容し、各プラットフォームの実データに即したフォーマットを優先する。
 
 # Part 2: アーキテクチャ
 
 ## 2-1. 全体構成
 
-Android OSのAutofillフレームワークから呼び出される`AutofillService`実装として`KuraAutofillService`を新設する。`onFillRequest`は、ブラウザ由来リクエストの除外（Section 1-6）、`AssistStructure`解析によるフィールド検出（Section 3-1）、vaultのロック状態確認、状態に応じたDataset構築または認証プレースホルダー提示、という順で処理する。`onSaveRequest`（新規ログイン保存提案）は対応しない（Section 1-1）。
-
-既存の`android/rust-jni`経由でvault-core（Rust）を呼び出す既存の構成をそのまま踏襲し、vault-core本体への変更は行わない（Section 2-4参照）。
+Autofillフレームワークから呼び出される`AutofillService`実装として`KuraAutofillService`を新設する。`onFillRequest`は、リクエスト元の判定（ネイティブアプリ／ウェブブラウザ）、`AssistStructure`解析によるフィールド検出、vaultのロック状態確認、状態に応じたDataset構築または認証プレースホルダー提示、という順で処理する。`onSaveRequest`（新規ログイン保存提案）は対応しない。
 
 ### 2-1-1. Manifest宣言
 
@@ -144,32 +167,26 @@ vault IDは既存実装同様、固定値を用いる。複数vault対応は現�
 
 `onFillRequest`の冒頭でvaultのロック状態を確認する。
 
-- アンロック済みの場合は、そのままマッチング処理（Section 1-3）へ進む
+- アンロック済みの場合は、そのままマッチング処理へ進む
 - ロック中の場合は、認証プレースホルダー（タップすると認証Activityを起動する`Dataset`）を1件提示する。ユーザーがタップすると認証Activityが起動し、認証成功後に実データセットを返却する（標準的なAutofill Authenticationパターン）
 
 認証Activityは既存の`LockScreen`のロジック（`BiometricHelper`は`Context`非依存で`Cipher`取得可能、`BiometricPrompt`表示自体は`FragmentActivity`が必要）を可能な限り再利用する。生体認証が未設定の場合はマスターパスワード入力にフォールバックする、既存`LockScreen`と同様の挙動とする。
 
 ## 2-3. データフロー・セキュリティ
 
-「クレデンシャルの最小露出」原則を維持する。候補リスト取得の時点ではパスワードを含まない情報（URL・ユーザー名等）のみを扱い、パッケージ名⇔ドメインマッピングDBによる絞り込み（Section 1-3）を行った上で、実際にマッチしたエントリについてのみ個別に復号する。
+「クレデンシャルの最小露出」原則を維持する。候補リスト取得の時点ではパスワードを含まない情報（URL・ユーザー名等）のみを扱う。マッチング対象のドメイン文字列自体の解決（ネイティブアプリはパッケージ名⇔ドメインマッピングファイル。ブラウザは`webDomain`の直接一致）はAndroidアプリ内で行うが、解決したドメインに対する実際のエントリ絞り込みはvault-core側の`api_list_login_candidates(domain, strict_subdomain)`（PSL/eTLD+1ベース）に委ねる。拡張機能も同一のvault-core関数を経由するため、Android・拡張機能で候補マッチングの挙動が一致する。実際にマッチしたエントリについてのみ個別に復号する。
 
-Android Autofillフレームワークの`Dataset`はフィールド値を`onFillRequest`のレスポンス構築時点で確定させる必要があり、ブラウザ拡張のように「候補表示後、選択された1件のみ復号する」という二段階を素朴には実現できない（`Dataset`ごとに個別の認証を設定し、選択時に値を確定させることも可能だが、都度認証を要求するとUXが悪化する）。そのため、**vaultアンロック済みの場合は候補提示の時点で全マッチ候補のパスワードをまとめて復号し`Dataset`に埋め込む方式を採用した**（パッケージ名マッピングDBによる絞り込みで該当件数は通常少数のため許容）。選択時に個別復号する方式は、都度認証によるUX悪化を避けるため採用しなかった。
+Autofillフレームワークの`Dataset`はフィールド値を`onFillRequest`のレスポンス構築時点で確定させる必要があり、ブラウザ拡張のように「候補表示後、選択された1件のみ復号する」という二段階を素朴には実現できない（`Dataset`ごとに個別の認証を設定し、選択時に値を確定させることも可能だが、都度認証を要求するとUXが悪化する）。そのため、**vaultアンロック済みの場合は候補提示の時点で全マッチ候補のパスワードをまとめて復号し`Dataset`に埋め込む方式を採用した**（ドメインベースの絞り込みで該当件数は通常少数のため許容）。選択時に個別復号する方式は、都度認証によるUX悪化を避けるため採用しなかった。
 
-例外的にTOTPコードのみはDataset単位認証（選択時に個別解決する方式）を採用している。パスワードと異なりTOTPコードは短時間で失効するため、値の鮮度をUXより優先する必要がある（Section 1-5参照）。
-
-## 2-4. vault-core / JNI層の変更点
-
-vault-core側の変更は不要。ログイン候補一覧を取得するための既存APIをそのまま利用する。
-
-`android/rust-jni`には、既存のJNIブリッジ関数群と同じパターンを踏襲した新規ブリッジ関数を1つ追加する。Android側の`VaultRepository`でも、既存の同種メソッドと同じパターンでデシリアライズ・suspend化を行う。
+例外的にTOTPコードのみはDataset単位認証（選択時に個別解決する方式）を採用している。パスワードと異なりTOTPコードは短時間で失効するため、値の鮮度をUXより優先する必要がある。
 
 # Part 3: 個別設計
 
 ## 3-1. AssistStructure解析・フィールド検出
 
-`onFillRequest`で渡される`AssistStructure`を再帰的にトラバースし、`ViewNode`ごとにフィールドの役割を判定する。判定ロジックはAndroidアプリ内（Kotlin）に閉じた実装とし、vault-core・拡張機能とのロジック共有は行わない（Section 1-6参照。ネイティブアプリには拡張機能側に対応する実装が元々存在しないため、共有の効能が薄い）。
+`onFillRequest`で渡される`AssistStructure`を再帰的にトラバースし、`ViewNode`ごとにフィールドの役割を判定する。判定ロジックはAndroidアプリ内に閉じた実装とし、vault-core・拡張機能とのロジック共有は行わない（ネイティブアプリ向け判定ロジックには拡張機能側に対応する実装が元々存在しないため、共有の効能が薄い）。まずリクエスト元を判定し、ネイティブアプリ由来ならSection 3-1-1、ブラウザ由来ならSection 1-6-2のロジックに進む。
 
-### 3-1-1. 優先順位
+### 3-1-1. 優先順位（ネイティブアプリ由来リクエスト）
 
 1. `ViewNode.getAutofillHints()`: `View.AUTOFILL_HINT_USERNAME` / `AUTOFILL_HINT_PASSWORD` / `AUTOFILL_HINT_EMAIL_ADDRESS`が設定されていれば最優先で採用する。Android開発者が明示的に付与したヒントであり信頼性が最も高い
 2. **ヒューリスティックfallback**: `autofillHints`が未設定のView（多くのアプリで発生しうる）に対し、以下のシグナルでスコアリングする：
@@ -179,18 +196,31 @@ vault-core側の変更は不要。ログイン候補一覧を取得するため�
 
 extension側の重み付きシグナル方式と同じ**考え方**（複数シグナルの重み付けスコアリング、閾値未満は分類不能として無視する保守的な設計）をKotlin実装の参考にする。ただしコード・データ（正規表現・重み定義）自体は共有せず、Android独自にチューニングする。誤検出によって無関係なフィールドにオートフィル候補が出ることを避けるため、検出漏れは許容し積極的な拡張は行わない。
 
-### 3-1-2. リクエスト元の判定とブラウザ由来リクエストの扱い
+### 3-1-2. リクエスト元の判定
 
-- `structure.getWebDomain()`（`ViewNode`単位、いずれかのノードで取得できればブラウザ由来と判定）が非nullの場合、**候補を返さない**（`FillCallback.onSuccess(null)`）。本フェーズではブラウザ経由のウェブサイトオートフィルは対象外のため（Section 1-6）
+- `structure.getWebDomain()`（`ViewNode`単位、いずれかのノードで取得できればブラウザ由来と判定）が非nullの場合、ブラウザ由来リクエストとしてSection 1-6-2のフィールド検出方針に進む
 - 取得できない場合（ネイティブアプリ由来）は`structure.getActivityComponent().getPackageName()`でパッケージ名を取得し、Section 1-3のマッチングに進む
 
-## 3-2. パッケージ名⇔ドメインマッピングDB
+`AssistStructureParser.parse()`は、祖先ノードでは`webDomain`が空/nullになるケースがある実態（1-6-1(d)）を踏まえ、木構造の走査中にブラウザ由来と判明した時点で打ち切るのではなく、全ノードを収集してから判定する2段階方式で実装している。ネイティブアプリ向け（`FieldClassifier`, Section 3-1-1）とブラウザ向け（`BrowserFieldClassifier`, Section 1-6-2, 1-5）は別クラスとして独立実装されている。
+
+## 3-2. パッケージ名⇔ドメインマッピングファイル（ネイティブアプリ専用）
+
+**本パターンファイルはネイティブアプリ由来リクエスト専用**である。ブラウザ由来リクエストは`getWebDomain()`で直接ドメインが取得できるため本パターンファイルを参照しない。ブラウザ由来リクエスト向けのサイト別パターンファイルは3-2-2で別途扱う。
 
 ### 3-2-1. データ形式・配置
 
 パッケージ名をキーとし、値を属性オブジェクト（ドメイン等）とする辞書形式のデータとする。値をドメイン文字列そのものではなくオブジェクトにするのは、将来的な拡張（例: コメント、検証状況フラグ、複数ドメインを許容する場合の配列化等）をスキーマ非破壊で行えるようにするため。1ドメインに対して複数パッケージが対応するケース（Android版/iOS版で別パッケージ名、等）を考慮し、キーはパッケージ名側とする。
 
-**配置場所:** リポジトリ直下の`assets/`は「外部権威データソース」（PSL等、外部から取得し定期更新するデータ）の置き場という既存方針であり、本マッピングDBは外部データではなくkuraチームが自前でキュレーションするデータのため区別する。`extension/patterns/`（拡張機能が自前キュレーションするサイトパターンDB）と同様の位置づけとして、Androidアプリ内リソースとして配置する。
+**配置場所:** リポジトリ直下の`assets/`は「外部権威データソース」（PSL等、外部から取得し定期更新するデータ）の置き場という既存方針であり、本マッピングファイルは外部データではなくkuraチームが自前でキュレーションするデータのため区別する。`extension/patterns/`（拡張機能が自前キュレーションするサイトパターンファイル）と同様の位置づけとして、Androidアプリ内リソースとして配置する。
+
+### 3-2-2. Android向けサイト別フィールド検出パターンファイル（ブラウザ由来リクエスト用）
+
+Section 1-6-3の方針に基づき、拡張機能のパターンファイルとは別ファイル・別スキーマとして、Android専用のサイト別フィールド検出パターンファイルを新設した。
+
+- **データ形式**: ドメインをキーとし、値は`username`/`password`/`totp`のフィールド種別ごとに`htmlAttributes`の`name`または`id`属性値のリストを直接指定する辞書形式（`SiteFieldPatternMap.kt`の`SitePatternEntry`）。CSSセレクタは扱わない（子孫結合子等を要するセレクタはAndroid側の`AssistStructure`では原理的に再現できないため）。ドメインの引き当ては完全一致 or サブドメイン許容のサフィックス一致（`www.`除去込み）とし、複数キーがマッチする場合は最長一致を採用する（`HostMatcher.kt`）。これはフィールド検出専用の軽量な文字列比較であり、PSL/eTLD+1は使わない。vaultエントリ自体のドメインマッチング（ログイン候補検索）はvault-core側の`api_list_login_candidates`に一元化されており、`HostMatcher.kt`はそちらとは独立している
+- **配置場所**: `android/app/src/main/assets/site_field_patterns.json`。3-2-1のパッケージ名⇔ドメインファイル（`package_domains.json`）と同様、Androidアプリ内リソースとして配置する。初期状態は空オブジェクトからスタートしており、標準シグナル（Chromium独自キー/`autofillHints`/`type`属性）だけでは検出できないサイトを実機検証で洗い出し、随時追加していく（拡張機能側の`extension/patterns/`と同様、継続的なキュレーション運用が前提のデータであり、実装の完成度とは切り離して扱う）。
+- **拡張機能側パターンファイルとの関係**: 同一サイトについて拡張機能用・Android用それぞれにデータを持つことになり重複管理コストが発生するが、CSSセレクタの表現力の前提が両プラットフォームで根本的に異なるため、共有パターンファイルとしてスキーマを歩み寄らせるより、各プラットフォームの実データに即した専用フォーマットを優先する
+- **判定優先順位における位置づけ**: `BrowserFieldClassifier.kt`が1-6-2/1-5の優先順位に従い、Chromium独自キー・`autofillHints`・`type`属性・TOTPシグナル（`autocomplete="one-time-code"`/name・id正規表現）のいずれでも判定できなかった場合の最終フォールバックとして本パターンファイルを参照する
 
 ## 3-3. 設定導線
 
@@ -198,9 +228,3 @@ Androidの「自動入力サービス」設定でkuraを選択してもらうた
 
 - `Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE`インテントを起動し、システム設定でkuraを選択できるようにする
 - `AutofillManager.hasEnabledAutofillServices()`で現在の設定状態を表示する
-
-# Part 4: 将来課題
-
-- **ブラウザ経由のウェブサイトオートフィル対応**: Section 1-6-3の実機検証を行った上で改めて設計する。最優先の将来課題
-- **Save対応**: `onSaveRequest`実装。新規ログイン検知後、既存`EntryCreateScreen`へ遷移し確認・保存させるフロー設計が必要
-

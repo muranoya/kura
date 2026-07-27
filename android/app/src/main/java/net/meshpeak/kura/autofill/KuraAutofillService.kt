@@ -20,8 +20,8 @@ import net.meshpeak.kura.data.repository.VaultRepository
 private const val TAG = "KuraAutofill"
 
 /**
- * v1スコープはネイティブアプリのログインフォームのみ（docs/android-autofillservice.md 1-1）。
- * onSaveRequest（新規ログイン保存提案）は将来課題として未対応。
+ * ネイティブアプリおよびブラウザ（Chrome/Firefox/WebView）双方のログインフォームに対応する
+ * （docs/android-autofillservice.md 1-1）。onSaveRequest（新規ログイン保存提案）は方針として非対応。
  */
 class KuraAutofillService : AutofillService() {
 
@@ -50,11 +50,11 @@ class KuraAutofillService : AutofillService() {
             return
         }
 
-        val parsed = AssistStructureParser.parse(structure)
-        if (parsed.isBrowserRequest || parsed.packageName == null) {
-            // ブラウザ由来リクエスト、またはパッケージ名不明: 対象外（Section 1-6, 3-1-2）
+        val parsed = AssistStructureParser.parse(structure, applicationContext)
+        if (!parsed.isBrowserRequest && parsed.packageName == null) {
+            // ネイティブアプリ由来だがパッケージ名不明: 対象外
             if (BuildConfig.DEBUG) {
-                Log.d(TAG, "skipping: isBrowserRequest=${parsed.isBrowserRequest} packageName=${parsed.packageName}")
+                Log.d(TAG, "skipping: native request with unknown packageName")
             }
             callback.onSuccess(null)
             return

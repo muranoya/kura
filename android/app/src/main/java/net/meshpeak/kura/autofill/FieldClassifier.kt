@@ -87,7 +87,8 @@ object FieldClassifier {
         }
     }
 
-    private fun classifyByAutofillHints(hints: List<String>): DetectedFieldType? {
+    /** ネイティブ/ブラウザ双方の`autofillHints`判定で共有する（[BrowserFieldClassifier]からも参照）。 */
+    internal fun classifyByAutofillHints(hints: List<String>): DetectedFieldType? {
         if (hints.any { it == View.AUTOFILL_HINT_PASSWORD }) return DetectedFieldType.PASSWORD
         if (hints.any { it == View.AUTOFILL_HINT_USERNAME }) return DetectedFieldType.USERNAME
         if (hints.any { it == View.AUTOFILL_HINT_EMAIL_ADDRESS }) return DetectedFieldType.EMAIL

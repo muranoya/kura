@@ -49,25 +49,27 @@ object FillResponseBuilder {
         repository: IVaultRepository,
         parsed: ParsedLoginForm
     ): FillResponse? {
-        val packageName = parsed.packageName ?: return null
-        val domain = PackageDomainMap.domainFor(context, packageName)
+        val domain = if (parsed.isBrowserRequest) {
+            parsed.webDomain
+        } else {
+            parsed.packageName?.let { PackageDomainMap.domainFor(context, it) }
+        }
         if (BuildConfig.DEBUG) {
-            Log.d(TAG, "buildUnlocked: packageName=$packageName -> domain=$domain")
+            Log.d(TAG, "buildUnlocked: packageName=${parsed.packageName} webDomain=${parsed.webDomain} -> domain=$domain")
         }
         if (domain == null) {
-            if (BuildConfig.DEBUG) Log.d(TAG, "packageName=$packageName not in package_domains.json -> no candidates")
+            if (BuildConfig.DEBUG) Log.d(TAG, "no domain resolved (packageName=${parsed.packageName}) -> no candidates")
             return null
         }
 
-        val allCandidates = try {
-            repository.listLoginUrls()
+        val matched = try {
+            repository.listLoginCandidates(domain)
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.d(TAG, "listLoginUrls failed", e)
+            if (BuildConfig.DEBUG) Log.d(TAG, "listLoginCandidates failed", e)
             return null
         }
-        val matched = LoginCandidateMatcher.filter(allCandidates, domain)
         if (BuildConfig.DEBUG) {
-            Log.d(TAG, "listLoginUrls returned ${allCandidates.size} entries, ${matched.size} matched domain=$domain")
+            Log.d(TAG, "listLoginCandidates matched ${matched.size} entries for domain=$domain")
         }
         if (matched.isEmpty()) return null
 

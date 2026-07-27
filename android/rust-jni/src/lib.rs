@@ -303,15 +303,19 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_getEntry(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_listLoginUrls(
+pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_listLoginCandidates(
     mut env: JNIEnv,
     _class: JClass,
     vault_id: JString,
+    domain: JString,
+    strict_subdomain: jboolean,
 ) -> jstring {
     jni_catch(&mut env, |env| {
         let vid = get_string(env, &vault_id)?;
-        let candidates = with_manager(&vid, |m| m.api_list_login_urls())
-            .map_err(|e| format!("Failed to list login urls: {}", e))?;
+        let domain = get_string(env, &domain)?;
+        let strict = strict_subdomain != JNI_FALSE;
+        let candidates = with_manager(&vid, |m| m.api_list_login_candidates(&domain, strict))
+            .map_err(|e| format!("Failed to list login candidates: {}", e))?;
         let json = serde_json::to_string(&candidates).unwrap_or_else(|_| "[]".to_string());
         new_jstring(env, &json)
     })

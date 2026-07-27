@@ -1,6 +1,7 @@
 pub mod codec;
 pub mod config;
 pub mod crypto;
+pub mod domain_match;
 pub mod error;
 pub mod models;
 pub mod password_gen;

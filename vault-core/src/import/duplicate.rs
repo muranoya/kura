@@ -215,35 +215,8 @@ fn normalize_name(name: &str) -> String {
 
 /// Extract domain from a URL, removing scheme, www prefix, port, and path.
 pub fn extract_domain(url: &str) -> Option<String> {
-    let url = url.trim();
-    if url.is_empty() {
-        return None;
-    }
-
-    // Remove scheme
-    let without_scheme = if let Some(pos) = url.find("://") {
-        &url[pos + 3..]
-    } else {
-        url
-    };
-
-    // Remove path
-    let without_path = without_scheme.split('/').next().unwrap_or(without_scheme);
-
-    // Remove port
-    let without_port = if let Some(pos) = without_path.rfind(':') {
-        // Make sure the part after ':' is actually a port number
-        if without_path[pos + 1..].chars().all(|c| c.is_ascii_digit()) {
-            &without_path[..pos]
-        } else {
-            without_path
-        }
-    } else {
-        without_path
-    };
-
-    // Remove www. prefix
-    let domain = without_port.strip_prefix("www.").unwrap_or(without_port);
+    let host = crate::domain_match::extract_host(url)?;
+    let domain = host.strip_prefix("www.").unwrap_or(host);
 
     if domain.is_empty() {
         None

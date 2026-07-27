@@ -249,25 +249,45 @@ impl VaultManager {
         })
     }
 
-    /// オートフィル候補検索（ホスト名でマッチング）
+    /// オートフィル候補検索（ドメインでマッチング）
     ///
-    /// 全loginエントリのtyped_value.urlからホスト名を抽出し、
-    /// 指定されたホスト名と一致するエントリをパスワードなしで返す。
-    /// ホスト名の比較はcaller側（JS）で行うeTLD+1ベースのマッチングではなく、
-    /// 完全一致で行う。eTLD+1の判定はJS側で行い、このAPIには正規化済みの
-    /// ホスト名リストを渡す設計にすることもできるが、シンプルさのため
-    /// 全loginエントリのURL情報を返し、マッチングはJS側に委ねる。
-    pub fn api_list_login_urls(&self) -> Result<Vec<AutofillCandidate>, String> {
+    /// 全loginエントリのtyped_value.urlからホスト名を抽出し、指定された
+    /// `page_hostname` とマッチするエントリをパスワードなしで返す。
+    /// マッチング判定はvault-core側（本関数）で一元的に行う。これにより
+    /// Android・拡張機能のいずれから呼んでも同一の挙動になる。
+    ///
+    /// - `strict_subdomain = false`（デフォルト）: PSLベースのeTLD+1が一致すれば
+    ///   マッチする（例: `www.example.com` と `m.example.com` は同一サイトとみなす）。
+    /// - `strict_subdomain = true`: ホスト名の完全一致のみをマッチとする。
+    ///   どのサイトで厳密一致が必要かはvault-coreの関知するところではなく、
+    ///   呼び出し側（拡張機能のサイト別パターンDB等）が判断してこの引数に渡す。
+    pub fn api_list_login_candidates(
+        &self,
+        page_hostname: &str,
+        strict_subdomain: bool,
+    ) -> Result<Vec<AutofillCandidate>, String> {
         self.with_unlocked(|unlocked| {
             let filter = EntryFilter::new().with_type("login".to_string());
 
             // password等の秘匿値は不要なため、list_entry_summariesで復号・cloneを避ける
             let entries = unlocked.list_entry_summaries(&filter);
+            let page_hostname_lower = page_hostname.to_lowercase();
 
             Ok(entries
                 .into_iter()
                 .filter_map(|entry| {
                     let url = entry.login_url?;
+                    let entry_host = crate::domain_match::extract_host(&url)?;
+
+                    let matched = if strict_subdomain {
+                        entry_host.eq_ignore_ascii_case(&page_hostname_lower)
+                    } else {
+                        crate::domain_match::same_etld_plus1(entry_host, &page_hostname_lower)
+                    };
+                    if !matched {
+                        return None;
+                    }
+
                     Some(AutofillCandidate {
                         id: entry.id,
                         name: entry.name,

@@ -30,6 +30,7 @@ vault-coreの責務：
 - vault.jsonの読み書き管理
 - 暗号化・復号
 - 同期ロジック（コンフリクト自動解消、tombstone GC）
+- オートフィル候補のドメインマッチング（Public Suffix List (PSL) ベースのeTLD+1正規化。詳細は[`docs/android-autofillservice.md`](android-autofillservice.md)と[`docs/extension-autofill.md`](extension-autofill.md)を参照）
 
 FFI構成：
 ```

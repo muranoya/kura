@@ -39,7 +39,7 @@ interface IVaultRepository {
         sortOrder: String? = null
     ): List<EntryRow>
     suspend fun getEntry(id: String): Entry
-    suspend fun listLoginUrls(): List<AutofillCandidate>
+    suspend fun listLoginCandidates(domain: String, strictSubdomain: Boolean = false): List<AutofillCandidate>
     suspend fun createEntry(
         entryType: String,
         name: String,
@@ -196,8 +196,8 @@ class VaultRepository(private val context: Context) : IVaultRepository {
         json.decodeFromString<Entry>(jsonStr)
     }
 
-    override suspend fun listLoginUrls(): List<AutofillCandidate> = withContext(Dispatchers.IO) {
-        val jsonStr = VaultBridge.listLoginUrls(DEFAULT_VAULT_ID)
+    override suspend fun listLoginCandidates(domain: String, strictSubdomain: Boolean): List<AutofillCandidate> = withContext(Dispatchers.IO) {
+        val jsonStr = VaultBridge.listLoginCandidates(DEFAULT_VAULT_ID, domain, strictSubdomain)
         json.decodeFromString<List<AutofillCandidate>>(jsonStr)
     }
 
