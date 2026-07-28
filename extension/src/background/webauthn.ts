@@ -16,6 +16,11 @@ const LOG_PREFIX = '[kura:webauthn:sw]'
 const RITUAL_TIMEOUT_MS = 85_000
 // アンロック画面挟み込み時: マスターパスワード入力に時間がかかるため長めに確保
 const RITUAL_UNLOCK_TIMEOUT_MS = 180_000
+// create()/get()には（覆されているため）ネイティブのuser activation要件が
+// 効かず、ページ側のスクリプトはクリックなしで呼び出せる。ポップアップウィンドウの
+// 生成自体にレート制限がないと、ループ呼び出し等でポップアップを連続生成
+// できてしまうため、同時に開けるポップアップの数を上限で頭打ちにする。
+const MAX_CONCURRENT_RITUALS = 3
 
 export interface WebauthnVaultApi {
   api_webauthn_find_credentials(vaultId: string, rpId: string, allowCredentialIds: string[]): string
@@ -114,6 +119,11 @@ function runRitual(
   onUnlock?: () => Promise<WebauthnRitualContext>,
 ): Promise<WebauthnRitualDecision> {
   return new Promise((resolve) => {
+    if (pendingRituals.size >= MAX_CONCURRENT_RITUALS) {
+      resolve({ type: 'WEBAUTHN_RITUAL_DECISION', requestId, cancelled: true })
+      return
+    }
+
     const timeoutMs = context.kind === 'locked' ? RITUAL_UNLOCK_TIMEOUT_MS : RITUAL_TIMEOUT_MS
     const timeoutId = setTimeout(() => {
       finishRitual(requestId, { type: 'WEBAUTHN_RITUAL_DECISION', requestId, cancelled: true })

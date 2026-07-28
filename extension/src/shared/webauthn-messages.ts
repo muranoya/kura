@@ -38,6 +38,19 @@ export interface WebauthnBridgeResponse {
   errorMessage?: string
 }
 
+/**
+ * ISOLATED world → MAIN world、一方向のブロードキャスト（requestIdと紐付かない）。
+ * webauthn-bridge.ts起動時に現在値を一度送り、以後は`passkeyEnabled`設定の変更
+ * （`chrome.storage.onChanged`）を検知するたびに再送する。MAIN world側は、この
+ * 通知が届くまで`isUserVerifyingPlatformAuthenticatorAvailable()`をfalse相当
+ * （ネイティブ実装への委譲）として扱う。
+ */
+export interface WebauthnFeatureStateMessage {
+  source: typeof KURA_WEBAUTHN_BRIDGE_SOURCE
+  type: 'feature-state'
+  enabled: boolean
+}
+
 /** ISOLATED world → Service Worker (adds the bridge's own untainted origin/hostname) */
 export interface WebauthnSwRequest {
   type: 'WEBAUTHN_CREATE_REQUEST' | 'WEBAUTHN_GET_REQUEST'

@@ -4,10 +4,13 @@
 // — this is the only origin/hostname value the Service Worker's rp_id
 // validation trusts (see docs/webauthn-passkey.md 3-5). Values arriving from
 // MAIN world are never used for that check.
+import { STORAGE_KEYS } from '../shared/constants'
+import { getFromStorage } from '../shared/storage'
 import {
   KURA_WEBAUTHN_BRIDGE_SOURCE,
   KURA_WEBAUTHN_MAIN_SOURCE,
   type WebauthnBridgeResponse,
+  type WebauthnFeatureStateMessage,
   type WebauthnMainRequest,
   type WebauthnSwRequest,
   type WebauthnSwResponse,
@@ -19,6 +22,29 @@ window.addEventListener('message', (event) => {
   if (!data || data.source !== KURA_WEBAUTHN_MAIN_SOURCE) return
 
   handleRequest(data)
+})
+
+// MAIN world (webauthn-main-injected.js) has no chrome.* access, so it can't
+// read `passkeyEnabled` itself. Push the current value now and every time it
+// changes, so `isUserVerifyingPlatformAuthenticatorAvailable()` there only
+// ever reports `true` while the feature is actually enabled — see the
+// override's rationale note in webauthn-main-injected.js.
+async function pushFeatureState() {
+  const settings = await getFromStorage<{ passkeyEnabled?: boolean }>(STORAGE_KEYS.APP_SETTINGS)
+  const message: WebauthnFeatureStateMessage = {
+    source: KURA_WEBAUTHN_BRIDGE_SOURCE,
+    type: 'feature-state',
+    enabled: settings?.passkeyEnabled === true,
+  }
+  window.postMessage(message, window.location.origin)
+}
+
+pushFeatureState()
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && STORAGE_KEYS.APP_SETTINGS in changes) {
+    pushFeatureState()
+  }
 })
 
 async function handleRequest(request: WebauthnMainRequest) {

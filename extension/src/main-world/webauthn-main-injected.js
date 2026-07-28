@@ -32,6 +32,20 @@
 
   const originalCreate = navigator.credentials.create.bind(navigator.credentials)
   const originalGet = navigator.credentials.get.bind(navigator.credentials)
+  const originalIsUVPAA =
+    window.PublicKeyCredential &&
+    typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function'
+      ? window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable.bind(
+          window.PublicKeyCredential,
+        )
+      : null
+
+  // Pushed one-way from webauthn-bridge.ts (ISOLATED world) — see
+  // WebauthnFeatureStateMessage. Defaults to false so that, until the first
+  // push arrives, isUserVerifyingPlatformAuthenticatorAvailableOverride below
+  // behaves like the feature is off rather than claiming a platform
+  // authenticator exists.
+  let passkeyEnabled = false
 
   // ---- src/shared/webauthn-codec.ts (duplicated) ----
 
@@ -70,6 +84,10 @@
     if (event.source !== window) return
     const data = event.data
     if (!data || data.source !== KURA_WEBAUTHN_BRIDGE_SOURCE) return
+    if (data.type === 'feature-state') {
+      passkeyEnabled = !!data.enabled
+      return
+    }
     const entry = pending.get(data.requestId)
     if (!entry) return
     pending.delete(data.requestId)
@@ -119,6 +137,43 @@
 
   function getClientExtensionResults() {
     return {}
+  }
+
+  // Native browsers require transient activation (a recent click/keypress)
+  // before honoring a non-conditional create()/get() call, rejecting with
+  // NotAllowedError otherwise. Since we replace the functions outright, that
+  // protection is lost unless we re-check it ourselves here — without it, any
+  // script (no click needed) could call get() on page load and use the
+  // ritual window's appearance/focus-steal as an even stronger version of the
+  // "does this user have a passkey for this site" side channel that
+  // background/webauthn.ts's candidate-count gating is trying to prevent
+  // (docs/webauthn-passkey.md Part 5). `navigator.userActivation` is
+  // supported by both browsers this extension already targets; fail open
+  // (allow) only if it's unavailable at all, rather than silently breaking
+  // create()/get() on a hypothetical browser that lacks it.
+  function hasTransientActivation() {
+    return !navigator.userActivation || navigator.userActivation.isActive
+  }
+
+  function noActivationError() {
+    const message = 'A user gesture is required to use a passkey.'
+    try {
+      return new DOMException(message, 'NotAllowedError')
+    } catch {
+      const err = new Error(message)
+      err.name = 'NotAllowedError'
+      return err
+    }
+  }
+
+  // Gated by `passkeyEnabled` (pushed from webauthn-bridge.ts) rather than
+  // unconditionally true: without this, every site would be told a platform
+  // authenticator is present — and would show "sign in with a passkey" UI —
+  // even for users who have never turned the (opt-in, default-off) Passkey
+  // setting on, purely because kura is installed.
+  function isUserVerifyingPlatformAuthenticatorAvailableOverride() {
+    if (passkeyEnabled) return Promise.resolve(true)
+    return originalIsUVPAA ? originalIsUVPAA() : Promise.resolve(false)
   }
 
   // Minimal, purpose-built reader for kura's own "none"-format attestationObject
@@ -184,6 +239,9 @@
     if (!options?.publicKey || options.mediation === 'conditional') {
       return originalCreate(options)
     }
+    if (!hasTransientActivation()) {
+      return Promise.reject(noActivationError())
+    }
     const publicKey = options.publicKey
 
     return sendRequest('create', {
@@ -242,6 +300,9 @@
     if (!options?.publicKey || options.mediation === 'conditional') {
       return originalGet(options)
     }
+    if (!hasTransientActivation()) {
+      return Promise.reject(noActivationError())
+    }
     const publicKey = options.publicKey
 
     return sendRequest('get', {
@@ -297,11 +358,12 @@
 
   // Part 5-7: without this, sites on platforms with no native platform
   // authenticator (e.g. Linux desktop) simply never offer a "Sign in with a
-  // passkey" button. Safe to force unconditionally — actual gating (feature
-  // toggle, vault lock state, whether a matching credential exists) happens
-  // later in background/webauthn.ts / the ritual UI, not here.
+  // passkey" button while the feature is on. The override itself must be
+  // installed unconditionally at document_start (before the page can cache
+  // the original reference), but what it *returns* is gated on
+  // `passkeyEnabled` above — see isUserVerifyingPlatformAuthenticatorAvailableOverride.
   if (window.PublicKeyCredential) {
-    window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = () =>
-      Promise.resolve(true)
+    window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable =
+      isUserVerifyingPlatformAuthenticatorAvailableOverride
   }
 })()
