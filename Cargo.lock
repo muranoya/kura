@@ -2828,7 +2828,7 @@ dependencies = [
 
 [[package]]
 name = "kura-desktop"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "aws-config",
@@ -5892,7 +5892,7 @@ dependencies = [
 
 [[package]]
 name = "vault_core"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -5919,7 +5919,7 @@ dependencies = [
 
 [[package]]
 name = "vault_jni"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "jni",
  "serde_json",
@@ -6074,7 +6074,7 @@ dependencies = [
 
 [[package]]
 name = "wasm-bridge"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "console_error_panic_hook",
  "js-sys",
