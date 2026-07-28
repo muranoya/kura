@@ -1,5 +1,11 @@
 {
     "com.github.android": { "domain": "github.com" },
     "com.kouzoh.mercari": { "domain": "mercari.com" },
-    "jp.co.sbisec.hyperkabu2": { "domain": "sbisec.co.jp" }
+    "jp.co.sbisec.hyperkabu2": { "domain": "sbisec.co.jp" },
+    "com.yamareco.memo": { "domain": "yamareco.com" },
+    "com.instagram.android": { "domain": "instagram.com" },
+    "com.instagram.android": { "domain": "facebook.com" },
+    "com.facebook.orca": { "domain": "facebook.com" },
+    "com.facebook.katana": { "domain": "facebook.com" },
+    "jp.co.yamap": { "domain": "yamap.com" }
 }
