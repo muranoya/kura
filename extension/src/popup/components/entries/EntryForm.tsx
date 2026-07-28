@@ -573,7 +573,7 @@ export default function EntryForm({
                   defaultValue: field.fieldType,
                 })}
               </Badge>
-              {field.fieldType !== 'totp' && (
+              {field.fieldType !== 'totp' && field.fieldType !== 'passkey' && (
                 <Input
                   id={`field-name-${field.id}`}
                   value={field.name}
@@ -582,7 +582,14 @@ export default function EntryForm({
                   className="h-8 text-sm flex-[2] min-w-0"
                 />
               )}
-              <div className={cn('relative', field.fieldType === 'totp' ? 'flex-1' : 'flex-[3]')}>
+              <div
+                className={cn(
+                  'relative',
+                  field.fieldType === 'totp' || field.fieldType === 'passkey'
+                    ? 'flex-1'
+                    : 'flex-[3]',
+                )}
+              >
                 {field.fieldType === 'passkey' ? (
                   // Passkeyの値はvault-core専用APIが生成したJSON（秘密鍵含む）であり、
                   // 自由テキスト編集で壊せないよう読み取り専用のサマリのみ表示する。

@@ -578,6 +578,20 @@ fun PasswordField(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun passkeySummaryText(value: String): String {
+    val rpId = try {
+        Json.parseToJsonElement(value).jsonObject["rp_id"]?.jsonPrimitive?.contentOrNull
+    } catch (_: Exception) {
+        null
+    }
+    return if (rpId != null) {
+        stringResource(R.string.field_passkey_for, rpId)
+    } else {
+        stringResource(R.string.custom_field_passkey)
+    }
+}
+
+@Composable
 fun CustomFieldEditor(
     field: CustomField,
     onFieldChange: (CustomField) -> Unit,
@@ -596,7 +610,7 @@ fun CustomFieldEditor(
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         // Row 1: Field name + type badge (read-only) + delete
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (field.fieldType == "totp") {
+            if (field.fieldType == "totp" || field.fieldType == "passkey") {
                 Spacer(modifier = Modifier.weight(1f))
             } else {
                 TextField(
@@ -621,7 +635,11 @@ fun CustomFieldEditor(
                 color = MaterialTheme.colorScheme.secondaryContainer,
             ) {
                 Text(
-                    text = CustomFieldType.fromValue(field.fieldType)?.let { stringResource(it.displayNameResId) } ?: field.fieldType,
+                    text = if (field.fieldType == "passkey") {
+                        stringResource(R.string.custom_field_passkey)
+                    } else {
+                        CustomFieldType.fromValue(field.fieldType)?.let { stringResource(it.displayNameResId) } ?: field.fieldType
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
@@ -662,27 +680,44 @@ fun CustomFieldEditor(
         }
 
         // Row 2: Value
-        TextField(
-            value = field.value,
-            onValueChange = { onFieldChange(field.copy(value = it)) },
-            modifier = Modifier.fillMaxWidth().onFocusChanged { isValueFocused = it.isFocused },
-            singleLine = true,
-            placeholder = { Text(if (field.fieldType == "totp") stringResource(R.string.field_totp_placeholder) else stringResource(R.string.field_value_placeholder)) },
-            visualTransformation = if (!isValueFocused && isSecret) PasswordVisualTransformation() else VisualTransformation.None,
-            trailingIcon = if (showGenerateButton) {
-                {
-                    IconButton(onClick = { showGenerator = !showGenerator }) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = stringResource(R.string.cd_generate_password))
+        if (field.fieldType == "passkey") {
+            // Passkeyの値はvault-core専用APIが生成したJSON（秘密鍵含む）であり、
+            // 自由テキスト編集で壊せないよう読み取り専用のサマリのみ表示する。
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = passkeySummaryText(field.value),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
+                )
+            }
+        } else {
+            TextField(
+                value = field.value,
+                onValueChange = { onFieldChange(field.copy(value = it)) },
+                modifier = Modifier.fillMaxWidth().onFocusChanged { isValueFocused = it.isFocused },
+                singleLine = true,
+                placeholder = { Text(if (field.fieldType == "totp") stringResource(R.string.field_totp_placeholder) else stringResource(R.string.field_value_placeholder)) },
+                visualTransformation = if (!isValueFocused && isSecret) PasswordVisualTransformation() else VisualTransformation.None,
+                trailingIcon = if (showGenerateButton) {
+                    {
+                        IconButton(onClick = { showGenerator = !showGenerator }) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = stringResource(R.string.cd_generate_password))
+                        }
                     }
-                }
-            } else null,
-            colors = TextFieldDefaults.colors(
-                unfocusedContainerColor = Color.Transparent,
-                focusedContainerColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent
+                } else null,
+                colors = TextFieldDefaults.colors(
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent
+                )
             )
-        )
+        }
 
         if (showGenerator && onGeneratePassword != null) {
             Card(

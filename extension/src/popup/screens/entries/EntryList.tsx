@@ -748,7 +748,11 @@ function EntryDetailPane({
               field.fieldType === 'totp' ? (
                 <TotpCustomFieldDisplay key={field.id} label={field.name} value={field.value} />
               ) : field.fieldType === 'passkey' ? (
-                <PasskeyCustomFieldDisplay key={field.id} label={field.name} value={field.value} />
+                <PasskeyCustomFieldDisplay
+                  key={field.id}
+                  label={t('entries.customFieldTypes.passkey')}
+                  value={field.value}
+                />
               ) : (
                 <PaneFieldDisplay
                   key={field.id}

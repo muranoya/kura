@@ -21,7 +21,7 @@ import {
   onVaultUnlocked,
 } from './autofill'
 import { initWasmManual } from './wasm-init'
-import { handleWebauthnMessage, initWebauthn } from './webauthn'
+import { handleWebauthnMessage, initWebauthn, resumeLockedWebauthnRituals } from './webauthn'
 
 /** WASM API surface for Service Worker */
 interface WasmApi {
@@ -542,6 +542,9 @@ async function handleMessage(
           }
           // 定期同期アラームを設定
           chrome.alarms.create('autosync', { periodInMinutes: 1 })
+          // WebAuthnリチュアルがアンロック待ちの場合、確認/選択画面へ進める
+          // （sendResponseより前に行い、リチュアルウィンドウ側の後続contextフェッチと順序を保証する）
+          await resumeLockedWebauthnRituals()
           sendResponse({ success: true })
           // オートフィル: アクティブタブにContent Script注入
           onVaultUnlocked()
@@ -605,6 +608,7 @@ async function handleMessage(
           }
           // 定期同期アラームを設定
           chrome.alarms.create('autosync', { periodInMinutes: 1 })
+          await resumeLockedWebauthnRituals()
           sendResponse({ success: true })
           // オートフィル: アクティブタブにContent Script注入
           onVaultUnlocked()

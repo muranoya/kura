@@ -566,7 +566,10 @@
       "createTitle": "Create a passkey",
       "chooseEntry": "Which item should this passkey be saved to?",
       "createNewEntry": "Create a new item",
-      "confirm": "Continue"
+      "confirm": "Continue",
+      "unlockTitle": "Unlock kura",
+      "unlockDescription": "Unlock your vault to use this passkey.",
+      "unlockButton": "Unlock"
     }
   }
 }

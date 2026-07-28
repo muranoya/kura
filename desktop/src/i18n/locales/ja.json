@@ -67,7 +67,8 @@
     "expiry": "有効期限",
     "cvv": "CVV",
     "cc_pin": "暗証番号",
-    "license_key": "ライセンスキー"
+    "license_key": "ライセンスキー",
+    "passkeyFor": "{{rpId}} のパスキー"
   },
   "fieldPlaceholders": {
     "url": "https://example.com",
@@ -94,7 +95,8 @@
     "email": "メール",
     "url": "URL",
     "phone": "電話番号",
-    "totp": "ワンタイムパスワード"
+    "totp": "ワンタイムパスワード",
+    "passkey": "パスキー"
   },
   "filters": {
     "all": "すべて",

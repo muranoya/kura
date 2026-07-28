@@ -67,7 +67,8 @@
     "expiry": "Expiry",
     "cvv": "CVV",
     "cc_pin": "PIN",
-    "license_key": "License key"
+    "license_key": "License key",
+    "passkeyFor": "Passkey for {{rpId}}"
   },
   "fieldPlaceholders": {
     "url": "https://example.com",
@@ -94,7 +95,8 @@
     "email": "Email",
     "url": "URL",
     "phone": "Phone",
-    "totp": "One-time password"
+    "totp": "One-time password",
+    "passkey": "Passkey"
   },
   "filters": {
     "all": "All",

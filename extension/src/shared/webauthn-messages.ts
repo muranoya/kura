@@ -74,6 +74,15 @@ export interface WebauthnRitualContextRequest {
   requestId: string
 }
 
+/**
+ * Service Worker → ritual window。'locked' context待機中に(このウィンドウ経由に
+ * 限らず)vaultがアンロックされ、contextが差し替わったことを知らせる一方向通知。
+ */
+export interface WebauthnRitualContextUpdated {
+  type: 'WEBAUTHN_RITUAL_CONTEXT_UPDATED'
+  requestId: string
+}
+
 export interface WebauthnRitualCandidate {
   entryId: string
   entryName: string
@@ -90,6 +99,9 @@ export interface WebauthnRitualEntryOption {
 }
 
 export type WebauthnRitualContext =
+  /** vaultがロック中: アンロック後にget/createのcontextへ差し替わる */
+  | { kind: 'locked' }
+  | { kind: 'error'; message: string }
   | {
       kind: 'get'
       rpId: string

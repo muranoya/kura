@@ -258,8 +258,15 @@ Service Worker background/webauthn.ts
 
 基本構造は同じだが、以下が異なる:
 
-- Service Workerは`excludeCredentials`と既存`credential_id`の一致をUIを開く**前**にチェックし、一致すれば即座に（UIを一切開かず）`InvalidStateError`でreject。
+- Service Workerは`excludeCredentials`と既存`credential_id`の一致をUIを開く**前**にチェックし、一致すれば即座に（UIを一切開かず）`InvalidStateError`でreject。**ただし、これはリクエスト受信時点でvaultがアンロック済みの場合に限る**（後述）。
 - 儀式ウィンドウ（`kind=create`）は、`api_list_login_candidates`（オートフィルと同じeTLD+1マッチング）で見つかった既存`login`エントリの一覧 + 「新しいアイテムを作成」を選択肢として表示し、ユーザーが紐付け先を選ぶ（3-7節参照）。
+
+**vaultがロック中に`create()`が呼ばれた場合**（登録ボタンの明示的クリックが前提のため、GETの「候補0件ならUIを開かずpassthrough」とは異なり、ブラウザネイティブ処理へ丸投げしない）:
+
+1. `excludeCredentials`チェック・`matchingEntries`計算は復号が必要なため実行できない。そこでService Workerは`{kind:'locked'}` contextで儀式ウィンドウを先に開く（同一ウィンドウを使い回す。タイムアウトは入力時間確保のため180秒に延長）。
+2. 儀式ウィンドウは`UnlockRitual`画面を表示し、`UNLOCK`メッセージ（メインpopupの「アンロック」画面と共通のメッセージ型）を送ってvaultをアンロックさせる。
+3. アンロック成功時、Service Worker側（`resumeLockedWebauthnRituals`）が`excludeCredentials`チェック・`matchingEntries`計算をこの時点で初めて実行し、儀式windowのcontextを`{kind:'create', ...}`（または一致検出時は`{kind:'error', message}`）に差し替える。タイムアウトも通常の85秒にリセットする。儀式ウィンドウは`WEBAUTHN_RITUAL_CONTEXT_UPDATED`通知（または自分自身のアンロック成功レスポンス）を契機にcontextを再取得し、確認画面へ自動遷移する。
+4. 以降は通常のcreate確認フローと同じ。ユーザーがどの経路（この儀式ウィンドウ内、またはメインpopup）でアンロックしても、儀式は継続される。
 
 ## 3-7. 新規Passkey作成時の紐付け先エントリ決定
 

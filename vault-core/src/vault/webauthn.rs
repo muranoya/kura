@@ -122,7 +122,7 @@ impl UnlockedVault {
         let custom_field_id = uuid::Uuid::new_v4().to_string();
         let custom_field = CustomField {
             id: custom_field_id.clone(),
-            name: format!("Passkey ({})", display_name),
+            name: "Passkey".to_string(),
             field_type: "passkey".to_string(),
             value: SecretString::from_string(passkey_data.to_json_string()?),
         };

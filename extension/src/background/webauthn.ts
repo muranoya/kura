@@ -14,6 +14,8 @@ import type {
 
 const LOG_PREFIX = '[kura:webauthn:sw]'
 const RITUAL_TIMEOUT_MS = 85_000
+// アンロック画面挟み込み時: マスターパスワード入力に時間がかかるため長めに確保
+const RITUAL_UNLOCK_TIMEOUT_MS = 180_000
 
 export interface WebauthnVaultApi {
   api_webauthn_find_credentials(vaultId: string, rpId: string, allowCredentialIds: string[]): string
@@ -74,6 +76,8 @@ interface PendingRitual {
   context: WebauthnRitualContext
   windowId?: number
   timeoutId: ReturnType<typeof setTimeout>
+  /** context.kind === 'locked' の場合のみ設定。アンロック成功時に一度だけ呼ばれ、続きのcontextを返す */
+  onUnlock?: () => Promise<WebauthnRitualContext>
 }
 
 const pendingRituals = new Map<string, PendingRitual>()
@@ -107,13 +111,15 @@ chrome.windows.onRemoved.addListener((windowId) => {
 function runRitual(
   requestId: string,
   context: WebauthnRitualContext,
+  onUnlock?: () => Promise<WebauthnRitualContext>,
 ): Promise<WebauthnRitualDecision> {
   return new Promise((resolve) => {
+    const timeoutMs = context.kind === 'locked' ? RITUAL_UNLOCK_TIMEOUT_MS : RITUAL_TIMEOUT_MS
     const timeoutId = setTimeout(() => {
       finishRitual(requestId, { type: 'WEBAUTHN_RITUAL_DECISION', requestId, cancelled: true })
-    }, RITUAL_TIMEOUT_MS)
+    }, timeoutMs)
 
-    pendingRituals.set(requestId, { resolve, context, timeoutId })
+    pendingRituals.set(requestId, { resolve, context, timeoutId, onUnlock })
 
     const url = chrome.runtime.getURL(
       `src/popup/webauthn.html?requestId=${encodeURIComponent(requestId)}&kind=${context.kind}`,
@@ -125,6 +131,35 @@ function runRitual(
       }
     })
   })
+}
+
+/**
+ * vaultアンロック成功時にservice worker側から呼ばれる。
+ * 'locked' contextで待機中のリチュアルがあれば、実データを積んだcontextに差し替え、
+ * 選択/確認画面用にタイムアウトをリセットする（儀式自体の解決はしない）。
+ */
+export async function resumeLockedWebauthnRituals(): Promise<void> {
+  for (const [requestId, pending] of pendingRituals) {
+    if (!pending.onUnlock) continue
+    const onUnlock = pending.onUnlock
+    pending.onUnlock = undefined
+    try {
+      const newContext = await onUnlock()
+      const stillPending = pendingRituals.get(requestId)
+      if (!stillPending) continue // その間にウィンドウが閉じられた/タイムアウトした
+      stillPending.context = newContext
+      clearTimeout(stillPending.timeoutId)
+      stillPending.timeoutId = setTimeout(() => {
+        finishRitual(requestId, { type: 'WEBAUTHN_RITUAL_DECISION', requestId, cancelled: true })
+      }, RITUAL_TIMEOUT_MS)
+      chrome.runtime
+        .sendMessage({ type: 'WEBAUTHN_RITUAL_CONTEXT_UPDATED', requestId })
+        .catch(() => {})
+    } catch (err) {
+      console.error(LOG_PREFIX, 'resume after unlock failed', err)
+      finishRitual(requestId, { type: 'WEBAUTHN_RITUAL_DECISION', requestId, cancelled: true })
+    }
+  }
 }
 
 // ========== create()/get() request handling ==========
@@ -235,12 +270,58 @@ interface RawLoginCandidate {
   username: string | null
 }
 
+type CreateContextResult =
+  | { kind: 'ok'; context: Extract<WebauthnRitualContext, { kind: 'create' }> }
+  | { kind: 'error'; message: string }
+
+/**
+ * create() のcontext計算本体。呼び出し時点でvaultがアンロック済みであることが前提。
+ * ロック中に開始したリチュアルでは、アンロック成功後にこの関数を呼んで続きを計算する。
+ */
+async function computeCreateContext(
+  req: WebauthnSwRequest,
+  rpId: string,
+): Promise<CreateContextResult> {
+  if (!vaultApi) return { kind: 'error', message: 'Vault API not initialized' }
+
+  // excludeCredentialsチェックはUIを開く前に行う（一致すれば即座にreject、Part 3-6参照）
+  if (req.excludeCredentialIds && req.excludeCredentialIds.length > 0) {
+    try {
+      const json = vaultApi.api_webauthn_find_credentials(
+        DEFAULT_VAULT_ID,
+        rpId,
+        req.excludeCredentialIds,
+      )
+      const existing: RawCredentialCandidate[] = JSON.parse(json)
+      if (existing.length > 0) {
+        return { kind: 'error', message: 'Credential already registered for this relying party' }
+      }
+    } catch (err) {
+      return { kind: 'error', message: String(err) }
+    }
+  }
+
+  let matchingEntries: { id: string; name: string; username: string | null }[] = []
+  try {
+    const json = vaultApi.api_list_login_candidates(DEFAULT_VAULT_ID, req.hostname, false)
+    const raw: RawLoginCandidate[] = JSON.parse(json)
+    matchingEntries = raw.map((e) => ({ id: e.id, name: e.name, username: e.username }))
+  } catch (err) {
+    console.error(LOG_PREFIX, 'list_login_candidates failed', err)
+  }
+
+  return {
+    kind: 'ok',
+    context: { kind: 'create', rpId, rpName: req.rpName ?? null, matchingEntries },
+  }
+}
+
 async function handleCreateRequest(
   req: WebauthnSwRequest,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies by outcome
   sendResponse: (response?: any) => void,
 ) {
-  if (!(await isPasskeyFeatureEnabled()) || !vaultApi || !isUnlocked()) {
+  if (!(await isPasskeyFeatureEnabled()) || !vaultApi) {
     sendResponse({ success: true, status: 'passthrough' })
     return
   }
@@ -255,48 +336,44 @@ async function handleCreateRequest(
     return
   }
 
-  // excludeCredentialsチェックはUIを開く前に行う（一致すれば即座にreject、Part 3-6参照）
-  if (req.excludeCredentialIds && req.excludeCredentialIds.length > 0) {
-    try {
-      const json = vaultApi.api_webauthn_find_credentials(
-        DEFAULT_VAULT_ID,
-        rpId,
-        req.excludeCredentialIds,
-      )
-      const existing: RawCredentialCandidate[] = JSON.parse(json)
-      if (existing.length > 0) {
-        sendResponse({
-          success: false,
-          errorName: 'InvalidStateError',
-          error: 'Credential already registered for this relying party',
-        })
-        return
-      }
-    } catch (err) {
-      sendResponse({ success: false, errorName: 'NotAllowedError', error: String(err) })
+  // ロック中に判明したエラー（既に登録済み等）はここに積む。儀式の解決結果からは
+  // cancelled:trueとしか分からないため、正確なエラー名を後段のsendResponseへ橋渡しする。
+  let abortReason: { errorName: string; error: string } | null = null
+
+  async function resumeAfterUnlock(): Promise<WebauthnRitualContext> {
+    const computed = await computeCreateContext(req, rpId)
+    if (computed.kind === 'error') {
+      abortReason = { errorName: 'InvalidStateError', error: computed.message }
+      return { kind: 'error', message: computed.message }
+    }
+    return computed.context
+  }
+
+  let initialContext: WebauthnRitualContext
+  if (isUnlocked()) {
+    const computed = await computeCreateContext(req, rpId)
+    if (computed.kind === 'error') {
+      sendResponse({ success: false, errorName: 'InvalidStateError', error: computed.message })
       return
     }
-  }
-
-  let matchingEntries: { id: string; name: string; username: string | null }[] = []
-  try {
-    const json = vaultApi.api_list_login_candidates(DEFAULT_VAULT_ID, req.hostname, false)
-    const raw: RawLoginCandidate[] = JSON.parse(json)
-    matchingEntries = raw.map((e) => ({ id: e.id, name: e.name, username: e.username }))
-  } catch (err) {
-    console.error(LOG_PREFIX, 'list_login_candidates failed', err)
+    initialContext = computed.context
+  } else {
+    // vaultがロック中: まずアンロック画面を挟み、成功後に同じウィンドウでcreate確認へ進む
+    initialContext = { kind: 'locked' }
   }
 
   try {
-    const decision = await runRitual(req.requestId, {
-      kind: 'create',
-      rpId,
-      rpName: req.rpName ?? null,
-      matchingEntries,
-    })
+    const decision = await runRitual(
+      req.requestId,
+      initialContext,
+      initialContext.kind === 'locked' ? resumeAfterUnlock : undefined,
+    )
 
     if (decision.cancelled) {
-      sendResponse({ success: false, errorName: 'NotAllowedError', error: 'User cancelled' })
+      sendResponse({
+        success: false,
+        ...(abortReason ?? { errorName: 'NotAllowedError', error: 'User cancelled' }),
+      })
       return
     }
 

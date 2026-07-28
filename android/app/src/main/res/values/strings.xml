@@ -252,6 +252,7 @@
     <string name="field_name_placeholder">Enter item name…</string>
     <string name="field_value_placeholder">Value</string>
     <string name="field_totp_placeholder">otpauth:// URI or Base32 secret</string>
+    <string name="field_passkey_for">Passkey for %1$s</string>
 
     <!-- Custom fields -->
     <string name="custom_field_text">Text</string>
@@ -260,6 +261,7 @@
     <string name="custom_field_url">URL</string>
     <string name="custom_field_phone">Phone</string>
     <string name="custom_field_totp">TOTP</string>
+    <string name="custom_field_passkey">Passkey</string>
     <string name="custom_field_select_type">Select field type</string>
     <string name="custom_field_add">Add field</string>
     <string name="custom_field_name_placeholder">Field name</string>

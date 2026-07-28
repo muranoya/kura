@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type {
   WebauthnRitualContext,
+  WebauthnRitualContextUpdated,
   WebauthnRitualDecision,
 } from '../../../shared/webauthn-messages'
 import CreateConfirm from './CreateConfirm'
 import SelectCredential from './SelectCredential'
+import UnlockRitual from './UnlockRitual'
 
 function getRequestId(): string | null {
   return new URLSearchParams(window.location.search).get('requestId')
@@ -24,7 +26,7 @@ export default function WebauthnRitualApp() {
   const [context, setContext] = useState<WebauthnRitualContext | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const fetchContext = useCallback(() => {
     if (!requestId) {
       setError(t('webauthn.ritual.invalidRequest'))
       return
@@ -40,6 +42,21 @@ export default function WebauthnRitualApp() {
       },
     )
   }, [requestId, t])
+
+  useEffect(fetchContext, [fetchContext])
+
+  // 'locked' context待機中、このウィンドウ以外の経路（メインpopup等）でアンロックされた
+  // 場合にも、確認/選択画面へ進めるようcontextを取り直す。
+  useEffect(() => {
+    if (!requestId) return
+    const listener = (message: WebauthnRitualContextUpdated) => {
+      if (message?.type === 'WEBAUTHN_RITUAL_CONTEXT_UPDATED' && message.requestId === requestId) {
+        fetchContext()
+      }
+    }
+    chrome.runtime.onMessage.addListener(listener)
+    return () => chrome.runtime.onMessage.removeListener(listener)
+  }, [requestId, fetchContext])
 
   const cancel = () => {
     if (!requestId) return
@@ -59,6 +76,25 @@ export default function WebauthnRitualApp() {
     return (
       <div className="p-6 text-sm text-text-muted bg-bg-base min-h-screen">
         {t('common.loading')}
+      </div>
+    )
+  }
+
+  if (context.kind === 'locked') {
+    return <UnlockRitual onUnlocked={fetchContext} onCancel={cancel} />
+  }
+
+  if (context.kind === 'error') {
+    return (
+      <div className="min-h-screen bg-bg-base flex flex-col p-4 gap-3">
+        <p className="text-sm text-danger flex-1">{context.message}</p>
+        <button
+          type="button"
+          onClick={cancel}
+          className="text-sm text-center py-2 rounded-md border border-border bg-bg-surface hover:border-accent/50 transition-colors"
+        >
+          {t('common.close')}
+        </button>
       </div>
     )
   }

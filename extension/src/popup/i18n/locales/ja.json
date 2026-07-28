@@ -566,7 +566,10 @@
       "createTitle": "パスキーを作成",
       "chooseEntry": "どのアイテムにこのパスキーを保存しますか？",
       "createNewEntry": "新しいアイテムを作成",
-      "confirm": "続ける"
+      "confirm": "続ける",
+      "unlockTitle": "kuraをアンロック",
+      "unlockDescription": "パスキーを利用するには、まずvaultをアンロックしてください。",
+      "unlockButton": "アンロック"
     }
   }
 }
