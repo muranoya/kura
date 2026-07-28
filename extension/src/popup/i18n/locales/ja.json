@@ -569,7 +569,10 @@
       "confirm": "続ける",
       "unlockTitle": "kuraをアンロック",
       "unlockDescription": "パスキーを利用するには、まずvaultをアンロックしてください。",
-      "unlockButton": "アンロック"
+      "unlockButton": "アンロック",
+      "errorAlreadyRegistered": "このサイトのパスキーは既に登録済みです。",
+      "errorNoCredentials": "このサイト用に保存されているパスキーが見つかりませんでした。",
+      "errorInternal": "エラーが発生しました。"
     }
   }
 }

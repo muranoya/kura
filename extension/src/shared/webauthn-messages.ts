@@ -101,7 +101,13 @@ export interface WebauthnRitualEntryOption {
 export type WebauthnRitualContext =
   /** vaultがロック中: アンロック後にget/createのcontextへ差し替わる */
   | { kind: 'locked' }
-  | { kind: 'error'; message: string }
+  /**
+   * アンロック後に判明したエラー/終了理由。'already_registered'/'no_credentials'は
+   * 儀式ウィンドウ側でローカライズ済みメッセージを表示する。'internal'のみ
+   * Service Worker由来の生メッセージ（非ローカライズ）をそのまま表示する。
+   */
+  | { kind: 'error'; reason: 'already_registered' | 'no_credentials'; message?: undefined }
+  | { kind: 'error'; reason: 'internal'; message: string }
   | {
       kind: 'get'
       rpId: string

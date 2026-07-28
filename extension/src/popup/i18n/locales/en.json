@@ -569,7 +569,10 @@
       "confirm": "Continue",
       "unlockTitle": "Unlock kura",
       "unlockDescription": "Unlock your vault to use this passkey.",
-      "unlockButton": "Unlock"
+      "unlockButton": "Unlock",
+      "errorAlreadyRegistered": "A passkey for this site is already registered.",
+      "errorNoCredentials": "No saved passkey was found for this site.",
+      "errorInternal": "Something went wrong."
     }
   }
 }

@@ -1,4 +1,4 @@
-// ISOLATED world relay between public/webauthn-main-injected.js (MAIN world)
+// ISOLATED world relay between src/main-world/webauthn-main-injected.js (MAIN world)
 // and the Service Worker. Runs in a separate JS realm from the page, so
 // `window.location` here is the browser's real, unmodifiable Location object
 // — this is the only origin/hostname value the Service Worker's rp_id

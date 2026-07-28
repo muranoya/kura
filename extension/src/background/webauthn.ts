@@ -174,12 +174,66 @@ interface RawCredentialCandidate {
   user_display_name: string
 }
 
+type GetContextResult =
+  | {
+      kind: 'ok'
+      context: Extract<WebauthnRitualContext, { kind: 'get' }>
+      raw: RawCredentialCandidate[]
+    }
+  | { kind: 'passthrough' }
+  | { kind: 'error'; message: string }
+
+/**
+ * get() のcontext計算本体。呼び出し時点でvaultがアンロック済みであることが前提。
+ * ロック中に開始したリチュアルでは、アンロック成功後にこの関数を呼んで続きを計算する。
+ */
+async function computeGetContext(req: WebauthnSwRequest, rpId: string): Promise<GetContextResult> {
+  if (!vaultApi) return { kind: 'error', message: 'Vault API not initialized' }
+
+  let candidates: RawCredentialCandidate[]
+  try {
+    const json = vaultApi.api_webauthn_find_credentials(
+      DEFAULT_VAULT_ID,
+      rpId,
+      req.allowCredentialIds ?? [],
+    )
+    candidates = JSON.parse(json)
+  } catch (err) {
+    return { kind: 'error', message: String(err) }
+  }
+
+  // 候補0件の場合の扱い（サイドチャネル防止、Part 5参照）:
+  // - 既にアンロック済みで呼ばれた場合はUIを一切開かずpassthrough
+  // - ロック中に開始したリチュアルでは既にウィンドウを開いてしまっているため、
+  //   ここではpassthroughを選ぶだけに留め、ウィンドウを閉じる判断は呼び出し側に委ねる
+  if (candidates.length === 0) {
+    return { kind: 'passthrough' }
+  }
+
+  return {
+    kind: 'ok',
+    raw: candidates,
+    context: {
+      kind: 'get',
+      rpId,
+      candidates: candidates.map((c) => ({
+        entryId: c.entry_id,
+        entryName: c.entry_name,
+        customFieldId: c.custom_field_id,
+        credentialId: c.credential_id,
+        userName: c.user_name,
+        userDisplayName: c.user_display_name,
+      })),
+    },
+  }
+}
+
 async function handleGetRequest(
   req: WebauthnSwRequest,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies by outcome
   sendResponse: (response?: any) => void,
 ) {
-  if (!(await isPasskeyFeatureEnabled()) || !vaultApi || !isUnlocked()) {
+  if (!(await isPasskeyFeatureEnabled()) || !vaultApi) {
     sendResponse({ success: true, status: 'passthrough' })
     return
   }
@@ -194,46 +248,69 @@ async function handleGetRequest(
     return
   }
 
-  let candidates: RawCredentialCandidate[]
+  let rawCandidates: RawCredentialCandidate[] = []
+  // ロック中に判明したpassthrough/エラーはここに積む。儀式の解決結果からは
+  // cancelled:trueとしか分からないため、後段のsendResponseへ橋渡しする。
+  let postUnlockPassthrough = false
+  let abortReason: { errorName: string; error: string } | null = null
+
+  async function resumeAfterUnlock(): Promise<WebauthnRitualContext> {
+    const computed = await computeGetContext(req, rpId)
+    if (computed.kind === 'passthrough') {
+      postUnlockPassthrough = true
+      return { kind: 'error', reason: 'no_credentials' }
+    }
+    if (computed.kind === 'error') {
+      abortReason = { errorName: 'NotAllowedError', error: computed.message }
+      return { kind: 'error', reason: 'internal', message: computed.message }
+    }
+    rawCandidates = computed.raw
+    return computed.context
+  }
+
+  let initialContext: WebauthnRitualContext
+  if (isUnlocked()) {
+    const computed = await computeGetContext(req, rpId)
+    if (computed.kind === 'passthrough') {
+      sendResponse({ success: true, status: 'passthrough' })
+      return
+    }
+    if (computed.kind === 'error') {
+      sendResponse({ success: false, errorName: 'NotAllowedError', error: computed.message })
+      return
+    }
+    rawCandidates = computed.raw
+    initialContext = computed.context
+  } else {
+    // vaultがロック中: まずアンロック画面を挟み、成功後に同じウィンドウで候補選択へ進む
+    initialContext = { kind: 'locked' }
+  }
+
   try {
-    const json = vaultApi.api_webauthn_find_credentials(
-      DEFAULT_VAULT_ID,
-      rpId,
-      req.allowCredentialIds ?? [],
+    const decision = await runRitual(
+      req.requestId,
+      initialContext,
+      initialContext.kind === 'locked' ? resumeAfterUnlock : undefined,
     )
-    candidates = JSON.parse(json)
-  } catch (err) {
-    console.error(LOG_PREFIX, 'find_credentials failed', err)
-    sendResponse({ success: false, errorName: 'NotAllowedError', error: String(err) })
-    return
-  }
 
-  // 候補0件ならUIを一切開かずパススルー（サイドチャネル防止、Part 5参照）
-  if (candidates.length === 0) {
-    sendResponse({ success: true, status: 'passthrough' })
-    return
-  }
+    if (decision.cancelled) {
+      if (postUnlockPassthrough) {
+        sendResponse({ success: true, status: 'passthrough' })
+        return
+      }
+      sendResponse({
+        success: false,
+        ...(abortReason ?? { errorName: 'NotAllowedError', error: 'User cancelled' }),
+      })
+      return
+    }
 
-  try {
-    const decision = await runRitual(req.requestId, {
-      kind: 'get',
-      rpId,
-      candidates: candidates.map((c) => ({
-        entryId: c.entry_id,
-        entryName: c.entry_name,
-        customFieldId: c.custom_field_id,
-        credentialId: c.credential_id,
-        userName: c.user_name,
-        userDisplayName: c.user_display_name,
-      })),
-    })
-
-    if (decision.cancelled || !decision.credentialId) {
+    if (!decision.credentialId) {
       sendResponse({ success: false, errorName: 'NotAllowedError', error: 'User cancelled' })
       return
     }
 
-    const chosen = candidates.find((c) => c.credential_id === decision.credentialId)
+    const chosen = rawCandidates.find((c) => c.credential_id === decision.credentialId)
     if (!chosen) {
       sendResponse({ success: false, errorName: 'NotAllowedError', error: 'Invalid selection' })
       return
@@ -272,6 +349,7 @@ interface RawLoginCandidate {
 
 type CreateContextResult =
   | { kind: 'ok'; context: Extract<WebauthnRitualContext, { kind: 'create' }> }
+  | { kind: 'already_registered' }
   | { kind: 'error'; message: string }
 
 /**
@@ -294,7 +372,7 @@ async function computeCreateContext(
       )
       const existing: RawCredentialCandidate[] = JSON.parse(json)
       if (existing.length > 0) {
-        return { kind: 'error', message: 'Credential already registered for this relying party' }
+        return { kind: 'already_registered' }
       }
     } catch (err) {
       return { kind: 'error', message: String(err) }
@@ -342,9 +420,16 @@ async function handleCreateRequest(
 
   async function resumeAfterUnlock(): Promise<WebauthnRitualContext> {
     const computed = await computeCreateContext(req, rpId)
+    if (computed.kind === 'already_registered') {
+      abortReason = {
+        errorName: 'InvalidStateError',
+        error: 'Credential already registered for this relying party',
+      }
+      return { kind: 'error', reason: 'already_registered' }
+    }
     if (computed.kind === 'error') {
-      abortReason = { errorName: 'InvalidStateError', error: computed.message }
-      return { kind: 'error', message: computed.message }
+      abortReason = { errorName: 'NotAllowedError', error: computed.message }
+      return { kind: 'error', reason: 'internal', message: computed.message }
     }
     return computed.context
   }
@@ -352,8 +437,16 @@ async function handleCreateRequest(
   let initialContext: WebauthnRitualContext
   if (isUnlocked()) {
     const computed = await computeCreateContext(req, rpId)
+    if (computed.kind === 'already_registered') {
+      sendResponse({
+        success: false,
+        errorName: 'InvalidStateError',
+        error: 'Credential already registered for this relying party',
+      })
+      return
+    }
     if (computed.kind === 'error') {
-      sendResponse({ success: false, errorName: 'InvalidStateError', error: computed.message })
+      sendResponse({ success: false, errorName: 'NotAllowedError', error: computed.message })
       return
     }
     initialContext = computed.context

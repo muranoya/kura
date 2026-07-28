@@ -85,9 +85,15 @@ export default function WebauthnRitualApp() {
   }
 
   if (context.kind === 'error') {
+    const errorMessage =
+      context.reason === 'already_registered'
+        ? t('webauthn.ritual.errorAlreadyRegistered')
+        : context.reason === 'no_credentials'
+          ? t('webauthn.ritual.errorNoCredentials')
+          : context.message || t('webauthn.ritual.errorInternal')
     return (
       <div className="min-h-screen bg-bg-base flex flex-col p-4 gap-3">
-        <p className="text-sm text-danger flex-1">{context.message}</p>
+        <p className="text-sm text-danger flex-1">{errorMessage}</p>
         <button
           type="button"
           onClick={cancel}
