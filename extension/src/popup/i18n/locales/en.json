@@ -248,7 +248,8 @@
       "totpFieldPlaceholder": "otpauth:// URI or Base32 secret",
       "selectFieldType": "Select field type",
       "addField": "Add field",
-      "generatePassword": "Generate password"
+      "generatePassword": "Generate password",
+      "passkeyFor": "Passkey for {{rpId}}"
     },
     "customFieldTypes": {
       "text": "Text",
@@ -256,7 +257,8 @@
       "email": "Email",
       "url": "URL",
       "phone": "Phone",
-      "totp": "One-time password"
+      "totp": "One-time password",
+      "passkey": "Passkey"
     },
     "actions": {
       "favorite": "Favorite",
@@ -393,6 +395,8 @@
       "language": "Language",
       "autoLock": "Auto-lock",
       "clipboardClear": "Auto-clear clipboard",
+      "passkeyEnabled": "Passkey support (beta)",
+      "passkeyEnabledDesc": "Let kura respond to this site's passkey creation/sign-in requests. Off by default.",
       "autoLockOptions": {
         "disabled": "Disabled",
         "1min": "1 min",
@@ -553,6 +557,22 @@
     },
     "totpDisplay": {
       "expiresIn": "{{seconds}}s left"
+    }
+  },
+  "webauthn": {
+    "ritual": {
+      "invalidRequest": "This request is invalid or has expired.",
+      "getTitle": "Sign in with a passkey",
+      "createTitle": "Create a passkey",
+      "chooseEntry": "Which item should this passkey be saved to?",
+      "createNewEntry": "Create a new item",
+      "confirm": "Continue",
+      "unlockTitle": "Unlock kura",
+      "unlockDescription": "Unlock your vault to use this passkey.",
+      "unlockButton": "Unlock",
+      "errorAlreadyRegistered": "A passkey for this site is already registered.",
+      "errorNoCredentials": "No saved passkey was found for this site.",
+      "errorInternal": "Something went wrong."
     }
   }
 }

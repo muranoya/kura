@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractETldPlus1, isSameETldPlus1 } from '../shared/etld'
+import { extractETldPlus1, isSameETldPlus1, isValidRpId } from '../shared/etld'
 
 describe('extractETldPlus1', () => {
   it('returns eTLD+1 as-is for simple domains', () => {
@@ -110,5 +110,38 @@ describe('isSameETldPlus1', () => {
 
   it('is case-insensitive', () => {
     expect(isSameETldPlus1('Example.COM', 'EXAMPLE.com')).toBe(true)
+  })
+})
+
+describe('isValidRpId', () => {
+  it('allows rp_id equal to the origin hostname', () => {
+    expect(isValidRpId('example.com', 'example.com')).toBe(true)
+  })
+
+  it('allows rp_id that is a registrable-domain suffix of a subdomain origin', () => {
+    expect(isValidRpId('login.example.com', 'example.com')).toBe(true)
+  })
+
+  it('rejects rp_id for an unrelated domain', () => {
+    expect(isValidRpId('example.com', 'evil.com')).toBe(false)
+  })
+
+  it('rejects rp_id that is a superstring, not a suffix, of the hostname', () => {
+    expect(isValidRpId('example.com', 'notexample.com')).toBe(false)
+  })
+
+  it('rejects a bare public suffix as rp_id (co.jp attack)', () => {
+    expect(isValidRpId('example.co.jp', 'co.jp')).toBe(false)
+  })
+
+  it('rejects rp_id narrower than the origin eTLD+1 across sibling subdomains', () => {
+    // "attacker.example.com" trying to claim rp_id scoped to "login.example.com"
+    // shouldn't matter here since both share eTLD+1 "example.com" — but a
+    // completely different eTLD+1 must still be rejected.
+    expect(isValidRpId('attacker.example.com', 'victim.other.com')).toBe(false)
+  })
+
+  it('is case-insensitive', () => {
+    expect(isValidRpId('Login.Example.COM', 'example.com')).toBe(true)
   })
 })

@@ -6,6 +6,7 @@ import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 import wasm from 'vite-plugin-wasm'
 import manifest from './manifest.firefox.json'
+import { injectWebauthnMainContentScript } from './vite-inject-webauthn-main'
 
 /** Strip Chrome-only properties from manifest.json for Firefox compatibility */
 function firefoxManifestCleanup(): Plugin {
@@ -29,13 +30,21 @@ function firefoxManifestCleanup(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), wasm(), tailwindcss(), crx({ manifest }), firefoxManifestCleanup()],
+  plugins: [
+    react(),
+    wasm(),
+    tailwindcss(),
+    crx({ manifest }),
+    firefoxManifestCleanup(),
+    injectWebauthnMainContentScript(),
+  ],
   build: {
     target: 'esnext',
     rollupOptions: {
       input: {
         popup: new URL('./src/popup/index.html', import.meta.url).pathname,
         background: new URL('./src/background/index.ts', import.meta.url).pathname,
+        webauthn: new URL('./src/popup/webauthn.html', import.meta.url).pathname,
       },
     },
   },

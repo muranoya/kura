@@ -6,6 +6,7 @@ mod session;
 mod sync;
 mod transfer;
 mod utils;
+mod webauthn;
 
 #[cfg(any(feature = "desktop", feature = "android"))]
 mod import;
@@ -13,6 +14,9 @@ mod import;
 pub use sync::parse_s3_config;
 pub use transfer::*;
 pub use utils::*;
+pub use webauthn::{
+    WebAuthnAssertionResult, WebAuthnAttestationResult, WebAuthnCredentialCandidate,
+};
 
 use crate::sync::engine::SessionState;
 use std::sync::Mutex;

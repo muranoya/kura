@@ -10,6 +10,7 @@ import type { Entry, Label } from '../../shared/types'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { LargeTextDialog } from '../ui/large-text-dialog'
+import PasskeyCustomFieldDisplay from './PasskeyCustomFieldDisplay'
 import TotpCustomFieldDisplay from './TotpCustomFieldDisplay'
 
 interface FieldDisplayProps {
@@ -436,6 +437,12 @@ export default function EntryDetailContent({
             {entry.customFields.map((field) =>
               field.fieldType === 'totp' ? (
                 <TotpCustomFieldDisplay key={field.id} label={field.name} value={field.value} />
+              ) : field.fieldType === 'passkey' ? (
+                <PasskeyCustomFieldDisplay
+                  key={field.id}
+                  label={t('customFieldTypes.passkey')}
+                  value={field.value}
+                />
               ) : (
                 <FieldDisplay
                   key={field.id}

@@ -38,6 +38,12 @@
       "js": ["src/content/main.ts"],
       "run_at": "document_idle",
       "all_frames": true
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/webauthn-bridge.ts"],
+      "run_at": "document_start",
+      "all_frames": true
     }
   ],
 
@@ -48,7 +54,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "kura-pm@meshpeak.net",
-      "strict_min_version": "112.0",
+      "strict_min_version": "128.0",
       "data_collection_permissions": {
         "required": ["none"],
         "optional": []

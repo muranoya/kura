@@ -274,6 +274,11 @@ fun EntryDetailScreen(
                                                 context = context,
                                                 clipboardClearSeconds = clipboardClearSeconds,
                                             )
+                                        } else if (field.fieldType == "passkey") {
+                                            PasskeyField(
+                                                label = stringResource(R.string.custom_field_passkey),
+                                                value = field.value,
+                                            )
                                         } else {
                                             DetailField(
                                                 label = field.name,
@@ -615,6 +620,63 @@ fun TotpField(
             value = totpCode,
             onDismiss = { largeTextOpen = false }
         )
+    }
+}
+
+/**
+ * Passkeyカスタムフィールドの読み取り専用表示。
+ * `value`はvault-core専用APIが生成したJSON文字列で、private_keyを含むため
+ * 絶対に画面に出さない（extension/desktop側のPasskeyCustomFieldDisplayと同じ方針）。
+ */
+@Composable
+fun PasskeyField(
+    label: String,
+    value: String,
+) {
+    val (displayName, userName) = remember(value) {
+        try {
+            val obj = Json.parseToJsonElement(value).jsonObject
+            val rpId = obj["rp_id"]?.jsonPrimitive?.contentOrNull
+            val rpName = obj["rp_name"]?.jsonPrimitive?.contentOrNull
+            val user = obj["user_name"]?.jsonPrimitive?.contentOrNull
+            (rpName ?: rpId) to user
+        } catch (_: Exception) {
+            null to null
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Icon(
+            Icons.Default.Key,
+            contentDescription = null,
+            modifier = Modifier.size(14.dp).padding(top = 2.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = displayName ?: label,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (!userName.isNullOrEmpty()) {
+                Text(
+                    text = userName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 

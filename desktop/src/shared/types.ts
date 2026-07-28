@@ -9,7 +9,7 @@ export type EntryType =
   | 'software_license'
 
 // Custom field types
-export type CustomFieldType = 'text' | 'password' | 'email' | 'url' | 'phone' | 'totp'
+export type CustomFieldType = 'text' | 'password' | 'email' | 'url' | 'phone' | 'totp' | 'passkey'
 
 // Custom field
 export interface CustomField {

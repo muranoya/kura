@@ -5,6 +5,7 @@ import type { Plugin } from 'vite'
 import { defineConfig } from 'vite'
 import wasm from 'vite-plugin-wasm'
 import manifest from './manifest.json'
+import { injectWebauthnMainContentScript } from './vite-inject-webauthn-main'
 
 // Service Worker では document が存在しないため、
 // Vite の modulepreload polyfill 内の document 参照をガードする
@@ -26,7 +27,14 @@ function serviceWorkerDocumentGuard(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), wasm(), tailwindcss(), crx({ manifest }), serviceWorkerDocumentGuard()],
+  plugins: [
+    react(),
+    wasm(),
+    tailwindcss(),
+    crx({ manifest }),
+    serviceWorkerDocumentGuard(),
+    injectWebauthnMainContentScript(),
+  ],
   build: {
     target: 'esnext',
     rollupOptions: {
@@ -34,6 +42,7 @@ export default defineConfig({
         popup: new URL('./src/popup/index.html', import.meta.url).pathname,
         background: new URL('./src/background/index.ts', import.meta.url).pathname,
         offscreen: new URL('./src/background/offscreen.html', import.meta.url).pathname,
+        webauthn: new URL('./src/popup/webauthn.html', import.meta.url).pathname,
       },
     },
   },

@@ -55,6 +55,9 @@ pub enum VaultError {
 
     #[error("Vault UUID mismatch: local={local}, remote={remote}")]
     VaultUuidMismatch { local: String, remote: String },
+
+    #[error("WebAuthn error: {0}")]
+    WebAuthnError(String),
 }
 
 pub type Result<T> = std::result::Result<T, VaultError>;

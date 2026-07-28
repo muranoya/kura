@@ -11,6 +11,7 @@ pub mod store;
 pub mod sync;
 pub mod totp;
 pub mod vault;
+pub mod webauthn;
 
 #[cfg(any(feature = "desktop", feature = "android", feature = "wasm"))]
 pub mod api;

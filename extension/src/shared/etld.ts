@@ -79,3 +79,21 @@ export function extractETldPlus1(hostname: string): string {
 export function isSameETldPlus1(hostname1: string, hostname2: string): boolean {
   return extractETldPlus1(hostname1) === extractETldPlus1(hostname2)
 }
+
+/**
+ * WebAuthn rp.id validation: per spec, rp.id must equal the origin's
+ * effective domain, or be a registrable domain suffix of it. `strict_subdomain`
+ * (the autofill pattern-DB flag) does not apply here — rp.id scoping is a
+ * security-mandatory property of the site's own request, not a user/site
+ * preference (see docs/webauthn-passkey.md 3-5).
+ *
+ * `hostname` must be read from an untainted source (the ISOLATED-world
+ * content script's own `window.location`, never a value forwarded from the
+ * MAIN-world-injected script).
+ */
+export function isValidRpId(hostname: string, rpId: string): boolean {
+  const h = hostname.toLowerCase()
+  const r = rpId.toLowerCase()
+  const isSuffix = h === r || h.endsWith(`.${r}`)
+  return isSuffix && isSameETldPlus1(h, r)
+}

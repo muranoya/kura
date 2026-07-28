@@ -26,6 +26,21 @@ import { Label as UILabel } from '../ui/label'
 import { Textarea } from '../ui/textarea'
 import PasswordGeneratorPanel from './PasswordGeneratorPanel'
 
+function passkeySummary(
+  value: string,
+  t: (key: string, options?: Record<string, unknown>) => string,
+) {
+  try {
+    const data = JSON.parse(value) as { rp_id?: string }
+    if (data.rp_id) {
+      return t('fields.passkeyFor', { rpId: data.rp_id })
+    }
+  } catch {
+    // fall through to generic label below
+  }
+  return t('customFieldTypes.passkey')
+}
+
 export interface EntryFormProps {
   entryType: string
   name: string
@@ -154,6 +169,7 @@ export default function EntryForm({
       url: t('customFieldTypes.url'),
       phone: t('customFieldTypes.phone'),
       totp: t('customFieldTypes.totp'),
+      passkey: t('customFieldTypes.passkey'),
     }),
     [t],
   )
@@ -642,7 +658,7 @@ export default function EntryForm({
               <Badge variant="muted" className="shrink-0 mt-1.5 text-[10px]">
                 {fieldTypeLabels[field.fieldType] || field.fieldType}
               </Badge>
-              {field.fieldType !== 'totp' && (
+              {field.fieldType !== 'totp' && field.fieldType !== 'passkey' && (
                 <Input
                   id={`field-name-${field.id}`}
                   value={field.name}
@@ -651,35 +667,50 @@ export default function EntryForm({
                   className="h-8 text-xs flex-[2] min-w-0"
                 />
               )}
-              <div className={cn('relative', field.fieldType === 'totp' ? 'flex-1' : 'flex-[3]')}>
-                <Input
-                  id={`field-value-${field.id}`}
-                  type={
-                    field.fieldType === 'password' || field.fieldType === 'totp'
-                      ? focusedPasswordFieldId === `custom-${field.id}`
-                        ? 'text'
-                        : 'password'
-                      : 'text'
-                  }
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
-                  placeholder={
-                    field.fieldType === 'totp'
-                      ? t('fieldPlaceholders.totp')
-                      : t('entries.form.valuePlaceholder')
-                  }
-                  className={cn('h-8 text-xs', field.fieldType === 'password' && 'pr-9')}
-                  onFocus={() => {
-                    if (field.fieldType === 'password' || field.fieldType === 'totp')
-                      setFocusedPasswordFieldId(`custom-${field.id}`)
-                    if (field.fieldType === 'password' && !field.value)
-                      setActiveGeneratorFieldId(`custom-${field.id}`)
-                  }}
-                  onBlur={() => {
-                    if (field.fieldType === 'password' || field.fieldType === 'totp')
-                      setFocusedPasswordFieldId(null)
-                  }}
-                />
+              <div
+                className={cn(
+                  'relative',
+                  field.fieldType === 'totp' || field.fieldType === 'passkey'
+                    ? 'flex-1'
+                    : 'flex-[3]',
+                )}
+              >
+                {field.fieldType === 'passkey' ? (
+                  // Passkeyの値はvault-core専用APIが生成したJSON（秘密鍵含む）であり、
+                  // 自由テキスト編集で壊せないよう読み取り専用のサマリのみ表示する。
+                  <div className="h-8 flex items-center px-2 rounded-md bg-bg-elevated border border-border text-xs text-text-secondary truncate">
+                    {passkeySummary(field.value, t)}
+                  </div>
+                ) : (
+                  <Input
+                    id={`field-value-${field.id}`}
+                    type={
+                      field.fieldType === 'password' || field.fieldType === 'totp'
+                        ? focusedPasswordFieldId === `custom-${field.id}`
+                          ? 'text'
+                          : 'password'
+                        : 'text'
+                    }
+                    value={field.value}
+                    onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
+                    placeholder={
+                      field.fieldType === 'totp'
+                        ? t('fieldPlaceholders.totp')
+                        : t('entries.form.valuePlaceholder')
+                    }
+                    className={cn('h-8 text-xs', field.fieldType === 'password' && 'pr-9')}
+                    onFocus={() => {
+                      if (field.fieldType === 'password' || field.fieldType === 'totp')
+                        setFocusedPasswordFieldId(`custom-${field.id}`)
+                      if (field.fieldType === 'password' && !field.value)
+                        setActiveGeneratorFieldId(`custom-${field.id}`)
+                    }}
+                    onBlur={() => {
+                      if (field.fieldType === 'password' || field.fieldType === 'totp')
+                        setFocusedPasswordFieldId(null)
+                    }}
+                  />
+                )}
                 {field.fieldType === 'password' &&
                   focusedPasswordFieldId === `custom-${field.id}` &&
                   !!field.value && (

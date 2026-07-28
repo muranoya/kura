@@ -252,6 +252,7 @@
     <string name="field_name_placeholder">アイテム名を入力…</string>
     <string name="field_value_placeholder">値</string>
     <string name="field_totp_placeholder">otpauth:// URI または Base32 シークレット</string>
+    <string name="field_passkey_for">%1$s のパスキー</string>
 
     <!-- Custom fields -->
     <string name="custom_field_text">テキスト</string>
@@ -260,6 +261,7 @@
     <string name="custom_field_url">URL</string>
     <string name="custom_field_phone">電話番号</string>
     <string name="custom_field_totp">ワンタイムパスワード</string>
+    <string name="custom_field_passkey">パスキー</string>
     <string name="custom_field_select_type">フィールドの種類を選択</string>
     <string name="custom_field_add">フィールドを追加</string>
     <string name="custom_field_name_placeholder">フィールド名</string>
