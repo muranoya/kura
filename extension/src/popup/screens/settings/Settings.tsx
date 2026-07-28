@@ -40,6 +40,7 @@ export default function Settings() {
   const [language, setLanguageState] = useState<SupportedLanguage>(
     (i18n.language as SupportedLanguage) ?? 'en',
   )
+  const [passkeyEnabled, setPasskeyEnabled] = useState(false)
 
   // Change Master Password Dialog
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
@@ -192,6 +193,7 @@ export default function Settings() {
       ) {
         setLanguageState(settings.language as SupportedLanguage)
       }
+      setPasskeyEnabled(settings.passkeyEnabled === true)
     } catch (err) {
       console.error('Failed to load settings:', err)
     }
@@ -220,6 +222,18 @@ export default function Settings() {
       const currentSettings = await commands.getSettings()
       await commands.saveSettings({ ...currentSettings, clipboardClearSeconds: seconds })
     } catch (err) {
+      pushError(t('errors.saveSettingsFailed', { error: String(err) }))
+    }
+  }
+
+  const handlePasskeyEnabledToggle = async () => {
+    const next = !passkeyEnabled
+    setPasskeyEnabled(next)
+    try {
+      const currentSettings = await commands.getSettings()
+      await commands.saveSettings({ ...currentSettings, passkeyEnabled: next })
+    } catch (err) {
+      setPasskeyEnabled(!next)
       pushError(t('errors.saveSettingsFailed', { error: String(err) }))
     }
   }
@@ -427,6 +441,29 @@ export default function Settings() {
                 options={CLIPBOARD_CLEAR_OPTIONS}
               />
             </div>
+          </div>
+          <div className="flex items-center justify-between px-1 gap-2 mt-2">
+            <div className="min-w-0 pr-2">
+              <span className="text-sm text-text-primary block">
+                {t('settings.general.passkeyEnabled')}
+              </span>
+              <span className="text-xs text-text-muted block mt-0.5">
+                {t('settings.general.passkeyEnabledDesc')}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handlePasskeyEnabledToggle}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${
+                passkeyEnabled ? 'bg-accent' : 'bg-bg-elevated border border-border'
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform shadow-sm ${
+                  passkeyEnabled ? 'translate-x-4.5' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
           </div>
         </section>
 

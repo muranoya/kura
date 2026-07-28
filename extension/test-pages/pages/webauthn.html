@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebAuthn / Passkey - Extension Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.25rem; }
+    nav { margin-bottom: 24px; }
+    nav a { color: #2563eb; }
+    label { display: block; margin-bottom: 4px; font-weight: 500; }
+    input { display: block; width: 100%; padding: 8px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-right: 8px; }
+    button:disabled { background: #9ca3af; cursor: default; }
+    pre#result { margin-top: 24px; padding: 12px; background: #f3f4f6; border-radius: 4px; white-space: pre-wrap; word-break: break-all; min-height: 3em; }
+    .expected { margin: 24px 0; padding: 12px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.9rem; }
+    .expected summary { font-weight: 600; cursor: pointer; }
+    .expected ul { margin: 8px 0 0; padding-left: 20px; }
+    .expected li { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <nav><a href="/">&larr; Test Pages Index</a></nav>
+  <h1>WebAuthn / Passkey (kura extension interception test)</h1>
+  <p>
+    Calls <code>navigator.credentials.create()</code> / <code>.get()</code> directly.
+    This is <strong>not</strong> a real relying party server — there's no backend to verify
+    the attestation/assertion. Use this page to confirm kura intercepts the calls, opens the
+    ritual window, and returns a well-formed credential object; check the DevTools console
+    for the raw result.
+  </p>
+
+  <details class="expected" open>
+    <summary>Prerequisites</summary>
+    <ul>
+      <li>拡張機能の設定で「パスキー対応（ベータ）」がONになっていること</li>
+      <li>Vaultがアンロックされていること</li>
+      <li>「Create Passkey」実行時、儀式ウィンドウで紐付け先のloginエントリ（または新規作成）を選ぶ</li>
+      <li>「Get Passkey」は、直前に作成したPasskeyに対応するloginエントリがある状態で実行する</li>
+    </ul>
+  </details>
+
+  <label for="username">Username (for create)</label>
+  <input type="text" id="username" value="test-user@example.com">
+
+  <button id="create-btn">Create Passkey</button>
+  <button id="get-btn">Get Passkey</button>
+
+  <pre id="result">(no result yet)</pre>
+
+  <script>
+    function randomChallenge() {
+      return crypto.getRandomValues(new Uint8Array(32));
+    }
+
+    function show(label, value) {
+      const result = document.getElementById('result');
+      result.textContent = label + ':\n' + JSON.stringify(value, (key, v) => {
+        if (v instanceof ArrayBuffer) {
+          return '(ArrayBuffer, ' + v.byteLength + ' bytes)';
+        }
+        return v;
+      }, 2);
+      console.log(label, value);
+    }
+
+    document.getElementById('create-btn').addEventListener('click', async () => {
+      const username = document.getElementById('username').value || 'test-user@example.com';
+      try {
+        const credential = await navigator.credentials.create({
+          publicKey: {
+            rp: { name: 'kura WebAuthn Test Page' },
+            user: {
+              id: crypto.getRandomValues(new Uint8Array(16)),
+              name: username,
+              displayName: username,
+            },
+            challenge: randomChallenge(),
+            pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+            authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
+            timeout: 120000,
+          },
+        });
+        show('create() result', credential ? {
+          id: credential.id,
+          type: credential.type,
+          attestationObjectBytes: credential.response.attestationObject.byteLength,
+        } : null);
+      } catch (err) {
+        show('create() error', { name: err.name, message: err.message });
+      }
+    });
+
+    document.getElementById('get-btn').addEventListener('click', async () => {
+      try {
+        const credential = await navigator.credentials.get({
+          publicKey: {
+            challenge: randomChallenge(),
+            userVerification: 'preferred',
+            timeout: 120000,
+          },
+        });
+        show('get() result', credential ? {
+          id: credential.id,
+          type: credential.type,
+          authenticatorDataBytes: credential.response.authenticatorData.byteLength,
+          signatureBytes: credential.response.signature.byteLength,
+          hasUserHandle: !!credential.response.userHandle,
+        } : null);
+      } catch (err) {
+        show('get() error', { name: err.name, message: err.message });
+      }
+    });
+  </script>
+</body>
+</html>

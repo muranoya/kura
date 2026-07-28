@@ -42,6 +42,9 @@ export interface EntryFormProps {
   error?: string
 }
 
+// 'passkey' はここに含めない: パスキーは通常のカスタムフィールド追加UIからは
+// 作成できず、WebAuthnの作成儀式（navigator.credentials.create()の横取り、または
+// エントリ詳細からの明示的な作成操作）経由でのみ追加される。
 const CUSTOM_FIELD_TYPE_ICONS = [
   { value: 'text' as const, icon: Type },
   { value: 'password' as const, icon: Lock },
@@ -50,6 +53,21 @@ const CUSTOM_FIELD_TYPE_ICONS = [
   { value: 'phone' as const, icon: Phone },
   { value: 'totp' as const, icon: Timer },
 ]
+
+function passkeySummary(
+  value: string,
+  t: (key: string, options?: Record<string, unknown>) => string,
+) {
+  try {
+    const data = JSON.parse(value) as { rp_id?: string }
+    if (data.rp_id) {
+      return t('entries.fields.passkeyFor', { rpId: data.rp_id })
+    }
+  } catch {
+    // fall through to generic label below
+  }
+  return t('entries.customFieldTypes.passkey')
+}
 
 export default function EntryForm({
   entryType,
@@ -565,34 +583,42 @@ export default function EntryForm({
                 />
               )}
               <div className={cn('relative', field.fieldType === 'totp' ? 'flex-1' : 'flex-[3]')}>
-                <Input
-                  id={`field-value-${field.id}`}
-                  type={
-                    field.fieldType === 'password' || field.fieldType === 'totp'
-                      ? focusedPasswordFieldId === `custom-${field.id}`
-                        ? 'text'
-                        : 'password'
-                      : 'text'
-                  }
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
-                  placeholder={
-                    field.fieldType === 'totp'
-                      ? t('entries.fields.totpFieldPlaceholder')
-                      : t('entries.fields.fieldValue')
-                  }
-                  className={cn('h-8 text-sm', field.fieldType === 'password' && 'pr-9')}
-                  onFocus={() => {
-                    if (field.fieldType === 'password' || field.fieldType === 'totp')
-                      setFocusedPasswordFieldId(`custom-${field.id}`)
-                    if (field.fieldType === 'password' && !field.value)
-                      setActiveGeneratorFieldId(`custom-${field.id}`)
-                  }}
-                  onBlur={() => {
-                    if (field.fieldType === 'password' || field.fieldType === 'totp')
-                      setFocusedPasswordFieldId(null)
-                  }}
-                />
+                {field.fieldType === 'passkey' ? (
+                  // Passkeyの値はvault-core専用APIが生成したJSON（秘密鍵含む）であり、
+                  // 自由テキスト編集で壊せないよう読み取り専用のサマリのみ表示する。
+                  <div className="h-8 flex items-center px-2 rounded-md bg-bg-elevated border border-border text-xs text-text-secondary truncate">
+                    {passkeySummary(field.value, t)}
+                  </div>
+                ) : (
+                  <Input
+                    id={`field-value-${field.id}`}
+                    type={
+                      field.fieldType === 'password' || field.fieldType === 'totp'
+                        ? focusedPasswordFieldId === `custom-${field.id}`
+                          ? 'text'
+                          : 'password'
+                        : 'text'
+                    }
+                    value={field.value}
+                    onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
+                    placeholder={
+                      field.fieldType === 'totp'
+                        ? t('entries.fields.totpFieldPlaceholder')
+                        : t('entries.fields.fieldValue')
+                    }
+                    className={cn('h-8 text-sm', field.fieldType === 'password' && 'pr-9')}
+                    onFocus={() => {
+                      if (field.fieldType === 'password' || field.fieldType === 'totp')
+                        setFocusedPasswordFieldId(`custom-${field.id}`)
+                      if (field.fieldType === 'password' && !field.value)
+                        setActiveGeneratorFieldId(`custom-${field.id}`)
+                    }}
+                    onBlur={() => {
+                      if (field.fieldType === 'password' || field.fieldType === 'totp')
+                        setFocusedPasswordFieldId(null)
+                    }}
+                  />
+                )}
                 {field.fieldType === 'password' &&
                   focusedPasswordFieldId === `custom-${field.id}` &&
                   !!field.value && (

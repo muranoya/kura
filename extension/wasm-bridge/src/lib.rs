@@ -421,3 +421,64 @@ pub fn api_parse_totp_period(value: String) -> u32 {
 pub fn api_export_bitwarden_json(vault_id: String) -> Result<String, JsValue> {
     with_manager(&vault_id, |m| m.api_export_bitwarden_json()).map_err(to_js_err)
 }
+
+// ============================================================================
+// WebAuthn/Passkey API
+// ============================================================================
+
+/// `rp_id`に一致するPasskey候補を検索する（秘密鍵を含まない）
+#[wasm_bindgen]
+pub fn api_webauthn_find_credentials(
+    vault_id: String,
+    rp_id: String,
+    allow_credential_ids: Vec<String>,
+) -> Result<String, JsValue> {
+    let candidates = with_manager(&vault_id, |m| {
+        m.api_webauthn_find_credentials(rp_id, allow_credential_ids)
+    })
+    .map_err(to_js_err)?;
+    serde_json::to_string(&candidates).map_err(|e| to_js_err(format!("Serialization error: {}", e)))
+}
+
+/// 新しいPasskeyを作成する。`entry_id`未指定時は新規loginエントリを作成する
+#[wasm_bindgen]
+#[allow(clippy::too_many_arguments)]
+pub fn api_webauthn_create_credential(
+    vault_id: String,
+    entry_id: Option<String>,
+    rp_id: String,
+    rp_name: Option<String>,
+    user_handle: String,
+    user_name: String,
+    user_display_name: String,
+    exclude_credential_ids: Vec<String>,
+) -> Result<String, JsValue> {
+    let result = with_manager(&vault_id, |m| {
+        m.api_webauthn_create_credential(
+            entry_id,
+            rp_id,
+            rp_name,
+            user_handle,
+            user_name,
+            user_display_name,
+            exclude_credential_ids,
+        )
+    })
+    .map_err(to_js_err)?;
+    serde_json::to_string(&result).map_err(|e| to_js_err(format!("Serialization error: {}", e)))
+}
+
+/// 既存Passkeyで認証assertionに署名する
+#[wasm_bindgen]
+pub fn api_webauthn_get_assertion(
+    vault_id: String,
+    entry_id: String,
+    custom_field_id: String,
+    client_data_json: String,
+) -> Result<String, JsValue> {
+    let result = with_manager(&vault_id, |m| {
+        m.api_webauthn_get_assertion(entry_id, custom_field_id, client_data_json)
+    })
+    .map_err(to_js_err)?;
+    serde_json::to_string(&result).map_err(|e| to_js_err(format!("Serialization error: {}", e)))
+}

@@ -21,6 +21,7 @@ import {
   onVaultUnlocked,
 } from './autofill'
 import { initWasmManual } from './wasm-init'
+import { handleWebauthnMessage, initWebauthn } from './webauthn'
 
 /** WASM API surface for Service Worker */
 interface WasmApi {
@@ -96,6 +97,23 @@ interface WasmApi {
   api_encrypt_transfer_config(password: string, configJson: string): string
   api_decrypt_transfer_config(password: string, transferString: string): string
   api_export_bitwarden_json(vaultId: string): string
+  api_webauthn_find_credentials(vaultId: string, rpId: string, allowCredentialIds: string[]): string
+  api_webauthn_create_credential(
+    vaultId: string,
+    entryId: string | null,
+    rpId: string,
+    rpName: string | null,
+    userHandle: string,
+    userName: string,
+    userDisplayName: string,
+    excludeCredentialIds: string[],
+  ): string
+  api_webauthn_get_assertion(
+    vaultId: string,
+    entryId: string,
+    customFieldId: string,
+    clientDataJson: string,
+  ): string
   [key: string]: unknown
 }
 
@@ -183,6 +201,16 @@ setupAlarms()
 
 // Autofill の初期化（vault はプロキシ経由でlazy参照）
 initAutofill(
+  new Proxy({} as WasmApi, {
+    get: (_target, prop) => (vault as unknown as Record<string | symbol, unknown>)[prop],
+  }),
+  () => unlocked,
+  saveLocally,
+  autoSync,
+)
+
+// WebAuthn/Passkeyの初期化（vault はプロキシ経由でlazy参照）
+initWebauthn(
   new Proxy({} as WasmApi, {
     get: (_target, prop) => (vault as unknown as Record<string | symbol, unknown>)[prop],
   }),
@@ -458,6 +486,11 @@ async function handleMessage(
     // Delegate autofill messages to the autofill module
     if (typeof message.type === 'string' && message.type.startsWith('AUTOFILL_')) {
       return handleAutofillMessage(message, _sender, sendResponse)
+    }
+
+    // Delegate WebAuthn/Passkey messages to the webauthn module
+    if (typeof message.type === 'string' && message.type.startsWith('WEBAUTHN_')) {
+      return handleWebauthnMessage(message, _sender, sendResponse)
     }
 
     switch (message.type) {

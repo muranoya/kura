@@ -133,7 +133,7 @@ authenticatorData構築時、signCountフィールド（4byte）には常に`0u3
 
 # Part 3: アーキテクチャ
 
-> **未実装（将来対応予定）**: このPart全体（鍵生成・署名・CBOR構築を含むvault-core側の暗号処理、およびブラウザ拡張側のWebAuthn横取り機構）は未実装。実装済みなのはPart 2のデータ構造のみ。
+> **実装済み**（Chrome/Firefox both）。以下、実装時に当初案から変わった点のみ注記する。詳細ファイル一覧はPart 7参照。
 
 ## 3-1. 全体構成
 
@@ -165,21 +165,21 @@ vault-core (Rust: 鍵生成・CBOR構築・ECDSA署名、loginエントリのcus
     // 既存のオートフィル用エントリ（変更なし）
     { "matches": ["<all_urls>"], "js": ["src/content/main.ts"], "run_at": "document_idle", "all_frames": true },
 
-    // 追加: ISOLATED world側ブリッジ
+    // 追加: ISOLATED world側ブリッジ（crx管理下のTS、通常のビルドパイプライン）
     { "matches": ["<all_urls>"], "js": ["src/content/webauthn-bridge.ts"], "run_at": "document_start", "all_frames": true },
 
-    // 追加: MAIN world注入スクリプト
-    { "matches": ["<all_urls>"], "js": ["src/content/webauthn-main.ts"], "run_at": "document_start", "all_frames": true, "world": "MAIN" }
+    // 追加: MAIN world注入スクリプト。ソースのmanifest.jsonには書かず、
+    // ビルド後処理（vite-inject-webauthn-main.ts）でdist/manifest.jsonに注入する（後述）
+    { "matches": ["<all_urls>"], "js": ["webauthn-main-injected.js"], "run_at": "document_start", "all_frames": true, "world": "MAIN" }
   ]
 }
 ```
 
 `document_start`が必須（ページの他スクリプトが`navigator.credentials.create/get`の参照をキャッシュする前に上書きする必要があるため）。
 
-**ブラウザ対応状況:**
+**MAIN world注入スクリプトは`src/content/`のTypeScriptモジュールではなく、`extension/public/webauthn-main-injected.js`という依存なしの単一プレーンJSファイルとして実装し、ソースの`manifest.json`/`manifest.firefox.json`には一切書かず、Vite Pluginによるビルド後処理（`extension/vite-inject-webauthn-main.ts`、`closeBundle`フックで`dist/manifest.json`に直接エントリを追記）で登録する。**
 
-- **Chrome**: `world: "MAIN"`はChrome 111+でmanifest宣言可能。ただし、manifest宣言では動作せず`chrome.scripting.registerContentScripts`による動的登録でのみ動作するという既知の不具合報告があるため、実装時は両方式を実機検証し、manifest宣言が信頼できない場合は動的登録にフォールバックする（Part 8 Phase 0参照）。
-- **Firefox**: Firefox 128でMAIN world対応。既存の`manifest.firefox.json`の`strict_min_version`（現状112.0）を128以上に引き上げる必要がある。対応ブラウザ幅の変更となるため、実装フェーズでメンテナーの承認を得る。
+**理由（実装時に判明した問題）**: `@crxjs/vite-plugin`は`content_scripts`に列挙された全エントリを、実体を動的`import()`で読み込む薄いローダースクリプトに置き換える（HMR対応のため）。ISOLATED world側スクリプト（`webauthn-bridge.ts`）はこの方式で問題なく動作するが、MAIN worldスクリプトはページ自身のスクリプト読み込みコンテキストで実行されるため、少なくともFirefox 153ではローダーの相対import解決がページ自身のオリジンに対して行われ、拡張機能側の実体を読み込めずに（コンソールエラーも出さず）静かに失敗した（Chromeでは問題なく動作した）。`public/`配下の単一ファイル（importなし、動的import不要）に切り出し、ビルド後処理でmanifestに直接注入することで、ローダー機構自体を経由しないようにし、Chrome/Firefox間の差異を解消した。このファイルは`src/shared/webauthn-codec.ts`/`webauthn-messages.ts`のロジックを意図的に複製している（importできないため）。
 
 MAIN world scriptは`chrome.*` APIに一切アクセスできないため、ISOLATED world側とのpostMessage仲介が必須になる。
 
@@ -193,8 +193,8 @@ attestationObject（`{fmt: "none", attStmt: {}, authData: <bytes>}`）とauthent
 
 **責務分割:**
 
-- **TypeScript（Service Worker）**: `clientDataJSON`の組み立てのみ（`{type, challenge, origin, crossOrigin}`。`window.location.origin`というDOM由来の値が必要なためJS側が自然）。
-- **Rust（vault-core）**: `clientDataJSON`のSHA-256ハッシュ計算、authenticatorData/attestationObjectのCBOR構築、COSE_Key構築、ECDSA署名、対象`login`エントリの`custom_fields`への読み書き。
+- **TypeScript（Service Worker）**: `clientDataJSON`の組み立てのみ（`{type, challenge, origin, crossOrigin}`）。Service Worker自体はDOMを持たないため、`origin`はISOLATED world（`webauthn-bridge.ts`）が自身の`window.location.origin`から読み取り、メッセージ経由でService Workerに渡した値を使う。
+- **Rust（vault-core）**: `clientDataJSON`のSHA-256ハッシュ計算、authenticatorData/attestationObjectのCBOR構築、COSE_Key構築、ECDSA署名。対象`login`エントリの`custom_fields`への読み書きは`vault-core/src/vault/webauthn.rs`が担当し、暗号処理本体（`vault-core/src/webauthn/mod.rs`）とは責務を分離した（当初案からの変更、Part 7参照）。
 
 ## 3-5. ドメイン検証
 
@@ -217,44 +217,49 @@ Webページ (page realm)
   ▼
 [MAIN world] webauthn-main.ts
   │ mediation === 'conditional' ? → 元関数へパススルー（非対応スコープ）
-  │ requestId発行、独自タイムアウトタイマー開始
-  │ postMessage({ type: 'KURA_WEBAUTHN_GET_REQUEST', requestId, options }, origin)
+  │ requestId発行、独自タイムアウトタイマー開始（90秒）
+  │ postMessage({ source: 'kura-webauthn-main', requestId, kind: 'get', ... }, origin)
   ▼
 [ISOLATED world] webauthn-bridge.ts
   │ 自前のwindow.locationからorigin/hostnameを独立取得
-  │ chrome.runtime.sendMessage({ type: 'WEBAUTHN_GET_REQUEST', payload: { ..., origin } })
+  │ chrome.runtime.sendMessage({ type: 'WEBAUTHN_GET_REQUEST', ..., origin, hostname })
   ▼
 Service Worker background/webauthn.ts
-  │ etld.tsでrp.id vs origin のsuffix検証 → 不一致ならreject
+  │ 設定トグルOFF・vaultロック中は候補探索自体を行わずpassthrough
+  │ etld.ts (isValidRpId) でrp.id vs origin のsuffix検証 → 不一致ならreject
   │ vault.api_webauthn_find_credentials(rp_id, allowCredentials)
   │   → entry_type=="login"のエントリを走査し、custom_fields内のfield_type=="passkey"を
   │     collectする（非機密フィールドのみの候補、Part 2-4参照）
   │
-  ├─ 候補0件 ────────────────────────────► ISOLATED → MAIN: "PASSTHROUGH"
+  ├─ 候補0件 ────────────────────────────► status: 'passthrough' を返す
   │                                          MAIN worldが元のnavigator.credentials.getを呼ぶ
   │                                          （ネイティブ認証器/他拡張機能に処理を譲る。UIは開かない）
   │
   └─ 候補1件以上
-        │ chrome.windows.create（儀式ウィンドウ）を開き、専用portで接続を維持
-        │ ユーザーがカードを選択・確認クリック（カードは「loginエントリ名 + Passkey名」で表示）
+        │ chrome.windows.create（儀式ウィンドウ、webauthn.html?kind=get&requestId=...）を開く
+        │ 儀式ウィンドウはWEBAUTHN_RITUAL_GET_CONTEXTで候補一覧を取得し表示
+        │ ユーザーがカードを選択（カードは「loginエントリ名 + user表示名」で表示）
+        │ WEBAUTHN_RITUAL_DECISIONでcredentialIdを送信、儀式ウィンドウclose
         │ vault.api_webauthn_get_assertion(entry_id, custom_field_id, client_data_json)
         │   [秘密鍵はvault-core内のみで完結]
-        │ 儀式ウィンドウclose
         ▼
-      ISOLATED → MAIN: { credentialId, authenticatorData, signature, userHandle }（base64url）
+      status: 'ok', { credentialId, authenticatorData, signature, userHandle, clientDataJSON }（base64url）
+        ▼
+      [ISOLATED world] → [MAIN world] へpostMessageで中継
         ▼
       [MAIN world] PublicKeyCredential形状のオブジェクトを構築しPromiseをresolve
         ▼
       Webページ側のget()呼び出しがresolveされる
 ```
 
+儀式ウィンドウとService Workerの間は、「専用port維持」ではなく、儀式ウィンドウ自身が`chrome.runtime.sendMessage`でService Workerに問い合わせる方式にした（当初案からの簡略化）。Service Workerが儀式ウィンドウとの通信・ページからのリクエストへの応答を両方抱えている間は生きたままになるため、追加のport維持は行っていない。ウィンドウが閉じられた場合は`chrome.windows.onRemoved`で検知しcancelled扱いにする。
+
 ### `navigator.credentials.create()`（登録）
 
 基本構造は同じだが、以下が異なる:
 
-- Service Workerは`excludeCredentials`と既存`credential_id`の一致をUIを開く**前**にチェックし、一致すれば即座に（UIを一切開かず）reject。
-- 確認ダイアログでは「どの`login`エントリに紐付けるか」を決定する必要がある（3-7節参照）。
-- 候補選択UIの代わりに「{rp_name}のPasskeyを作成しますか？」の確認ダイアログを表示する。「別の方法を使う」を選ぶとMAIN worldに"PASSTHROUGH"を返し、元の`create()`を呼ばせる。
+- Service Workerは`excludeCredentials`と既存`credential_id`の一致をUIを開く**前**にチェックし、一致すれば即座に（UIを一切開かず）`InvalidStateError`でreject。
+- 儀式ウィンドウ（`kind=create`）は、`api_list_login_candidates`（オートフィルと同じeTLD+1マッチング）で見つかった既存`login`エントリの一覧 + 「新しいアイテムを作成」を選択肢として表示し、ユーザーが紐付け先を選ぶ（3-7節参照）。
 
 ## 3-7. 新規Passkey作成時の紐付け先エントリ決定
 
@@ -272,7 +277,7 @@ Service Worker background/webauthn.ts
 
 # Part 4: UI設計
 
-> **未実装（将来対応予定）**: ブラウザ拡張・デスクトップ・Androidいずれのクライアントコードも未変更。
+> **実装済み（一部トリム）**: 4-1〜4-3は実装済み。4-4は「種別選択の制限」「表示の読み取り専用化」のみ実装し、「エントリ詳細から能動的にPasskeyを作成するボタン」は未実装（Passkeyの作成は`navigator.credentials.create()`の横取り経由のみ）。4-5はエントリ詳細画面の読み取り専用表示のみ実装し、エントリ一覧のバッジ表示は未実装。デスクトップ・Androidは今回のスコープ外のまま。
 
 ## 4-1. 儀式ウィンドウ
 
@@ -298,16 +303,16 @@ CLAUDE.mdの制約（拡張ポップアップのisolated DOMではRadix UIのPor
 
 通常のカスタムフィールドはユーザーが種別を選び、自由にテキスト値を入力する（`docs/architecture.md`「既知タイプのカスタムフィールド編集: ○ タイプに依存しない」）。`passkey`はこの一般フローに次の特殊対応を加える。
 
-- **種別選択の制限**: 「カスタムフィールド追加」の種別選択に`passkey`を表示するのは`entry_type == "login"`のエントリのみ。他のエントリタイプ（`secure_note`等）では選択肢に出さない。
-- **入力フローの分岐**: `passkey`を選ぶと、通常のテキスト入力フォームの代わりに「このサイトの新しいPasskeyを作成」ボタンが表示され、WebAuthn作成儀式（3-6節の`create()`フロー相当）が起動する。ユーザーが直接テキストを入力して`passkey`フィールドを作ることはできない。
-- **表示の読み取り専用化**: 一度作成された`passkey`カスタムフィールドは、既存の「値」欄をテキストとして表示・編集させず、専用のカード表示（作成日、RP名、削除ボタンのみ）にする。既存の「既知タイプは全フィールド編集可能」という前提を初めて破るケースであり、実装時に個別対応が必要になる点をここに明記しておく。
+- **種別選択の制限（実装済み）**: `EntryForm.tsx`の「カスタムフィールド追加」種別一覧（`CUSTOM_FIELD_TYPE_ICONS`）に`passkey`を含めていないため、どのエントリタイプであっても手動でpasskeyフィールドを新規作成する経路自体が存在しない。当初案の「`entry_type == "login"`のみ選択肢に出す」という条件分岐は、選択肢自体を出さないことでより単純に実現している。
+- **入力フローの分岐（未実装）**: 「このサイトの新しいPasskeyを作成」ボタンをエントリ詳細/編集画面に置く案は見送った。Passkeyの作成は`navigator.credentials.create()`の横取り（Part 3）経由のみで、拡張のUIから能動的に開始する手段はない。
+- **表示の読み取り専用化（実装済み）**: 既存の`passkey`カスタムフィールドは、`EntryForm.tsx`の「値」欄をテキスト入力の代わりに読み取り専用サマリ（rp_id等をJSONから抽出して表示）にし、`EntryList.tsx`の詳細表示では専用コンポーネント`PasskeyCustomFieldDisplay.tsx`（rp_name/rp_id、user_nameのみ表示、削除は既存のカスタムフィールド削除ボタンをそのまま使用）を使う。「既知タイプは全フィールド編集可能」という前提を初めて破る例外。
 
 ## 4-5. エントリ一覧・詳細画面への表示対応
 
-新規`EntryType`を追加しないため、`EntryTypeIcon.tsx`等の既存のエントリ種別表示コンポーネントへの変更は不要。代わりに以下が必要になる。
+新規`EntryType`を追加しないため、`EntryTypeIcon.tsx`等の既存のエントリ種別表示コンポーネントへの変更は不要。
 
-- `EntryCard.tsx`/`EntryListPanel.tsx`: `login`エントリの`custom_fields`に`field_type == "passkey"`が含まれる場合、Passkey対応であることを示す小さなバッジ/アイコンを追加表示する。
-- `login`エントリの詳細画面: `custom_fields`内の`passkey`エントリを「Passkey」セクションとしてグルーピング表示し、4-4節の専用カード表示を適用する。
+- `login`エントリの詳細画面（実装済み）: `custom_fields`内の`passkey`エントリを`PasskeyCustomFieldDisplay.tsx`で表示する（4-4節）。
+- `EntryCard.tsx`/`EntryListPanel.tsx`でのバッジ表示（未実装）: 一覧表示用の`EntryRow`/`EntrySummary`（Rust側DTO）が`custom_fields`を含まない設計のため、バッジを付けるには一覧取得APIの拡張が必要になり、今回のスコープでは見送った。
 
 ---
 
@@ -351,47 +356,53 @@ CLAUDE.mdの制約（拡張ポップアップのisolated DOMではRadix UIのPor
 
 既存の`sha2`（ハッシュ）、`rand`+`getrandom`（jsフィーチャ、鍵・credential ID用の乱数）、`base64`はそのまま流用する。
 
-## 7-2. 新規ファイル一覧
+## 7-2. 新規ファイル一覧（実装済み）
 
 ### vault-core
 
-> **実装済み**: `src/models/passkey_data.rs`（Part 2-2参照。`PasskeyFieldData`構造体とJSON変換）と、`src/models/entry.rs`への検索除外リグレッションテスト追加。以下の表は残り（未実装）の新規ファイル。
+| ファイル | 内容 |
+|---|---|
+| `src/models/passkey_data.rs` | `PasskeyFieldData`構造体とJSON変換（前回タスクで実装済み） |
+| `src/webauthn/mod.rs` | 鍵生成、authenticatorData/attestationObject構築、COSE_Key構築、ECDSA署名、固定AAGUID定数（`crypto/`と並列のトップレベルモジュール） |
+| `src/vault/webauthn.rs` | `UnlockedVault`への`find_passkey_credentials`/`create_passkey_credential`/`get_passkey_assertion`。`custom_fields`の読み書きはここに集約し、`src/webauthn/mod.rs`（暗号処理本体）とは責務を分離（当初案からの変更） |
+| `src/api/webauthn.rs` | `VaultManager`への`api_webauthn_find_credentials`/`api_webauthn_create_credential`/`api_webauthn_get_assertion`（`Result<T, String>`を返すAPI層の既存慣習に従う） |
 
-| 新規ファイル | 対応する既存ファイル | 内容 |
-|---|---|---|
-| `src/webauthn/mod.rs` | `src/crypto/encryption.rs`と並列 | 鍵生成、authenticatorData/attestationObject構築、COSE_Key構築、ECDSA署名、固定AAGUID定数（`PasskeyFieldData`は`src/models/passkey_data.rs`から参照する） |
-| `src/api/webauthn.rs` | `src/api/entries.rs`と並列 | `api_webauthn_find_credentials`（`login`エントリのcustom_fieldsを横断的に走査、非機密候補一覧を返す）、`api_webauthn_create_credential`（対象entry_id指定 or 新規login作成 + `passkey`カスタムフィールド追加）、`api_webauthn_get_assertion`（entry_id + custom_field_id指定で署名） |
-| `tests/webauthn_test.rs` | 既存`tests/`配下の統合テスト群と並列 | バイト単位のラウンドトリップ・ゴールデンベクタテスト |
-
-**当初案からの変更点**: `src/models/entry.rs`（`EntryType`追加）・`src/models/typed_value.rs`（`TypedValue::Passkey`追加）への変更は**不要**になった。既存の`CustomField`検索除外ロジック（`entry.rs`）への変更も不要（Part 2-4参照）。
+`src/error.rs`に`VaultError::WebAuthnError(String)`を追加。`src/models/entry.rs`（`EntryType`追加）・`src/models/typed_value.rs`（`TypedValue::Passkey`追加）・既存の`CustomField`検索除外ロジックへの変更は不要だった（Part 2-4参照）。バイト単位のゴールデンベクタ・署名検証テストは独立した`tests/webauthn_test.rs`ではなく、`src/webauthn/mod.rs`/`src/vault/webauthn.rs`内の`#[cfg(test)] mod tests`に実装した（このリポジトリの既存モジュールと同じテスト配置パターン）。
 
 ### extension/wasm-bridge
 
-`src/lib.rs`に、上記3関数のwasm-bindgenラッパーを追記する。
+`src/lib.rs`に`api_webauthn_find_credentials`/`api_webauthn_create_credential`/`api_webauthn_get_assertion`の3つの`#[wasm_bindgen]`ラッパーを追加。
 
 ### extension（TypeScript）
 
-| 新規ファイル | 対応する既存ファイル | 内容 |
-|---|---|---|
-| `src/content/webauthn-main.ts` | （新規カテゴリ） | MAIN world、`navigator.credentials.create/get`のオーバーライド、タイムアウト管理、requestIdマップ |
-| `src/content/webauthn-bridge.ts` | `src/content/main.ts`のメッセージ中継部分と類似 | postMessage⇄`chrome.runtime.sendMessage`中継、独立したorigin再検証 |
-| `src/background/webauthn.ts` | `src/background/autofill.ts`と並列 | `WEBAUTHN_*`メッセージハンドラ、rp_id suffix検証、紐付け先エントリ決定（3-7節）、儀式ウィンドウ管理 |
-| `src/popup/webauthn.html` + `webauthn-main.tsx` | `src/background/offscreen.html`（別HTMLエントリの前例） | 儀式専用ウィンドウのエントリポイント |
-| `src/popup/screens/webauthn/CreateConfirm.tsx` | `EntryTypeSelectDialog.tsx`（Radix Dialog利用実績） | 新規作成確認画面（紐付け先エントリ選択含む） |
-| `src/popup/screens/webauthn/SelectCredential.tsx` | `EntryCard.tsx`/`EntryListPanel.tsx` | 複数候補選択画面 |
+| ファイル | 内容 |
+|---|---|
+| `public/webauthn-main-injected.js` | MAIN world、`navigator.credentials.create/get`のオーバーライド、90秒タイムアウト管理。crxのビルドパイプラインを経由しない単一プレーンJSファイル（3-2節参照） |
+| `vite-inject-webauthn-main.ts` | 上記ファイルのcontent_scripts宣言をビルド後に`dist/manifest.json`へ注入するVite Plugin（`vite.config.ts`/`vite.config.firefox.ts`両方から使用） |
+| `src/content/webauthn-bridge.ts` | ISOLATED world、postMessage⇄`chrome.runtime.sendMessage`中継、独立したorigin/hostname取得 |
+| `src/background/webauthn.ts` | `WEBAUTHN_*`メッセージハンドラ、rp_id検証、紐付け先エントリ決定、儀式ウィンドウ管理（`chrome.windows.create`/`onRemoved`） |
+| `src/shared/webauthn-messages.ts` | MAIN↔ISOLATED↔Service Worker↔儀式ウィンドウ間のメッセージ型定義一式 |
+| `src/shared/webauthn-codec.ts` | BufferSource⇄base64url変換ヘルパー |
+| `src/popup/webauthn.html` + `webauthn-main.tsx` | 儀式ウィンドウのエントリポイント（`offscreen.html`と同じVite別エントリのパターン） |
+| `src/popup/screens/webauthn/WebauthnRitualApp.tsx` | requestId/kindをURLクエリから読み、コンテキスト取得→`CreateConfirm`/`SelectCredential`への振り分けを行うルート |
+| `src/popup/screens/webauthn/CreateConfirm.tsx` | 新規作成確認画面（紐付け先エントリ選択、またはRadioボタンでの「新しいアイテムを作成」選択） |
+| `src/popup/screens/webauthn/SelectCredential.tsx` | 複数候補選択画面 |
+| `src/popup/components/entries/PasskeyCustomFieldDisplay.tsx` | エントリ詳細でのPasskey読み取り専用表示（`TotpCustomFieldDisplay.tsx`と並列） |
 
-既存ファイルへの変更: `manifest.json`/`manifest.firefox.json`（content_scripts追加、Firefox `strict_min_version`引き上げ）、`src/background/index.ts`（`WEBAUTHN_`プレフィックス委譲を`AUTOFILL_`/`DEV_MODE_`と同パターンで追加）、`src/shared/messages.ts`（`WEBAUTHN_*`メッセージ型定義）、`EntryCard.tsx`/`EntryListPanel.tsx`（Passkeyバッジ表示）、`EntryForm.tsx`（`passkey`カスタムフィールドの種別制限・専用表示、4-4節）、i18nロケールファイル。
+既存ファイルへの変更: `manifest.json`/`manifest.firefox.json`（content_scripts追加、Firefox `strict_min_version`を128に引き上げ）、`vite.config.ts`/`vite.config.firefox.ts`（`webauthn.html`エントリ追加）、`src/background/index.ts`（`WEBAUTHN_`プレフィックス委譲、`WasmApi`インターフェース拡張、`initWebauthn`呼び出し）、`src/shared/etld.ts`（`isValidRpId`追加）、`src/shared/types.ts`（`CustomFieldType`に`'passkey'`追加、`AppSettings`に`passkeyEnabled`追加）、`src/popup/components/entries/EntryForm.tsx`（`passkey`の種別選択除外・読み取り専用表示、4-4節）、`src/popup/screens/entries/EntryList.tsx`（`PasskeyCustomFieldDisplay`の組み込み）、`src/popup/screens/settings/Settings.tsx`（「パスキー対応（ベータ）」トグル）、i18nロケールファイル（`en.json`/`ja.json`）、`test-pages/pages/webauthn.html`（手動テストページ）。
+
+`EntryCard.tsx`/`EntryListPanel.tsx`（一覧でのバッジ表示）、`src/shared/messages.ts`への`WEBAUTHN_*`型追加は見送った（4-5節、7-2節参照）。
 
 ---
 
 # Part 8: 段階的リリース
 
-| フェーズ | 範囲 | 成果物 |
+| フェーズ | 範囲 | 状態 |
 |---|---|---|
-| **Phase 0（スパイク・検証）** | 実装なし。(a) manifest宣言`world:MAIN`と`chrome.scripting.registerContentScripts`の信頼性比較、(b) `PublicKeyCredential`ライクなオブジェクトが実サイト（webauthn.io、GitHub等）のJSで`instanceof`チェック等に耐えるかの検証、(c) ページCSPとの相互作用検証 | 検証結果メモ。以降のフェーズの設計を必要に応じて修正 |
-| **Phase 1** | vault-coreの暗号処理+`login`エントリへの`passkey`カスタムフィールド読み書きAPIのみ。UI・拡張側の配線なし | `src/webauthn/`モジュール、`api/webauthn.rs`の3関数、Rustユニットテスト（バイト単位ゴールデンベクタ）。**うちデータ構造（`PasskeyFieldData`、`src/models/passkey_data.rs`）のみ実装済み。鍵生成・署名・API層は未実装** |
-| **Phase 2** | wasm-bridgeラッパー、MAIN/ISOLATED注入、Service Workerのメッセージハンドリングと儀式ウィンドウ管理、最小限の儀式UI（作成確認・紐付け先選択・候補選択）。設定画面に「Passkey対応（β）」トグルを追加しデフォルトOFFで段階的に有効化 | manifest変更、`webauthn-main.ts`/`webauthn-bridge.ts`/`background/webauthn.ts`/儀式用ポップアップ画面。doc-statusを`partial`に更新 |
-| **Phase 3** | `login`エントリ一覧・詳細・編集画面でのPasskey表示対応（バッジ・専用カード表示・i18n）、カスタムフィールド追加UIの種別制限対応 | UI touch point一式。doc-statusを`implemented`に更新 |
-| **Phase 4（将来・任意・スコープ外）** | Conditional Mediation対応、Bitwarden JSON export/importでのfido2Credentials互換、デスクトップ/Android側のUI対応 | 本ドキュメントでは設計しない |
+| **Phase 0（スパイク・検証）** | (a) manifest宣言`world:MAIN`のビルド反映確認、(b) 実サイトでの動作確認 | (a) 確認済み（ビルド成果物の`dist/manifest.json`に`world: "MAIN"`が正しく出力される）。(b) 未実施 — 未パッケージ拡張機能を実ブラウザに読み込む自動化手段がこの開発環境になく、**ユーザーによる手動確認待ち**（`extension/test-pages/pages/webauthn.html`を使用） |
+| **Phase 1** | vault-coreの暗号処理+`login`エントリへの`passkey`カスタムフィールド読み書きAPI | **実装済み**。`src/webauthn/mod.rs`、`src/vault/webauthn.rs`、`src/api/webauthn.rs`。Rustユニットテスト（バイト単位ゴールデンベクタ・署名検証・vault層の一連の動作）全て通過 |
+| **Phase 2** | wasm-bridgeラッパー、MAIN/ISOLATED注入、Service Workerのメッセージハンドリングと儀式ウィンドウ管理、儀式UI（作成確認・紐付け先選択・候補選択）。設定画面に「Passkey対応（ベータ）」トグルを追加しデフォルトOFF | **実装済み**（Chrome/Firefox両方のビルド確認・型チェック・lint・vitest通過）。実サイトでのE2E動作確認はPhase 0と同様ユーザー確認待ち |
+| **Phase 3** | `login`エントリ詳細画面でのPasskey表示対応、カスタムフィールド追加UIの種別制限対応 | **部分的に実装**。エントリ詳細の読み取り専用表示・種別選択からの除外は実装済み。エントリ一覧でのバッジ表示、エントリ詳細から能動的にPasskeyを作成するボタンは未実装（4-4, 4-5節参照） |
+| **Phase 4（将来・任意・スコープ外）** | Conditional Mediation対応、Bitwarden JSON export/importでのfido2Credentials互換、デスクトップ/Android側のUI対応、エントリ一覧のバッジ表示 | 本ドキュメントでは設計しない |
 
-Phase 2以降も、`mediation: "conditional"`が指定されたリクエストは常にオリジナル関数へパススルーする（Conditional UIはPhase 4の明示的な非対応スコープ）。
+`mediation: "conditional"`が指定されたリクエストは常にオリジナル関数へパススルーする（Conditional UIはPhase 4の明示的な非対応スコープ、実装済み）。

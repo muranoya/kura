@@ -4,6 +4,7 @@ mod labels;
 mod locked;
 mod security;
 mod state;
+pub(crate) mod webauthn;
 
 use crate::crypto::Dek;
 use crate::models::VaultMeta;

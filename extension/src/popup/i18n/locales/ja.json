@@ -248,7 +248,8 @@
       "totpFieldPlaceholder": "otpauth:// URI または Base32 シークレット",
       "selectFieldType": "フィールドの種類を選択",
       "addField": "フィールドを追加",
-      "generatePassword": "パスワード生成"
+      "generatePassword": "パスワード生成",
+      "passkeyFor": "{{rpId}} のパスキー"
     },
     "customFieldTypes": {
       "text": "テキスト",
@@ -256,7 +257,8 @@
       "email": "メール",
       "url": "URL",
       "phone": "電話番号",
-      "totp": "ワンタイムパスワード"
+      "totp": "ワンタイムパスワード",
+      "passkey": "パスキー"
     },
     "actions": {
       "favorite": "お気に入り",
@@ -393,6 +395,8 @@
       "language": "言語",
       "autoLock": "自動ロック",
       "clipboardClear": "クリップボード自動クリア",
+      "passkeyEnabled": "パスキー対応（ベータ）",
+      "passkeyEnabledDesc": "このサイトのパスキー作成・サインインリクエストにkuraが応答できるようにします。デフォルトはOFFです。",
       "autoLockOptions": {
         "disabled": "無効",
         "1min": "1分",
@@ -553,6 +557,16 @@
     },
     "totpDisplay": {
       "expiresIn": "あと{{seconds}}秒"
+    }
+  },
+  "webauthn": {
+    "ritual": {
+      "invalidRequest": "このリクエストは無効か、有効期限が切れています。",
+      "getTitle": "パスキーでサインイン",
+      "createTitle": "パスキーを作成",
+      "chooseEntry": "どのアイテムにこのパスキーを保存しますか？",
+      "createNewEntry": "新しいアイテムを作成",
+      "confirm": "続ける"
     }
   }
 }

@@ -25,6 +25,7 @@ import type { Entry, EntryRow, EntryType, SortConfig } from '../../../shared/typ
 import * as commands from '../../commands'
 import EntryCard from '../../components/entries/EntryCard'
 import EntryListPanel from '../../components/entries/EntryListPanel'
+import PasskeyCustomFieldDisplay from '../../components/entries/PasskeyCustomFieldDisplay'
 import TotpCustomFieldDisplay from '../../components/entries/TotpCustomFieldDisplay'
 import { EmptyState } from '../../components/layout/EmptyState'
 import { SyncActions } from '../../components/layout/SyncActions'
@@ -746,6 +747,8 @@ function EntryDetailPane({
             (field: { id: string; name: string; value: string; fieldType: string }) =>
               field.fieldType === 'totp' ? (
                 <TotpCustomFieldDisplay key={field.id} label={field.name} value={field.value} />
+              ) : field.fieldType === 'passkey' ? (
+                <PasskeyCustomFieldDisplay key={field.id} label={field.name} value={field.value} />
               ) : (
                 <PaneFieldDisplay
                   key={field.id}
