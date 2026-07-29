@@ -3,6 +3,35 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!--
+        Android 11 (API 30)以降のパッケージ可視性制限により、ここで可視性を宣言していない
+        パッケージはPackageManager.getPackageInfo()が(インストール済みでも)
+        NameNotFoundExceptionを返す。PackageDomainMap.ktの署名証明書検証
+        （GET_SIGNING_CERTIFICATES）が機能するために必須。
+
+        個別パッケージ名を列挙する<package>方式ではなく、ランチャーアイコンを持つ
+        （ACTION_MAIN/CATEGORY_LAUNCHERのintent-filterを宣言する）アプリ全般に
+        可視性を与える<intent>方式を採用している。理由:
+        - assets/package_domains.jsonに新しいパッケージを追加するたびにここも
+          更新するという同期の手間が要らない
+        - 将来、パスワードエントリにユーザーが任意のインストール済みアプリを
+          紐付けられるようにする場合、対象パッケージ名を事前に列挙できないため
+          <package>方式では原理的に対応できない
+        - QUERY_ALL_PACKAGES権限（Google Playで特別審査対象となる機微な権限）を
+          使わずに済む
+
+        なお、ACTION_MAIN/CATEGORY_LAUNCHERはほぼ全てのアプリが宣言しているため、
+        「フィンガープリンティング対策」としての実効性はQUERY_ALL_PACKAGESとほぼ
+        変わらない、という点は把握した上での採用である。kuraはOSSかつバックエンド・
+        テレメトリを持たないため、取得した情報が外部に送信される経路自体が存在しない。
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
         android:name=".KuraApplication"
         android:allowBackup="false"

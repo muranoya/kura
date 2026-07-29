@@ -151,6 +151,11 @@ default: help
 	echo "🔌 Starting extension dev server..."
 	cd {{EXTENSION_DIR}} && pnpm run dev
 
+# Android - package_domains.jsonの署名証明書fingerprintをassetlinks.jsonから更新
+@update-android-package-fingerprints:
+	echo "🔐 Updating package fingerprints from assetlinks.json..."
+	node scripts/update-package-fingerprints.mjs
+
 # Android app - Generate icons from SVG
 @_android-icons:
 	echo "🎨 Generating Android icons..."
@@ -495,6 +500,7 @@ test-manual-autofill:
 	echo "    just build-android-jni         - Build Rust native libraries only"
 	echo "    just run-android               - Build & run on emulator"
 	echo "    just run-android-device        - Build & install on USB device"
+	echo "    just update-android-package-fingerprints - Update package_domains.json cert fingerprints"
 	echo ""
 	echo "  🖥️  Desktop:"
 	echo "    just dev-desktop              - Start desktop app in dev mode (hot reload)"

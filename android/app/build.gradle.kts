@@ -13,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "net.meshpeak.kura"
-        minSdk = 26
+        minSdk = 34
         targetSdk = 35
         versionCode = 1
         versionName = appVersion
