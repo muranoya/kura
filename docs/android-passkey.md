@@ -5,9 +5,7 @@
 
 ## 1-1. 目的
 
-Androidアプリを、ウェブサイト（ブラウザ経由）およびネイティブアプリが要求するPasskey（WebAuthn discoverable credential）の作成・認証に応答できる**Credential Provider**として振る舞わせる。データモデル・暗号処理は`docs/webauthn-passkey.md`（ブラウザ拡張向け、doc-status: `implemented`）で確立済みのものをそのまま再利用し、本ドキュメントはAndroid固有のプラットフォーム統合（`CredentialProviderService`実装、JNI連携、UI設計）のみを扱う。
-
-`docs/webauthn-passkey.md` 1-1節に「Androidクライアントでの`create()`/`get()`対応は将来追加予定だが本ドキュメントのスコープ外。追加する際は別途Android向け設計ドキュメントを起こす想定」と明記されており、本ドキュメントがそれに該当する。
+Androidアプリを、ウェブサイト（ブラウザ経由）およびネイティブアプリが要求するPasskey（WebAuthn discoverable credential）の作成・認証に応答できる**Credential Provider**として振る舞わせる。データモデル・暗号処理はウェブブラウザ拡張で確立済みのものをそのまま再利用し、本ドキュメントはAndroid固有のプラットフォーム統合（`CredentialProviderService`実装、JNI連携、UI設計）のみを扱う。
 
 **対応する機能:**
 
@@ -19,7 +17,7 @@ Androidアプリを、ウェブサイト（ブラウザ経由）およびネイ�
 
 **対応しない機能（スコープ外として明記）:**
 
-- パスワードクレデンシャル（`BeginGetPasswordOption`/`BeginCreatePasswordCredentialRequest`）への対応。パスワードの自動入力は既存の`KuraAutofillService`（`docs/android-autofillservice.md`）が引き続き担当し、`CredentialProviderService`は`TYPE_PUBLIC_KEY_CREDENTIAL`（Passkey）のみを扱う。2つの仕組みを1つのサービスに統合しない（詳細はPart 2-3）
+- パスワードクレデンシャル（`BeginGetPasswordOption`/`BeginCreatePasswordCredentialRequest`）への対応。パスワードの自動入力は既存の`KuraAutofillService`が引き続き担当し、`CredentialProviderService`は`TYPE_PUBLIC_KEY_CREDENTIAL`（Passkey）のみを扱う。2つの仕組みを1つのサービスに統合しない
 - Conditional Mediation相当（Android側では「自動サジェスト」に近い挙動だが、`BeginGetCredentialRequest`の扱いとして`CredentialEntry`一覧を返す通常フローと実質的に同じであるため、特別な考慮は不要。ただし初期実装では動作確認を優先し、細かな挙動チューニングは将来対応とする）
 - 新規ログイン保存提案（Passkeyには`onSaveRequest`に相当する概念自体が存在しないため、そもそも非該当）
 
@@ -32,11 +30,11 @@ AndroidのCredential Manager（`androidx.credentials`、Android 14 / API 34で�
 1. **Query（Begin）フェーズ**: システムが全ての登録済みProviderに`onBeginCreateCredentialRequest`/`onBeginGetCredentialRequest`をブロードキャストし、各Providerは（実際の復号を伴わず）「候補が何件あるか」を`CreateEntry`/`CredentialEntry`のリストとして返す。システムはこれらを集約し、ユーザーに選択UI（システム標準のボトムシート）を提示する。
 2. **Selectionフェーズ**: ユーザーがkuraの候補を選択すると、Query時に紐付けた`PendingIntent`が発火し、kuraアプリ自身のActivityが起動する。ここで初めて実際の復号・生体認証・vault-core呼び出しを行い、結果を`setResult()`で返す。
 
-この2段階モデルにより、Query時点ではまだユーザーがkuraを選ぶかどうか分からないため、他社Providerの候補と横並びで表示される段階では機密情報に触れない設計が要求される。ブラウザ拡張の「候補0件ならUIを一切開かない」（`webauthn-passkey.md` Part 4-3）に相当するサイドチャネル配慮は、Androidでは「Query時点でロック中でも候補件数の概算を返さざるを得ない」という制約下でどう扱うかがPart 3-2の論点になる。
+この2段階モデルにより、Query時点ではまだユーザーがkuraを選ぶかどうか分からないため、他社Providerの候補と横並びで表示される段階では機密情報に触れない設計が要求される。ブラウザ拡張の「候補0件ならUIを一切開かない」に相当するサイドチャネル配慮は、Androidでは「Query時点でロック中でも候補件数の概算を返さざるを得ない」という制約下でどう扱うかがPart 3-2の論点になる。
 
 ## 1-3. vault-core側は実装済み、Android側はゼロから
 
-`vault-core/src/api/webauthn.rs`に以下の3つの公開APIが既に実装されており、ブラウザ拡張（`extension/wasm-bridge`経由）で使われている。Android側の作業は、これらのAPIをJNIで公開し、Credential Manager統合のプラットフォームコードを新設することに限定される。**vault-core自体への変更は原則不要。**
+vault-coreに以下の3つの公開APIが既に実装されており、ブラウザ拡張で使われている。Android側の作業は、これらのAPIをJNIで公開し、Credential Manager統合のプラットフォームコードを新設することに限定される。**vault-core自体への変更は原則不要。**
 
 | API | 役割 |
 |---|---|
@@ -44,7 +42,7 @@ AndroidのCredential Manager（`androidx.credentials`、Android 14 / API 34で�
 | `api_webauthn_create_credential(entry_id, rp_id, rp_name, user_handle, user_name, user_display_name, exclude_credential_ids)` | 新規Passkeyを生成し`login`エントリに追加。`entry_id`が`None`なら新規エントリ作成 |
 | `api_webauthn_get_assertion(entry_id, custom_field_id, client_data_json)` | 既存Passkeyで認証assertionに署名。`sign_count`を持たせない設計のためエントリ更新は行わない |
 
-データ構造（`PasskeyFieldData`）・`sign_count`固定0の設計判断・`public_key`非保持の理由は全て`docs/webauthn-passkey.md` Part 2で確定済みであり、Android版でもそのまま踏襲する。ここで再検討はしない。
+データ構造（`PasskeyFieldData`）・`sign_count`固定0の設計判断・`public_key`非保持の理由は全てウェブブラウザ拡張で確定済みであり、Android版でもそのまま踏襲する。
 
 # Part 2: 全体アーキテクチャ
 
@@ -78,7 +76,7 @@ dependencies {
 </service>
 ```
 
-`android.permission.BIND_CREDENTIAL_PROVIDER_SERVICE`はシステムのみがバインド可能にするための必須宣言であり、`KuraAutofillService`が`BIND_AUTOFILL_SERVICE`を要求するのと同じ位置づけ（`docs/android-autofillservice.md` 2-1-1）。
+`android.permission.BIND_CREDENTIAL_PROVIDER_SERVICE`はシステムのみがバインド可能にするための必須宣言であり、`KuraAutofillService`が`BIND_AUTOFILL_SERVICE`を要求するのと同じ位置づけ。
 
 **能力宣言（`android/app/src/main/res/xml/credential_provider.xml`、新設）:**
 
@@ -91,15 +89,16 @@ dependencies {
 </credential-provider>
 ```
 
-`TYPE_PASSWORD_CREDENTIAL`は宣言しない（1-1節、Part 2-3参照）。
+`TYPE_PASSWORD_CREDENTIAL`は宣言しない。
 
-## 2-2. 最小APIレベルとフィーチャーゲーティング
+## 2-2. 最小APIレベルの引き上げ
 
-`CredentialProviderService`はAndroid 14（API 34）で導入された仕組みであり、現在のkuraの`minSdk = 26`（`android/app/build.gradle`）を下回る。既存の`KuraAutofillService`（API 26で動作）とは異なり、**Passkeyプロバイダ機能はAPI 34未満のデバイスでは提供できない。**
+`CredentialProviderService`はAndroid 14（API 34）で導入された仕組みであり、現在のkuraの`minSdk = 26`（`android/app/build.gradle.kts`）を下回る。API34未満向けにフィーチャーゲーティングで両立させる案もあったが、**`minSdk`自体を34に引き上げる**方針とする。Android 14以降のシェアが既に過半数に達していること、kuraがそもそも少数ユーザー向けのアプリであることから、フィーチャーゲーティングの実装・テストコストをかけてまでAPI26〜33端末を救う必要はないと判断した。
 
-- `AndroidManifest.xml`の`<service>`宣言自体はAPI34未満の端末にインストールされても害はない（システムがCredential Manager機構自体を持たないため単に呼ばれないだけ）。`targetApi`属性の明示は不要（Lint対応として`tools:targetApi="34"`をservice要素に付与する）
-- アプリ内の設定画面（Part 7）は`Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE`でガードし、API34未満では「このOSバージョンではPasskey機能は利用できません」の案内に差し替える
-- `minSdk`自体を34に引き上げることはしない。オートフィル機能はAPI26以上の全端末で提供し続ける
+- `minSdk`はモジュール全体に効く設定のため、`KuraAutofillService`を含むkuraアプリ全体がAndroid 14（API 34）未満の端末をサポート対象外とする
+- `AndroidManifest.xml`の`<service>`宣言に`tools:targetApi="34"`を付与する必要はない（`minSdk`自体が34になるため、Lintの`NewApi`警告はそもそも発生しない）
+- アプリ内の設定画面（Part 7）を`Build.VERSION.SDK_INT`で分岐させる必要はない。API34未満の端末はインストール自体ができないため、「このOSバージョンでは利用できません」という代替UIは不要
+- **`docs/android-autofillservice.md`との整合**：同ドキュメントの「`minSdk 26`のため、AutofillFramework自体の可用性チェック（バージョン分岐）は不要」という記述（`doc-status: implemented`）は、この変更が実装され`minSdk`が実際に34へ上がった時点で古くなる。実装時にはそちらの記述も同時に更新すること（本ファイルが`design`ステータスの間は対象外）
 
 ## 2-3. 既存AutofillServiceとの役割分担
 
@@ -188,11 +187,11 @@ setResult(RESULT_OK, result); finish()
 
 ## 3-3. Query時点での「アンロック済みなら候補を列挙する」設計判断
 
-ブラウザ拡張版（`webauthn-passkey.md` Part 4-3）は「候補0件ならUIを一切開かない」というサイドチャネル対策を取っているが、これは拡張機能が候補の有無を自分だけで完結して判断し、ポップアップウィンドウの開閉そのものを制御できたことに依る。Androidの2段階モデルでは、**Query（Begin）フェーズの時点でシステムに`CredentialEntry`の有無を返す必要があり、この時点の応答自体がシステム標準UIに反映される**ため、「候補があるかないか」という情報はQueryフェーズで既にシステムに渡さざるを得ない。
+ブラウザ拡張版は「候補0件ならUIを一切開かない」というサイドチャネル対策を取っているが、これは拡張機能が候補の有無を自分だけで完結して判断し、ポップアップウィンドウの開閉そのものを制御できたことに依る。Androidの2段階モデルでは、**Query（Begin）フェーズの時点でシステムに`CredentialEntry`の有無を返す必要があり、この時点の応答自体がシステム標準UIに反映される**ため、「候補があるかないか」という情報はQueryフェーズで既にシステムに渡さざるを得ない。
 
-したがって、Android版ではブラウザ拡張と同水準のサイドチャネル遮断は実現できない（Androidプラットフォームの制約であり、kura固有の設計不備ではない）。Query時点で候補一覧を返すこと自体は`api_webauthn_find_credentials`が秘密鍵を含まない情報のみを返す設計（Part 1-3の表）であるため、露出する情報は「kuraがこのRP向けのPasskeyを持っているか、いくつ持っているか」に限られ、秘密鍵や署名結果が漏れることはない。
+したがって、Android版ではブラウザ拡張と同水準のサイドチャネル遮断は実現できない（Androidプラットフォームの制約であり、kura固有の設計不備ではない）。Query時点で候補一覧を返すこと自体は`api_webauthn_find_credentials`が秘密鍵を含まない情報のみを返す設計であるため、露出する情報は「kuraがこのRP向けのPasskeyを持っているか、いくつ持っているか」に限られ、秘密鍵や署名結果が漏れることはない。
 
-ロック中は候補の有無を判定するために復号が必要なため、Query時点では常に`AuthenticationAction`のみを返し（候補が実際にあるかどうかに関わらず）、アンロック後のSelectionフェーズで初めて候補を確定する。これはブラウザ拡張の「ロック中はcreate/getいずれも`{kind:'locked'}`で儀式ウィンドウを先に開く」（`webauthn-passkey.md` 3-6）と同じ考え方であり、「vaultがロック中かどうか」はAuthenticationActionの提示から推測されうるが、「ロック中のvaultがこのRP用のPasskeyを持っているか」はアンロックしない限り秘匿される。
+ロック中は候補の有無を判定するために復号が必要なため、Query時点では常に`AuthenticationAction`のみを返し（候補が実際にあるかどうかに関わらず）、アンロック後のSelectionフェーズで初めて候補を確定する。これはブラウザ拡張の「ロック中はcreate/getいずれも`{kind:'locked'}`で儀式ウィンドウを先に開く」と同じ考え方であり、「vaultがロック中かどうか」はAuthenticationActionの提示から推測されうるが、「ロック中のvaultがこのRP用のPasskeyを持っているか」はアンロックしない限り秘匿される。
 
 # Part 4: Origin検証・呼び出し元判定
 
@@ -204,15 +203,23 @@ Chrome等の主要ブラウザは、Android OS（またはGoogle Play Services�
 val origin: String? = callingAppInfo.getOrigin(privilegedAllowlistJson)
 ```
 
-`privilegedAllowlistJson`はGoogleが公開する既知ブラウザの許可リスト（パッケージ名 + 署名指紋 + 対応オリジン形式）であり、kura側でChromeやFirefoxを個別に許可申請する必要はない（1Password・Bitwarden等の実装と同様）。既存方針（`feedback_external_assets`：外部データソースはassetsに配置しビルド時DLは避ける）に倣い、このJSONは`android/app/src/main/assets/gpm_privileged_allowlist.json`としてリポジトリにバンドルし、PSL（`assets/`）と同様に手動で定期更新する運用とする。
+`privilegedAllowlistJson`はGoogleが公開する既知ブラウザの許可リスト（パッケージ名 + 署名指紋 + 対応オリジン形式）であり、kura側でChromeやFirefoxを個別に許可申請する必要はない（1Password・Bitwarden等の実装と同様）。Google Password Manager自身が`getOrigin()`検証に使っているのと同じリストが以下のURLで公開されている。
 
-**注意：kura自身をこのallowlistに載せる必要はない。** allowlistは「どのブラウザ／呼び出し元アプリを信頼してWebオリジンを代弁させるか」をシステム側が判断するためのものであり、kuraは受け取る側（Provider）であるため対象外。Digital Asset Links（`assetlinks.json`）もこの経路では不要（`docs/android-autofillservice.md` 1-3で触れているassetlinks.json不採用の経緯とは別の理由だが、結論として今回もassetlinks.jsonは不要という点で一致する）。
+```
+https://www.gstatic.com/gpm-passkeys-privileged-apps/apps.json
+```
+
+（[Android公式ドキュメント](https://developer.android.com/identity/sign-in/credential-provider)「Obtain an allowlist of privileged apps」節で案内されているもの）
+
+既存方針（`feedback_external_assets`：外部データソースはassetsに配置しビルド時DLは避ける）に倣い、このJSONを`android/app/src/main/assets/gpm_privileged_allowlist.json`としてリポジトリにバンドルし、PSL（`assets/`）と同様に上記URLから手動で定期更新する運用とする。
+
+**注意：kura自身をこのallowlistに載せる必要はない。** allowlistは「どのブラウザ／呼び出し元アプリを信頼してWebオリジンを代弁させるか」をシステム側が判断するためのものであり、kuraは受け取る側（Provider）であるため対象外。Digital Asset Links（`assetlinks.json`）もこの経路では不要。
 
 ## 4-2. ネイティブアプリ発オリジンの扱い
 
-`getOrigin()`がnull（呼び出し元がallowlistに載っていない一般アプリ、つまり大半のネイティブアプリ）の場合、`CallingAppInfo.signingInfo`から署名ベースのorigin（`android:apk-key-hash:<base64>`形式）を算出できるが、これはkuraのPasskeyデータの`rp_id`（ドメイン名前提、Part 1-3参照）とは形式が一致せず、そのままでは既存Passkeyと照合できない。
+`getOrigin()`がnull（呼び出し元がallowlistに載っていない一般アプリ、つまり大半のネイティブアプリ）の場合、`CallingAppInfo.signingInfo`から署名ベースのorigin（`android:apk-key-hash:<base64>`形式）を算出できるが、これはkuraのPasskeyデータの`rp_id`（ドメイン名前提）とは形式が一致せず、そのままでは既存Passkeyと照合できない。
 
-ネイティブアプリ自身がRPとしてPasskeyを要求するケース（例：銀行アプリが自社Webサイトと同じアカウントのPasskeyでログインさせたい場合）に対応するため、既存の`PackageDomainMap`（`android/app/src/main/java/net/meshpeak/kura/autofill/PackageDomainMap.kt`、`assets/package_domains.json`によるパッケージ名⇔ドメインの手動キュレーションDB、`docs/android-autofillservice.md` 3-2-1）を流用し、`callingAppInfo.packageName`からドメイン（`rp_id`として使う値）を引く。
+ネイティブアプリ自身がRPとしてPasskeyを要求するケース（例：銀行アプリが自社Webサイトと同じアカウントのPasskeyでログインさせたい場合）に対応するため、既存の`PackageDomainMap`を流用し、`callingAppInfo.packageName`からドメイン（`rp_id`として使う値）を引く。
 
 ```kotlin
 val packageName = callingAppInfo.packageName
@@ -327,15 +334,11 @@ Query（Begin）フェーズで`CredentialEntry`を複数返している場合�
 
 # Part 7: 設定画面統合
 
-kuraアプリの設定画面に、Credential Managerの「パスキーサービス」設定へのショートカットを追加する。
+kuraアプリの設定画面に、Credential Managerの「パスキーサービス」設定へのショートカットを追加する。`minSdk = 34`（2-2参照）のため、`SDK_INT`によるバージョン分岐は不要で、常時以下のIntentを発行できる。
 
 ```kotlin
-if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-    val intent = Intent(Settings.ACTION_CREDENTIAL_PROVIDER)
-    startActivity(intent)
-} else {
-    // API34未満: 機能自体が使えない旨を案内し、ボタン自体を非表示にする
-}
+val intent = Intent(Settings.ACTION_CREDENTIAL_PROVIDER)
+startActivity(intent)
 ```
 
 現在の有効化状態表示は`androidx.credentials.CredentialManager`の`isEnabledProvider`相当のAPIで取得する（Autofillの`AutofillManager.hasEnabledAutofillServices()`、`docs/android-autofillservice.md` 3-3と対になる導線）。
@@ -348,12 +351,3 @@ if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
 4. **PendingIntentは`FLAG_MUTABLE`必須、`FLAG_ONE_SHOT`は使用しない。** ユーザーが選択画面から戻って再選択する可能性があるため（Android公式ガイダンス通り）。
 5. **ロック中のQuery応答からの情報漏洩は許容範囲を明記する。** Part 3-3の通り、「vaultが現在ロックされているか」はAuthenticationActionの提示から推測されうるが、「ロック中のvaultが特定RP向けのPasskeyを持っているか」はアンロックしない限り秘匿される。この非対称性はブラウザ拡張版と同じ設計判断であり、vaultのロック状態自体は既存のAutofillサービスでも同様に観測されうる情報（`docs/webauthn-passkey.md` Part 4-3の議論と同じ理由）である。
 6. **タイムアウト・キャンセル処理。** `CancellationSignal`が`onBeginCreateCredentialRequest`/`onBeginGetCredentialRequest`に渡されるため、これを尊重して処理を中断できるようにする。Selectionフェーズ（Activity）がユーザー操作待ちのままバックグラウンドに置かれた場合の扱いは、既存`AutofillUnlockActivity`のライフサイクル処理を参考にする。
-
-# Part 9: 未実装・将来対応予定
-
-> **未実装（将来対応予定）**
->
-> - パスワードクレデンシャル（`BeginGetPasswordOption`/`BeginCreatePasswordCredentialRequest`）への対応。将来的にAutofillServiceとCredentialProviderServiceの重複領域をどう整理するかは別途検討する
-> - Conditional Mediation相当の挙動チューニング（システム標準UIの候補提示順序・表示内容の最適化）
-> - `PackageDomainMap`を介さない、より厳格なネイティブアプリ向けドメイン所有権検証（Digital Asset Links相当の仕組みの採用検討）
-> - 複数vault対応時のCredential Provider側の切り替えUI（現状は他機能と同様、固定vault IDを前提とする）
