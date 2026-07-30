@@ -192,6 +192,41 @@ impl UnlockedVault {
             signature_b64url: assertion.signature_b64url,
         })
     }
+
+    /// [`get_passkey_assertion`]と同じだが、clientDataJSONそのものではなくその
+    /// SHA-256ハッシュを受け取って署名する。Android Credential Managerの
+    /// 特権アプリ（ブラウザ）発リクエストでは、Provider側に元のJSON文字列が渡されず
+    /// `clientDataHash`のみが渡されるため（`docs/android-passkey.md` 5-3参照）。
+    pub fn get_passkey_assertion_with_hash(
+        &self,
+        entry_id: &str,
+        custom_field_id: &str,
+        client_data_hash: &[u8; 32],
+    ) -> Result<PasskeyAssertion> {
+        let vault_entry = self
+            .contents
+            .entries
+            .get(entry_id)
+            .ok_or_else(|| VaultError::EntryNotFound(entry_id.to_string()))?;
+
+        let field = find_passkey_fields(vault_entry)
+            .find(|f| f.id == custom_field_id)
+            .ok_or_else(|| VaultError::EntryNotFound(custom_field_id.to_string()))?;
+
+        let data = PasskeyFieldData::from_json_string(field.value.as_str())?;
+        let assertion = crate::webauthn::get_assertion_with_hash(
+            &data.rp_id,
+            &data.private_key,
+            client_data_hash,
+        )?;
+
+        Ok(PasskeyAssertion {
+            credential_id: data.credential_id,
+            user_handle: data.user_handle,
+            authenticator_data_b64url: assertion.authenticator_data_b64url,
+            signature_b64url: assertion.signature_b64url,
+        })
+    }
 }
 
 /// `VaultEntry`の`custom_fields`から`field_type == "passkey"`のものだけを走査する。
@@ -343,5 +378,48 @@ mod tests {
 
         let after = vault.get_entry(&attestation.entry_id).unwrap().unwrap();
         assert_eq!(before.updated_at, after.updated_at);
+    }
+
+    #[test]
+    fn test_get_assertion_with_hash_matches_json_variant() {
+        let mut vault = make_vault();
+        let attestation = vault
+            .create_passkey_credential(
+                None,
+                "example.com".to_string(),
+                None,
+                "handle".to_string(),
+                "user".to_string(),
+                "User".to_string(),
+                &[],
+            )
+            .unwrap();
+
+        let client_data_json = r#"{"type":"webauthn.get"}"#;
+        let hash: [u8; 32] = {
+            use sha2::{Digest, Sha256};
+            Sha256::digest(client_data_json.as_bytes()).into()
+        };
+
+        let via_json = vault
+            .get_passkey_assertion(
+                &attestation.entry_id,
+                &attestation.custom_field_id,
+                client_data_json,
+            )
+            .unwrap();
+        let via_hash = vault
+            .get_passkey_assertion_with_hash(
+                &attestation.entry_id,
+                &attestation.custom_field_id,
+                &hash,
+            )
+            .unwrap();
+
+        assert_eq!(
+            via_json.authenticator_data_b64url,
+            via_hash.authenticator_data_b64url
+        );
+        assert_eq!(via_json.signature_b64url, via_hash.signature_b64url);
     }
 }

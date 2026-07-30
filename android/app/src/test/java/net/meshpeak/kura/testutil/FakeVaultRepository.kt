@@ -21,6 +21,11 @@ class FakeVaultRepository : IVaultRepository {
     var decryptTransferConfigError: Exception? = null
     var lastSyncTimeResult: Long = 0L
     var listLoginCandidatesResult: List<AutofillCandidate> = emptyList()
+    var webauthnFindCredentialsResult: List<WebAuthnCredentialCandidate> = emptyList()
+    var webauthnCreateCredentialResult: WebAuthnAttestationResult =
+        WebAuthnAttestationResult("", "", "", "")
+    var webauthnGetAssertionResult: WebAuthnAssertionResult =
+        WebAuthnAssertionResult("", "", "", "")
 
     // Tracking calls for assertions
     var writeVaultFileCalled = false
@@ -161,4 +166,31 @@ class FakeVaultRepository : IVaultRepository {
     }
 
     override suspend fun saveAndPush(s3ConfigJson: String?) {}
+
+    override suspend fun webauthnFindCredentials(
+        rpId: String,
+        allowCredentialIds: List<String>
+    ): List<WebAuthnCredentialCandidate> = webauthnFindCredentialsResult
+
+    override suspend fun webauthnCreateCredential(
+        entryId: String?,
+        rpId: String,
+        rpName: String?,
+        userHandle: String,
+        userName: String,
+        userDisplayName: String,
+        excludeCredentialIds: List<String>
+    ): WebAuthnAttestationResult = webauthnCreateCredentialResult
+
+    override suspend fun webauthnGetAssertion(
+        entryId: String,
+        customFieldId: String,
+        clientDataJson: String
+    ): WebAuthnAssertionResult = webauthnGetAssertionResult
+
+    override suspend fun webauthnGetAssertionWithHash(
+        entryId: String,
+        customFieldId: String,
+        clientDataHash: ByteArray
+    ): WebAuthnAssertionResult = webauthnGetAssertionResult
 }

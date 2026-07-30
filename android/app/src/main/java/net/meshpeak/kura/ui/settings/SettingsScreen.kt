@@ -181,6 +181,20 @@ fun SettingsScreen(
                 )
             }
 
+            Card(
+                onClick = {
+                    context.startActivity(Intent(Settings.ACTION_CREDENTIAL_PROVIDER))
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_passkey_provider)) },
+                    supportingContent = { Text(stringResource(R.string.settings_passkey_provider_description)) },
+                    leadingContent = { Icon(Icons.Default.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                )
+            }
+
             Card(onClick = { showChangePasswordDialog = true }, modifier = Modifier.fillMaxWidth()) {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.settings_change_master_password)) },

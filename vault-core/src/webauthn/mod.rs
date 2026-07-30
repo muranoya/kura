@@ -180,12 +180,33 @@ pub fn get_assertion(
     private_key_b64: &str,
     client_data_json: &str,
 ) -> Result<AssertionResult> {
-    let auth_data = build_authenticator_data(rp_id, FLAG_UP | FLAG_UV, None);
     let client_data_hash = sha256(client_data_json.as_bytes());
+    sign_assertion(rp_id, private_key_b64, &client_data_hash)
+}
+
+/// Same as [`get_assertion`], but for callers that only have the SHA-256 hash
+/// of clientDataJSON (Android Credential Manager's `clientDataHash` for
+/// privileged-app/browser-originated requests never exposes the original JSON
+/// to the provider — see `docs/android-passkey.md` 5-3). Signs the given hash
+/// directly instead of hashing a JSON string.
+pub fn get_assertion_with_hash(
+    rp_id: &str,
+    private_key_b64: &str,
+    client_data_hash: &[u8; 32],
+) -> Result<AssertionResult> {
+    sign_assertion(rp_id, private_key_b64, client_data_hash)
+}
+
+fn sign_assertion(
+    rp_id: &str,
+    private_key_b64: &str,
+    client_data_hash: &[u8; 32],
+) -> Result<AssertionResult> {
+    let auth_data = build_authenticator_data(rp_id, FLAG_UP | FLAG_UV, None);
 
     let mut message = Vec::with_capacity(auth_data.len() + client_data_hash.len());
     message.extend_from_slice(&auth_data);
-    message.extend_from_slice(&client_data_hash);
+    message.extend_from_slice(client_data_hash);
 
     let signature = sign(private_key_b64, &message)?;
 
@@ -280,5 +301,24 @@ mod tests {
     fn test_invalid_private_key_encoding_returns_error() {
         let result = get_assertion("example.com", "not-base64!!", "{}");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_assertion_with_hash_matches_json_variant() {
+        let created = create_credential("example.com").unwrap();
+        let client_data_json =
+            r#"{"type":"webauthn.get","challenge":"abc","origin":"https://example.com"}"#;
+        let hash = sha256(client_data_json.as_bytes());
+
+        let via_json =
+            get_assertion("example.com", &created.private_key_b64, client_data_json).unwrap();
+        let via_hash =
+            get_assertion_with_hash("example.com", &created.private_key_b64, &hash).unwrap();
+
+        assert_eq!(
+            via_json.authenticator_data_b64url,
+            via_hash.authenticator_data_b64url
+        );
+        assert_eq!(via_json.signature_b64url, via_hash.signature_b64url);
     }
 }

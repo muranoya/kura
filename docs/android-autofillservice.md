@@ -156,7 +156,7 @@ Autofillフレームワークから呼び出される`AutofillService`実装と�
 
 ### 2-1-1. Manifest宣言
 
-`AutofillService`はシステムのAutofillフレームワークからバインドされるコンポーネントであり、`BIND_AUTOFILL_SERVICE`権限の指定がシステム以外からのバインドを拒否するために必須となる。`minSdk 26`のため、AutofillFramework自体の可用性チェック（バージョン分岐）は不要。
+`AutofillService`はシステムのAutofillフレームワークからバインドされるコンポーネントであり、`BIND_AUTOFILL_SERVICE`権限の指定がシステム以外からのバインドを拒否するために必須となる。`minSdk`は`docs/android-passkey.md`（Credential Provider対応）により26から34に引き上げられているため、AutofillFramework自体の可用性チェック（バージョン分岐）は元々不要だった上に、その前提はさらに強まっている。
 
 ### 2-1-2. プロセスモデル
 

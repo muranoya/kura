@@ -98,4 +98,31 @@ object VaultBridge {
     external fun getEtag(vaultId: String): String?
     external fun getLastSyncTime(vaultId: String): Long
     external fun restoreLastSyncTime(vaultId: String, ts: Long)
+
+    // WebAuthn / Passkey operations
+    external fun webauthnFindCredentials(vaultId: String, rpId: String, allowCredentialIdsJson: String): String
+    external fun webauthnCreateCredential(
+        vaultId: String,
+        entryId: String?,
+        rpId: String,
+        rpName: String?,
+        userHandle: String,
+        userName: String,
+        userDisplayName: String,
+        excludeCredentialIdsJson: String
+    ): String
+
+    external fun webauthnGetAssertion(
+        vaultId: String,
+        entryId: String,
+        customFieldId: String,
+        clientDataJson: String
+    ): String
+
+    external fun webauthnGetAssertionWithHash(
+        vaultId: String,
+        entryId: String,
+        customFieldId: String,
+        clientDataHash: ByteArray
+    ): String
 }

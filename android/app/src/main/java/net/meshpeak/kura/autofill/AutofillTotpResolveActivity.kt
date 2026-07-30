@@ -78,9 +78,9 @@ class AutofillTotpResolveActivity : AppCompatActivity() {
         } ?: emptyList()
         val totpField = customFields.firstOrNull { it.fieldType == CustomFieldType.TOTP.value } ?: return null
         val code = appViewModel.repository.generateTotpFromValue(totpField.value)
-        // 認証解決後のDatasetはUIに再表示されないためpresentationの内容自体に意味はないが、
-        // Dataset.Builder(RemoteViews)コンストラクタ（API 26〜）がminSdk 26との互換性を保つ
-        // 唯一の選択肢（無引数コンストラクタはAPI 30以降）。
+        // 認証解決後のDatasetはUIに再表示されないためpresentationの内容自体に意味はない。
+        // minSdkは34（API 30以降の無引数コンストラクタが使える）だが、他のDataset構築箇所
+        // （FillResponseBuilder.kt）と表記を揃えるためRemoteViewsコンストラクタのままにしている。
         val presentation = FillResponseBuilder.simplePresentation(applicationContext, totpField.name)
         return Dataset.Builder(presentation)
             .setValue(request.totpFieldId, AutofillValue.forText(code))

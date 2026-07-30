@@ -1,4 +1,4 @@
-<!-- doc-status: design -->
+<!-- doc-status: implemented -->
 # Android Passkey (Credential Provider) 対応
 
 # Part 1: 概要
@@ -43,6 +43,8 @@ vault-coreに以下の3つの公開APIが既に実装されており、ブラウ
 | `api_webauthn_get_assertion(entry_id, custom_field_id, client_data_json)` | 既存Passkeyで認証assertionに署名。`sign_count`を持たせない設計のためエントリ更新は行わない |
 
 データ構造（`PasskeyFieldData`）・`sign_count`固定0の設計判断・`public_key`非保持の理由は全てウェブブラウザ拡張で確定済みであり、Android版でもそのまま踏襲する。
+
+**実装時の追加（Part 5-3参照）**: 上記3 APIに加えて`api_webauthn_get_assertion_with_hash(entry_id, custom_field_id, client_data_hash: Vec<u8>)`をvault-core側に新設した。ブラウザ（特権アプリ）発のCredential Managerリクエストでは、Android側に元の`clientDataJSON`文字列が渡されず`clientDataHash`（SHA-256、32バイト）のみが渡されるため、`client_data_json: String`を受け取ってハッシュ計算する既存APIでは対応できない（詳細はPart 5-3）。`api_webauthn_create_credential`は元々`client_data_json`を引数に取らないため（"none" attestation formatは署名を持たない）、Create側の追加APIは不要だった。
 
 # Part 2: 全体アーキテクチャ
 
@@ -177,13 +179,26 @@ KuraCredentialProviderService.onBeginGetCredentialRequest(BeginGetCredentialRequ
 PasskeyGetActivity 起動
   │ ロック中だった場合はここでBiometricHelper/マスターパスワード認証
   │ PendingIntentHandler.retrieveProviderGetCredentialRequest(intent)
+  │
+  ├─ Query時点で候補（entry_id/custom_field_id/credential_id）が確定済み
+  │     → そのまま認証へ
+  │
+  └─ AuthenticationAction経由（Query時点ではロック中で候補未確定）
+        │ アンロック後、ここで初めてapi_webauthn_find_credentialsを呼び候補を確定する
+        ├─ 0件 → キャンセル扱いで呼び出し元に返す
+        ├─ 1件 → 自動的にそのまま認証へ
+        └─ 複数件 → PasskeyGetSelectScreen（実装時に追加、6-2参照）で選択させてから認証へ
   ▼
-vault.api_webauthn_get_assertion(entry_id, custom_field_id, client_data_json) 呼び出し（JNI経由）
+vault.api_webauthn_get_assertion(entry_id, custom_field_id, client_data_json)
+  または vault.api_webauthn_get_assertion_with_hash(entry_id, custom_field_id, client_data_hash)
+  （clientDataHashの有無で分岐。5-3参照） 呼び出し（JNI経由）
   ▼
-PendingIntentHandler.setGetCredentialResponse(result, GetCredentialResponse(PublicKeyCredential(...)))
+PendingIntentHandler.setGetCredentialResponse(result, GetCredentialResponse(PublicKeyCredential(...)), providerRequest)
   ▼
 setResult(RESULT_OK, result); finish()
 ```
+
+**実装時に判明したギャップとその解消**: Query（Begin）フェーズで返すのはAuthenticationAction 1件のみのため、ロック中に開始された場合はシステムの候補選択UIが機能しない。アンロック後に複数のPasskey候補が判明するケースへの対応として、`PasskeyGetActivity`内に軽量な候補選択画面`PasskeyGetSelectScreen`（`ui/credential/`）を追加した（6-2参照）。これは当初のdesign（3-2/6-2の初版）には明記されていなかった拡張。
 
 ## 3-3. Query時点での「アンロック済みなら候補を列挙する」設計判断
 
@@ -269,6 +284,8 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_webauthnFindCre
 
 `api_webauthn_create_credential`・`api_webauthn_get_assertion`も同様に、既存の`createEntry`/`listLoginCandidates`と同じ引数変換パターン（`JString` → `String`、複合型はJSON文字列でシリアライズして受け渡し）でラップする。
 
+**実装時の追加**: `webauthnGetAssertionWithHash(vault_id, entry_id, custom_field_id, client_data_hash: JByteArray)`も同様に追加した。`client_data_hash`は既存の`get_byte_array`ヘルパー（`loadVault`/`mergeRemoteVault`で使われているものと同じ）でバイト列として受け取り、`api_webauthn_get_assertion_with_hash`にそのまま渡す。
+
 ## 5-2. VaultBridge.ktへの追加
 
 ```kotlin
@@ -290,15 +307,23 @@ external fun webauthnGetAssertion(
     customFieldId: String,
     clientDataJson: String
 ): String
+external fun webauthnGetAssertionWithHash(
+    vaultId: String,
+    entryId: String,
+    customFieldId: String,
+    clientDataHash: ByteArray
+): String
 ```
+
+（`webauthnGetAssertionWithHash`は実装時に追加。Part 5-3参照）
 
 ## 5-3. clientDataJSON・attestationObjectの構築責務
 
 `docs/webauthn-passkey.md` 3-4と同じ方針を踏襲する：CBOR/authenticatorData/attestationObjectのバイト単位の構築とECDSA署名は全てvault-core（Rust）側の責務とし、Android（Kotlin）側では組み立てない。ただし`clientDataJSON`自体の構築元がブラウザ拡張とは異なる点に注意する。
 
 - ブラウザ拡張では`clientDataJSON`をTypeScript側（Service Worker）が`{type, challenge, origin, crossOrigin}`から組み立てていた
-- Android Credential Managerでは、`CreatePublicKeyCredentialRequest`/`GetPublicKeyCredentialOption`が`clientDataHash`（システム側で既に計算済みのハッシュ値）を提供するケースと、`requestJson`から`clientDataJSON`をアプリ側で組み立てる必要があるケースの両方がありうる。**Part 4-1の特権アプリ経由（ブラウザ発）では`clientDataHash`をそのまま使い、自前でJSONを組み立てない**（システムが検証済みのoriginを埋め込み済みのため、アプリ側での再構築はかえって整合性リスクを生む）。ネイティブアプリ発（`clientDataHash`が渡されないケース）では、Part 4-2で確定した`rp_id`ベースのoriginを使い`{type, challenge, origin}`形式のJSONをKotlin側で組み立てた上でvault-coreに渡す
-- `vault-core`側のAPIシグネチャ（`client_data_json: String`）は変更しない。Android側でどちらの経路でも最終的に文字列化されたclientDataJSONを渡す形に揃える
+- Android Credential Managerでは、`GetPublicKeyCredentialOption`（Getのみ。Createの`CreatePublicKeyCredentialRequest`にも同名フィールドがあるが、後述の通りvault-core側では使わない）が`clientDataHash`（システム側で既に計算済みのSHA-256ハッシュ、32バイト）を提供するケースと、`requestJson`から`clientDataJSON`をアプリ側で組み立てる必要があるケースの両方がありうる。**Part 4-1の特権アプリ経由（ブラウザ発）では`clientDataHash`をそのまま使い、自前でJSONを組み立てない**（システムが検証済みのoriginを埋め込み済みのため、アプリ側での再構築はかえって整合性リスクを生む）。ネイティブアプリ発（`clientDataHash`が渡されないケース）では、Part 4-2で確定した`rp_id`ベースのoriginを使い`{type, challenge, origin}`形式のJSONをKotlin側で組み立てた上でvault-coreに渡す
+- **実装時の訂正**: 当初「`vault-core`側のAPIシグネチャ（`client_data_json: String`）は変更しない」としていたが、これは技術的に成立しない。既存`api_webauthn_get_assertion`は受け取った`client_data_json`文字列から内部でSHA-256を計算する設計であり、Android側が元のJSON文字列を持たない（`clientDataHash`のみが渡される）ブラウザ発リクエストでは、Android側で「それらしいJSON」を組み立てて渡してもハッシュが一致せず署名検証は必ず失敗する。このため、ハッシュを直接受け取って署名する`api_webauthn_get_assertion_with_hash`をvault-coreに新設した（Part 1-3参照）。ブラウザ発では`GetPublicKeyCredentialOption.clientDataHash`をそのままこの新APIに渡し、ネイティブアプリ発では引き続き既存の`client_data_json: String`版APIを使う。Createでは元々`client_data_json`を引数に取らないため、この問題は発生しない（Part 1-3参照）
 
 # Part 6: UI/UXフロー設計
 
@@ -310,7 +335,7 @@ external fun webauthnGetAssertion(
 
 | 画面状態 | 対応するComposable | 拡張機能側の対応画面 |
 |---|---|---|
-| ロック中 → 認証要求 | `PasskeyUnlockScreen`（既存`AutofillAuthScreen`のロジックを再利用） | `UnlockRitual.tsx` |
+| ロック中 → 認証要求 | 既存`AutofillAuthScreen`をそのまま再利用（専用の`PasskeyUnlockScreen`は新設せず、既存Composableを直接呼び出す形にした。6-3参照） | `UnlockRitual.tsx` |
 | 紐付け先エントリ選択（1件一致は提案、複数件は選択、0件は新規作成） | `PasskeyCreateConfirmScreen` | `CreateConfirm.tsx` |
 | 既に登録済み（`exclude_credential_ids`一致） | エラー表示、閉じるとキャンセル扱いで呼び出し元に返す | `{kind:'error', reason:'already_registered'}` |
 
@@ -324,8 +349,9 @@ Query（Begin）フェーズで`CredentialEntry`を複数返している場合�
 
 | 画面状態 | 対応するComposable |
 |---|---|
-| ロック中 → 認証要求（`AuthenticationAction`経由で遷移） | `PasskeyUnlockScreen`（6-1と共通） |
+| ロック中 → 認証要求（`AuthenticationAction`経由で遷移） | `AutofillAuthScreen`を再利用（6-3参照。専用の`PasskeyUnlockScreen`は新設していない） |
 | 認証済み → assertion生成中のローディング | 数百ms程度で完了する想定のため簡易スピナーで十分 |
+| ロック中に開始され、アンロック後に複数のPasskey候補が判明した場合 | `PasskeyGetSelectScreen`（実装時に追加。3-2参照。この状態はQuery時点で候補が確定していれば発生しない） |
 
 ## 6-3. 既存コンポーネントの再利用
 
@@ -341,7 +367,7 @@ val intent = Intent(Settings.ACTION_CREDENTIAL_PROVIDER)
 startActivity(intent)
 ```
 
-現在の有効化状態表示は`androidx.credentials.CredentialManager`の`isEnabledProvider`相当のAPIで取得する（Autofillの`AutofillManager.hasEnabledAutofillServices()`、`docs/android-autofillservice.md` 3-3と対になる導線）。
+**実装時の訂正**: `androidx.credentials.CredentialManager`（1.7.0-alpha02時点）には`AutofillManager.hasEnabledAutofillServices()`に相当する同期的な「有効プロバイダ一覧取得」APIが存在しなかった。そのため、Autofillの設定Cardのような有効/無効状態表示は行わず、常にタップ可能な単一のCard（タップで`ACTION_CREDENTIAL_PROVIDER`を発行するのみ）としている。将来のandroidx.credentialsバージョンで同等のAPIが追加された場合は、状態表示の追加を検討する。
 
 # Part 8: セキュリティ上の注意点
 

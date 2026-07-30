@@ -113,4 +113,32 @@ impl VaultManager {
             })
         })
     }
+
+    /// [`Self::api_webauthn_get_assertion`]と同じだが、clientDataJSONそのものでは
+    /// なくそのSHA-256ハッシュ（32バイト）を受け取る。Android Credential Managerの
+    /// 特権アプリ（ブラウザ）発リクエストは元のJSON文字列を提供せず`clientDataHash`
+    /// のみを渡すため（`docs/android-passkey.md` 5-3参照）。
+    pub fn api_webauthn_get_assertion_with_hash(
+        &self,
+        entry_id: String,
+        custom_field_id: String,
+        client_data_hash: Vec<u8>,
+    ) -> Result<WebAuthnAssertionResult, String> {
+        let hash: [u8; 32] = client_data_hash
+            .try_into()
+            .map_err(|_| "client_data_hash must be exactly 32 bytes".to_string())?;
+
+        self.with_unlocked(|unlocked| {
+            let result = unlocked
+                .get_passkey_assertion_with_hash(&entry_id, &custom_field_id, &hash)
+                .map_err(|e| format!("Failed to get passkey assertion: {}", e))?;
+
+            Ok(WebAuthnAssertionResult {
+                credential_id: result.credential_id,
+                user_handle: result.user_handle,
+                authenticator_data: result.authenticator_data_b64url,
+                signature: result.signature_b64url,
+            })
+        })
+    }
 }

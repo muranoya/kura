@@ -108,6 +108,20 @@ interface IVaultRepository {
     suspend fun syncInBackground(s3ConfigJson: String?)
     suspend fun saveAndSync(s3ConfigJson: String?)
     suspend fun saveAndPush(s3ConfigJson: String?)
+
+    // WebAuthn / Passkey
+    suspend fun webauthnFindCredentials(rpId: String, allowCredentialIds: List<String>): List<WebAuthnCredentialCandidate>
+    suspend fun webauthnCreateCredential(
+        entryId: String?,
+        rpId: String,
+        rpName: String?,
+        userHandle: String,
+        userName: String,
+        userDisplayName: String,
+        excludeCredentialIds: List<String>
+    ): WebAuthnAttestationResult
+    suspend fun webauthnGetAssertion(entryId: String, customFieldId: String, clientDataJson: String): WebAuthnAssertionResult
+    suspend fun webauthnGetAssertionWithHash(entryId: String, customFieldId: String, clientDataHash: ByteArray): WebAuthnAssertionResult
 }
 
 class VaultRepository(private val context: Context) : IVaultRepository {
@@ -462,5 +476,52 @@ class VaultRepository(private val context: Context) : IVaultRepository {
         val vaultBytes = getVaultBytes()
         writeVaultFile(vaultBytes)
         s3ConfigJson?.let { pushVault(it) }
+    }
+
+    // ========================================================================
+    // WebAuthn / Passkey
+    // ========================================================================
+
+    override suspend fun webauthnFindCredentials(
+        rpId: String,
+        allowCredentialIds: List<String>
+    ): List<WebAuthnCredentialCandidate> = withContext(Dispatchers.IO) {
+        val allowIdsJson = json.encodeToString(ListSerializer(String.serializer()), allowCredentialIds)
+        val jsonStr = VaultBridge.webauthnFindCredentials(DEFAULT_VAULT_ID, rpId, allowIdsJson)
+        json.decodeFromString<List<WebAuthnCredentialCandidate>>(jsonStr)
+    }
+
+    override suspend fun webauthnCreateCredential(
+        entryId: String?,
+        rpId: String,
+        rpName: String?,
+        userHandle: String,
+        userName: String,
+        userDisplayName: String,
+        excludeCredentialIds: List<String>
+    ): WebAuthnAttestationResult = withContext(Dispatchers.IO) {
+        val excludeIdsJson = json.encodeToString(ListSerializer(String.serializer()), excludeCredentialIds)
+        val jsonStr = VaultBridge.webauthnCreateCredential(
+            DEFAULT_VAULT_ID, entryId, rpId, rpName, userHandle, userName, userDisplayName, excludeIdsJson
+        )
+        json.decodeFromString<WebAuthnAttestationResult>(jsonStr)
+    }
+
+    override suspend fun webauthnGetAssertion(
+        entryId: String,
+        customFieldId: String,
+        clientDataJson: String
+    ): WebAuthnAssertionResult = withContext(Dispatchers.IO) {
+        val jsonStr = VaultBridge.webauthnGetAssertion(DEFAULT_VAULT_ID, entryId, customFieldId, clientDataJson)
+        json.decodeFromString<WebAuthnAssertionResult>(jsonStr)
+    }
+
+    override suspend fun webauthnGetAssertionWithHash(
+        entryId: String,
+        customFieldId: String,
+        clientDataHash: ByteArray
+    ): WebAuthnAssertionResult = withContext(Dispatchers.IO) {
+        val jsonStr = VaultBridge.webauthnGetAssertionWithHash(DEFAULT_VAULT_ID, entryId, customFieldId, clientDataHash)
+        json.decodeFromString<WebAuthnAssertionResult>(jsonStr)
     }
 }
