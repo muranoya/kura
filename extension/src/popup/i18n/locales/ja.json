@@ -249,7 +249,14 @@
       "selectFieldType": "フィールドの種類を選択",
       "addField": "フィールドを追加",
       "generatePassword": "パスワード生成",
-      "passkeyFor": "{{rpId}} のパスキー"
+      "passkeyFor": "{{rpId}} のパスキー",
+      "scanTotpQr": "QR画像からTOTPを読み取る",
+      "totpQrScanning": "QRを読み取り中…",
+      "totpQrError": {
+        "no_qr": "画像からQRコードを検出できませんでした",
+        "empty": "QRコードが空でした",
+        "invalid_totp": "TOTPシークレットまたは otpauth URI ではありません"
+      }
     },
     "customFieldTypes": {
       "text": "テキスト",

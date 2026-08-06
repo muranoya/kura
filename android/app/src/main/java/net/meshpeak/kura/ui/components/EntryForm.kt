@@ -44,6 +44,7 @@ fun EntryForm(
     onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean) -> String)? = null,
     onCopyToClipboard: ((String) -> Unit)? = null,
     onCreateLabel: (suspend (String) -> Label)? = null,
+    onValidateTotp: (suspend (String) -> Boolean)? = null,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -224,7 +225,8 @@ fun EntryForm(
         CustomFieldsSection(
             customFields = customFields,
             onCustomFieldsChange = onCustomFieldsChange,
-            onGeneratePassword = onGeneratePassword
+            onGeneratePassword = onGeneratePassword,
+            onValidateTotp = onValidateTotp
         )
 
         // Notes section
@@ -333,7 +335,8 @@ fun EntryForm(
 private fun CustomFieldsSection(
     customFields: List<CustomField>,
     onCustomFieldsChange: (List<CustomField>) -> Unit,
-    onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean) -> String)? = null
+    onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean) -> String)? = null,
+    onValidateTotp: (suspend (String) -> Boolean)? = null,
 ) {
     var showTypeSelector by remember { mutableStateOf(false) }
 
@@ -377,7 +380,8 @@ private fun CustomFieldsSection(
                         onCustomFieldsChange(newList)
                     }
                 } else null,
-                onGeneratePassword = onGeneratePassword
+                onGeneratePassword = onGeneratePassword,
+                onValidateTotp = onValidateTotp
             )
         }
         if (customFields.isNotEmpty()) SectionDivider()
@@ -600,12 +604,26 @@ fun CustomFieldEditor(
     canMoveDown: Boolean = false,
     onMoveUp: (() -> Unit)? = null,
     onMoveDown: (() -> Unit)? = null,
-    onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean) -> String)? = null
+    onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean) -> String)? = null,
+    onValidateTotp: (suspend (String) -> Boolean)? = null,
 ) {
     val isSecret = field.fieldType == "password" || field.fieldType == "totp"
     var isValueFocused by remember { mutableStateOf(false) }
     var showGenerator by remember { mutableStateOf(false) }
+    var showTotpQrScan by remember { mutableStateOf(false) }
     val showGenerateButton = field.fieldType == "password" && onGeneratePassword != null
+    val showTotpQrButton = field.fieldType == "totp" && onValidateTotp != null
+
+    if (showTotpQrScan && onValidateTotp != null) {
+        TotpQrScanDialog(
+            onResult = { value ->
+                onFieldChange(field.copy(value = value))
+                showTotpQrScan = false
+            },
+            onDismiss = { showTotpQrScan = false },
+            validateTotp = onValidateTotp,
+        )
+    }
 
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         // Row 1: Field name + type badge (read-only) + delete
@@ -703,13 +721,23 @@ fun CustomFieldEditor(
                 singleLine = true,
                 placeholder = { Text(if (field.fieldType == "totp") stringResource(R.string.field_totp_placeholder) else stringResource(R.string.field_value_placeholder)) },
                 visualTransformation = if (!isValueFocused && isSecret) PasswordVisualTransformation() else VisualTransformation.None,
-                trailingIcon = if (showGenerateButton) {
-                    {
-                        IconButton(onClick = { showGenerator = !showGenerator }) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = stringResource(R.string.cd_generate_password))
+                trailingIcon = when {
+                    showGenerateButton -> {
+                        {
+                            IconButton(onClick = { showGenerator = !showGenerator }) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = stringResource(R.string.cd_generate_password))
+                            }
                         }
                     }
-                } else null,
+                    showTotpQrButton -> {
+                        {
+                            IconButton(onClick = { showTotpQrScan = true }) {
+                                Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.cd_scan_totp_qr))
+                            }
+                        }
+                    }
+                    else -> null
+                },
                 colors = TextFieldDefaults.colors(
                     unfocusedContainerColor = Color.Transparent,
                     focusedContainerColor = Color.Transparent,

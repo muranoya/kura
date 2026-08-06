@@ -249,7 +249,14 @@
       "selectFieldType": "Select field type",
       "addField": "Add field",
       "generatePassword": "Generate password",
-      "passkeyFor": "Passkey for {{rpId}}"
+      "passkeyFor": "Passkey for {{rpId}}",
+      "scanTotpQr": "Read TOTP from QR image",
+      "totpQrScanning": "Reading QR…",
+      "totpQrError": {
+        "no_qr": "No QR code found in the image",
+        "empty": "QR code was empty",
+        "invalid_totp": "QR code is not a valid TOTP secret or otpauth URI"
+      }
     },
     "customFieldTypes": {
       "text": "Text",

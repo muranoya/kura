@@ -266,6 +266,15 @@
     <string name="custom_field_add">Add field</string>
     <string name="custom_field_name_placeholder">Field name</string>
     <string name="custom_field_totp_label">TOTP</string>
+    <string name="totp_qr_scan_title">Scan TOTP QR</string>
+    <string name="totp_qr_from_gallery">Choose image</string>
+    <string name="totp_qr_camera_rationale">Allow camera access to scan a TOTP QR code</string>
+    <string name="totp_qr_camera_denied">Camera permission denied. You can still choose an image.</string>
+    <string name="totp_qr_request_camera">Allow camera</string>
+    <string name="totp_qr_error_no_qr">No QR code found in the image</string>
+    <string name="totp_qr_error_empty">QR code was empty</string>
+    <string name="totp_qr_error_invalid">QR code is not a valid TOTP secret or otpauth URI</string>
+    <string name="cd_scan_totp_qr">Scan TOTP QR code</string>
 
     <!-- Labels (entry form) -->
     <string name="label_new_dialog_title">New label</string>
