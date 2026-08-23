@@ -113,6 +113,13 @@ export type Message =
       password: string
     }
 
+  // TOTP QR scan (page screenshot)
+  | { type: 'TOTP_QR_START'; entryId: string; fieldId: string }
+  | { type: 'TOTP_QR_END' }
+  | { type: 'TOTP_QR_CAPTURE' }
+  | { type: 'TOTP_QR_APPLY'; value: string }
+  | { type: 'TOTP_QR_CANCEL' }
+
 export type MessageResponse =
   // Common
   | { success: true }
@@ -183,6 +190,11 @@ export type MessageResponse =
       creditCards?: AutofillCredentialCandidate[]
       totpCandidates?: AutofillCredentialCandidate[]
       pendingFlow?: { entryId: string; username: string; password: string } | null
+    })
+
+  // TOTP QR scan responses
+  | ({ success: true } & {
+      dataUrl?: string
     })
 
 export function sendMessage<T extends Message>(

@@ -298,7 +298,14 @@
       "noLabels": "ラベルがありません",
       "newLabelPlaceholder": "ラベル名",
       "newLabelButton": "新規",
-      "errorLabelCreate": "ラベル作成失敗:"
+      "errorLabelCreate": "ラベル作成失敗:",
+      "scanTotpQr": "QR画像からTOTPを読み取る",
+      "totpQrScanning": "QRを読み取り中…",
+      "totpQrError": {
+        "no_qr": "画像からQRコードを検出できませんでした",
+        "empty": "QRコードが空でした",
+        "invalid_totp": "TOTPシークレットまたは otpauth URI ではありません"
+      }
     },
     "typeSelectDialog": {
       "title": "アイテム種別を選択",

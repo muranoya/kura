@@ -6,6 +6,7 @@ import {
   Mail,
   Phone,
   Plus,
+  ScanQrCode,
   Timer,
   Trash2,
   Type,
@@ -40,6 +41,9 @@ export interface EntryFormProps {
   onSelectedLabelIdsChange: (ids: string[]) => void
   onCreateLabel?: (name: string) => Promise<Label>
   error?: string
+  /** When set with onScanTotpQr, page TOTP QR scan is available. */
+  entryId?: string
+  onScanTotpQr?: (fieldId: string) => Promise<void>
 }
 
 // 'passkey' はここに含めない: パスキーは通常のカスタムフィールド追加UIからは
@@ -84,6 +88,8 @@ export default function EntryForm({
   onSelectedLabelIdsChange,
   onCreateLabel,
   error,
+  entryId,
+  onScanTotpQr,
 }: EntryFormProps) {
   const { t } = useTranslation()
   const [secureNotePreviewMode, setSecureNotePreviewMode] = useState(false)
@@ -93,6 +99,8 @@ export default function EntryForm({
   const [activeGeneratorFieldId, setActiveGeneratorFieldId] = useState<string | null>(null)
   const [focusedPasswordFieldId, setFocusedPasswordFieldId] = useState<string | null>(null)
   const [pendingFieldType, setPendingFieldType] = useState(false)
+  const [scanningTotpQr, setScanningTotpQr] = useState(false)
+  const [totpQrError, setTotpQrError] = useState<string | null>(null)
 
   const updateTypedValue = useCallback(
     (key: string, value: string) => {
@@ -120,6 +128,21 @@ export default function EntryForm({
       onCustomFieldsChange(customFields.map((f) => (f.id === fieldId ? { ...f, ...field } : f)))
     },
     [customFields, onCustomFieldsChange],
+  )
+
+  const startTotpQrScan = useCallback(
+    async (fieldId: string) => {
+      if (!entryId || !onScanTotpQr) return
+      setTotpQrError(null)
+      setScanningTotpQr(true)
+      try {
+        await onScanTotpQr(fieldId)
+      } catch (err) {
+        setTotpQrError(String(err))
+        setScanningTotpQr(false)
+      }
+    },
+    [entryId, onScanTotpQr],
   )
 
   const deleteCustomField = useCallback(
@@ -613,7 +636,11 @@ export default function EntryForm({
                         ? t('entries.fields.totpFieldPlaceholder')
                         : t('entries.fields.fieldValue')
                     }
-                    className={cn('h-8 text-sm', field.fieldType === 'password' && 'pr-9')}
+                    className={cn(
+                      'h-8 text-sm',
+                      field.fieldType === 'password' && 'pr-9',
+                      field.fieldType === 'totp' && 'pr-1',
+                    )}
                     onFocus={() => {
                       if (field.fieldType === 'password' || field.fieldType === 'totp')
                         setFocusedPasswordFieldId(`custom-${field.id}`)
@@ -646,6 +673,22 @@ export default function EntryForm({
                     </button>
                   )}
               </div>
+              {field.fieldType === 'totp' && entryId && onScanTotpQr && (
+                <button
+                  type="button"
+                  onClick={() => void startTotpQrScan(field.id)}
+                  disabled={scanningTotpQr}
+                  className="p-1 shrink-0 mt-1 text-text-muted hover:text-accent disabled:opacity-50 transition-colors"
+                  title={
+                    scanningTotpQr
+                      ? t('entries.fields.totpQrScanning')
+                      : t('entries.fields.scanTotpQr')
+                  }
+                  aria-label={t('entries.fields.scanTotpQr')}
+                >
+                  <ScanQrCode size={14} />
+                </button>
+              )}
               {customFields.length > 1 && (
                 <div className="flex flex-col shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
@@ -733,6 +776,10 @@ export default function EntryForm({
     activeGeneratorFieldId,
     focusedPasswordFieldId,
     pendingFieldType,
+    startTotpQrScan,
+    scanningTotpQr,
+    entryId,
+    onScanTotpQr,
   ])
 
   return (
@@ -740,6 +787,11 @@ export default function EntryForm({
       {error && (
         <div className="p-3 rounded-md bg-danger/10 border border-danger/20">
           <p className="text-sm text-danger">{error}</p>
+        </div>
+      )}
+      {totpQrError && (
+        <div className="p-3 rounded-md bg-danger/10 border border-danger/20">
+          <p className="text-sm text-danger">{totpQrError}</p>
         </div>
       )}
 

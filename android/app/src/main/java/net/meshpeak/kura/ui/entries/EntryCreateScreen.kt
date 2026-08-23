@@ -160,6 +160,14 @@ fun EntryCreateScreen(
                         labels = labels + newLabel
                         newLabel
                     },
+                    onValidateTotp = { value ->
+                        try {
+                            appViewModel.repository.generateTotpFromValue(value)
+                            true
+                        } catch (_: Exception) {
+                            false
+                        }
+                    },
                     modifier = Modifier.weight(1f, fill = true)
                 )
             }

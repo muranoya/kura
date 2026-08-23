@@ -298,7 +298,14 @@
       "noLabels": "No labels",
       "newLabelPlaceholder": "Label name",
       "newLabelButton": "New",
-      "errorLabelCreate": "Failed to create label:"
+      "errorLabelCreate": "Failed to create label:",
+      "scanTotpQr": "Read TOTP from QR image",
+      "totpQrScanning": "Reading QR…",
+      "totpQrError": {
+        "no_qr": "No QR code found in the image",
+        "empty": "QR code was empty",
+        "invalid_totp": "QR code is not a valid TOTP secret or otpauth URI"
+      }
     },
     "typeSelectDialog": {
       "title": "Select item type",

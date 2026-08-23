@@ -80,6 +80,34 @@ export default function EntryEdit() {
     }
   }
 
+  const handleScanTotpQr = async (fieldId: string) => {
+    if (!id) return
+    if (!name.trim()) {
+      setError(t('entries.edit.nameRequired'))
+      throw new Error(t('entries.edit.nameRequired'))
+    }
+    setError('')
+    const typedValueJson = JSON.stringify(typedValue)
+    const customFieldsJson = JSON.stringify(
+      customFields.map((f) => ({
+        id: f.id,
+        name: f.name,
+        field_type: f.fieldType,
+        value: f.value,
+      })),
+    )
+    await commands.updateEntry(
+      id,
+      name,
+      typedValueJson,
+      notes || undefined,
+      selectedLabelIds,
+      customFieldsJson,
+    )
+    await commands.startTotpQrScan(id, fieldId)
+    window.close()
+  }
+
   if (loading) return <PageHeader title={t('common.loading')} showBackButton={true} />
   if (!entry) return <PageHeader title={t('entries.edit.notFound')} showBackButton={true} />
 
@@ -117,6 +145,8 @@ export default function EntryEdit() {
           allLabels={allLabels}
           selectedLabelIds={selectedLabelIds}
           onSelectedLabelIdsChange={setSelectedLabelIds}
+          entryId={id}
+          onScanTotpQr={handleScanTotpQr}
           onCreateLabel={async (name) => {
             const labelId = await commands.createLabel(name)
             const newLabel: Label = { id: labelId, name }

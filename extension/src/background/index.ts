@@ -20,6 +20,7 @@ import {
   onVaultLocked,
   onVaultUnlocked,
 } from './autofill'
+import { clearTotpQrScanContext, handleTotpQrMessage, initTotpQrScan } from './totp-qr-scan'
 import { initWasmManual } from './wasm-init'
 import { handleWebauthnMessage, initWebauthn, resumeLockedWebauthnRituals } from './webauthn'
 
@@ -201,6 +202,15 @@ setupAlarms()
 
 // Autofill の初期化（vault はプロキシ経由でlazy参照）
 initAutofill(
+  new Proxy({} as WasmApi, {
+    get: (_target, prop) => (vault as unknown as Record<string | symbol, unknown>)[prop],
+  }),
+  () => unlocked,
+  saveLocally,
+  autoSync,
+)
+
+initTotpQrScan(
   new Proxy({} as WasmApi, {
     get: (_target, prop) => (vault as unknown as Record<string | symbol, unknown>)[prop],
   }),
@@ -488,6 +498,10 @@ async function handleMessage(
       return handleAutofillMessage(message, _sender, sendResponse)
     }
 
+    if (typeof message.type === 'string' && message.type.startsWith('TOTP_QR_')) {
+      return handleTotpQrMessage(message, _sender, sendResponse)
+    }
+
     // Delegate WebAuthn/Passkey messages to the webauthn module
     if (typeof message.type === 'string' && message.type.startsWith('WEBAUTHN_')) {
       return handleWebauthnMessage(message, _sender, sendResponse)
@@ -632,6 +646,7 @@ async function handleMessage(
           chrome.alarms.clear('autosync')
           // オートフィル: 全タブに通知してContent Scriptを無効化
           onVaultLocked()
+          clearTotpQrScanContext()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -1332,6 +1347,7 @@ async function handleAutolockAlarm() {
     await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
     chrome.alarms.clear('autosync')
     onVaultLocked()
+    clearTotpQrScanContext()
   } catch (err) {
     console.error('[SW] Autolock failed:', err)
   }

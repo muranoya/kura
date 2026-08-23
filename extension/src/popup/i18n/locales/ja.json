@@ -249,7 +249,14 @@
       "selectFieldType": "フィールドの種類を選択",
       "addField": "フィールドを追加",
       "generatePassword": "パスワード生成",
-      "passkeyFor": "{{rpId}} のパスキー"
+      "passkeyFor": "{{rpId}} のパスキー",
+      "scanTotpQr": "ページのTOTP QRをスキャン",
+      "totpQrScanning": "QRスキャンを開始中…",
+      "totpQrError": {
+        "no_qr": "QRコードが見つかりません",
+        "empty": "QRコードが空でした",
+        "invalid_totp": "TOTP用のシークレットまたはotpauth URIではありません"
+      }
     },
     "customFieldTypes": {
       "text": "テキスト",
@@ -573,6 +580,32 @@
       "errorAlreadyRegistered": "このサイトのパスキーは既に登録済みです。",
       "errorNoCredentials": "このサイト用に保存されているパスキーが見つかりませんでした。",
       "errorInternal": "エラーが発生しました。"
+    }
+  },
+  "content": {
+    "totpQr": {
+      "title": "kura: TOTP QR スキャン",
+      "desc": "このページに表示されている TOTP の QR コードを読み取ります。見えている位置に合わせて [スキャン] を押してください。",
+      "scan": "スキャン",
+      "scanning": "読み取り中…",
+      "cancel": "キャンセル",
+      "idle": "",
+      "success": "TOTP を保存しました",
+      "noQr": "QR コードが見つかりません。スクロールして再試行してください。",
+      "empty": "QR コードが空でした",
+      "invalid": "TOTP 用の QR コードではありません",
+      "captureFailed": "画面のキャプチャに失敗しました",
+      "applyFailed": "保存に失敗しました",
+      "locked": "Vault がロックされたため終了しました",
+      "selectOne": "QR コードが 1 件見つかりました。意図した TOTP か確認してから保存してください。",
+      "selectMany": "QR コードが {{count}} 件見つかりました。保存する TOTP を選んでください。",
+      "secretKind": "Base32 シークレット",
+      "otpauthKind": "otpauth",
+      "digitsPeriod": "{{digits}} 桁 · {{period}}秒",
+      "secretLabel": "secret {{masked}}",
+      "save": "保存",
+      "rescan": "再スキャン",
+      "saving": "保存中…"
     }
   }
 }
