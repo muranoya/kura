@@ -251,8 +251,8 @@ impl VaultManager {
 
     /// オートフィル候補検索（ドメインでマッチング）
     ///
-    /// 全loginエントリのtyped_value.urlからホスト名を抽出し、指定された
-    /// `page_hostname` とマッチするエントリをパスワードなしで返す。
+    /// 全loginエントリのtyped_value.urlおよびURL型カスタムフィールドからホスト名を
+    /// 抽出し、指定された `page_hostname` とマッチするエントリをパスワードなしで返す。
     /// マッチング判定はvault-core側（本関数）で一元的に行う。これにより
     /// Android・拡張機能のいずれから呼んでも同一の挙動になる。
     ///
@@ -276,18 +276,12 @@ impl VaultManager {
             Ok(entries
                 .into_iter()
                 .filter_map(|entry| {
-                    let url = entry.login_url?;
-                    let entry_host = crate::domain_match::extract_host(&url)?;
-
-                    let matched = if strict_subdomain {
-                        entry_host.eq_ignore_ascii_case(&page_hostname_lower)
-                    } else {
-                        crate::domain_match::same_etld_plus1(entry_host, &page_hostname_lower)
-                    };
-                    if !matched {
-                        return None;
-                    }
-
+                    let url = match_autofill_url(
+                        entry.login_url.as_deref(),
+                        &entry.additional_urls,
+                        &page_hostname_lower,
+                        strict_subdomain,
+                    )?;
                     Some(AutofillCandidate {
                         id: entry.id,
                         name: entry.name,
@@ -317,5 +311,166 @@ impl VaultManager {
                 .map(|(entry_id, period)| TotpPeriodRow { entry_id, period })
                 .collect())
         })
+    }
+}
+
+/// オートフィル候補のURLマッチングを行う。
+///
+/// `login_url`（typed_value.url）と URL型カスタムフィールド（`additional_urls`）の
+/// いずれかが `page_hostname` にマッチするかを判定し、マッチした場合は代表URLを返す。
+/// 代表URLとしては `login_url` を優先し、`login_url` が存在しない場合はマッチした
+/// カスタムフィールドURLを返す。
+///
+/// - `strict_subdomain = false`: PSLベースのeTLD+1が一致すればマッチ
+/// - `strict_subdomain = true`: ホスト名の完全一致のみマッチ
+fn match_autofill_url(
+    login_url: Option<&str>,
+    additional_urls: &[String],
+    page_hostname_lower: &str,
+    strict_subdomain: bool,
+) -> Option<String> {
+    let candidate_urls: Vec<&str> = login_url
+        .into_iter()
+        .chain(additional_urls.iter().map(String::as_str))
+        .collect();
+
+    let any_matched = candidate_urls.iter().any(|url| {
+        let Some(entry_host) = crate::domain_match::extract_host(url) else {
+            return false;
+        };
+        if strict_subdomain {
+            entry_host.eq_ignore_ascii_case(page_hostname_lower)
+        } else {
+            crate::domain_match::same_etld_plus1(entry_host, page_hostname_lower)
+        }
+    });
+    if !any_matched {
+        return None;
+    }
+    // 代表URLとして login_url を優先し、なければマッチしたカスタムフィールドURL
+    Some(login_url.map(|u| u.to_string()).unwrap_or_else(|| {
+        candidate_urls
+            .iter()
+            .find_map(|url| {
+                let entry_host = crate::domain_match::extract_host(url)?;
+                let matched = if strict_subdomain {
+                    entry_host.eq_ignore_ascii_case(page_hostname_lower)
+                } else {
+                    crate::domain_match::same_etld_plus1(entry_host, page_hostname_lower)
+                };
+                matched.then(|| url.to_string())
+            })
+            .unwrap_or_default()
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::match_autofill_url;
+
+    #[test]
+    fn test_match_autofill_url_login_url_match() {
+        let result =
+            match_autofill_url(Some("https://example.com/login"), &[], "example.com", false);
+        assert_eq!(result.as_deref(), Some("https://example.com/login"));
+    }
+
+    #[test]
+    fn test_match_autofill_url_no_match() {
+        let result = match_autofill_url(
+            Some("https://example.com"),
+            &["https://other.com".to_string()],
+            "unrelated.org",
+            false,
+        );
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_match_autofill_url_custom_field_url_match() {
+        // login_url はページと不一致だが、カスタムフィールドURLがマッチする
+        let result = match_autofill_url(
+            Some("https://example.com"),
+            &["https://github.com/login".to_string()],
+            "github.com",
+            false,
+        );
+        // login_url が存在するため代表URLとしてそれを返す
+        assert_eq!(result.as_deref(), Some("https://example.com"));
+    }
+
+    #[test]
+    fn test_match_autofill_url_custom_field_only_match() {
+        // login_url がなく、カスタムフィールドURLのみでマッチする
+        let result = match_autofill_url(
+            None,
+            &["https://github.com/login".to_string()],
+            "github.com",
+            false,
+        );
+        assert_eq!(result.as_deref(), Some("https://github.com/login"));
+    }
+
+    #[test]
+    fn test_match_autofill_url_etld_plus1_match() {
+        // www. 付きのカスタムフィールドURLが eTLD+1 でマッチ
+        let result = match_autofill_url(
+            None,
+            &["https://www.example.com/path".to_string()],
+            "m.example.com",
+            false,
+        );
+        assert_eq!(result.as_deref(), Some("https://www.example.com/path"));
+    }
+
+    #[test]
+    fn test_match_autofill_url_strict_subdomain_match() {
+        let result = match_autofill_url(
+            None,
+            &["https://www.example.com".to_string()],
+            "www.example.com",
+            true,
+        );
+        assert_eq!(result.as_deref(), Some("https://www.example.com"));
+    }
+
+    #[test]
+    fn test_match_autofill_url_strict_subdomain_no_match() {
+        // strict_subdomain = true ではサブドメイン違いはマッチしない
+        let result = match_autofill_url(
+            None,
+            &["https://www.example.com".to_string()],
+            "m.example.com",
+            true,
+        );
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_match_autofill_url_invalid_url_ignored() {
+        // extract_host は空文字列を拒否するため、空のURLはマッチ対象外
+        let result = match_autofill_url(
+            None,
+            &["".to_string(), "https://example.com".to_string()],
+            "example.com",
+            false,
+        );
+        // 空URLはスキップされ、2番目のURLがマッチする
+        assert_eq!(result.as_deref(), Some("https://example.com"));
+    }
+
+    #[test]
+    fn test_match_autofill_url_multiple_custom_fields() {
+        // 複数のカスタムフィールドURLのうち2番目がマッチ
+        let result = match_autofill_url(
+            None,
+            &[
+                "https://other.com".to_string(),
+                "https://example.com/path".to_string(),
+            ],
+            "example.com",
+            false,
+        );
+        assert_eq!(result.as_deref(), Some("https://example.com/path"));
     }
 }

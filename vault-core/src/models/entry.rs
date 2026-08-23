@@ -123,6 +123,9 @@ pub struct EntrySummary {
     pub subtitle: Option<String>,
     /// entry_type == "login"の場合のみ設定されるURL（オートフィル候補抽出用）
     pub login_url: Option<String>,
+    /// カスタムフィールド（field_type == "url"）から抽出したURLのリスト。
+    /// オートフィル候補抽出時にlogin_urlとともにマッチ対象となる。
+    pub additional_urls: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default)]
