@@ -93,7 +93,7 @@ fun EntryEditScreen(
                                             id = entryId,
                                             name = name,
                                             typedValueJson = tvJson,
-                                            notes = notes.ifBlank { null },
+                                            notes = notes,
                                             labelIds = selectedLabelIds.toList(),
                                             customFieldsJson = cfJson
                                         )

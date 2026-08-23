@@ -68,7 +68,7 @@ export default function EntryEdit() {
         id,
         name,
         typedValueJson,
-        notes || undefined,
+        notes ?? undefined,
         selectedLabelIds,
         customFieldsJson,
       )
@@ -100,7 +100,7 @@ export default function EntryEdit() {
       id,
       name,
       typedValueJson,
-      notes || undefined,
+      notes ?? undefined,
       selectedLabelIds,
       customFieldsJson,
     )

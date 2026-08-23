@@ -73,7 +73,7 @@ fun EntryCreateScreen(
                                         val id = appViewModel.repository.createEntry(
                                             entryType = selectedType!!,
                                             name = name,
-                                            notes = notes.ifBlank { null },
+                                            notes = notes,
                                             typedValueJson = tvJson,
                                             labelIds = selectedLabelIds.toList(),
                                             customFieldsJson = cfJson
