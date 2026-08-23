@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.core.resolutionselector.ResolutionSelector
@@ -446,6 +447,7 @@ fun TotpQrScanDialog(
     }
 }
 
+@androidx.annotation.OptIn(markerClass = [ExperimentalGetImage::class])
 @Composable
 private fun CameraPreview(
     analysisEnabled: AtomicBoolean,

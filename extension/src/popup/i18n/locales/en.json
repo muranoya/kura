@@ -581,5 +581,31 @@
       "errorNoCredentials": "No saved passkey was found for this site.",
       "errorInternal": "Something went wrong."
     }
+  },
+  "content": {
+    "totpQr": {
+      "title": "kura: TOTP QR scan",
+      "desc": "Scan a TOTP QR code visible on this page. Position it in view, then press Scan.",
+      "scan": "Scan",
+      "scanning": "Scanning…",
+      "cancel": "Cancel",
+      "idle": "",
+      "success": "TOTP saved",
+      "noQr": "No QR code found. Scroll and try again.",
+      "empty": "QR code was empty",
+      "invalid": "QR code is not a TOTP secret",
+      "captureFailed": "Failed to capture the screen",
+      "applyFailed": "Failed to save",
+      "locked": "Stopped because the vault was locked",
+      "selectOne": "1 QR code found. Confirm it is the intended TOTP before saving.",
+      "selectMany": "{{count}} QR codes found. Choose the intended TOTP before saving.",
+      "secretKind": "Base32 secret",
+      "otpauthKind": "otpauth",
+      "digitsPeriod": "{{digits}} digits · {{period}}s",
+      "secretLabel": "secret {{masked}}",
+      "save": "Save",
+      "rescan": "Scan again",
+      "saving": "Saving…"
+    }
   }
 }

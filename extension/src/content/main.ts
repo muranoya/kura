@@ -69,7 +69,13 @@ function onVaultMessage(
   if (message.type === 'TOTP_QR_START') {
     hideDropdown()
     if (isCaptureActive()) return
-    startTotpQrScanMode()
+    void startTotpQrScanMode()
+    return
+  }
+  if (message.type === 'TOTP_QR_END') {
+    // Scan context was replaced by a new tab — tear down without notifying
+    // (TOTP_QR_CANCEL would wipe the new context in the Service Worker).
+    void stopTotpQrScanMode(false)
     return
   }
 

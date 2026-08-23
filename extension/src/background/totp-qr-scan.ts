@@ -70,11 +70,20 @@ export function handleTotpQrMessage(
           sendResponse({ success: false, error: 'No active tab' })
           return
         }
+        const prevContext = scanContext
         scanContext = {
           entryId,
           fieldId,
           tabId: tab.id,
           windowId: tab.windowId,
+        }
+        // Tear down an overlay left on a previous tab — the scan context now
+        // belongs to the new tab, so the old tab's overlay would otherwise
+        // stay on screen and fail with 'Scan tab mismatch' on interaction.
+        if (prevContext && prevContext.tabId !== tab.id) {
+          chrome.tabs
+            .sendMessage(prevContext.tabId, { type: 'TOTP_QR_END' }, { frameId: 0 })
+            .catch(() => {}) // Tab may already be closed
         }
         chrome.tabs
           .sendMessage(tab.id, { type: 'TOTP_QR_START' }, { frameId: 0 })
@@ -97,6 +106,10 @@ export function handleTotpQrMessage(
         break
       }
       const windowId = scanContext.windowId ?? sender.tab?.windowId
+      if (windowId == null) {
+        sendResponse({ success: false, error: 'No window for capture' })
+        break
+      }
       chrome.tabs.captureVisibleTab(windowId, { format: 'png' }, (dataUrl) => {
         if (chrome.runtime.lastError || !dataUrl) {
           sendResponse({
@@ -133,77 +146,78 @@ export function handleTotpQrMessage(
       }
 
       const { entryId, fieldId } = scanContext
-      try {
-        const raw = JSON.parse(vaultApi.api_get_entry(DEFAULT_VAULT_ID, entryId)) as Record<
-          string,
-          unknown
-        >
-        if (!raw) {
-          sendResponse({ success: false, error: 'Entry not found' })
-          break
-        }
+      const api = vaultApi
+      const saveFn = saveLocallyFn
+      const syncFn = autoSyncFn
+      ;(async () => {
+        try {
+          const raw = JSON.parse(api.api_get_entry(DEFAULT_VAULT_ID, entryId)) as Record<
+            string,
+            unknown
+          >
+          if (!raw) {
+            sendResponse({ success: false, error: 'Entry not found' })
+            return
+          }
 
-        if (raw.typed_value && typeof raw.typed_value === 'string') {
-          raw.typed_value = JSON.parse(raw.typed_value)
-        }
-        if (raw.custom_fields && typeof raw.custom_fields === 'string') {
-          raw.custom_fields = JSON.parse(raw.custom_fields)
-        }
+          if (raw.typed_value && typeof raw.typed_value === 'string') {
+            raw.typed_value = JSON.parse(raw.typed_value)
+          }
+          if (raw.custom_fields && typeof raw.custom_fields === 'string') {
+            raw.custom_fields = JSON.parse(raw.custom_fields)
+          }
 
-        const name = String(raw.name ?? '')
-        const notes = (raw.notes as string | null) ?? null
-        const typedValue = raw.typed_value ?? {}
-        const labelIds =
-          (raw.labels as string[] | undefined) ?? (raw.label_ids as string[] | undefined) ?? []
-        let customFields = ((raw.custom_fields as Record<string, unknown>[] | undefined) ?? []).map(
-          (f) => ({
+          const name = String(raw.name ?? '')
+          const notes = (raw.notes as string | null) ?? null
+          const typedValue = raw.typed_value ?? {}
+          const labelIds =
+            (raw.labels as string[] | undefined) ?? (raw.label_ids as string[] | undefined) ?? []
+          let customFields = (
+            (raw.custom_fields as Record<string, unknown>[] | undefined) ?? []
+          ).map((f) => ({
             id: String(f.id ?? ''),
             name: String(f.name ?? ''),
             field_type: String(f.field_type ?? 'text'),
             value: String(f.value ?? ''),
-          }),
-        )
+          }))
 
-        const idx = customFields.findIndex((f) => f.id === fieldId)
-        if (idx >= 0) {
-          customFields = customFields.map((f, i) =>
-            i === idx ? { ...f, field_type: 'totp', value } : f,
+          const idx = customFields.findIndex((f) => f.id === fieldId)
+          if (idx >= 0) {
+            customFields = customFields.map((f, i) =>
+              i === idx ? { ...f, field_type: 'totp', value } : f,
+            )
+          } else {
+            customFields = [
+              ...customFields,
+              {
+                id: fieldId,
+                name: 'TOTP',
+                field_type: 'totp',
+                value,
+              },
+            ]
+          }
+
+          api.api_update_entry(
+            DEFAULT_VAULT_ID,
+            entryId,
+            name,
+            notes,
+            JSON.stringify(typedValue),
+            labelIds,
+            JSON.stringify(customFields),
           )
-        } else {
-          customFields = [
-            ...customFields,
-            {
-              id: fieldId,
-              name: 'TOTP',
-              field_type: 'totp',
-              value,
-            },
-          ]
+          await saveFn()
+          syncFn().catch((e) => console.error(LOG_PREFIX, 'Sync failed:', e))
+
+          scanContext = null
+          sendResponse({ success: true })
+        } catch (e) {
+          console.error(LOG_PREFIX, 'TOTP_QR_APPLY failed:', e)
+          sendResponse({ success: false, error: String(e) })
         }
-
-        vaultApi.api_update_entry(
-          DEFAULT_VAULT_ID,
-          entryId,
-          name,
-          notes,
-          JSON.stringify(typedValue),
-          labelIds,
-          JSON.stringify(customFields),
-        )
-        const syncFn = autoSyncFn
-        saveLocallyFn()
-          .then(() => {
-            syncFn().catch((e) => console.error(LOG_PREFIX, 'Sync failed:', e))
-          })
-          .catch((e) => console.error(LOG_PREFIX, 'Save failed:', e))
-
-        scanContext = null
-        sendResponse({ success: true })
-      } catch (e) {
-        console.error(LOG_PREFIX, 'TOTP_QR_APPLY failed:', e)
-        sendResponse({ success: false, error: String(e) })
-      }
-      break
+      })()
+      return true
     }
 
     case 'TOTP_QR_CANCEL': {

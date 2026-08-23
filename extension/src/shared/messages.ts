@@ -115,6 +115,7 @@ export type Message =
 
   // TOTP QR scan (page screenshot)
   | { type: 'TOTP_QR_START'; entryId: string; fieldId: string }
+  | { type: 'TOTP_QR_END' }
   | { type: 'TOTP_QR_CAPTURE' }
   | { type: 'TOTP_QR_APPLY'; value: string }
   | { type: 'TOTP_QR_CANCEL' }

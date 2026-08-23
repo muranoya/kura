@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeTotpQrPayload, rankTotpQrCandidates, TotpQrDecodeError } from '../shared/totp-qr'
+import {
+  maskSecretFragment,
+  normalizeTotpQrPayload,
+  rankTotpQrCandidates,
+  summarizeTotpQrCandidate,
+  TotpQrDecodeError,
+} from '../shared/totp-qr'
 
 describe('normalizeTotpQrPayload', () => {
   it('trims whitespace', () => {
@@ -41,5 +47,36 @@ describe('rankTotpQrCandidates', () => {
 
   it('deduplicates and drops empty', () => {
     expect(rankTotpQrCandidates(['  x  ', 'x', '', '  '])).toEqual(['x'])
+  })
+})
+
+describe('maskSecretFragment', () => {
+  it('masks long secrets', () => {
+    expect(maskSecretFragment('JBSWY3DPEHPK3PXP')).toBe('JBSW…3PXP')
+  })
+
+  it('fully masks short secrets', () => {
+    expect(maskSecretFragment('ABCD')).toMatch(/^•+$/)
+  })
+})
+
+describe('summarizeTotpQrCandidate', () => {
+  it('parses otpauth issuer and account with masked secret', () => {
+    const uri =
+      'otpauth://totp/GitHub:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub&digits=6&period=30'
+    const s = summarizeTotpQrCandidate(uri)
+    expect(s.kind).toBe('otpauth')
+    expect(s.issuer).toBe('GitHub')
+    expect(s.account).toBe('user@example.com')
+    expect(s.digits).toBe('6')
+    expect(s.period).toBe('30')
+    expect(s.secretMasked).toBe('JBSW…3PXP')
+    expect(s.secretMasked).not.toContain('JBSWY3DPEHPK3PXP')
+  })
+
+  it('summarizes plain base32 as secret kind', () => {
+    const s = summarizeTotpQrCandidate('JBSWY3DPEHPK3PXP')
+    expect(s.kind).toBe('secret')
+    expect(s.secretMasked).toBe('JBSW…3PXP')
   })
 })
