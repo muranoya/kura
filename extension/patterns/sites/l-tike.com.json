@@ -1,0 +1,17 @@
+{
+  "description": "l-tike.comのログイン画面",
+  "match": {
+    "type": "domain_suffix",
+    "value": "l-tike.com"
+  },
+  "forms": [
+    {
+      "id": "l-tike-member-login",
+      "type": "login",
+      "fields": {
+        "username": { "selector": "input[name='lwebMailAddress']" },
+        "password": { "selector": "input[name='lwebPassword']" }
+      }
+    }
+  ]
+}
