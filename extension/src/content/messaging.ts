@@ -7,6 +7,7 @@ interface SuccessResponse {
   credentials?: AutofillCredentialCandidate[]
   fillData?: AutofillFillData
   password?: string
+  dataUrl?: string
 }
 
 interface ErrorResponse {
@@ -159,4 +160,27 @@ export async function saveCapturedCredential(
     }
   }
   return { success: false, error: (response as unknown as Record<string, unknown>).error as string }
+}
+
+export async function captureTotpQrScreenshot(): Promise<string | null> {
+  const response = await sendMessage({ type: 'TOTP_QR_CAPTURE' })
+  if (response.success && 'dataUrl' in response && typeof response.dataUrl === 'string') {
+    return response.dataUrl
+  }
+  return null
+}
+
+export async function applyTotpQrValue(
+  value: string,
+): Promise<{ success: boolean; error?: string }> {
+  const response = await sendMessage({ type: 'TOTP_QR_APPLY', value })
+  if (response.success) return { success: true }
+  return {
+    success: false,
+    error: 'error' in response ? String(response.error) : 'Unknown error',
+  }
+}
+
+export async function cancelTotpQrScan(): Promise<void> {
+  await sendMessage({ type: 'TOTP_QR_CANCEL' })
 }

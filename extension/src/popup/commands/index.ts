@@ -198,6 +198,11 @@ export async function generateTotpFromValue(
   }
 }
 
+export async function startTotpQrScan(entryId: string, fieldId: string): Promise<void> {
+  const res = await sendMessage({ type: 'TOTP_QR_START', entryId, fieldId })
+  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
+}
+
 // Export
 export async function exportBitwardenJson(): Promise<string> {
   const res = await sendMessage({ type: 'EXPORT_BITWARDEN_JSON' })

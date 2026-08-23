@@ -19,6 +19,12 @@ import {
 } from './messaging'
 import { detectFormByPattern } from './pattern-detector'
 import { findMatchingPattern } from './pattern-matcher'
+import {
+  isTotpQrScanActive,
+  onVaultLockedDuringTotpQrScan,
+  startTotpQrScanMode,
+  stopTotpQrScanMode,
+} from './totp-qr-scan'
 
 // Prevent double-initialization if injected multiple times
 if (!(window as unknown as Record<string, boolean>).__kura_autofill_initialized) {
@@ -47,6 +53,7 @@ function onVaultMessage(
   if (message.type === 'AUTOFILL_VAULT_LOCKED') {
     hideDropdown()
     onVaultLockedDuringCapture()
+    onVaultLockedDuringTotpQrScan()
     return
   }
   if (message.type === 'AUTOFILL_VAULT_UNLOCKED') {
@@ -55,7 +62,14 @@ function onVaultMessage(
   }
   if (message.type === 'AUTOFILL_START_CAPTURE') {
     hideDropdown()
+    void stopTotpQrScanMode(true)
     startCaptureMode()
+    return
+  }
+  if (message.type === 'TOTP_QR_START') {
+    hideDropdown()
+    if (isCaptureActive()) return
+    startTotpQrScanMode()
     return
   }
 
@@ -69,7 +83,7 @@ function onVaultMessage(
 let focusDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 function onFocus(e: Event) {
-  if (isCaptureActive()) return
+  if (isCaptureActive() || isTotpQrScanActive()) return
 
   // Use composedPath to get the actual target across shadow DOM boundaries
   const target = e.composedPath()[0]

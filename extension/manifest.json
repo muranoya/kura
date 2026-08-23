@@ -5,7 +5,15 @@
   "description": "__MSG_appDescription__",
   "default_locale": "en",
 
-  "permissions": ["storage", "alarms", "clipboardWrite", "clipboardRead", "offscreen", "tabs"],
+  "permissions": [
+    "storage",
+    "alarms",
+    "clipboardWrite",
+    "clipboardRead",
+    "offscreen",
+    "tabs",
+    "activeTab"
+  ],
 
   "action": {
     "default_popup": "src/popup/index.html",
@@ -26,7 +34,8 @@
       "resources": [
         "wasm/wasm_bridge_bg.wasm",
         "src/content/dropdown.css",
-        "src/content/capture.css"
+        "src/content/capture.css",
+        "src/content/totp-qr-scan.css"
       ],
       "matches": ["<all_urls>"]
     }
