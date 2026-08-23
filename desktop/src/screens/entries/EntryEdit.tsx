@@ -66,7 +66,7 @@ export default function EntryEdit() {
         id as string,
         name,
         typedValueJson,
-        notes || undefined,
+        notes ?? undefined,
         selectedLabelIds,
         customFieldsJson,
       )

@@ -59,7 +59,7 @@ export default function EntryCreate() {
         entryType,
         name,
         typedValueJson,
-        notes || undefined,
+        notes ?? undefined,
         selectedLabelIds,
         customFieldsJson,
       )
