@@ -296,6 +296,8 @@ SPA遷移後に新しいフォームが出現した場合も、ユーザーが�
 
 **ログイン候補（vaultエントリ）のマッチングはvault-core（Rust）側で行う。** `vault-core/src/domain_match.rs`が同じ`assets/public_suffix_list.dat`を`include_str!`でビルド時に埋め込み、実行時に一度だけパースしてeTLD+1判定を行う。`api_list_login_candidates(vault_id, page_hostname, strict_subdomain)`がマッチ済みの候補のみを返すため、拡張機能側（`extension/src/background/autofill.ts`の`getCredentialsForUrl`）はこのAPIの呼び出し結果をそのまま使うだけでよい。Android版も同一のvault-core関数を経由するため、両プラットフォームでマッチング挙動が一致する（詳細は[`docs/android-autofillservice.md`](android-autofillservice.md) 2-3節を参照）。
 
+**マッチ対象となるURLは エントリの `typed_value.url`（ログインURL）に加え、URL型カスタムフィールド（`field_type == "url"`）の値も含まれる。** これにより、1つのログインエントリに複数のサイトURLを紐付けることができる（例: メインURLとは別に、リカバリ用URLや関連サービスのURLをカスタムフィールドに登録すれば、それらのサイトでも同じエントリが候補に出る）。マッチング処理は`vault-core/src/api/entries.rs`の`api_list_login_candidates`で一元化されている。
+
 **TypeScript版（`extension/src/shared/etld.ts`）は分割ログインフロー（Section 3-5）のpending-flowドメインキー比較にのみ使用し、vaultエントリのマッチングには使用しない。** ビルド時処理は以下の通り:
 
 1. `extension/scripts/generate-etld.ts`が`assets/public_suffix_list.dat`を読み込む

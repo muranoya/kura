@@ -255,7 +255,7 @@ mod tests {
     use super::super::UnlockedVault;
     use super::*;
     use crate::crypto::Dek;
-    use crate::models::{Argon2Params, SortField, SortOrder, VaultMeta};
+    use crate::models::{Argon2Params, CustomField, SortField, SortOrder, VaultMeta};
     use crate::secret::SecretString;
     use crate::store::VaultContents;
 
@@ -519,6 +519,74 @@ mod tests {
         assert_eq!(summaries[0].subtitle.as_deref(), Some("My Bank"));
         // bankエントリはlogin_urlの対象外
         assert_eq!(summaries[0].login_url, None);
+    }
+
+    #[test]
+    fn test_list_entry_summaries_additional_urls_from_custom_fields() {
+        let mut vault = make_vault();
+        let mut data = make_login_data();
+        data.custom_fields = Some(vec![
+            CustomField {
+                id: "cf1".to_string(),
+                name: "Recovery URL".to_string(),
+                field_type: "url".to_string(),
+                value: SecretString::from_string("https://recovery.example.com".to_string()),
+            },
+            CustomField {
+                id: "cf2".to_string(),
+                name: "API Endpoint".to_string(),
+                field_type: "url".to_string(),
+                value: SecretString::from_string("https://api.example.com".to_string()),
+            },
+            CustomField {
+                id: "cf3".to_string(),
+                name: "Note".to_string(),
+                field_type: "text".to_string(),
+                value: SecretString::from_string("not a url".to_string()),
+            },
+        ]);
+        vault
+            .create_entry("Login".into(), "login".to_string(), data, vec![])
+            .unwrap();
+
+        let filter = EntryFilter::new();
+        let summaries = vault.list_entry_summaries(&filter);
+
+        assert_eq!(summaries.len(), 1);
+        // login_url は typed_value.url から
+        assert_eq!(
+            summaries[0].login_url.as_deref(),
+            Some("https://example.com")
+        );
+        // URL型カスタムフィールドのみが additional_urls に収集される
+        assert_eq!(
+            summaries[0].additional_urls,
+            vec![
+                "https://recovery.example.com".to_string(),
+                "https://api.example.com".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_list_entry_summaries_additional_urls_empty_when_no_url_fields() {
+        let mut vault = make_vault();
+        let mut data = make_login_data();
+        data.custom_fields = Some(vec![CustomField {
+            id: "cf1".to_string(),
+            name: "Security Q".to_string(),
+            field_type: "text".to_string(),
+            value: SecretString::from_string("answer".to_string()),
+        }]);
+        vault
+            .create_entry("Login".into(), "login".to_string(), data, vec![])
+            .unwrap();
+
+        let filter = EntryFilter::new();
+        let summaries = vault.list_entry_summaries(&filter);
+
+        assert_eq!(summaries.len(), 1);
+        assert!(summaries[0].additional_urls.is_empty());
     }
 
     #[test]
@@ -1062,6 +1130,19 @@ pub(crate) fn vault_entry_to_summary(id: String, e: &VaultEntry) -> EntrySummary
         None
     };
 
+    // カスタムフィールドのURL（field_type == "url"）をオートフィル候補抽出用に収集
+    let additional_urls: Vec<String> = e
+        .custom_fields
+        .as_ref()
+        .map(|fs| {
+            fs.iter()
+                .filter(|f| f.field_type == "url")
+                .map(|f| f.value.as_str().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
+        .unwrap_or_default();
+
     EntrySummary {
         id,
         name: e.name.clone(),
@@ -1072,6 +1153,7 @@ pub(crate) fn vault_entry_to_summary(id: String, e: &VaultEntry) -> EntrySummary
         deleted_at: e.deleted_at,
         subtitle,
         login_url,
+        additional_urls,
     }
 }
 
