@@ -125,11 +125,12 @@ dependencies {
     // ActivityResultRegistry と併用すると IllegalArgumentException となる。
     implementation("androidx.fragment:fragment:1.6.2")
 
-    // CameraX + ML Kit (TOTP QR scan)
+    // CameraX + ML Kit (TOTP QR live scan) + ZXing (static image / PNG gallery)
     implementation("androidx.camera:camera-camera2:1.4.1")
     implementation("androidx.camera:camera-lifecycle:1.4.1")
     implementation("androidx.camera:camera-view:1.4.1")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    implementation("com.google.zxing:core:3.5.3")
 
     // Markdown
     implementation("org.commonmark:commonmark:0.24.0")

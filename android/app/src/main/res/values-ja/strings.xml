@@ -267,7 +267,10 @@
     <string name="custom_field_name_placeholder">フィールド名</string>
     <string name="custom_field_totp_label">TOTP</string>
     <string name="totp_qr_scan_title">TOTP QRをスキャン</string>
+    <string name="totp_qr_source_title">TOTP QRを読み取る</string>
+    <string name="totp_qr_use_camera">カメラでスキャン</string>
     <string name="totp_qr_from_gallery">画像を選択</string>
+    <string name="totp_qr_processing">QRコードを読み取り中…</string>
     <string name="totp_qr_camera_rationale">TOTPのQRコードを読み取るにはカメラへのアクセスを許可してください</string>
     <string name="totp_qr_camera_denied">カメラ権限が拒否されました。画像から読み取ることもできます。</string>
     <string name="totp_qr_request_camera">カメラを許可</string>

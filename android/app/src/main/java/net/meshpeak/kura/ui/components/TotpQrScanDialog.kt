@@ -1,12 +1,9 @@
 package net.meshpeak.kura.ui.components
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.ImageDecoder
 import android.net.Uri
-import android.os.Build
-import android.provider.MediaStore
 import android.util.Size
 import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -22,15 +19,20 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -68,13 +70,173 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import net.meshpeak.kura.R
+import net.meshpeak.kura.util.TotpQrImageDecoder
 import net.meshpeak.kura.util.TotpQrPayload
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.coroutines.resume
+
+@Composable
+fun TotpQrSourceDialog(
+    onCamera: () -> Unit,
+    onGallery: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.totp_qr_source_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(
+                    onClick = onCamera,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Default.PhotoCamera, contentDescription = null)
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(R.string.totp_qr_use_camera))
+                    }
+                }
+                TextButton(
+                    onClick = onGallery,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Default.Image, contentDescription = null)
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(R.string.totp_qr_from_gallery))
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+    )
+}
+
+/**
+ * Launches the system image picker, decodes a TOTP QR, and reports the result.
+ * Call [launch] from a click handler. While processing, shows a blocking progress dialog;
+ * on failure shows an error dialog.
+ */
+@Composable
+fun TotpQrGalleryImport(
+    validateTotp: suspend (String) -> Boolean,
+    onResult: (String) -> Unit,
+    onIdle: () -> Unit = {},
+): () -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var processing by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val validateState = rememberUpdatedState(validateTotp)
+    val onResultState = rememberUpdatedState(onResult)
+    val onIdleState = rememberUpdatedState(onIdle)
+
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri == null) {
+            onIdleState.value()
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch {
+            processing = true
+            errorMessage = null
+            when (val outcome = decodeAndValidateTotpQr(context, uri, validateState.value)) {
+                is TotpQrDecodeOutcome.Success -> onResultState.value(outcome.value)
+                is TotpQrDecodeOutcome.Failure -> errorMessage = context.getString(outcome.messageRes)
+            }
+            processing = false
+            if (errorMessage == null) {
+                onIdleState.value()
+            }
+        }
+    }
+
+    if (processing) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text(stringResource(R.string.totp_qr_source_title)) },
+            text = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
+                    Text(stringResource(R.string.totp_qr_processing))
+                }
+            },
+            confirmButton = {},
+        )
+    }
+
+    errorMessage?.let { msg ->
+        AlertDialog(
+            onDismissRequest = {
+                errorMessage = null
+                onIdleState.value()
+            },
+            title = { Text(stringResource(R.string.totp_qr_source_title)) },
+            text = { Text(msg) },
+            confirmButton = {
+                TextButton(onClick = {
+                    errorMessage = null
+                    onIdleState.value()
+                }) {
+                    Text(stringResource(R.string.action_confirm))
+                }
+            },
+        )
+    }
+
+    return remember(launcher) {
+        { launcher.launch("image/*") }
+    }
+}
+
+private sealed class TotpQrDecodeOutcome {
+    data class Success(val value: String) : TotpQrDecodeOutcome()
+    data class Failure(val messageRes: Int) : TotpQrDecodeOutcome()
+}
+
+private suspend fun decodeAndValidateTotpQr(
+    context: Context,
+    uri: Uri,
+    validateTotp: suspend (String) -> Boolean,
+): TotpQrDecodeOutcome {
+    return try {
+        val payload = withContext(Dispatchers.IO) { TotpQrImageDecoder.decode(context, uri) }
+            ?: return TotpQrDecodeOutcome.Failure(R.string.totp_qr_error_no_qr)
+        val value = TotpQrPayload.normalize(payload)
+        if (TotpQrPayload.isEmpty(value)) {
+            return TotpQrDecodeOutcome.Failure(R.string.totp_qr_error_empty)
+        }
+        val ok = try {
+            validateTotp(value)
+        } catch (_: Exception) {
+            false
+        }
+        if (ok) {
+            TotpQrDecodeOutcome.Success(value)
+        } else {
+            TotpQrDecodeOutcome.Failure(R.string.totp_qr_error_invalid)
+        }
+    } catch (_: Exception) {
+        TotpQrDecodeOutcome.Failure(R.string.totp_qr_error_no_qr)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -146,27 +308,13 @@ fun TotpQrScanDialog(
             processing = true
             analysisEnabled.set(false)
             errorMessage = null
-            try {
-                val bitmap = withContext(Dispatchers.IO) { loadBitmap(context, uri) }
-                if (bitmap == null) {
-                    errorMessage = context.getString(R.string.totp_qr_error_no_qr)
+            when (val outcome = decodeAndValidateTotpQr(context, uri, validateTotp)) {
+                is TotpQrDecodeOutcome.Success -> onResult(outcome.value)
+                is TotpQrDecodeOutcome.Failure -> {
+                    errorMessage = context.getString(outcome.messageRes)
                     processing = false
                     analysisEnabled.set(true)
-                    return@launch
                 }
-                val payload = withContext(Dispatchers.IO) { decodeQrFromBitmap(bitmap) }
-                if (payload == null) {
-                    errorMessage = context.getString(R.string.totp_qr_error_no_qr)
-                    processing = false
-                    analysisEnabled.set(true)
-                } else {
-                    handled.set(false)
-                    handlePayload(payload)
-                }
-            } catch (_: Exception) {
-                errorMessage = context.getString(R.string.totp_qr_error_no_qr)
-                processing = false
-                analysisEnabled.set(true)
             }
         }
     }
@@ -263,6 +411,7 @@ fun TotpQrScanDialog(
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .background(Color.Black.copy(alpha = 0.65f))
+                        .navigationBarsPadding()
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -404,40 +553,3 @@ private fun CameraPreview(
         modifier = modifier,
     )
 }
-
-@Suppress("DEPRECATION")
-private fun loadBitmap(context: android.content.Context, uri: Uri): Bitmap? {
-    return try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val source = ImageDecoder.createSource(context.contentResolver, uri)
-            ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                decoder.isMutableRequired = false
-                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-            }
-        } else {
-            MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-        }
-    } catch (_: Exception) {
-        null
-    }
-}
-
-private suspend fun decodeQrFromBitmap(bitmap: Bitmap): String? =
-    suspendCancellableCoroutine { cont ->
-        val scanner = BarcodeScanning.getClient(
-            BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-                .build()
-        )
-        val image = InputImage.fromBitmap(bitmap, 0)
-        scanner.process(image)
-            .addOnSuccessListener { barcodes ->
-                cont.resume(barcodes.firstOrNull()?.rawValue)
-            }
-            .addOnFailureListener {
-                cont.resume(null)
-            }
-            .addOnCompleteListener {
-                scanner.close()
-            }
-    }

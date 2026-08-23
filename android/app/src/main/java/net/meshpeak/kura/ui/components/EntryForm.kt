@@ -610,19 +610,44 @@ fun CustomFieldEditor(
     val isSecret = field.fieldType == "password" || field.fieldType == "totp"
     var isValueFocused by remember { mutableStateOf(false) }
     var showGenerator by remember { mutableStateOf(false) }
+    var showTotpQrSource by remember { mutableStateOf(false) }
     var showTotpQrScan by remember { mutableStateOf(false) }
     val showGenerateButton = field.fieldType == "password" && onGeneratePassword != null
     val showTotpQrButton = field.fieldType == "totp" && onValidateTotp != null
+    val validateTotp = onValidateTotp
 
-    if (showTotpQrScan && onValidateTotp != null) {
-        TotpQrScanDialog(
+    if (field.fieldType == "totp" && validateTotp != null) {
+        val launchTotpGallery = TotpQrGalleryImport(
+            validateTotp = validateTotp,
             onResult = { value ->
                 onFieldChange(field.copy(value = value))
-                showTotpQrScan = false
             },
-            onDismiss = { showTotpQrScan = false },
-            validateTotp = onValidateTotp,
         )
+
+        if (showTotpQrSource) {
+            TotpQrSourceDialog(
+                onCamera = {
+                    showTotpQrSource = false
+                    showTotpQrScan = true
+                },
+                onGallery = {
+                    showTotpQrSource = false
+                    launchTotpGallery()
+                },
+                onDismiss = { showTotpQrSource = false },
+            )
+        }
+
+        if (showTotpQrScan) {
+            TotpQrScanDialog(
+                onResult = { value ->
+                    onFieldChange(field.copy(value = value))
+                    showTotpQrScan = false
+                },
+                onDismiss = { showTotpQrScan = false },
+                validateTotp = validateTotp,
+            )
+        }
     }
 
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -731,7 +756,7 @@ fun CustomFieldEditor(
                     }
                     showTotpQrButton -> {
                         {
-                            IconButton(onClick = { showTotpQrScan = true }) {
+                            IconButton(onClick = { showTotpQrSource = true }) {
                                 Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.cd_scan_totp_qr))
                             }
                         }
