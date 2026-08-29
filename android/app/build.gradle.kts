@@ -13,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "net.meshpeak.kura"
-        minSdk = 26
+        minSdk = 34
         targetSdk = 35
         versionCode = 1
         versionName = appVersion
@@ -117,6 +117,9 @@ dependencies {
 
     // AppCompat (needed for AppCompatDelegate.setApplicationLocales on per-app language preferences)
     implementation("androidx.appcompat:appcompat:1.7.0")
+
+    // Credential Manager (Passkey / Credential Provider)
+    implementation("androidx.credentials:credentials:1.7.0-alpha02")
 
     // Biometric
     implementation("androidx.biometric:biometric:1.1.0")

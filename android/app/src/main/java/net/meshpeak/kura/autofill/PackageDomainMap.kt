@@ -4,8 +4,14 @@ import android.content.Context
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
+/**
+ * 1パッケージに複数ドメインを紐づけられるようにする（例: com.instagram.androidは
+ * instagram.com/facebook.comのどちらのアカウントでもログインできるため両方登録する）。
+ * 同じパッケージ名を複数回キーとして書くとJSONオブジェクトとして不正
+ * （後勝ちで上書きされ、片方が静かに失われる）なので、必ずリストで表現する。
+ */
 @Serializable
-data class PackageDomainEntry(val domain: String)
+data class PackageDomainEntry(val domains: List<String>)
 
 /**
  * パッケージ名⇔ドメインの手動キュレーションDB（assets/package_domains.json）を読み込む。
@@ -19,8 +25,9 @@ object PackageDomainMap {
     @Volatile
     private var cache: Map<String, PackageDomainEntry>? = null
 
-    fun domainFor(context: Context, packageName: String): String? {
-        return mapFor(context)[packageName]?.domain
+    /** パッケージ名に紐づく全てのドメイン候補。未登録なら空リスト。 */
+    fun domainsFor(context: Context, packageName: String): List<String> {
+        return mapFor(context)[packageName]?.domains ?: emptyList()
     }
 
     private fun mapFor(context: Context): Map<String, PackageDomainEntry> {

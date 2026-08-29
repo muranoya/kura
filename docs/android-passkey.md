@@ -1,4 +1,4 @@
-<!-- doc-status: design -->
+<!-- doc-status: implemented -->
 # Android Passkey (Credential Provider) 対応
 
 # Part 1: 概要
@@ -43,6 +43,8 @@ vault-coreに以下の3つの公開APIが既に実装されており、ブラウ
 | `api_webauthn_get_assertion(entry_id, custom_field_id, client_data_json)` | 既存Passkeyで認証assertionに署名。`sign_count`を持たせない設計のためエントリ更新は行わない |
 
 データ構造（`PasskeyFieldData`）・`sign_count`固定0の設計判断・`public_key`非保持の理由は全てウェブブラウザ拡張で確定済みであり、Android版でもそのまま踏襲する。
+
+**実装時の追加（Part 5-3参照）**: 上記3 APIに加えて`api_webauthn_get_assertion_with_hash(entry_id, custom_field_id, client_data_hash: Vec<u8>)`をvault-core側に新設した。ブラウザ（特権アプリ）発のCredential Managerリクエストでは、Android側に元の`clientDataJSON`文字列が渡されず`clientDataHash`（SHA-256、32バイト）のみが渡されるため、`client_data_json: String`を受け取ってハッシュ計算する既存APIでは対応できない（詳細はPart 5-3）。`api_webauthn_create_credential`は元々`client_data_json`を引数に取らないため（"none" attestation formatは署名を持たない）、Create側の追加APIは不要だった。
 
 # Part 2: 全体アーキテクチャ
 
@@ -176,14 +178,36 @@ KuraCredentialProviderService.onBeginGetCredentialRequest(BeginGetCredentialRequ
   ▼
 PasskeyGetActivity 起動
   │ ロック中だった場合はここでBiometricHelper/マスターパスワード認証
-  │ PendingIntentHandler.retrieveProviderGetCredentialRequest(intent)
+  │
+  ├─ Query時点で候補（entry_id/custom_field_id/credential_id）が確定済み
+  │     │ PendingIntentHandler.retrieveProviderGetCredentialRequest(intent)
+  │     │ で元のProviderGetCredentialRequestを復元
+  │     → そのまま認証へ
+  │
+  └─ AuthenticationAction経由（Query時点ではロック中で候補未確定）
+        │ PendingIntentHandler.retrieveBeginGetCredentialRequest(intent)
+        │ で元のBeginGetCredentialRequestを復元し、アンロック済みとして
+        │ GetCredentialQueryBuilder.buildを再実行して候補（CredentialEntry）を再構築
+        │ PendingIntentHandler.setBeginGetCredentialResponse(result, response)
+        │ setResult(RESULT_OK, result); finish()
+        ▼
+      システムが実際の候補一覧を含む選択UIを再表示 → ユーザーが選択
+      → 上の「Query時点で候補が確定済み」の経路としてPasskeyGetActivityが再度起動される
   ▼
-vault.api_webauthn_get_assertion(entry_id, custom_field_id, client_data_json) 呼び出し（JNI経由）
+vault.api_webauthn_get_assertion(entry_id, custom_field_id, client_data_json)
+  または vault.api_webauthn_get_assertion_with_hash(entry_id, custom_field_id, client_data_hash)
+  （clientDataHashの有無で分岐。5-3参照） 呼び出し（JNI経由）
   ▼
-PendingIntentHandler.setGetCredentialResponse(result, GetCredentialResponse(PublicKeyCredential(...)))
+PendingIntentHandler.setGetCredentialResponse(result, GetCredentialResponse(PublicKeyCredential(...)), providerRequest)
   ▼
 setResult(RESULT_OK, result); finish()
 ```
+
+**実装時に判明したギャップとその解消**: Query（Begin）フェーズで返すのはAuthenticationAction 1件のみのため、ロック中に開始された場合はシステムの候補選択UIが機能しない。アンロック後、`PasskeyGetActivity`内で`GetCredentialQueryBuilder.build`を再実行して候補（`CredentialEntry`）を再構築し、`PendingIntentHandler.setBeginGetCredentialResponse`でシステムに突き返すことで、システム標準の選択UIを再表示させる（0件/1件/複数件のいずれもQuery時点と同じロジックで自然に処理される。当初のdesign（3-2/6-2の初版）には明記されていなかった拡張）。
+
+**実装時の訂正1（レビューで指摘・修正）**: 上記フロー図の「アンロック後、ここで初めてapi_webauthn_find_credentialsを呼び候補を確定する」の実装は、当初は元リクエストの`allowCredentials`を復元せずに常に無制限で検索していた（`GetCredentialQueryBuilder`がアンロック済み時に行う絞り込みと不整合）。`PasskeyGetActivity`側でも`GetPublicKeyCredentialOption.requestJson`から`allowCredentials`を復元し、`GetCredentialQueryBuilder`と同じ絞り込みを適用するよう修正した（この訂正自体は後述の実装時の訂正2で`GetCredentialQueryBuilder.build`の再実行に置き換わったため、絞り込みは同関数の実装に一本化されている）。
+
+**実装時の訂正2（実機検証で発覚・修正）**: `AuthenticationAction`経由でアンロック後に候補を確定するロジックは、当初`PasskeyGetActivity`内で直接`PendingIntentHandler.retrieveProviderGetCredentialRequest(intent)`を呼び、そのまま候補解決・認証まで完結させようとしていた（`PasskeyGetSelectScreen`という軽量選択画面を独自に追加し、0件/1件/複数件をこのActivity内だけで処理する設計だった）。しかし`AuthenticationAction`のPendingIntentには`ProviderGetCredentialRequest`が一切埋め込まれない仕様であるため（`retrieveProviderGetCredentialRequest`はCredentialEntry経由の起動でのみ機能する）、この関数は常にnullを返し、アンロック済みであっても必ずキャンセル扱いになっていた。結果として、ユーザーが実機でChromeからパスキーログインを試みると、「kuraのロックを解除してください」という同じ画面に何度も戻り続ける無限ループとして再現した（実機ログでの`retrieveProviderGetCredentialRequest returned null`の記録により特定）。正しくは`PendingIntentHandler.retrieveBeginGetCredentialRequest`で元の`BeginGetCredentialRequest`を復元し、`GetCredentialQueryBuilder.build`を再実行、`PendingIntentHandler.setBeginGetCredentialResponse`でシステムに候補を突き返す設計に修正した。これにより`PasskeyGetSelectScreen`（独自の候補選択画面）は不要になり削除した——複数候補が判明した場合もシステム標準の選択UIがそのまま使われる。
 
 ## 3-3. Query時点での「アンロック済みなら候補を列挙する」設計判断
 
@@ -215,6 +239,10 @@ https://www.gstatic.com/gpm-passkeys-privileged-apps/apps.json
 
 **注意：kura自身をこのallowlistに載せる必要はない。** allowlistは「どのブラウザ／呼び出し元アプリを信頼してWebオリジンを代弁させるか」をシステム側が判断するためのものであり、kuraは受け取る側（Provider）であるため対象外。Digital Asset Links（`assetlinks.json`）もこの経路では不要。
 
+**実装時の訂正（サブドメインをまたぐrp.id、実機検証で発覚）**: 当初はブラウザ発の場合、rp_idを常に検証済みoriginのホスト名そのもの（例: `login.example.com`）とし、requestJson内の`rp.id`/`rpId`フィールドは一切参照していなかった。しかし多くのサイトは、ログインページ（サブドメイン、例: `login.example.com`）とは別に、Passkeyをサブドメイン間で共有できるよう親ドメイン（例: `example.com`）を`rp.id`として正当に登録する（WebAuthn仕様の"is a registrable domain suffix of origin"を満たす範囲で許可されている一般的な構成）。この場合、Android版はrp_idを常にorigin.host自身と決め打ちしていたため、`example.com`をrp_idとして保存された既存Passkey（例えばブラウザ拡張版で作成したもの）が一切ヒットせず、Query（Begin）フェーズが`unlocked=true`であっても常に候補0件を返し続け、実質的にログインが機能しない状態になっていた（表面的には3-2のロック解除ループと同じ「パスキーでログインできない」症状として現れる）。
+
+`OriginResolver.Resolved.validateClaimedRpId`を新設し、requestJsonの`rp.id`/`rpId`（GET: `ClientDataJsonBuilder.extractRpId`、CREATE: `CreateRequestJsonParser.parse`の`rpId`）を、検証済みorigin.hostに対するWebAuthn仕様の"registrable domain suffix"チェック（`vault-core::domain_match::is_valid_webauthn_rp_id`、PSL/eTLD+1ベースで`sbisec.co.jp`のような裸の公開サフィックスを弾く）に通した上でのみ採用するよう修正した。無条件に信用するわけではない点は変わらない——検証を経ない値は従来通り無視され、origin.hostのみが使われる（fail-safeなデフォルトは維持）。GETは検索対象rp_idを widen（`findCredentialsAcrossDomains`の`extraRpId`）、CREATEは新規Passkeyの実際の束縛先rp_id自体をこの検証済み値に切り替える（`PasskeyCreateActivity.effectiveRpId`）ことで、Android版で新規作成したPasskeyもブラウザ拡張版と同じrp_idの下に保存され、プラットフォーム間の相互運用性が保たれる。
+
 ## 4-2. ネイティブアプリ発オリジンの扱い
 
 `getOrigin()`がnull（呼び出し元がallowlistに載っていない一般アプリ、つまり大半のネイティブアプリ）の場合、`CallingAppInfo.signingInfo`から署名ベースのorigin（`android:apk-key-hash:<base64>`形式）を算出できるが、これはkuraのPasskeyデータの`rp_id`（ドメイン名前提）とは形式が一致せず、そのままでは既存Passkeyと照合できない。
@@ -223,21 +251,25 @@ https://www.gstatic.com/gpm-passkeys-privileged-apps/apps.json
 
 ```kotlin
 val packageName = callingAppInfo.packageName
-val rpId = PackageDomainMap.domainFor(context, packageName)
+val rpId = PackageDomainMap.domainsFor(context, packageName).firstOrNull()
     ?: return /* 未登録パッケージはPasskey機能も候補なし。オートフィルと同じ安全側デフォルト */
 ```
 
 **セキュリティ上の限界を明記する:** この経路はDigital Asset Linksのような暗号学的な所有権証明を伴わない。`PackageDomainMap`はkuraチームが手動でキュレーションするデータであり、「そのパッケージ名のアプリが本当にそのドメインの正規運営者である」ことをAndroid OSが保証しているわけではない。ただし、Android自体がAPKの署名検証によってパッケージ名の詐称（同一パッケージ名を騙る別アプリのインストール）を防いでいるため、実質的なリスクは「`PackageDomainMap`への誤ったマッピング登録」に限定される。この経路は**オプトイン的な位置づけ**とし、初期実装では`package_domains.json`に明示的に登録されたパッケージのみを対象にする（未登録は常に候補なし、という既存方針をPasskeyでも維持）。
 
+**実装時の訂正（1パッケージ複数ドメイン対応）**: `package_domains.json`は当初1パッケージ1ドメイン（`{"domain": "example.com"}`）の設計だったが、`com.instagram.android`のようにfacebook.comアカウントでもログインできるアプリを表現しようとして同一キーを複数回書いてしまい（JSONオブジェクトとしては後勝ちで上書きされ、片方が静かに失われる不正な定義）、`instagram.com`向けPasskeyが実際には`facebook.com`のrp_idに誤って束縛される事故が起きていた。`PackageDomainEntry.domain: String`を`domains: List<String>`に変更し、1パッケージに複数ドメインを正しく登録できるようにした。`OriginResolver.Resolved`は代表rp_id（新規作成時に使う、先頭ドメイン）に加えて`allRpIds: List<String>`を持ち、Passkeyの検索（`find_passkey_credentials`・`excludeCredentials`チェック・紐付け先エントリ提案）は必ず`allRpIds`全体を横断して行う（`OriginResolver.findCredentialsAcrossDomains`、`PasskeyCreateActivity.listLoginCandidatesAcrossDomains`）。`PackageDomainMap.domainFor`（先頭ドメインのみを返す旧API）は`domainsFor`一本に統一して廃止した。オートフィル側（`FillResponseBuilder`）は`domainsFor(...).firstOrNull()`で先頭ドメインのみを使う点は変わらず（全ドメイン横断の検索はPasskey側のみ）。
+
 ## 4-3. rp_id検証のまとめ
 
 | 呼び出し元 | rp_idの取得方法 | 追加検証 |
 |---|---|---|
-| ブラウザ（allowlist登録済み） | `callingAppInfo.getOrigin(allowlist)`で得たWebオリジンのホスト名 | なし（OSが署名検証済み） |
-| ネイティブアプリ（`PackageDomainMap`登録済み） | パッケージ名からのドメイン引き当て | パッケージ名自体はAPK署名検証によりOSが保証 |
+| ブラウザ（allowlist登録済み） | 検証済みWebオリジンのホスト名（`rpId`）。requestJsonが自己申告する`rp.id`/`rpId`は`OriginResolver.Resolved.validateClaimedRpId`のチェックを通れば検索対象（GET）・束縛先（CREATE）に採用される | OSが署名検証済みのoriginに対し、`vault-core::domain_match::is_valid_webauthn_rp_id`（PSL/eTLD+1ベースの"registrable domain suffix"判定）でrequestJson側の値を検証。無条件には信用しない |
+| ネイティブアプリ（`PackageDomainMap`登録済み） | パッケージ名からのドメイン引き当て | パッケージ名自体はAPK署名検証によりOSが保証。requestJsonの`rp.id`/`rpId`は検証手段がないため常に無視する |
 | 上記いずれにも該当しない呼び出し元 | 取得不可 | 候補なし・作成不可として扱う（安全側デフォルト） |
 
-いずれの経路で取得した`rp_id`も、`api_webauthn_find_credentials`/`api_webauthn_create_credential`にそのまま渡す。vault-core側では`rp_id`の完全一致でのみ照合するため（Part 2-4）、Android側で正規化（小文字化等）が必要な場合はJNI呼び出し前に行う。
+いずれの経路で取得した`rp_id`も、`api_webauthn_find_credentials`/`api_webauthn_create_credential`にそのまま渡す。vault-core側では`rp_id`の完全一致でのみ照合するため（Part 2-4）、Android側で正規化（小文字化等）が必要な場合はJNI呼び出し前に行う（ブラウザ発でrequestJson側の親ドメインrp_idが有効と判定された場合、GETは`allRpIds`にこの値を加えて横断検索することで、origin.host自身の下に保存された候補と親ドメインの下に保存された候補の両方を取りこぼさない）。
+
+**実装時の訂正（メインスレッドブロッキングの解消）**: `OriginResolver.resolve`は`PrivilegedAllowlist`の初回読み込み（asset同期I/O、944件のJSONパース）を伴うが、当初は`PasskeyCreateActivity`/`PasskeyGetActivity`の`lifecycleScope.launch`（デフォルトMainディスパッチャ）内で同期関数として直接呼んでいたため、初回リクエスト時にメインスレッドをブロックしうる状態だった。`OriginResolver.resolve`を`suspend fun`にし内部で`withContext(Dispatchers.IO)`に切り替えるよう修正した（`GetCredentialQueryBuilder.build`は元々`Dispatchers.IO`上のsuspend関数のため影響なし）。
 
 # Part 5: vault-core / JNI連携設計
 
@@ -269,6 +301,8 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_webauthnFindCre
 
 `api_webauthn_create_credential`・`api_webauthn_get_assertion`も同様に、既存の`createEntry`/`listLoginCandidates`と同じ引数変換パターン（`JString` → `String`、複合型はJSON文字列でシリアライズして受け渡し）でラップする。
 
+**実装時の追加**: `webauthnGetAssertionWithHash(vault_id, entry_id, custom_field_id, client_data_hash: JByteArray)`も同様に追加した。`client_data_hash`は既存の`get_byte_array`ヘルパー（`loadVault`/`mergeRemoteVault`で使われているものと同じ）でバイト列として受け取り、`api_webauthn_get_assertion_with_hash`にそのまま渡す。
+
 ## 5-2. VaultBridge.ktへの追加
 
 ```kotlin
@@ -290,15 +324,29 @@ external fun webauthnGetAssertion(
     customFieldId: String,
     clientDataJson: String
 ): String
+external fun webauthnGetAssertionWithHash(
+    vaultId: String,
+    entryId: String,
+    customFieldId: String,
+    clientDataHash: ByteArray
+): String
 ```
+
+（`webauthnGetAssertionWithHash`は実装時に追加。Part 5-3参照）
 
 ## 5-3. clientDataJSON・attestationObjectの構築責務
 
 `docs/webauthn-passkey.md` 3-4と同じ方針を踏襲する：CBOR/authenticatorData/attestationObjectのバイト単位の構築とECDSA署名は全てvault-core（Rust）側の責務とし、Android（Kotlin）側では組み立てない。ただし`clientDataJSON`自体の構築元がブラウザ拡張とは異なる点に注意する。
 
 - ブラウザ拡張では`clientDataJSON`をTypeScript側（Service Worker）が`{type, challenge, origin, crossOrigin}`から組み立てていた
-- Android Credential Managerでは、`CreatePublicKeyCredentialRequest`/`GetPublicKeyCredentialOption`が`clientDataHash`（システム側で既に計算済みのハッシュ値）を提供するケースと、`requestJson`から`clientDataJSON`をアプリ側で組み立てる必要があるケースの両方がありうる。**Part 4-1の特権アプリ経由（ブラウザ発）では`clientDataHash`をそのまま使い、自前でJSONを組み立てない**（システムが検証済みのoriginを埋め込み済みのため、アプリ側での再構築はかえって整合性リスクを生む）。ネイティブアプリ発（`clientDataHash`が渡されないケース）では、Part 4-2で確定した`rp_id`ベースのoriginを使い`{type, challenge, origin}`形式のJSONをKotlin側で組み立てた上でvault-coreに渡す
-- `vault-core`側のAPIシグネチャ（`client_data_json: String`）は変更しない。Android側でどちらの経路でも最終的に文字列化されたclientDataJSONを渡す形に揃える
+- Android Credential Managerでは、`GetPublicKeyCredentialOption`（Getのみ。Createの`CreatePublicKeyCredentialRequest`にも同名フィールドがあるが、後述の通りvault-core側では使わない）が`clientDataHash`（システム側で既に計算済みのSHA-256ハッシュ、32バイト）を提供するケースと、`requestJson`から`clientDataJSON`をアプリ側で組み立てる必要があるケースの両方がありうる。**Part 4-1の特権アプリ経由（ブラウザ発）では`clientDataHash`をそのまま使い、自前でJSONを組み立てない**（システムが検証済みのoriginを埋め込み済みのため、アプリ側での再構築はかえって整合性リスクを生む）。ネイティブアプリ発（`clientDataHash`が渡されないケース）では、Part 4-2で確定した`rp_id`ベースのoriginを使い`{type, challenge, origin}`形式のJSONをKotlin側で組み立てた上でvault-coreに渡す
+- **実装時の訂正**: 当初「`vault-core`側のAPIシグネチャ（`client_data_json: String`）は変更しない」としていたが、これは技術的に成立しない。既存`api_webauthn_get_assertion`は受け取った`client_data_json`文字列から内部でSHA-256を計算する設計であり、Android側が元のJSON文字列を持たない（`clientDataHash`のみが渡される）ブラウザ発リクエストでは、Android側で「それらしいJSON」を組み立てて渡してもハッシュが一致せず署名検証は必ず失敗する。このため、ハッシュを直接受け取って署名する`api_webauthn_get_assertion_with_hash`をvault-coreに新設した（Part 1-3参照）。ブラウザ発では`GetPublicKeyCredentialOption.clientDataHash`をそのままこの新APIに渡し、ネイティブアプリ発では引き続き既存の`client_data_json: String`版APIを使う。Createでは元々`client_data_json`を引数に取らないため、この問題は発生しない（Part 1-3参照）
+
+**実装時の訂正（rp.nameを表示・エントリ名に使わない）**: Create requestJson内の`rp.name`は呼び出し元の自己申告値であり、`rp_id`（Part 4で暗号学的に検証済み）と異なり検証手段がない。当初はこれを紐付け確認ダイアログの表示名・新規エントリの表示名にそのまま使っていたが、既にPart 4-1のallowlistに載った特権ブラウザ経由であればどのサイトでも任意の`rp.name`を送れてしまうため、これをユーザーへの識別子として信用するのはなりすまし対策上不適切と判断し修正した。`PasskeyCreateActivity`が表示する`rpDisplayName`、および`create_passkey_credential`が新規エントリに付ける`display_name`は、いずれも`rp.name`ではなく検証済みの`rp_id`のみを使う（`rp.name`自体は`PasskeyFieldData`に付随情報として保存はするが、表示上の信頼の起点にはしない）。
+
+**実装時の訂正（ゴミ箱エントリのPasskeyで署名できてしまう抜け穴）**: `get_passkey_assertion`/`get_passkey_assertion_with_hash`は当初`entry_id`を直接`self.contents.entries`から取得するだけで、`find_passkey_credentials`が適用している`deleted_at`/`purged_at`/`entry_type`の除外条件を適用していなかった。このため、ゴミ箱（Trash）に入れたPasskeyは候補検索（Get/Createの候補列挙）には出てこないにも関わらず、既に取得済みの`entry_id`/`custom_field_id`があれば署名だけはできてしまう不整合があった。共通ヘルパー`find_active_login_entry`を追加し、両関数がこれを経由するよう修正した。
+
+**実装時の訂正（`AuthenticationResponseJSON`/`RegistrationResponseJSON`の必須フィールド欠落、実機検証で発覚）**: `PasskeyGetActivity.buildAuthenticationResponseJson`/`PasskeyCreateActivity.buildRegistrationResponseJson`は当初、`id`/`rawId`/`type`/`response`のみを含むJSONを組み立てていた。WebAuthn Level 3の`AuthenticationResponseJSON`/`RegistrationResponseJSON`はspec上`clientExtensionResults`を必須フィールドとして持つ（拡張機能版`extension/src/main-world/webauthn-main-injected.js`の`getOverride`/`createOverride`が返す`toJSON()`も、`authenticatorAttachment: 'platform'`・`clientExtensionResults: {}`・（Createの場合）`response.transports: ['internal']`を常に含めている）。これが欠けたJSONを`PendingIntentHandler.setGetCredentialResponse`/`setCreateCredentialResponse`経由でシステムに返すと、Chrome側のJSON→実際の`PublicKeyCredential`オブジェクトへの変換が不正な形として扱われ、kuraは`RESULT_OK`を返しているにもかかわらず`navigator.credentials.get()`/`create()`のPromiseがページ側で解決されず、SBI証券のようなサイトでは検証APIを一度も呼ばないままchallenge再取得を繰り返す無限ループとして観測された（Chrome DevTools Protocol経由のネットワークキャプチャで、`/api/fido2/auth/challenge`のみが繰り返し呼ばれ検証系エンドポイントが一度も呼ばれていないことから特定）。拡張機能版と同じフィールド構成に揃えて修正した。
 
 # Part 6: UI/UXフロー設計
 
@@ -310,11 +358,14 @@ external fun webauthnGetAssertion(
 
 | 画面状態 | 対応するComposable | 拡張機能側の対応画面 |
 |---|---|---|
-| ロック中 → 認証要求 | `PasskeyUnlockScreen`（既存`AutofillAuthScreen`のロジックを再利用） | `UnlockRitual.tsx` |
+| ロック中 → 認証要求 | 既存`AutofillAuthScreen`をそのまま再利用（専用の`PasskeyUnlockScreen`は新設せず、既存Composableを直接呼び出す形にした。6-3参照） | `UnlockRitual.tsx` |
 | 紐付け先エントリ選択（1件一致は提案、複数件は選択、0件は新規作成） | `PasskeyCreateConfirmScreen` | `CreateConfirm.tsx` |
 | 既に登録済み（`exclude_credential_ids`一致） | エラー表示、閉じるとキャンセル扱いで呼び出し元に返す | `{kind:'error', reason:'already_registered'}` |
+| 候補検索・Passkey作成のいずれかが失敗した場合 | `CreateUiState.Error`（実装時に追加）、閉じるとキャンセル扱いで呼び出し元に返す | - |
 
 紐付け先エントリの判定ロジック（1件一致→提案、複数件→選択、0件→新規`login`エントリ作成）は`webauthn-passkey.md` 3-7の表をそのまま踏襲する。
+
+**実装時の訂正（検索失敗の握りつぶし）**: 当初は`excludeCredentials`一致チェックや紐付け先エントリ検索が例外を投げた場合、それを「一致なし」「候補0件」として握りつぶし、確認なしで（重複した）新規エントリを自動作成してしまっていた。検索失敗は「本当に候補が無い」ケースと区別できないため、いずれかが失敗した場合は`CreateUiState.Error`に遷移させ、確認なしでの自動作成には進まないよう修正した（fail-safe）。
 
 ## 6-2. Getフロー画面
 
@@ -324,8 +375,10 @@ Query（Begin）フェーズで`CredentialEntry`を複数返している場合�
 
 | 画面状態 | 対応するComposable |
 |---|---|
-| ロック中 → 認証要求（`AuthenticationAction`経由で遷移） | `PasskeyUnlockScreen`（6-1と共通） |
+| ロック中 → 認証要求（`AuthenticationAction`経由で遷移） | `AutofillAuthScreen`を再利用（6-3参照。専用の`PasskeyUnlockScreen`は新設していない） |
 | 認証済み → assertion生成中のローディング | 数百ms程度で完了する想定のため簡易スピナーで十分 |
+
+`AuthenticationAction`経由でアンロックした場合、複数のPasskey候補が判明しても`PasskeyGetActivity`自身が選択画面を持つことはない。`GetCredentialQueryBuilder.build`を再実行して`setBeginGetCredentialResponse`でシステムに突き返し、システム標準の選択UIに委ねる（3-2の実装時の訂正2参照。以前は独自の`PasskeyGetSelectScreen`を持っていたが、この設計変更に伴い削除した）。
 
 ## 6-3. 既存コンポーネントの再利用
 
@@ -341,12 +394,14 @@ val intent = Intent(Settings.ACTION_CREDENTIAL_PROVIDER)
 startActivity(intent)
 ```
 
-現在の有効化状態表示は`androidx.credentials.CredentialManager`の`isEnabledProvider`相当のAPIで取得する（Autofillの`AutofillManager.hasEnabledAutofillServices()`、`docs/android-autofillservice.md` 3-3と対になる導線）。
+**実装時の訂正1**: `androidx.credentials.CredentialManager`（1.7.0-alpha02時点）には`AutofillManager.hasEnabledAutofillServices()`に相当する同期的な「有効プロバイダ一覧取得」APIが存在しなかった。そのため、Autofillの設定Cardのような有効/無効状態表示は行わず、常にタップ可能な単一のCard（タップで`ACTION_CREDENTIAL_PROVIDER`を発行するのみ）としている。将来のandroidx.credentialsバージョンで同等のAPIが追加された場合は、状態表示の追加を検討する。
+
+**実装時の訂正2（実機検証で発覚・修正）**: `minSdk = 34`であっても、`Settings.ACTION_CREDENTIAL_PROVIDER`に対応する`Activity`が必ず存在するとは限らない。OEMがSettingsアプリを独自にカスタマイズしている端末（実機検証ではMotorola端末のAndroid 15）では、Credential Manager自体（実際のパスキー認証フロー）は正常に機能するにもかかわらず、この設定ショートカットのIntentにだけ対応する`Activity`が存在せず、`startActivity`が`ActivityNotFoundException`を投げてアプリ全体がクラッシュしていた。`try`/`catch`で`ActivityNotFoundException`を捕捉し、失敗時は「設定アプリから手動で有効にしてください」という案内を表示するのみに留めるよう修正した（クラッシュさせない）。当初はToastで表示していたが、文言が長く自動で消えてしまい読み切れないとの指摘を受け、ユーザーが閉じるまで表示され続けるダイアログ（`AlertDialog`、OKボタンのみ）に変更した。
 
 # Part 8: セキュリティ上の注意点
 
 1. **秘密鍵はFFI境界を一切越えない。** ブラウザ拡張と同じ原則をJNI境界にもそのまま適用する。JNI関数が返すのは候補一覧（秘密鍵を含まない）・attestationObject・signatureのみ。
-2. **Origin検証の起点はシステムが検証したもののみを信頼する。** ブラウザ発は`CallingAppInfo.getOrigin(allowlist)`の戻り値、ネイティブアプリ発は署名検証済みの`packageName`のみを起点にする。リクエストJSON内の`origin`/`rpId`フィールドをアプリ側で無条件に信用しない（システムAPIが提供する`CallingAppInfo`経由の値と突き合わせる）。
+2. **Origin検証の起点はシステムが検証したもののみを信頼する。** ブラウザ発は`CallingAppInfo.getOrigin(allowlist)`の戻り値、ネイティブアプリ発は署名検証済みの`packageName`のみを起点にする。リクエストJSON内の`origin`/`rp.id`/`rpId`フィールドをアプリ側で無条件に信用しない（システムAPIが提供する`CallingAppInfo`経由の値と突き合わせる）。ブラウザ発の`rp.id`/`rpId`のみ例外的に、この検証済みoriginに対するWebAuthn仕様の"registrable domain suffix"チェック（`OriginResolver.Resolved.validateClaimedRpId`→`vault-core::domain_match::is_valid_webauthn_rp_id`、PSL/eTLD+1ベース）を独立して通した場合のみ採用する（4-1参照）。これはrequestJSONの値をそのまま信用しているのではなく、ブラウザ自身が`navigator.credentials.*`呼び出し時に行うのと同じ検証をkura側でも独立に再実行しているだけであり、この原則への違反ではない。
 3. **`PackageDomainMap`によるドメイン紐付けの限界を利用者に説明可能な形にしておく。** Digital Asset Linksのような暗号学的証明ではなく手動キュレーションであるため、`package_domains.json`への追加は既存のオートフィル用マッピングと同じ慎重さ（誤登録防止のレビュー）で運用する（Part 4-2）。
 4. **PendingIntentは`FLAG_MUTABLE`必須、`FLAG_ONE_SHOT`は使用しない。** ユーザーが選択画面から戻って再選択する可能性があるため（Android公式ガイダンス通り）。
 5. **ロック中のQuery応答からの情報漏洩は許容範囲を明記する。** Part 3-3の通り、「vaultが現在ロックされているか」はAuthenticationActionの提示から推測されうるが、「ロック中のvaultが特定RP向けのPasskeyを持っているか」はアンロックしない限り秘匿される。この非対称性はブラウザ拡張版と同じ設計判断であり、vaultのロック状態自体は既存のAutofillサービスでも同様に観測されうる情報（`docs/webauthn-passkey.md` Part 4-3の議論と同じ理由）である。

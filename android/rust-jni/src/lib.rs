@@ -661,6 +661,24 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_generatePasswor
 }
 
 #[no_mangle]
+pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_isValidWebauthnRpId(
+    mut env: JNIEnv,
+    _class: JClass,
+    origin_host: JString,
+    claimed_rp_id: JString,
+) -> jboolean {
+    jni_catch(&mut env, |env| {
+        let origin_host = get_string(env, &origin_host)?;
+        let claimed_rp_id = get_string(env, &claimed_rp_id)?;
+        Ok(if api_is_valid_webauthn_rp_id(origin_host, claimed_rp_id) {
+            JNI_TRUE
+        } else {
+            JNI_FALSE
+        })
+    })
+}
+
+#[no_mangle]
 pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_generateTotp(
     mut env: JNIEnv,
     _class: JClass,
@@ -809,4 +827,113 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_restoreLastSync
         with_manager(&vid, |m| m.api_restore_last_sync_time(ts));
         Ok(())
     });
+}
+
+// ============================================================================
+// WebAuthn / Passkey Operations
+// ============================================================================
+
+#[no_mangle]
+pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_webauthnFindCredentials(
+    mut env: JNIEnv,
+    _class: JClass,
+    vault_id: JString,
+    rp_id: JString,
+    allow_credential_ids_json: JString,
+) -> jstring {
+    jni_catch(&mut env, |env| {
+        let vid = get_string(env, &vault_id)?;
+        let rp_id = get_string(env, &rp_id)?;
+        let allow_ids: Vec<String> =
+            serde_json::from_str(&get_string(env, &allow_credential_ids_json)?)
+                .map_err(|e| format!("Invalid allow_credential_ids JSON: {}", e))?;
+        let candidates = with_manager(&vid, |m| m.api_webauthn_find_credentials(rp_id, allow_ids))
+            .map_err(|e| format!("Failed to find passkey credentials: {}", e))?;
+        let json = serde_json::to_string(&candidates).unwrap_or_else(|_| "[]".to_string());
+        new_jstring(env, &json)
+    })
+}
+
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_webauthnCreateCredential(
+    mut env: JNIEnv,
+    _class: JClass,
+    vault_id: JString,
+    entry_id: JString,
+    rp_id: JString,
+    rp_name: JString,
+    user_handle: JString,
+    user_name: JString,
+    user_display_name: JString,
+    exclude_credential_ids_json: JString,
+) -> jstring {
+    jni_catch(&mut env, |env| {
+        let vid = get_string(env, &vault_id)?;
+        let eid = get_optional_string(env, &entry_id)?;
+        let rp_id = get_string(env, &rp_id)?;
+        let rp_name = get_optional_string(env, &rp_name)?;
+        let uh = get_string(env, &user_handle)?;
+        let un = get_string(env, &user_name)?;
+        let udn = get_string(env, &user_display_name)?;
+        let exclude_ids: Vec<String> =
+            serde_json::from_str(&get_string(env, &exclude_credential_ids_json)?)
+                .map_err(|e| format!("Invalid exclude_credential_ids JSON: {}", e))?;
+
+        let result = with_manager(&vid, |m| {
+            m.api_webauthn_create_credential(eid, rp_id, rp_name, uh, un, udn, exclude_ids)
+        })
+        .map_err(|e| format!("Failed to create passkey credential: {}", e))?;
+        let json = serde_json::to_string(&result)
+            .map_err(|e| format!("Failed to serialize result: {}", e))?;
+        new_jstring(env, &json)
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_webauthnGetAssertion(
+    mut env: JNIEnv,
+    _class: JClass,
+    vault_id: JString,
+    entry_id: JString,
+    custom_field_id: JString,
+    client_data_json: JString,
+) -> jstring {
+    jni_catch(&mut env, |env| {
+        let vid = get_string(env, &vault_id)?;
+        let eid = get_string(env, &entry_id)?;
+        let cfid = get_string(env, &custom_field_id)?;
+        let cdj = get_string(env, &client_data_json)?;
+
+        let result = with_manager(&vid, |m| m.api_webauthn_get_assertion(eid, cfid, cdj))
+            .map_err(|e| format!("Failed to get passkey assertion: {}", e))?;
+        let json = serde_json::to_string(&result)
+            .map_err(|e| format!("Failed to serialize result: {}", e))?;
+        new_jstring(env, &json)
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_webauthnGetAssertionWithHash(
+    mut env: JNIEnv,
+    _class: JClass,
+    vault_id: JString,
+    entry_id: JString,
+    custom_field_id: JString,
+    client_data_hash: JByteArray,
+) -> jstring {
+    jni_catch(&mut env, |env| {
+        let vid = get_string(env, &vault_id)?;
+        let eid = get_string(env, &entry_id)?;
+        let cfid = get_string(env, &custom_field_id)?;
+        let hash = get_byte_array(env, &client_data_hash)?;
+
+        let result = with_manager(&vid, |m| {
+            m.api_webauthn_get_assertion_with_hash(eid, cfid, hash)
+        })
+        .map_err(|e| format!("Failed to get passkey assertion: {}", e))?;
+        let json = serde_json::to_string(&result)
+            .map_err(|e| format!("Failed to serialize result: {}", e))?;
+        new_jstring(env, &json)
+    })
 }

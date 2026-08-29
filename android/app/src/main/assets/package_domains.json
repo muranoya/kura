@@ -1,11 +1,10 @@
 {
-    "com.github.android": { "domain": "github.com" },
-    "com.kouzoh.mercari": { "domain": "mercari.com" },
-    "jp.co.sbisec.hyperkabu2": { "domain": "sbisec.co.jp" },
-    "com.yamareco.memo": { "domain": "yamareco.com" },
-    "com.instagram.android": { "domain": "instagram.com" },
-    "com.instagram.android": { "domain": "facebook.com" },
-    "com.facebook.orca": { "domain": "facebook.com" },
-    "com.facebook.katana": { "domain": "facebook.com" },
-    "jp.co.yamap": { "domain": "yamap.com" }
+    "com.github.android": { "domains": ["github.com"] },
+    "com.kouzoh.mercari": { "domains": ["mercari.com"] },
+    "jp.co.sbisec.hyperkabu2": { "domains": ["sbisec.co.jp"] },
+    "com.yamareco.memo": { "domains": ["yamareco.com"] },
+    "com.instagram.android": { "domains": ["instagram.com", "facebook.com"] },
+    "com.facebook.orca": { "domains": ["facebook.com"] },
+    "com.facebook.katana": { "domains": ["facebook.com"] },
+    "jp.co.yamap": { "domains": ["yamap.com"] }
 }
