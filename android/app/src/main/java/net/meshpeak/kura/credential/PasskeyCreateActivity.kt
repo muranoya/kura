@@ -13,8 +13,10 @@ import androidx.credentials.CreatePublicKeyCredentialResponse
 import androidx.credentials.provider.PendingIntentHandler
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import net.meshpeak.kura.autofill.AutofillAuthScreen
 import net.meshpeak.kura.data.model.AutofillCandidate
@@ -44,6 +46,8 @@ class PasskeyCreateActivity : AppCompatActivity() {
     private var pkRequest: CreatePublicKeyCredentialRequest? = null
     private var resolvedOrigin: OriginResolver.Resolved? = null
     private var requestInfo: CreateRequestInfo? = null
+    /** 新規Passkeyの実際の束縛先rp_id。[proceed]内で[OriginResolver.Resolved.validateClaimedRpId]により確定する。 */
+    private var effectiveRpId: String? = null
 
     /** createPasskey()の多重起動防止用（Loading状態はproceed()内部からも一時的に経由するためuiStateでは判定できない）。 */
     private var creationInProgress = false
@@ -97,15 +101,25 @@ class PasskeyCreateActivity : AppCompatActivity() {
             }
             requestInfo = info
 
+            // サイトが自己申告するrp.id（例: ログインページ"login.example.com"に対する
+            // 親ドメイン"example.com"）。有効性検証はvalidateClaimedRpId内で行われる
+            // （検証を経ずに使ってはならない。GetCredentialQueryBuilder.buildと同じ理由）。
+            val claimedRpId = resolved.validateClaimedRpId(appViewModel.repository, info.rpId)
+            // 新規Passkeyの実際の束縛先rp_id。検証済みならサイトの自己申告値
+            // （将来のGetフローがこの値をrpIdとして問い合わせてきたときに一致させるため）、
+            // そうでなければ検証済みoriginをそのまま使う。
+            val effectiveRpId = claimedRpId ?: resolved.rpId
+            this@PasskeyCreateActivity.effectiveRpId = effectiveRpId
+            val searchRpIds = if (claimedRpId != null) resolved.allRpIds + claimedRpId else resolved.allRpIds
+
             // rp.nameはリクエストJSON内の自己申告値で検証手段がない。Passkey自体・
-            // 紐付け先エントリの検索は常に検証済みのrp_idにのみ束縛されるため、rp.nameが
-            // 偽装されていても認証が別ドメイン宛てに成立したり無関係なエントリに
+            // 紐付け先エントリの検索は常に検証済みのrp_id（＝effectiveRpId）にのみ束縛されるため、
+            // rp.nameが偽装されていても認証が別ドメイン宛てに成立したり無関係なエントリに
             // 紐づいたりすることはない（セキュリティ上の実害はない）。それでも、
             // ブラウザがページタイトルではなくURLを信頼の起点にするのと同じ理由で、
             // ユーザーが「このPasskeyが実際にどのドメイン向けか」を判断できる値を
-            // 見せるべきなので、確認ダイアログの表示名にはrp.nameではなく検証済みの
-            // rp_idを使う。
-            val rpDisplayName = resolved.rpId
+            // 見せるべきなので、確認ダイアログの表示名にはrp.nameではなくeffectiveRpIdを使う。
+            val rpDisplayName = effectiveRpId
 
             try {
                 if (info.excludeCredentialIds.isNotEmpty()) {
@@ -113,7 +127,7 @@ class PasskeyCreateActivity : AppCompatActivity() {
                     // 全ドメインを横断してチェックする。検索失敗を「一致なし」として握りつぶすと
                     // 既に登録済みのPasskeyを見逃したまま作成に進んでしまうため、例外は
                     // ここでcatchせず外側のcatchでErrorに倒す（fail-safe）。
-                    val existing = findExcludedCredentials(resolved.allRpIds, info.excludeCredentialIds)
+                    val existing = findExcludedCredentials(searchRpIds, info.excludeCredentialIds)
                     if (existing.isNotEmpty()) {
                         uiState = CreateActivityState.Confirm(CreateUiState.AlreadyRegistered)
                         return@launch
@@ -123,7 +137,7 @@ class PasskeyCreateActivity : AppCompatActivity() {
                 // 同様に検索失敗を「候補0件」として握りつぶすと、既存エントリがあるにも
                 // 関わらず確認なしで重複した新規エントリを自動作成してしまうため、
                 // 例外はここでcatchせず外側のcatchでErrorに倒す。
-                val matched = listLoginCandidatesAcrossDomains(resolved.allRpIds)
+                val matched = listLoginCandidatesAcrossDomains(searchRpIds)
                 uiState = when {
                     matched.isEmpty() -> {
                         createPasskey(null)
@@ -174,7 +188,8 @@ class PasskeyCreateActivity : AppCompatActivity() {
             val request = pkRequest
             val resolved = resolvedOrigin
             val info = requestInfo
-            if (request == null || resolved == null || info == null) {
+            val rpId = effectiveRpId
+            if (request == null || resolved == null || info == null || rpId == null) {
                 finishCanceled()
                 return@launch
             }
@@ -182,7 +197,7 @@ class PasskeyCreateActivity : AppCompatActivity() {
             val attestation = try {
                 appViewModel.repository.webauthnCreateCredential(
                     entryId,
-                    resolved.rpId,
+                    rpId,
                     info.rpName,
                     info.userHandle,
                     info.userName,
@@ -201,7 +216,7 @@ class PasskeyCreateActivity : AppCompatActivity() {
             val clientDataJson = if (request.clientDataHash != null) {
                 ""
             } else {
-                ClientDataJsonBuilder.encodeBase64Url(ClientDataJsonBuilder.buildForCreate(info.challenge, resolved.rpId))
+                ClientDataJsonBuilder.encodeBase64Url(ClientDataJsonBuilder.buildForCreate(info.challenge, rpId))
             }
 
             val responseJson = buildRegistrationResponseJson(attestation, clientDataJson)
@@ -214,6 +229,13 @@ class PasskeyCreateActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * WebAuthn Level 3 `RegistrationResponseJSON`を組み立てる。`clientExtensionResults`
+     * （spec上必須）・`authenticatorAttachment`・`response.transports`は、拡張機能版
+     * `webauthn-main-injected.js`の`createOverride`の`toJSON()`が常に含めているのに対し
+     * Android版では欠落していた。GetフローのbuildAuthenticationResponseJsonと同じ理由
+     * （欠落しているとChrome側のJSON→PublicKeyCredential変換が失敗しうる）で追加する。
+     */
     private fun buildRegistrationResponseJson(
         attestation: WebAuthnAttestationResult,
         clientDataJson: String
@@ -221,10 +243,13 @@ class PasskeyCreateActivity : AppCompatActivity() {
         put("id", attestation.credentialId)
         put("rawId", attestation.credentialId)
         put("type", "public-key")
+        put("authenticatorAttachment", "platform")
         putJsonObject("response") {
             put("clientDataJSON", clientDataJson)
             put("attestationObject", attestation.attestationObject)
+            putJsonArray("transports") { add("internal") }
         }
+        putJsonObject("clientExtensionResults") {}
     }.toString()
 
     private fun finishCanceled() {

@@ -115,6 +115,31 @@ pub fn same_etld_plus1(a: &str, b: &str) -> bool {
     extract_etld_plus1(a) == extract_etld_plus1(b)
 }
 
+/// WebAuthnの`rp.id`が検証済みoriginに対して有効かどうかを判定する
+/// （仕様の"is a registrable domain suffix of, or is equal to, effectiveDomain"）。
+///
+/// `claimed_rp_id`が`origin_host`自身と一致するか、`origin_host`の祖先ドメイン
+/// （例: `origin_host = "login.example.com"`に対する`claimed_rp_id = "example.com"`）
+/// であり、かつ両者が同一のeTLD+1に属する場合のみ有効とする。eTLD+1一致の要求により、
+/// `claimed_rp_id`が裸の公開サフィックス自体（例: `"co.jp"`）である場合は無効になる
+/// （`extract_etld_plus1("co.jp") == "co.jp"`だが`extract_etld_plus1(origin_host)`は
+/// 通常これと一致しないため）。
+///
+/// `android/rust-jni`のCredentialProviderService実装から、ブラウザ発リクエストの
+/// requestJson内`rp.id`/`rpId`フィールドを検証する目的で使う
+/// （`docs/android-passkey.md` Part 4-1/8-2参照。この関数を介さずrequestJsonの
+/// rp.idを直接信用してはならない）。
+pub fn is_valid_webauthn_rp_id(origin_host: &str, claimed_rp_id: &str) -> bool {
+    if claimed_rp_id.is_empty() {
+        return false;
+    }
+    let origin_host = origin_host.to_lowercase();
+    let claimed_rp_id = claimed_rp_id.to_lowercase();
+    let is_ancestor_or_self =
+        origin_host == claimed_rp_id || origin_host.ends_with(&format!(".{}", claimed_rp_id));
+    is_ancestor_or_self && same_etld_plus1(&origin_host, &claimed_rp_id)
+}
+
 /// URLからホスト部分を抽出する（scheme/path/portを除去、www除去や小文字化は行わない）。
 ///
 /// `vault-core::import::duplicate::extract_domain` と共有する下位ユーティリティ。
@@ -192,6 +217,40 @@ mod tests {
     #[test]
     fn case_insensitive() {
         assert!(same_etld_plus1("WWW.Example.COM", "m.example.com"));
+    }
+
+    #[test]
+    fn rp_id_equal_to_origin_is_valid() {
+        assert!(is_valid_webauthn_rp_id("login.sbisec.co.jp", "login.sbisec.co.jp"));
+    }
+
+    #[test]
+    fn rp_id_ancestor_domain_is_valid() {
+        // 実際にAndroid版で発生していたケース: ログインページは "login.sbisec.co.jp"
+        // だがサイトが登録したrp.idは親ドメイン "sbisec.co.jp"。
+        assert!(is_valid_webauthn_rp_id("login.sbisec.co.jp", "sbisec.co.jp"));
+    }
+
+    #[test]
+    fn rp_id_unrelated_domain_is_invalid() {
+        assert!(!is_valid_webauthn_rp_id("login.sbisec.co.jp", "evil.example.com"));
+    }
+
+    #[test]
+    fn rp_id_bare_public_suffix_is_invalid() {
+        // "co.jp" はPSL上の公開サフィックスそのもの。origin側と同一eTLD+1にならないため無効。
+        assert!(!is_valid_webauthn_rp_id("login.sbisec.co.jp", "co.jp"));
+    }
+
+    #[test]
+    fn rp_id_descendant_of_origin_is_invalid() {
+        // originより「狭い」ドメインをrp.idとして自称するのは無効（祖先方向のみ許可）。
+        assert!(!is_valid_webauthn_rp_id("sbisec.co.jp", "login.sbisec.co.jp"));
+    }
+
+    #[test]
+    fn rp_id_case_insensitive() {
+        assert!(is_valid_webauthn_rp_id("Login.SBISEC.co.jp", "SBISEC.co.jp"));
     }
 
     #[test]

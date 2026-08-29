@@ -3,12 +3,14 @@ package net.meshpeak.kura.credential
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.credentials.provider.AuthenticationAction
 import androidx.credentials.provider.BeginGetCredentialRequest
 import androidx.credentials.provider.BeginGetCredentialResponse
 import androidx.credentials.provider.BeginGetPublicKeyCredentialOption
 import androidx.credentials.provider.CredentialEntry
 import androidx.credentials.provider.PublicKeyCredentialEntry
+import net.meshpeak.kura.BuildConfig
 import net.meshpeak.kura.R
 import net.meshpeak.kura.credential.model.PasskeyGetSelection
 import net.meshpeak.kura.credential.model.putPasskeyGetSelection
@@ -18,6 +20,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /** [android.app.PendingIntent]のrequestCode採番。FillResponseBuilder.authRequestCodeSeqと同じ理由。 */
 private val requestCodeSeq = AtomicInteger()
+
+private const val TAG = "KuraPasskey"
 
 /**
  * `onBeginGetCredentialRequest`本体ロジック。ロック中は候補の有無に関わらず常に
@@ -34,22 +38,36 @@ object GetCredentialQueryBuilder {
     ): BeginGetCredentialResponse {
         val unlocked = try {
             repository.isUnlocked()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "onBeginGetCredentialRequest: isUnlocked() threw, treating as locked", e)
             false
         }
         if (!unlocked) {
             return BeginGetCredentialResponse(authenticationActions = listOf(buildAuthenticationAction(context)))
         }
 
-        val callingAppInfo = request.callingAppInfo ?: return BeginGetCredentialResponse()
-        val resolved = OriginResolver.resolve(context, callingAppInfo) ?: return BeginGetCredentialResponse()
+        val callingAppInfo = request.callingAppInfo
+        if (callingAppInfo == null) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "onBeginGetCredentialRequest: callingAppInfo is null -> empty response")
+            return BeginGetCredentialResponse()
+        }
+        val resolved = OriginResolver.resolve(context, callingAppInfo)
+        if (resolved == null) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "onBeginGetCredentialRequest: OriginResolver.resolve returned null for package=${callingAppInfo.packageName} -> empty response")
+            return BeginGetCredentialResponse()
+        }
 
         val entries = mutableListOf<CredentialEntry>()
         for (option in request.beginGetCredentialOptions.filterIsInstance<BeginGetPublicKeyCredentialOption>()) {
             val allowIds = ClientDataJsonBuilder.parseCredentialIds(option.requestJson, "allowCredentials")
-            val candidates = resolved.findCredentialsAcrossDomains(repository, allowIds)
+            // サイトが自己申告するrpId（例: ログインページ"login.example.com"に対する
+            // 親ドメイン"example.com"）。有効性検証はvalidateClaimedRpId内で行われる。
+            val claimedRpId = ClientDataJsonBuilder.extractRpId(option.requestJson)
+            val extraRpId = resolved.validateClaimedRpId(repository, claimedRpId)
+            val candidates = resolved.findCredentialsAcrossDomains(repository, allowIds, extraRpId)
             candidates.forEach { entries += buildEntry(context, option, it) }
         }
+        Log.d(TAG, "onBeginGetCredentialRequest: returning ${entries.size} credentialEntries")
         return BeginGetCredentialResponse(credentialEntries = entries)
     }
 

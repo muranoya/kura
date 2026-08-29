@@ -21,6 +21,7 @@ class FakeVaultRepository : IVaultRepository {
     var decryptTransferConfigError: Exception? = null
     var lastSyncTimeResult: Long = 0L
     var listLoginCandidatesResult: List<AutofillCandidate> = emptyList()
+    var isValidWebauthnRpIdResult: Boolean = false
     var webauthnFindCredentialsResult: List<WebAuthnCredentialCandidate> = emptyList()
     var webauthnCreateCredentialResult: WebAuthnAttestationResult =
         WebAuthnAttestationResult("", "", "", "")
@@ -166,6 +167,9 @@ class FakeVaultRepository : IVaultRepository {
     }
 
     override suspend fun saveAndPush(s3ConfigJson: String?) {}
+
+    override suspend fun isValidWebauthnRpId(originHost: String, claimedRpId: String): Boolean =
+        isValidWebauthnRpIdResult
 
     override suspend fun webauthnFindCredentials(
         rpId: String,

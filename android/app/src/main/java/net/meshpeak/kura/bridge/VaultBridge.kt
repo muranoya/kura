@@ -88,6 +88,7 @@ object VaultBridge {
     external fun generateTotpDefault(secret: String): String
     external fun generateTotpFromValue(value: String): String
     external fun parseTotpPeriod(value: String): Long
+    external fun isValidWebauthnRpId(originHost: String, claimedRpId: String): Boolean
 
     // Export
     external fun exportBitwardenJson(vaultId: String): String

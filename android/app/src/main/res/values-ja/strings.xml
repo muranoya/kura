@@ -476,7 +476,6 @@
     <!-- Passkey / Credential Provider -->
     <string name="credential_provider_settings_subtitle">kuraでパスキーを自動入力</string>
     <string name="passkey_unlock_prompt">パスキーを使うにはkuraのロックを解除してください</string>
-    <string name="passkey_get_select_title">パスキーを選択</string>
     <string name="passkey_create_proposal_title">パスキーを保存</string>
     <string name="passkey_create_proposal_message">%1$s用のパスキーを「%2$s」に追加しますか？</string>
     <string name="passkey_create_use_existing">このエントリを使う</string>
@@ -488,4 +487,5 @@
     <string name="passkey_create_error">パスキーの作成に失敗しました</string>
     <string name="settings_passkey_provider">パスキーサービス</string>
     <string name="settings_passkey_provider_description">システム設定でkuraをパスキープロバイダとして管理</string>
+    <string name="settings_passkey_provider_not_found">この端末では設定画面を開けませんでした。設定アプリの「パスワード、パスキー、アカウント」からkuraを手動で有効にしてください。</string>
 </resources>

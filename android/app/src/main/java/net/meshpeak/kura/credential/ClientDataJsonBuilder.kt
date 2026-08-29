@@ -26,6 +26,16 @@ object ClientDataJsonBuilder {
         json.parseToJsonElement(requestJson).jsonObject["challenge"]?.jsonPrimitive?.content
     }.getOrNull()
 
+    /**
+     * WebAuthn Level 3 `PublicKeyCredentialRequestOptionsJSON`の`rpId`フィールドを抽出する
+     * （サイトが自己申告する、検証前の値。単体では信用せず、必ず
+     * [OriginResolver.Resolved.validateClaimedRpId]で検証済みoriginに対する
+     * 有効性チェックを経由してから使うこと）。
+     */
+    fun extractRpId(requestJson: String): String? = runCatching {
+        json.parseToJsonElement(requestJson).jsonObject["rpId"]?.jsonPrimitive?.content
+    }.getOrNull()
+
     /** ネイティブアプリ発（`clientDataHash`なし）経路専用のclientDataJSON組み立て（get） */
     fun buildForGet(challenge: String, rpId: String): String = build("webauthn.get", challenge, rpId)
 

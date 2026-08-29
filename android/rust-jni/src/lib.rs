@@ -661,6 +661,24 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_generatePasswor
 }
 
 #[no_mangle]
+pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_isValidWebauthnRpId(
+    mut env: JNIEnv,
+    _class: JClass,
+    origin_host: JString,
+    claimed_rp_id: JString,
+) -> jboolean {
+    jni_catch(&mut env, |env| {
+        let origin_host = get_string(env, &origin_host)?;
+        let claimed_rp_id = get_string(env, &claimed_rp_id)?;
+        Ok(if api_is_valid_webauthn_rp_id(origin_host, claimed_rp_id) {
+            JNI_TRUE
+        } else {
+            JNI_FALSE
+        })
+    })
+}
+
+#[no_mangle]
 pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_generateTotp(
     mut env: JNIEnv,
     _class: JClass,

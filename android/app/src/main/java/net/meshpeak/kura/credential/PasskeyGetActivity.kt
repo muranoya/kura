@@ -2,6 +2,7 @@ package net.meshpeak.kura.credential
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -18,28 +19,42 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import net.meshpeak.kura.BuildConfig
 import net.meshpeak.kura.autofill.AutofillAuthScreen
 import net.meshpeak.kura.credential.model.PasskeyGetSelection
 import net.meshpeak.kura.credential.model.getPasskeyGetSelection
 import net.meshpeak.kura.data.model.WebAuthnAssertionResult
-import net.meshpeak.kura.data.model.WebAuthnCredentialCandidate
-import net.meshpeak.kura.ui.credential.PasskeyGetSelectScreen
 import net.meshpeak.kura.ui.navigation.LoadingScreen
 import net.meshpeak.kura.ui.theme.KuraTheme
 import net.meshpeak.kura.viewmodel.AppViewModel
 
+private const val TAG = "KuraPasskey"
+
 private sealed interface GetUiState {
     data object Auth : GetUiState
     data object Loading : GetUiState
-    data class Selecting(val candidates: List<WebAuthnCredentialCandidate>) : GetUiState
 }
 
 /**
  * Getフロー Selection フェーズのトランポリンActivity（[AutofillUnlockActivity]が雛形）。
- * Query（Begin）フェーズで候補が1件確定済みならそのまま認証するだけだが、
- * ロック中に開始された場合（[GetCredentialQueryBuilder]がAuthenticationActionのみを
- * 返している）は、ここでアンロック後に改めて候補解決を行う必要がある
- * （docs/android-passkey.md 3-2/3-3のギャップに対する拡張、Part 0参照）。
+ * 起動経路が2通りある点に注意（docs/android-passkey.md 3-2）:
+ *
+ * 1. Query（Begin）フェーズで候補が1件確定済み（[GetCredentialQueryBuilder.buildEntry]の
+ *    `PublicKeyCredentialEntry`が持つPendingIntent経由）→ `intent`に
+ *    [PasskeyGetSelection]が付与されており、`PendingIntentHandler.retrieveProviderGetCredentialRequest`
+ *    でそのまま元のリクエストを復元して直接認証できる。
+ * 2. Query時点ではロック中で`AuthenticationAction`のみを返している
+ *    （[GetCredentialQueryBuilder.buildAuthenticationAction]のPendingIntent経由）→
+ *    `AuthenticationAction`のPendingIntentには`ProviderGetCredentialRequest`が一切
+ *    埋め込まれないため`retrieveProviderGetCredentialRequest`は常にnullを返す
+ *    （実機検証で確認済み。以前はここでも同じ関数を呼んでいたため、アンロック後に必ず
+ *    キャンセル扱いになり、システムの選択UIに戻って無限ループしていた）。
+ *    正しくは`PendingIntentHandler.retrieveBeginGetCredentialRequest`で元の
+ *    `BeginGetCredentialRequest`を復元し、[GetCredentialQueryBuilder.build]と同じロジックで
+ *    （今度はアンロック済みとして）候補を再構築し、
+ *    `PendingIntentHandler.setBeginGetCredentialResponse`でシステムに突き返す。
+ *    システムは実際の候補一覧を含む選択UIを再表示し、ユーザーが選ぶと経路1として
+ *    このActivityが改めて起動される。
  */
 class PasskeyGetActivity : AppCompatActivity() {
 
@@ -52,9 +67,10 @@ class PasskeyGetActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         val selection = intent.getPasskeyGetSelection()
+        Log.d(TAG, "onCreate: hasSelection=${selection != null}")
 
         setContent {
-            when (val state = uiState) {
+            when (uiState) {
                 // AutofillAuthScreenは内部で自前にKuraThemeを適用するため、ここでは
                 // 二重にラップしない（AutofillUnlockActivityと同じ呼び出し方に揃える）。
                 GetUiState.Auth -> AutofillAuthScreen(
@@ -63,70 +79,69 @@ class PasskeyGetActivity : AppCompatActivity() {
                     onLogout = { finishCanceled() }
                 )
                 GetUiState.Loading -> KuraTheme { LoadingScreen() }
-                is GetUiState.Selecting -> KuraTheme {
-                    PasskeyGetSelectScreen(
-                        candidates = state.candidates,
-                        onSelect = { candidate ->
-                            finishWithAssertion(
-                                PasskeyGetSelection(candidate.entryId, candidate.customFieldId, candidate.credentialId)
-                            )
-                        }
-                    )
-                }
             }
         }
     }
 
     private fun proceed(selection: PasskeyGetSelection?) {
         if (uiState != GetUiState.Auth) return
+        if (BuildConfig.DEBUG) Log.d(TAG, "proceed: unlocked, resuming flow (hasSelection=${selection != null})")
         uiState = GetUiState.Loading
         lifecycleScope.launch {
-            val request = PendingIntentHandler.retrieveProviderGetCredentialRequest(intent)
-            if (request == null) {
-                finishCanceled()
-                return@launch
-            }
-            providerRequest = request
-
-            val resolved = OriginResolver.resolve(applicationContext, request.callingAppInfo)
-            if (resolved == null) {
-                finishCanceled()
-                return@launch
-            }
-            resolvedOrigin = resolved
-
             if (selection != null) {
-                finishWithAssertion(selection)
-                return@launch
-            }
-
-            // ロック中に開始されたケース: システムの候補選択UIは機能していないため、
-            // アンロック後にここで初めて候補を確定する。GetCredentialQueryBuilderが
-            // アンロック済み時に行うのと同じく、元のリクエストのallowCredentialsを
-            // 復元して適用する（元請求のRP指定の絞り込みを無視してはいけない）。
-            // requestJsonのallowCredentialsが壊れていて読めない場合、
-            // ClientDataJsonBuilder.parseCredentialIdsは例外を投げる（fail-closed）。
-            // これを「制限なし」として握りつぶすと絞り込みが無効化されてしまうため、
-            // ここでcatchしてキャンセル扱いにする（候補なしにするのと同じ安全側動作）。
-            val candidates = try {
-                val pkOption = request.credentialOptions.filterIsInstance<GetPublicKeyCredentialOption>().firstOrNull()
-                val allowIds = pkOption?.let {
-                    ClientDataJsonBuilder.parseCredentialIds(it.requestJson, "allowCredentials")
-                } ?: emptyList()
-                resolved.findCredentialsAcrossDomains(appViewModel.repository, allowIds)
-            } catch (_: Exception) {
-                finishCanceled()
-                return@launch
-            }
-            when {
-                candidates.isEmpty() -> finishCanceled()
-                candidates.size == 1 -> {
-                    val c = candidates[0]
-                    finishWithAssertion(PasskeyGetSelection(c.entryId, c.customFieldId, c.credentialId))
-                }
-                else -> uiState = GetUiState.Selecting(candidates)
+                proceedWithSelection(selection)
+            } else {
+                proceedFromAuthenticationAction()
             }
         }
+    }
+
+    /** 経路1: Query時点で候補が確定済み。元のProviderGetCredentialRequestを復元してそのまま認証する。 */
+    private suspend fun proceedWithSelection(selection: PasskeyGetSelection) {
+        val request = PendingIntentHandler.retrieveProviderGetCredentialRequest(intent)
+        if (request == null) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "proceedWithSelection: retrieveProviderGetCredentialRequest returned null -> cancel")
+            finishCanceled()
+            return
+        }
+        providerRequest = request
+
+        val resolved = OriginResolver.resolve(applicationContext, request.callingAppInfo)
+        if (resolved == null) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "proceedWithSelection: OriginResolver.resolve returned null for package=${request.callingAppInfo.packageName} -> cancel")
+            finishCanceled()
+            return
+        }
+        resolvedOrigin = resolved
+        finishWithAssertion(selection)
+    }
+
+    /**
+     * 経路2: AuthenticationAction経由（Query時点ではロック中で候補未確定）。
+     * ここで直接候補解決・認証まで完結させようとしてはいけない
+     * （`retrieveProviderGetCredentialRequest`は常にnullを返すため、fail-closedでキャンセルする
+     * しかなく、システムの選択UIに戻って無限ループする）。代わりに元の`BeginGetCredentialRequest`を
+     * 復元し、アンロック済みとして候補を再構築してシステムに突き返す。
+     */
+    private suspend fun proceedFromAuthenticationAction() {
+        val beginRequest = PendingIntentHandler.retrieveBeginGetCredentialRequest(intent)
+        if (beginRequest == null) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "proceedFromAuthenticationAction: retrieveBeginGetCredentialRequest returned null -> cancel")
+            finishCanceled()
+            return
+        }
+        val response = try {
+            GetCredentialQueryBuilder.build(applicationContext, appViewModel.repository, beginRequest)
+        } catch (e: Exception) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "proceedFromAuthenticationAction: GetCredentialQueryBuilder.build failed -> cancel", e)
+            finishCanceled()
+            return
+        }
+        Log.d(TAG, "proceedFromAuthenticationAction: rebuilt ${response.credentialEntries.size} credentialEntries -> handing back to system")
+        val resultIntent = Intent()
+        PendingIntentHandler.setBeginGetCredentialResponse(resultIntent, response)
+        setResult(RESULT_OK, resultIntent)
+        finish()
     }
 
     private fun finishWithAssertion(selection: PasskeyGetSelection) {
@@ -135,24 +150,28 @@ class PasskeyGetActivity : AppCompatActivity() {
             val request = providerRequest
             val resolved = resolvedOrigin
             if (request == null || resolved == null) {
+                if (BuildConfig.DEBUG) Log.d(TAG, "finishWithAssertion: providerRequest or resolvedOrigin missing -> cancel")
                 finishCanceled()
                 return@launch
             }
             val pkOption = request.credentialOptions.filterIsInstance<GetPublicKeyCredentialOption>().firstOrNull()
             if (pkOption == null) {
+                if (BuildConfig.DEBUG) Log.d(TAG, "finishWithAssertion: no GetPublicKeyCredentialOption in request -> cancel")
                 finishCanceled()
                 return@launch
             }
 
             val result = try {
                 buildAssertionResult(selection, pkOption, resolved)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (BuildConfig.DEBUG) Log.d(TAG, "finishWithAssertion: buildAssertionResult failed -> cancel", e)
                 null
             }
             if (result == null) {
                 finishCanceled()
                 return@launch
             }
+            Log.d(TAG, "finishWithAssertion: assertion built successfully -> RESULT_OK")
             val (assertion, clientDataJsonForResponse) = result
 
             val responseJson = buildAuthenticationResponseJson(
@@ -194,6 +213,14 @@ class PasskeyGetActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * WebAuthn Level 3 `AuthenticationResponseJSON`を組み立てる。`clientExtensionResults`
+     * （spec上必須、拡張機能版`webauthn-main-injected.js`の`toJSON()`も常に`{}`を返す）と
+     * `authenticatorAttachment`（拡張機能版は常に`"platform"`）が欠けていると、Chrome側の
+     * JSON→`PublicKeyCredential`変換で不正な形として扱われ、`navigator.credentials.get()`の
+     * Promiseが解決されずページのJSが再試行を繰り返す（実機検証で発覚：kuraはRESULT_OKを
+     * 返しているのに、ページ側は一度も検証APIを呼ばずchallenge再取得を繰り返しループしていた）。
+     */
     private fun buildAuthenticationResponseJson(
         credentialId: String,
         assertion: WebAuthnAssertionResult,
@@ -202,6 +229,7 @@ class PasskeyGetActivity : AppCompatActivity() {
         put("id", credentialId)
         put("rawId", credentialId)
         put("type", "public-key")
+        put("authenticatorAttachment", "platform")
         putJsonObject("response") {
             // clientDataHash経由（ネイティブ側でJSONを持たない）の場合は空文字列のまま返し、
             // Credential Managerシステム側が実際のclientDataJSONに補完する規約に従う。
@@ -210,9 +238,11 @@ class PasskeyGetActivity : AppCompatActivity() {
             put("signature", assertion.signature)
             put("userHandle", assertion.userHandle)
         }
+        putJsonObject("clientExtensionResults") {}
     }.toString()
 
     private fun finishCanceled() {
+        Log.d(TAG, "finishCanceled: returning RESULT_CANCELED")
         setResult(RESULT_CANCELED)
         finish()
     }

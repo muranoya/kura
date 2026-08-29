@@ -1,5 +1,6 @@
 package net.meshpeak.kura.ui.settings
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -53,6 +54,7 @@ fun SettingsScreen(
     onOpenDrawer: () -> Unit = {},
     onLogout: () -> Unit
 ) {
+    var showPasskeyProviderNotFoundDialog by remember { mutableStateOf(false) }
     var showChangePasswordDialog by remember { mutableStateOf(false) }
     var showRotateDekDialog by remember { mutableStateOf(false) }
     var showRegenRecoveryDialog by remember { mutableStateOf(false) }
@@ -183,7 +185,18 @@ fun SettingsScreen(
 
             Card(
                 onClick = {
-                    context.startActivity(Intent(Settings.ACTION_CREDENTIAL_PROVIDER))
+                    try {
+                        context.startActivity(Intent(Settings.ACTION_CREDENTIAL_PROVIDER))
+                    } catch (_: ActivityNotFoundException) {
+                        // 一部端末（OEMによるSettingsアプリのカスタマイズ次第）では
+                        // API 34で追加されたはずのこのIntentに対応するActivityが
+                        // 存在せず、ActivityNotFoundExceptionが投げられる。
+                        // Credential Manager自体（実際のパスキー認証フロー）は
+                        // 機能するため、ここはクラッシュさせず案内を出すだけに留める。
+                        // Toastだと文言が長い場合に途中で消えて読み切れないため、
+                        // 明示的に閉じるダイアログで表示する。
+                        showPasskeyProviderNotFoundDialog = true
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -565,6 +578,20 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+
+    // Passkey provider settings screen not found dialog
+    if (showPasskeyProviderNotFoundDialog) {
+        AlertDialog(
+            onDismissRequest = { showPasskeyProviderNotFoundDialog = false },
+            title = { Text(stringResource(R.string.settings_passkey_provider)) },
+            text = { Text(stringResource(R.string.settings_passkey_provider_not_found)) },
+            confirmButton = {
+                Button(onClick = { showPasskeyProviderNotFoundDialog = false }) {
+                    Text(stringResource(R.string.action_ok))
+                }
+            }
+        )
     }
 
     // Change password dialog

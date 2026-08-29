@@ -110,6 +110,8 @@ interface IVaultRepository {
     suspend fun saveAndPush(s3ConfigJson: String?)
 
     // WebAuthn / Passkey
+    /** WebAuthnの`rp.id`が検証済みoriginに対して有効かどうかを判定する（`OriginResolver`参照）。 */
+    suspend fun isValidWebauthnRpId(originHost: String, claimedRpId: String): Boolean
     suspend fun webauthnFindCredentials(rpId: String, allowCredentialIds: List<String>): List<WebAuthnCredentialCandidate>
     suspend fun webauthnCreateCredential(
         entryId: String?,
@@ -481,6 +483,11 @@ class VaultRepository(private val context: Context) : IVaultRepository {
     // ========================================================================
     // WebAuthn / Passkey
     // ========================================================================
+
+    override suspend fun isValidWebauthnRpId(originHost: String, claimedRpId: String): Boolean =
+        withContext(Dispatchers.IO) {
+            VaultBridge.isValidWebauthnRpId(originHost, claimedRpId)
+        }
 
     override suspend fun webauthnFindCredentials(
         rpId: String,

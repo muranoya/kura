@@ -21,6 +21,7 @@ class CreateRequestJsonParserTest {
         val info = CreateRequestJsonParser.parse(json)
 
         assertEquals("Example", info?.rpName)
+        assertEquals("example.com", info?.rpId)
         assertEquals("dXNlci1oYW5kbGU", info?.userHandle)
         assertEquals("user@example.com", info?.userName)
         assertEquals("Example User", info?.userDisplayName)

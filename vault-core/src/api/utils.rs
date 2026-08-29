@@ -1,3 +1,4 @@
+use crate::domain_match::is_valid_webauthn_rp_id;
 use crate::password_gen::{generate_password, PasswordOptions};
 use crate::secret::TotpSecretInput;
 use crate::totp::{
@@ -54,4 +55,10 @@ pub fn api_generate_totp_from_value(value: String) -> Result<String, String> {
 pub fn api_parse_totp_period(value: String) -> u64 {
     let value = TotpSecretInput::from_string(value);
     parse_totp_period(value.as_str())
+}
+
+/// WebAuthnの`rp.id`が検証済みoriginに対して有効かどうかを判定する
+/// （`domain_match::is_valid_webauthn_rp_id`参照）。
+pub fn api_is_valid_webauthn_rp_id(origin_host: String, claimed_rp_id: String) -> bool {
+    is_valid_webauthn_rp_id(&origin_host, &claimed_rp_id)
 }
