@@ -221,19 +221,28 @@ mod tests {
 
     #[test]
     fn rp_id_equal_to_origin_is_valid() {
-        assert!(is_valid_webauthn_rp_id("login.sbisec.co.jp", "login.sbisec.co.jp"));
+        assert!(is_valid_webauthn_rp_id(
+            "login.sbisec.co.jp",
+            "login.sbisec.co.jp"
+        ));
     }
 
     #[test]
     fn rp_id_ancestor_domain_is_valid() {
         // 実際にAndroid版で発生していたケース: ログインページは "login.sbisec.co.jp"
         // だがサイトが登録したrp.idは親ドメイン "sbisec.co.jp"。
-        assert!(is_valid_webauthn_rp_id("login.sbisec.co.jp", "sbisec.co.jp"));
+        assert!(is_valid_webauthn_rp_id(
+            "login.sbisec.co.jp",
+            "sbisec.co.jp"
+        ));
     }
 
     #[test]
     fn rp_id_unrelated_domain_is_invalid() {
-        assert!(!is_valid_webauthn_rp_id("login.sbisec.co.jp", "evil.example.com"));
+        assert!(!is_valid_webauthn_rp_id(
+            "login.sbisec.co.jp",
+            "evil.example.com"
+        ));
     }
 
     #[test]
@@ -245,12 +254,18 @@ mod tests {
     #[test]
     fn rp_id_descendant_of_origin_is_invalid() {
         // originより「狭い」ドメインをrp.idとして自称するのは無効（祖先方向のみ許可）。
-        assert!(!is_valid_webauthn_rp_id("sbisec.co.jp", "login.sbisec.co.jp"));
+        assert!(!is_valid_webauthn_rp_id(
+            "sbisec.co.jp",
+            "login.sbisec.co.jp"
+        ));
     }
 
     #[test]
     fn rp_id_case_insensitive() {
-        assert!(is_valid_webauthn_rp_id("Login.SBISEC.co.jp", "SBISEC.co.jp"));
+        assert!(is_valid_webauthn_rp_id(
+            "Login.SBISEC.co.jp",
+            "SBISEC.co.jp"
+        ));
     }
 
     #[test]

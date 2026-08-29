@@ -431,7 +431,11 @@ mod tests {
 
         let hash = [0u8; 32];
         assert!(vault
-            .get_passkey_assertion_with_hash(&attestation.entry_id, &attestation.custom_field_id, &hash)
+            .get_passkey_assertion_with_hash(
+                &attestation.entry_id,
+                &attestation.custom_field_id,
+                &hash
+            )
             .is_err());
     }
 
