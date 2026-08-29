@@ -9,10 +9,6 @@ import androidx.credentials.provider.BeginGetCredentialResponse
 import androidx.credentials.provider.BeginGetPublicKeyCredentialOption
 import androidx.credentials.provider.CredentialEntry
 import androidx.credentials.provider.PublicKeyCredentialEntry
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import net.meshpeak.kura.R
 import net.meshpeak.kura.credential.model.PasskeyGetSelection
 import net.meshpeak.kura.credential.model.putPasskeyGetSelection
@@ -22,7 +18,6 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /** [android.app.PendingIntent]のrequestCode採番。FillResponseBuilder.authRequestCodeSeqと同じ理由。 */
 private val requestCodeSeq = AtomicInteger()
-private val requestJsonFormat = Json { ignoreUnknownKeys = true }
 
 /**
  * `onBeginGetCredentialRequest`本体ロジック。ロック中は候補の有無に関わらず常に
@@ -51,12 +46,8 @@ object GetCredentialQueryBuilder {
 
         val entries = mutableListOf<CredentialEntry>()
         for (option in request.beginGetCredentialOptions.filterIsInstance<BeginGetPublicKeyCredentialOption>()) {
-            val allowIds = parseAllowCredentialIds(option.requestJson)
-            val candidates = try {
-                repository.webauthnFindCredentials(resolved.rpId, allowIds)
-            } catch (_: Exception) {
-                emptyList()
-            }
+            val allowIds = ClientDataJsonBuilder.parseCredentialIds(option.requestJson, "allowCredentials")
+            val candidates = resolved.findCredentialsAcrossDomains(repository, allowIds)
             candidates.forEach { entries += buildEntry(context, option, it) }
         }
         return BeginGetCredentialResponse(credentialEntries = entries)
@@ -93,11 +84,4 @@ object GetCredentialQueryBuilder {
             .setDisplayName(candidate.userDisplayName.ifBlank { candidate.userName })
             .build()
     }
-
-    private fun parseAllowCredentialIds(requestJson: String): List<String> = runCatching {
-        requestJsonFormat.parseToJsonElement(requestJson).jsonObject["allowCredentials"]
-            ?.jsonArray
-            ?.mapNotNull { it.jsonObject["id"]?.jsonPrimitive?.content }
-            ?: emptyList()
-    }.getOrDefault(emptyList())
 }

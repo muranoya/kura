@@ -52,7 +52,10 @@ object FillResponseBuilder {
         val domain = if (parsed.isBrowserRequest) {
             parsed.webDomain
         } else {
-            parsed.packageName?.let { PackageDomainMap.domainFor(context, it) }
+            // 1パッケージに複数ドメインが登録されている場合（PackageDomainMap参照）も
+            // オートフィルは先頭のドメインのみを候補解決に使う（Passkeyの検索と異なり
+            // 全ドメイン横断はまだ行っていない）。
+            parsed.packageName?.let { PackageDomainMap.domainsFor(context, it).firstOrNull() }
         }
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "buildUnlocked: packageName=${parsed.packageName} webDomain=${parsed.webDomain} -> domain=$domain")

@@ -2,7 +2,6 @@ package net.meshpeak.kura.credential
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.Base64
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -55,15 +54,17 @@ class PasskeyGetActivity : AppCompatActivity() {
         val selection = intent.getPasskeyGetSelection()
 
         setContent {
-            KuraTheme {
-                when (val state = uiState) {
-                    GetUiState.Auth -> AutofillAuthScreen(
-                        appViewModel = appViewModel,
-                        onUnlocked = { proceed(selection) },
-                        onLogout = { finishCanceled() }
-                    )
-                    GetUiState.Loading -> LoadingScreen()
-                    is GetUiState.Selecting -> PasskeyGetSelectScreen(
+            when (val state = uiState) {
+                // AutofillAuthScreenは内部で自前にKuraThemeを適用するため、ここでは
+                // 二重にラップしない（AutofillUnlockActivityと同じ呼び出し方に揃える）。
+                GetUiState.Auth -> AutofillAuthScreen(
+                    appViewModel = appViewModel,
+                    onUnlocked = { proceed(selection) },
+                    onLogout = { finishCanceled() }
+                )
+                GetUiState.Loading -> KuraTheme { LoadingScreen() }
+                is GetUiState.Selecting -> KuraTheme {
+                    PasskeyGetSelectScreen(
                         candidates = state.candidates,
                         onSelect = { candidate ->
                             finishWithAssertion(
@@ -100,11 +101,22 @@ class PasskeyGetActivity : AppCompatActivity() {
             }
 
             // ロック中に開始されたケース: システムの候補選択UIは機能していないため、
-            // アンロック後にここで初めて候補を確定する。
+            // アンロック後にここで初めて候補を確定する。GetCredentialQueryBuilderが
+            // アンロック済み時に行うのと同じく、元のリクエストのallowCredentialsを
+            // 復元して適用する（元請求のRP指定の絞り込みを無視してはいけない）。
+            // requestJsonのallowCredentialsが壊れていて読めない場合、
+            // ClientDataJsonBuilder.parseCredentialIdsは例外を投げる（fail-closed）。
+            // これを「制限なし」として握りつぶすと絞り込みが無効化されてしまうため、
+            // ここでcatchしてキャンセル扱いにする（候補なしにするのと同じ安全側動作）。
             val candidates = try {
-                appViewModel.repository.webauthnFindCredentials(resolved.rpId, emptyList())
+                val pkOption = request.credentialOptions.filterIsInstance<GetPublicKeyCredentialOption>().firstOrNull()
+                val allowIds = pkOption?.let {
+                    ClientDataJsonBuilder.parseCredentialIds(it.requestJson, "allowCredentials")
+                } ?: emptyList()
+                resolved.findCredentialsAcrossDomains(appViewModel.repository, allowIds)
             } catch (_: Exception) {
-                emptyList()
+                finishCanceled()
+                return@launch
             }
             when {
                 candidates.isEmpty() -> finishCanceled()
@@ -193,15 +205,12 @@ class PasskeyGetActivity : AppCompatActivity() {
         putJsonObject("response") {
             // clientDataHash経由（ネイティブ側でJSONを持たない）の場合は空文字列のまま返し、
             // Credential Managerシステム側が実際のclientDataJSONに補完する規約に従う。
-            put("clientDataJSON", if (clientDataJson.isEmpty()) "" else encodeBase64Url(clientDataJson))
+            put("clientDataJSON", if (clientDataJson.isEmpty()) "" else ClientDataJsonBuilder.encodeBase64Url(clientDataJson))
             put("authenticatorData", assertion.authenticatorData)
             put("signature", assertion.signature)
             put("userHandle", assertion.userHandle)
         }
     }.toString()
-
-    private fun encodeBase64Url(text: String): String =
-        Base64.encodeToString(text.toByteArray(Charsets.UTF_8), Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
 
     private fun finishCanceled() {
         setResult(RESULT_CANCELED)

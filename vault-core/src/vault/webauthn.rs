@@ -2,6 +2,8 @@
 //! operations (key generation, signing, CBOR construction) live in
 //! `crate::webauthn`; this module only knows about `CustomField`/`VaultEntry`.
 
+use std::collections::HashMap;
+
 use crate::error::{Result, VaultError};
 use crate::models::{CustomField, EntryData, PasskeyFieldData};
 use crate::secret::SecretString;
@@ -81,9 +83,20 @@ impl UnlockedVault {
     }
 
     /// 新しいPasskeyを生成し、指定エントリ（`entry_id`）に追加する。`entry_id`が
-    /// `None`の場合は`rp_name`/`rp_id`/`user_name`から新規`login`エントリを作成する。
+    /// `None`の場合は`rp_id`/`user_name`から新規`login`エントリを作成する。
     /// `exclude_credential_ids`のいずれかと一致する既存credentialがあればUIを開かず
     /// エラーで即拒否する（WebAuthnの`excludeCredentials`対応、サイドチャネル防止）。
+    ///
+    /// 新規エントリの表示名（`display_name`）には`rp_name`ではなく検証済みの`rp_id`のみを
+    /// 使う。Passkey自体（`rp_id`によるcredential照合・署名）とエントリの`url`は常に
+    /// 検証済みの`rp_id`にのみ束縛されるため、`rp_name`が偽装されていても認証が別ドメイン
+    /// 宛てに成立したり、無関係な既存エントリに紐付いたりすることはない
+    /// （セキュリティ上の実害はない）。それでも、`rp_name`はリクエストJSON内の
+    /// 呼び出し元の自己申告値で検証手段がなく、これをそのままエントリ名・確認ダイアログに
+    /// 出すと「このPasskeyが実際にどのドメイン向けか」をユーザーが判断できなくなる
+    /// （ブラウザがページタイトルではなくURLを信頼の起点にするのと同じ理由）。
+    /// そのため表示上・エントリ名としては検証済みの`rp_id`のみを使う（`rp_name`自体は
+    /// `PasskeyFieldData`に付随情報として保存はする）。
     #[allow(clippy::too_many_arguments)]
     pub fn create_passkey_credential(
         &mut self,
@@ -109,7 +122,7 @@ impl UnlockedVault {
 
         let attestation = crate::webauthn::create_credential(&rp_id)?;
 
-        let display_name = rp_name.clone().unwrap_or_else(|| rp_id.clone());
+        let display_name = rp_id.clone();
         let passkey_data = PasskeyFieldData {
             rp_id: rp_id.clone(),
             rp_name,
@@ -171,11 +184,7 @@ impl UnlockedVault {
         custom_field_id: &str,
         client_data_json: &str,
     ) -> Result<PasskeyAssertion> {
-        let vault_entry = self
-            .contents
-            .entries
-            .get(entry_id)
-            .ok_or_else(|| VaultError::EntryNotFound(entry_id.to_string()))?;
+        let vault_entry = find_active_login_entry(&self.contents.entries, entry_id)?;
 
         let field = find_passkey_fields(vault_entry)
             .find(|f| f.id == custom_field_id)
@@ -203,11 +212,7 @@ impl UnlockedVault {
         custom_field_id: &str,
         client_data_hash: &[u8; 32],
     ) -> Result<PasskeyAssertion> {
-        let vault_entry = self
-            .contents
-            .entries
-            .get(entry_id)
-            .ok_or_else(|| VaultError::EntryNotFound(entry_id.to_string()))?;
+        let vault_entry = find_active_login_entry(&self.contents.entries, entry_id)?;
 
         let field = find_passkey_fields(vault_entry)
             .find(|f| f.id == custom_field_id)
@@ -239,6 +244,28 @@ fn find_passkey_fields(e: &VaultEntry) -> impl Iterator<Item = &CustomField> {
         .filter(|f| f.field_type == "passkey")
 }
 
+/// `entry_id`が存在し、かつ`login`タイプでゴミ箱・tombstoneでもない場合のみエントリを
+/// 返す。`find_passkey_credentials`が候補列挙時に適用している除外条件
+/// （`entry_type != "login"` / `deleted_at` / `purged_at`）を、`get_passkey_assertion`系の
+/// 単一エントリ取得経路にも同じく適用するための共通ヘルパー。これが無いと、ゴミ箱に
+/// 入れたPasskeyは候補検索には出てこないのに、既に持っている`entry_id`/`custom_field_id`
+/// を使えば署名だけはできてしまう、という抜け穴になる。
+fn find_active_login_entry<'a>(
+    entries: &'a HashMap<String, VaultEntry>,
+    entry_id: &str,
+) -> Result<&'a VaultEntry> {
+    let vault_entry = entries
+        .get(entry_id)
+        .ok_or_else(|| VaultError::EntryNotFound(entry_id.to_string()))?;
+    if vault_entry.entry_type != "login"
+        || vault_entry.deleted_at.is_some()
+        || vault_entry.purged_at.is_some()
+    {
+        return Err(VaultError::EntryNotFound(entry_id.to_string()));
+    }
+    Ok(vault_entry)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -259,6 +286,28 @@ mod tests {
             dek: Dek::generate(),
             etag: None,
         }
+    }
+
+    #[test]
+    fn test_new_entry_display_name_uses_verified_rp_id_not_self_reported_rp_name() {
+        let mut vault = make_vault();
+
+        // rp_nameは呼び出し元の自己申告値（未検証）。エントリ名としては採用されず、
+        // 検証済みのrp_idがそのまま使われることを確認する（なりすまし対策）。
+        let attestation = vault
+            .create_passkey_credential(
+                None,
+                "example.com".to_string(),
+                Some("Totally Legit Bank".to_string()),
+                "user-handle".to_string(),
+                "user@example.com".to_string(),
+                "Example User".to_string(),
+                &[],
+            )
+            .unwrap();
+
+        let entry = vault.get_entry(&attestation.entry_id).unwrap().unwrap();
+        assert_eq!(entry.name, "example.com");
     }
 
     #[test]
@@ -348,6 +397,42 @@ mod tests {
             &[attestation.credential_id],
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_assertion_fails_after_entry_is_trashed() {
+        let mut vault = make_vault();
+        let attestation = vault
+            .create_passkey_credential(
+                None,
+                "example.com".to_string(),
+                None,
+                "handle".to_string(),
+                "user".to_string(),
+                "User".to_string(),
+                &[],
+            )
+            .unwrap();
+
+        vault.delete_entry(&attestation.entry_id).unwrap();
+
+        // ゴミ箱に入れたエントリは候補検索から除外されるだけでなく、
+        // entry_id/custom_field_idを直接指定してもassertionを生成できてはならない。
+        assert!(vault
+            .find_passkey_credentials("example.com", &[])
+            .is_empty());
+        assert!(vault
+            .get_passkey_assertion(
+                &attestation.entry_id,
+                &attestation.custom_field_id,
+                r#"{"type":"webauthn.get"}"#,
+            )
+            .is_err());
+
+        let hash = [0u8; 32];
+        assert!(vault
+            .get_passkey_assertion_with_hash(&attestation.entry_id, &attestation.custom_field_id, &hash)
+            .is_err());
     }
 
     #[test]

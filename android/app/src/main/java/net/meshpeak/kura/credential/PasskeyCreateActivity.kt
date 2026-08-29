@@ -2,7 +2,6 @@ package net.meshpeak.kura.credential
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.Base64
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -18,7 +17,9 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import net.meshpeak.kura.autofill.AutofillAuthScreen
+import net.meshpeak.kura.data.model.AutofillCandidate
 import net.meshpeak.kura.data.model.WebAuthnAttestationResult
+import net.meshpeak.kura.data.model.WebAuthnCredentialCandidate
 import net.meshpeak.kura.ui.credential.CreateUiState
 import net.meshpeak.kura.ui.credential.PasskeyCreateConfirmScreen
 import net.meshpeak.kura.ui.theme.KuraTheme
@@ -44,18 +45,23 @@ class PasskeyCreateActivity : AppCompatActivity() {
     private var resolvedOrigin: OriginResolver.Resolved? = null
     private var requestInfo: CreateRequestInfo? = null
 
+    /** createPasskey()の多重起動防止用（Loading状態はproceed()内部からも一時的に経由するためuiStateでは判定できない）。 */
+    private var creationInProgress = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            KuraTheme {
-                when (val state = uiState) {
-                    CreateActivityState.Auth -> AutofillAuthScreen(
-                        appViewModel = appViewModel,
-                        onUnlocked = { proceed() },
-                        onLogout = { finishCanceled() }
-                    )
-                    is CreateActivityState.Confirm -> PasskeyCreateConfirmScreen(
+            when (val state = uiState) {
+                // AutofillAuthScreenは内部で自前にKuraThemeを適用するため、ここでは
+                // 二重にラップしない（AutofillUnlockActivityと同じ呼び出し方に揃える）。
+                CreateActivityState.Auth -> AutofillAuthScreen(
+                    appViewModel = appViewModel,
+                    onUnlocked = { proceed() },
+                    onLogout = { finishCanceled() }
+                )
+                is CreateActivityState.Confirm -> KuraTheme {
+                    PasskeyCreateConfirmScreen(
                         state = state.screenState,
                         onConfirm = { entryId -> createPasskey(entryId) },
                         onCancel = { finishCanceled() }
@@ -91,36 +97,78 @@ class PasskeyCreateActivity : AppCompatActivity() {
             }
             requestInfo = info
 
-            if (info.excludeCredentialIds.isNotEmpty()) {
-                val existing = try {
-                    appViewModel.repository.webauthnFindCredentials(resolved.rpId, info.excludeCredentialIds)
-                } catch (_: Exception) {
-                    emptyList()
-                }
-                if (existing.isNotEmpty()) {
-                    uiState = CreateActivityState.Confirm(CreateUiState.AlreadyRegistered)
-                    return@launch
-                }
-            }
+            // rp.nameはリクエストJSON内の自己申告値で検証手段がない。Passkey自体・
+            // 紐付け先エントリの検索は常に検証済みのrp_idにのみ束縛されるため、rp.nameが
+            // 偽装されていても認証が別ドメイン宛てに成立したり無関係なエントリに
+            // 紐づいたりすることはない（セキュリティ上の実害はない）。それでも、
+            // ブラウザがページタイトルではなくURLを信頼の起点にするのと同じ理由で、
+            // ユーザーが「このPasskeyが実際にどのドメイン向けか」を判断できる値を
+            // 見せるべきなので、確認ダイアログの表示名にはrp.nameではなく検証済みの
+            // rp_idを使う。
+            val rpDisplayName = resolved.rpId
 
-            val rpDisplayName = info.rpName ?: resolved.rpId
-            val matched = try {
-                appViewModel.repository.listLoginCandidates(resolved.rpId, strictSubdomain = false)
-            } catch (_: Exception) {
-                emptyList()
-            }
-            uiState = when {
-                matched.isEmpty() -> {
-                    createPasskey(null)
-                    return@launch
+            try {
+                if (info.excludeCredentialIds.isNotEmpty()) {
+                    // 複数ドメインが紐づくパッケージ（OriginResolver.Resolved.allRpIds参照）は
+                    // 全ドメインを横断してチェックする。検索失敗を「一致なし」として握りつぶすと
+                    // 既に登録済みのPasskeyを見逃したまま作成に進んでしまうため、例外は
+                    // ここでcatchせず外側のcatchでErrorに倒す（fail-safe）。
+                    val existing = findExcludedCredentials(resolved.allRpIds, info.excludeCredentialIds)
+                    if (existing.isNotEmpty()) {
+                        uiState = CreateActivityState.Confirm(CreateUiState.AlreadyRegistered)
+                        return@launch
+                    }
                 }
-                matched.size == 1 -> CreateActivityState.Confirm(CreateUiState.Proposal(rpDisplayName, matched[0]))
-                else -> CreateActivityState.Confirm(CreateUiState.Selection(rpDisplayName, matched))
+
+                // 同様に検索失敗を「候補0件」として握りつぶすと、既存エントリがあるにも
+                // 関わらず確認なしで重複した新規エントリを自動作成してしまうため、
+                // 例外はここでcatchせず外側のcatchでErrorに倒す。
+                val matched = listLoginCandidatesAcrossDomains(resolved.allRpIds)
+                uiState = when {
+                    matched.isEmpty() -> {
+                        createPasskey(null)
+                        return@launch
+                    }
+                    matched.size == 1 -> CreateActivityState.Confirm(CreateUiState.Proposal(rpDisplayName, matched[0]))
+                    else -> CreateActivityState.Confirm(CreateUiState.Selection(rpDisplayName, matched))
+                }
+            } catch (_: Exception) {
+                uiState = CreateActivityState.Confirm(CreateUiState.Error)
             }
         }
     }
 
+    /** [findCredentialsAcrossDomains]のexcludeCredentials版。詳細は呼び出し元のコメント参照。 */
+    private suspend fun findExcludedCredentials(
+        rpIds: List<String>,
+        excludeCredentialIds: List<String>
+    ): List<WebAuthnCredentialCandidate> = rpIds.flatMap { rpId ->
+        appViewModel.repository.webauthnFindCredentials(rpId, excludeCredentialIds)
+    }
+
+    /**
+     * [rpIds]を横断して`listLoginCandidates`を行い、エントリIDで重複排除して返す。
+     * 1パッケージに複数ドメインが登録されている場合（OriginResolver.Resolved.allRpIds参照）に
+     * いずれのドメインの既存エントリも提案候補として拾えるようにする。例外はcatchせず
+     * 呼び出し元に伝播させる（検索失敗を「候補なし」と混同しないため）。
+     */
+    private suspend fun listLoginCandidatesAcrossDomains(rpIds: List<String>): List<AutofillCandidate> {
+        val seenEntryIds = HashSet<String>()
+        val result = mutableListOf<AutofillCandidate>()
+        for (rpId in rpIds) {
+            val found = appViewModel.repository.listLoginCandidates(rpId, strictSubdomain = false)
+            for (candidate in found) {
+                if (seenEntryIds.add(candidate.id)) {
+                    result += candidate
+                }
+            }
+        }
+        return result
+    }
+
     private fun createPasskey(entryId: String?) {
+        if (creationInProgress) return
+        creationInProgress = true
         uiState = CreateActivityState.Confirm(CreateUiState.Loading)
         lifecycleScope.launch {
             val request = pkRequest
@@ -145,14 +193,15 @@ class PasskeyCreateActivity : AppCompatActivity() {
                 null
             }
             if (attestation == null) {
-                finishCanceled()
+                creationInProgress = false
+                uiState = CreateActivityState.Confirm(CreateUiState.Error)
                 return@launch
             }
 
             val clientDataJson = if (request.clientDataHash != null) {
                 ""
             } else {
-                encodeBase64Url(ClientDataJsonBuilder.buildForCreate(info.challenge, resolved.rpId))
+                ClientDataJsonBuilder.encodeBase64Url(ClientDataJsonBuilder.buildForCreate(info.challenge, resolved.rpId))
             }
 
             val responseJson = buildRegistrationResponseJson(attestation, clientDataJson)
@@ -177,9 +226,6 @@ class PasskeyCreateActivity : AppCompatActivity() {
             put("attestationObject", attestation.attestationObject)
         }
     }.toString()
-
-    private fun encodeBase64Url(text: String): String =
-        Base64.encodeToString(text.toByteArray(Charsets.UTF_8), Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
 
     private fun finishCanceled() {
         setResult(RESULT_CANCELED)

@@ -200,6 +200,8 @@ setResult(RESULT_OK, result); finish()
 
 **実装時に判明したギャップとその解消**: Query（Begin）フェーズで返すのはAuthenticationAction 1件のみのため、ロック中に開始された場合はシステムの候補選択UIが機能しない。アンロック後に複数のPasskey候補が判明するケースへの対応として、`PasskeyGetActivity`内に軽量な候補選択画面`PasskeyGetSelectScreen`（`ui/credential/`）を追加した（6-2参照）。これは当初のdesign（3-2/6-2の初版）には明記されていなかった拡張。
 
+**実装時の訂正（レビューで指摘・修正）**: 上記フロー図の「アンロック後、ここで初めてapi_webauthn_find_credentialsを呼び候補を確定する」の実装は、当初は元リクエストの`allowCredentials`を復元せずに常に無制限で検索していた（`GetCredentialQueryBuilder`がアンロック済み時に行う絞り込みと不整合）。`PasskeyGetActivity`側でも`GetPublicKeyCredentialOption.requestJson`から`allowCredentials`を復元し、`GetCredentialQueryBuilder`と同じ絞り込みを適用するよう修正した。
+
 ## 3-3. Query時点での「アンロック済みなら候補を列挙する」設計判断
 
 ブラウザ拡張版は「候補0件ならUIを一切開かない」というサイドチャネル対策を取っているが、これは拡張機能が候補の有無を自分だけで完結して判断し、ポップアップウィンドウの開閉そのものを制御できたことに依る。Androidの2段階モデルでは、**Query（Begin）フェーズの時点でシステムに`CredentialEntry`の有無を返す必要があり、この時点の応答自体がシステム標準UIに反映される**ため、「候補があるかないか」という情報はQueryフェーズで既にシステムに渡さざるを得ない。
@@ -238,11 +240,13 @@ https://www.gstatic.com/gpm-passkeys-privileged-apps/apps.json
 
 ```kotlin
 val packageName = callingAppInfo.packageName
-val rpId = PackageDomainMap.domainFor(context, packageName)
+val rpId = PackageDomainMap.domainsFor(context, packageName).firstOrNull()
     ?: return /* 未登録パッケージはPasskey機能も候補なし。オートフィルと同じ安全側デフォルト */
 ```
 
 **セキュリティ上の限界を明記する:** この経路はDigital Asset Linksのような暗号学的な所有権証明を伴わない。`PackageDomainMap`はkuraチームが手動でキュレーションするデータであり、「そのパッケージ名のアプリが本当にそのドメインの正規運営者である」ことをAndroid OSが保証しているわけではない。ただし、Android自体がAPKの署名検証によってパッケージ名の詐称（同一パッケージ名を騙る別アプリのインストール）を防いでいるため、実質的なリスクは「`PackageDomainMap`への誤ったマッピング登録」に限定される。この経路は**オプトイン的な位置づけ**とし、初期実装では`package_domains.json`に明示的に登録されたパッケージのみを対象にする（未登録は常に候補なし、という既存方針をPasskeyでも維持）。
+
+**実装時の訂正（1パッケージ複数ドメイン対応）**: `package_domains.json`は当初1パッケージ1ドメイン（`{"domain": "example.com"}`）の設計だったが、`com.instagram.android`のようにfacebook.comアカウントでもログインできるアプリを表現しようとして同一キーを複数回書いてしまい（JSONオブジェクトとしては後勝ちで上書きされ、片方が静かに失われる不正な定義）、`instagram.com`向けPasskeyが実際には`facebook.com`のrp_idに誤って束縛される事故が起きていた。`PackageDomainEntry.domain: String`を`domains: List<String>`に変更し、1パッケージに複数ドメインを正しく登録できるようにした。`OriginResolver.Resolved`は代表rp_id（新規作成時に使う、先頭ドメイン）に加えて`allRpIds: List<String>`を持ち、Passkeyの検索（`find_passkey_credentials`・`excludeCredentials`チェック・紐付け先エントリ提案）は必ず`allRpIds`全体を横断して行う（`OriginResolver.findCredentialsAcrossDomains`、`PasskeyCreateActivity.listLoginCandidatesAcrossDomains`）。`PackageDomainMap.domainFor`（先頭ドメインのみを返す旧API）は`domainsFor`一本に統一して廃止した。オートフィル側（`FillResponseBuilder`）は`domainsFor(...).firstOrNull()`で先頭ドメインのみを使う点は変わらず（全ドメイン横断の検索はPasskey側のみ）。
 
 ## 4-3. rp_id検証のまとめ
 
@@ -253,6 +257,8 @@ val rpId = PackageDomainMap.domainFor(context, packageName)
 | 上記いずれにも該当しない呼び出し元 | 取得不可 | 候補なし・作成不可として扱う（安全側デフォルト） |
 
 いずれの経路で取得した`rp_id`も、`api_webauthn_find_credentials`/`api_webauthn_create_credential`にそのまま渡す。vault-core側では`rp_id`の完全一致でのみ照合するため（Part 2-4）、Android側で正規化（小文字化等）が必要な場合はJNI呼び出し前に行う。
+
+**実装時の訂正（メインスレッドブロッキングの解消）**: `OriginResolver.resolve`は`PrivilegedAllowlist`の初回読み込み（asset同期I/O、944件のJSONパース）を伴うが、当初は`PasskeyCreateActivity`/`PasskeyGetActivity`の`lifecycleScope.launch`（デフォルトMainディスパッチャ）内で同期関数として直接呼んでいたため、初回リクエスト時にメインスレッドをブロックしうる状態だった。`OriginResolver.resolve`を`suspend fun`にし内部で`withContext(Dispatchers.IO)`に切り替えるよう修正した（`GetCredentialQueryBuilder.build`は元々`Dispatchers.IO`上のsuspend関数のため影響なし）。
 
 # Part 5: vault-core / JNI連携設計
 
@@ -325,6 +331,10 @@ external fun webauthnGetAssertionWithHash(
 - Android Credential Managerでは、`GetPublicKeyCredentialOption`（Getのみ。Createの`CreatePublicKeyCredentialRequest`にも同名フィールドがあるが、後述の通りvault-core側では使わない）が`clientDataHash`（システム側で既に計算済みのSHA-256ハッシュ、32バイト）を提供するケースと、`requestJson`から`clientDataJSON`をアプリ側で組み立てる必要があるケースの両方がありうる。**Part 4-1の特権アプリ経由（ブラウザ発）では`clientDataHash`をそのまま使い、自前でJSONを組み立てない**（システムが検証済みのoriginを埋め込み済みのため、アプリ側での再構築はかえって整合性リスクを生む）。ネイティブアプリ発（`clientDataHash`が渡されないケース）では、Part 4-2で確定した`rp_id`ベースのoriginを使い`{type, challenge, origin}`形式のJSONをKotlin側で組み立てた上でvault-coreに渡す
 - **実装時の訂正**: 当初「`vault-core`側のAPIシグネチャ（`client_data_json: String`）は変更しない」としていたが、これは技術的に成立しない。既存`api_webauthn_get_assertion`は受け取った`client_data_json`文字列から内部でSHA-256を計算する設計であり、Android側が元のJSON文字列を持たない（`clientDataHash`のみが渡される）ブラウザ発リクエストでは、Android側で「それらしいJSON」を組み立てて渡してもハッシュが一致せず署名検証は必ず失敗する。このため、ハッシュを直接受け取って署名する`api_webauthn_get_assertion_with_hash`をvault-coreに新設した（Part 1-3参照）。ブラウザ発では`GetPublicKeyCredentialOption.clientDataHash`をそのままこの新APIに渡し、ネイティブアプリ発では引き続き既存の`client_data_json: String`版APIを使う。Createでは元々`client_data_json`を引数に取らないため、この問題は発生しない（Part 1-3参照）
 
+**実装時の訂正（rp.nameを表示・エントリ名に使わない）**: Create requestJson内の`rp.name`は呼び出し元の自己申告値であり、`rp_id`（Part 4で暗号学的に検証済み）と異なり検証手段がない。当初はこれを紐付け確認ダイアログの表示名・新規エントリの表示名にそのまま使っていたが、既にPart 4-1のallowlistに載った特権ブラウザ経由であればどのサイトでも任意の`rp.name`を送れてしまうため、これをユーザーへの識別子として信用するのはなりすまし対策上不適切と判断し修正した。`PasskeyCreateActivity`が表示する`rpDisplayName`、および`create_passkey_credential`が新規エントリに付ける`display_name`は、いずれも`rp.name`ではなく検証済みの`rp_id`のみを使う（`rp.name`自体は`PasskeyFieldData`に付随情報として保存はするが、表示上の信頼の起点にはしない）。
+
+**実装時の訂正（ゴミ箱エントリのPasskeyで署名できてしまう抜け穴）**: `get_passkey_assertion`/`get_passkey_assertion_with_hash`は当初`entry_id`を直接`self.contents.entries`から取得するだけで、`find_passkey_credentials`が適用している`deleted_at`/`purged_at`/`entry_type`の除外条件を適用していなかった。このため、ゴミ箱（Trash）に入れたPasskeyは候補検索（Get/Createの候補列挙）には出てこないにも関わらず、既に取得済みの`entry_id`/`custom_field_id`があれば署名だけはできてしまう不整合があった。共通ヘルパー`find_active_login_entry`を追加し、両関数がこれを経由するよう修正した。
+
 # Part 6: UI/UXフロー設計
 
 拡張機能の`extension/src/popup/screens/webauthn/`（`CreateConfirm.tsx`, `SelectCredential.tsx`, `UnlockRitual.tsx`）に相当する画面群を、Android Activity + Jetpack Composeで実装する。
@@ -338,8 +348,11 @@ external fun webauthnGetAssertionWithHash(
 | ロック中 → 認証要求 | 既存`AutofillAuthScreen`をそのまま再利用（専用の`PasskeyUnlockScreen`は新設せず、既存Composableを直接呼び出す形にした。6-3参照） | `UnlockRitual.tsx` |
 | 紐付け先エントリ選択（1件一致は提案、複数件は選択、0件は新規作成） | `PasskeyCreateConfirmScreen` | `CreateConfirm.tsx` |
 | 既に登録済み（`exclude_credential_ids`一致） | エラー表示、閉じるとキャンセル扱いで呼び出し元に返す | `{kind:'error', reason:'already_registered'}` |
+| 候補検索・Passkey作成のいずれかが失敗した場合 | `CreateUiState.Error`（実装時に追加）、閉じるとキャンセル扱いで呼び出し元に返す | - |
 
 紐付け先エントリの判定ロジック（1件一致→提案、複数件→選択、0件→新規`login`エントリ作成）は`webauthn-passkey.md` 3-7の表をそのまま踏襲する。
+
+**実装時の訂正（検索失敗の握りつぶし）**: 当初は`excludeCredentials`一致チェックや紐付け先エントリ検索が例外を投げた場合、それを「一致なし」「候補0件」として握りつぶし、確認なしで（重複した）新規エントリを自動作成してしまっていた。検索失敗は「本当に候補が無い」ケースと区別できないため、いずれかが失敗した場合は`CreateUiState.Error`に遷移させ、確認なしでの自動作成には進まないよう修正した（fail-safe）。
 
 ## 6-2. Getフロー画面
 

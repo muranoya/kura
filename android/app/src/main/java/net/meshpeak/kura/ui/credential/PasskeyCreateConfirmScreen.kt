@@ -36,6 +36,8 @@ sealed interface CreateUiState {
     data class Proposal(val rpDisplayName: String, val matched: AutofillCandidate) : CreateUiState
     data class Selection(val rpDisplayName: String, val candidates: List<AutofillCandidate>) : CreateUiState
     data object AlreadyRegistered : CreateUiState
+    /** 候補検索・Passkey作成のいずれかが失敗した場合。原因を握りつぶさず必ずここに遷移させる。 */
+    data object Error : CreateUiState
 }
 
 /**
@@ -56,6 +58,7 @@ fun PasskeyCreateConfirmScreen(
             is CreateUiState.Proposal -> ProposalContent(state, onConfirm)
             is CreateUiState.Selection -> SelectionContent(state, onConfirm)
             CreateUiState.AlreadyRegistered -> AlreadyRegisteredContent(onCancel)
+            CreateUiState.Error -> ErrorContent(onCancel)
         }
     }
 }
@@ -139,6 +142,27 @@ private fun AlreadyRegisteredContent(onCancel: () -> Unit) {
             stringResource(R.string.passkey_create_already_registered_message),
             style = MaterialTheme.typography.bodyMedium
         )
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.passkey_create_close))
+        }
+    }
+}
+
+@Composable
+private fun ErrorContent(onCancel: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            Icons.Default.ErrorOutline,
+            contentDescription = null,
+            modifier = Modifier.padding(top = 48.dp),
+            tint = MaterialTheme.colorScheme.error
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(stringResource(R.string.passkey_create_error), style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(24.dp))
         Button(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.passkey_create_close))

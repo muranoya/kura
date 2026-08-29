@@ -1,7 +1,9 @@
 package net.meshpeak.kura.credential
 
+import android.util.Base64
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -29,6 +31,26 @@ object ClientDataJsonBuilder {
 
     /** ネイティブアプリ発（`clientDataHash`なし）経路専用のclientDataJSON組み立て（create） */
     fun buildForCreate(challenge: String, rpId: String): String = build("webauthn.create", challenge, rpId)
+
+    /**
+     * WebAuthn Level 3の`allowCredentials`/`excludeCredentials`配列から`id`一覧を抽出する。
+     * `fieldName`が存在しない場合は空リスト（＝制限なし。WebAuthn仕様上、
+     * discoverable/usernameless credentialフローでは`allowCredentials`が空/省略される
+     * のが正当な状態であるため）を返す。ただし`requestJson`自体が不正なJSON、または
+     * `fieldName`は存在するのに配列として読めない等、"壊れていて読めない"場合は
+     * 例外を投げる（fail-closed）。ここで例外をcatchして空リストにフォールバックすると、
+     * 「本当に無制限」と「パースできず本来の絞り込みを失った」を呼び出し元が区別できず、
+     * RP指定の絞り込みが意図せず無効化されてしまうため、呼び出し元で必ずcatchして
+     * エラー扱いにすること（空リストとして黙って処理を続けてはいけない）。
+     */
+    fun parseCredentialIds(requestJson: String, fieldName: String): List<String> {
+        val field = json.parseToJsonElement(requestJson).jsonObject[fieldName] ?: return emptyList()
+        return field.jsonArray.mapNotNull { it.jsonObject["id"]?.jsonPrimitive?.content }
+    }
+
+    /** レスポンスJSONに埋め込む際のclientDataJSON文字列のbase64url(no-pad)エンコード。 */
+    fun encodeBase64Url(text: String): String =
+        Base64.encodeToString(text.toByteArray(Charsets.UTF_8), Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
 
     private fun build(type: String, challenge: String, rpId: String): String =
         buildJsonObject {
