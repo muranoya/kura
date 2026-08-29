@@ -1,0 +1,30 @@
+{
+  "description": "Oktaログインフォーム",
+  "match": {
+    "type": "domain_suffix",
+    "value": "okta.com"
+  },
+  "forms": [
+    {
+      "id": "okta-username",
+      "type": "login_username",
+      "fields": {
+        "username": { "selector": "input[name='identifier']" }
+      }
+    },
+    {
+      "id": "okta-password",
+      "type": "login_password",
+      "fields": {
+        "password": { "selector": "input[type='password'][name='credentials.passcode']" }
+      }
+    },
+    {
+      "id": "okta-totp",
+      "type": "totp",
+      "fields": {
+        "totp": { "selector": "input[type='text'][name='credentials.passcode']" }
+      }
+    }
+  ]
+}
