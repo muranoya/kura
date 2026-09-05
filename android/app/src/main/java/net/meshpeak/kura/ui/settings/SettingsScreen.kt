@@ -52,6 +52,7 @@ import kotlinx.serialization.json.Json
 fun SettingsScreen(
     appViewModel: AppViewModel,
     onOpenDrawer: () -> Unit = {},
+    onOpenAutofillLog: () -> Unit = {},
     onLogout: () -> Unit
 ) {
     var showPasskeyProviderNotFoundDialog by remember { mutableStateOf(false) }
@@ -180,6 +181,15 @@ fun SettingsScreen(
                     trailingContent = if (!autofillEnabled) {
                         { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                     } else null
+                )
+            }
+
+            Card(onClick = onOpenAutofillLog, modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_autofill_log)) },
+                    supportingContent = { Text(stringResource(R.string.settings_autofill_log_description)) },
+                    leadingContent = { Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 )
             }
 

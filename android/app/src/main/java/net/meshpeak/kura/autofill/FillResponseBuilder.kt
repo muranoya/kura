@@ -15,6 +15,9 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import net.meshpeak.kura.BuildConfig
 import net.meshpeak.kura.R
+import net.meshpeak.kura.autofill.log.AutofillLogEvent
+import net.meshpeak.kura.autofill.log.AutofillLogOutcome
+import net.meshpeak.kura.autofill.log.AutofillLogStore
 import net.meshpeak.kura.autofill.model.ParsedLoginForm
 import net.meshpeak.kura.autofill.model.TotpResolveRequest
 import net.meshpeak.kura.autofill.model.putParsedLoginForm
@@ -49,6 +52,8 @@ object FillResponseBuilder {
         repository: IVaultRepository,
         parsed: ParsedLoginForm
     ): FillResponse? {
+        val target = if (parsed.isBrowserRequest) parsed.webDomain else parsed.packageName
+
         val domain = if (parsed.isBrowserRequest) {
             parsed.webDomain
         } else {
@@ -61,20 +66,25 @@ object FillResponseBuilder {
             Log.d(TAG, "buildUnlocked: packageName=${parsed.packageName} webDomain=${parsed.webDomain} -> domain=$domain")
         }
         if (domain == null) {
-            if (BuildConfig.DEBUG) Log.d(TAG, "no domain resolved (packageName=${parsed.packageName}) -> no candidates")
-            return null
+            if (BuildConfig.DEBUG) Log.d(TAG, "no domain resolved (packageName=${parsed.packageName}) -> manual search fallback")
+            return manualSearchResponse(context, parsed, target, AutofillLogOutcome.NO_DOMAIN_RESOLVED)
         }
 
         val matched = try {
             repository.listLoginCandidates(domain)
         } catch (e: Exception) {
             if (BuildConfig.DEBUG) Log.d(TAG, "listLoginCandidates failed", e)
-            return null
+            return manualSearchResponse(
+                context, parsed, target, AutofillLogOutcome.ERROR,
+                errorClass = e::class.simpleName
+            )
         }
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "listLoginCandidates matched ${matched.size} entries for domain=$domain")
         }
-        if (matched.isEmpty()) return null
+        if (matched.isEmpty()) {
+            return manualSearchResponse(context, parsed, target, AutofillLogOutcome.NO_MATCHING_ENTRY)
+        }
 
         val responseBuilder = FillResponse.Builder()
         var added = false
@@ -99,8 +109,80 @@ object FillResponseBuilder {
             }
         }
         if (BuildConfig.DEBUG) Log.d(TAG, "buildUnlocked: datasets added=$added")
-        if (!added) return null
+        if (!added) {
+            return manualSearchResponse(context, parsed, target, AutofillLogOutcome.DATASET_BUILD_FAILED)
+        }
+        AutofillLogStore.record(
+            context,
+            AutofillLogEvent(
+                target = target,
+                isBrowserRequest = parsed.isBrowserRequest,
+                outcome = AutofillLogOutcome.SUCCESS,
+                candidateCount = matched.size,
+                detectedFields = detectedFieldsSummary(parsed)
+            )
+        )
         return responseBuilder.build()
+    }
+
+    /**
+     * ログインフィールドは検出できたが埋める値が見つからなかった場合のフォールバック。
+     * [buildManualSearchDataset] が非nullを返せる場合（＝usernameまたはpasswordの
+     * AutofillIdが分かっている場合）のみ、その1件だけを持つ[FillResponse]を返す。
+     * それ以外（フィールド自体が未検出）はnullのまま＝候補なしで終わる。
+     */
+    private fun manualSearchResponse(
+        context: Context,
+        parsed: ParsedLoginForm,
+        target: String?,
+        outcome: AutofillLogOutcome,
+        errorClass: String? = null
+    ): FillResponse? {
+        val fallback = buildManualSearchDataset(context, parsed)
+        AutofillLogStore.record(
+            context,
+            AutofillLogEvent(
+                target = target,
+                isBrowserRequest = parsed.isBrowserRequest,
+                outcome = if (fallback != null) AutofillLogOutcome.MANUAL_SEARCH_OFFERED else outcome,
+                detectedFields = detectedFieldsSummary(parsed),
+                errorClass = errorClass
+            )
+        )
+        return fallback?.let { FillResponse.Builder().addDataset(it).build() }
+    }
+
+    private fun detectedFieldsSummary(parsed: ParsedLoginForm): String =
+        listOfNotNull(
+            "username".takeIf { parsed.usernameFieldId != null },
+            "password".takeIf { parsed.passwordFieldId != null },
+            "totp".takeIf { parsed.totpFieldId != null }
+        ).joinToString(",")
+
+    /**
+     * 「アイテムを探す」手動検索候補（Dataset単位認証、[buildTotpDataset]と同型）。
+     * usernameFieldId/passwordFieldIdが両方nullの場合は埋める対象が分からないためnull
+     * （フィールドが全く検出できていない場合にまでKura起動候補を出すことはしない、
+     * field-classifierの保守的方針との整合、docs/android-autofillservice.md参照）。
+     */
+    private fun buildManualSearchDataset(context: Context, parsed: ParsedLoginForm): Dataset? {
+        if (parsed.usernameFieldId == null && parsed.passwordFieldId == null) return null
+
+        val intent = Intent(context, AutofillPickerActivity::class.java).apply {
+            putParsedLoginForm(parsed)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            authRequestCodeSeq.incrementAndGet(),
+            intent,
+            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val presentation = simplePresentation(context, context.getString(R.string.autofill_manual_search_label))
+        val datasetBuilder = Dataset.Builder(presentation)
+        parsed.usernameFieldId?.let { datasetBuilder.setValue(it, null) }
+        parsed.passwordFieldId?.let { datasetBuilder.setValue(it, null) }
+        return datasetBuilder.setAuthentication(pendingIntent.intentSender).build()
     }
 
     fun buildLockedAuthPlaceholder(context: Context, parsed: ParsedLoginForm): FillResponse? {
@@ -130,28 +212,44 @@ object FillResponseBuilder {
         candidate: AutofillCandidate,
         entry: Entry,
         parsed: ParsedLoginForm
+    ): Dataset? = buildLoginDataset(
+        context, candidate.name, entry.typedValue, parsed.usernameFieldId, parsed.passwordFieldId
+    )
+
+    /**
+     * エントリのtypedValueからusername/passwordを取り出し、指定されたAutofillIdへ値を
+     * セットしたDatasetを構築する。通常の候補一覧（[buildDatasetForCandidate]）と、
+     * 手動検索フォールバックで選択されたエントリ（[AutofillPickerActivity]）の両方から
+     * 共通で使う。
+     */
+    internal fun buildLoginDataset(
+        context: Context,
+        label: String,
+        typedValueJson: String,
+        usernameFieldId: AutofillId?,
+        passwordFieldId: AutofillId?
     ): Dataset? {
         val typedValue = try {
-            Json.parseToJsonElement(entry.typedValue).jsonObject
+            Json.parseToJsonElement(typedValueJson).jsonObject
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.d(TAG, "failed to parse typedValue for entry=${candidate.id}", e)
+            if (BuildConfig.DEBUG) Log.d(TAG, "failed to parse typedValue", e)
             return null
         }
 
         val username = (typedValue["username"] as? JsonPrimitive)?.contentOrNull
         val password = (typedValue["password"] as? JsonPrimitive)?.contentOrNull
 
-        val presentation = simplePresentation(context, candidate.name)
+        val presentation = simplePresentation(context, label)
         val datasetBuilder = Dataset.Builder(presentation)
         var hasValue = false
 
-        parsed.usernameFieldId?.let { id ->
+        usernameFieldId?.let { id ->
             username?.let {
                 datasetBuilder.setValue(id, AutofillValue.forText(it))
                 hasValue = true
             }
         }
-        parsed.passwordFieldId?.let { id ->
+        passwordFieldId?.let { id ->
             password?.let {
                 datasetBuilder.setValue(id, AutofillValue.forText(it))
                 hasValue = true

@@ -481,6 +481,28 @@
     <string name="settings_autofill">自動入力サービス</string>
     <string name="settings_autofill_enabled">有効</string>
     <string name="settings_autofill_disabled">タップしてkuraを自動入力サービスに設定</string>
+    <string name="autofill_manual_search_label">kura内でアイテムを探す…</string>
+    <string name="autofill_picker_title">アイテムを選択</string>
+    <string name="autofill_picker_no_value">選択したアイテムにはユーザー名もパスワードもありません</string>
+    <string name="settings_autofill_log">オートフィル動作ログ</string>
+    <string name="settings_autofill_log_description">オートフィル候補が出た/出なかった理由を確認できます</string>
+    <string name="autofill_log_title">オートフィル動作ログ</string>
+    <string name="autofill_log_empty">まだ記録がありません</string>
+    <string name="autofill_log_clear_action">ログを消去</string>
+    <string name="autofill_log_clear_title">オートフィルログを消去しますか？</string>
+    <string name="autofill_log_clear_description">この端末に記録されたオートフィルの動作履歴をすべて削除します。元に戻せません。</string>
+    <string name="autofill_log_candidate_count">%1$d件マッチ</string>
+    <string name="autofill_log_target_unknown">不明なアプリ/サイト</string>
+    <string name="autofill_log_outcome_no_structure">フォーム情報を取得できませんでした</string>
+    <string name="autofill_log_outcome_unknown_package">未登録のアプリです</string>
+    <string name="autofill_log_outcome_no_fields_detected">ログインフォームとして認識できませんでした</string>
+    <string name="autofill_log_outcome_locked_placeholder">ロック中のため解除を促しました</string>
+    <string name="autofill_log_outcome_no_domain_resolved">検索対象のサイト/アプリを特定できませんでした</string>
+    <string name="autofill_log_outcome_no_matching_entry">該当するアイテムが見つかりませんでした</string>
+    <string name="autofill_log_outcome_dataset_build_failed">該当アイテムはありましたが入力に失敗しました</string>
+    <string name="autofill_log_outcome_manual_search_offered">手動検索の候補を提示しました</string>
+    <string name="autofill_log_outcome_success">候補を提示しました</string>
+    <string name="autofill_log_outcome_error">エラーが発生しました</string>
 
     <!-- Passkey / Credential Provider -->
     <string name="credential_provider_settings_subtitle">kuraでパスキーを自動入力</string>

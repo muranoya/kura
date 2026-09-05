@@ -21,6 +21,9 @@ class FakeVaultRepository : IVaultRepository {
     var decryptTransferConfigError: Exception? = null
     var lastSyncTimeResult: Long = 0L
     var listLoginCandidatesResult: List<AutofillCandidate> = emptyList()
+    var listLoginCandidatesError: Exception? = null
+    var getEntryResults: Map<String, Entry> = emptyMap()
+    var getEntryError: Exception? = null
     var isValidWebauthnRpIdResult: Boolean = false
     var webauthnFindCredentialsResult: List<WebAuthnCredentialCandidate> = emptyList()
     var webauthnCreateCredentialResult: WebAuthnAttestationResult =
@@ -79,11 +82,14 @@ class FakeVaultRepository : IVaultRepository {
     ): List<EntryRow> = emptyList()
 
     override suspend fun getEntry(id: String): Entry {
-        throw NotImplementedError("Not used in onboarding tests")
+        getEntryError?.let { throw it }
+        return getEntryResults[id] ?: throw NotImplementedError("Not used in onboarding tests")
     }
 
-    override suspend fun listLoginCandidates(domain: String, strictSubdomain: Boolean): List<AutofillCandidate> =
-        listLoginCandidatesResult
+    override suspend fun listLoginCandidates(domain: String, strictSubdomain: Boolean): List<AutofillCandidate> {
+        listLoginCandidatesError?.let { throw it }
+        return listLoginCandidatesResult
+    }
 
     override suspend fun createEntry(
         entryType: String,

@@ -481,6 +481,28 @@
     <string name="settings_autofill">Autofill service</string>
     <string name="settings_autofill_enabled">Enabled</string>
     <string name="settings_autofill_disabled">Tap to set kura as your autofill service</string>
+    <string name="autofill_manual_search_label">Search for an item in kura…</string>
+    <string name="autofill_picker_title">Choose an item</string>
+    <string name="autofill_picker_no_value">Selected item has no username or password</string>
+    <string name="settings_autofill_log">Autofill activity log</string>
+    <string name="settings_autofill_log_description">See why autofill did or didn\'t offer a suggestion</string>
+    <string name="autofill_log_title">Autofill activity log</string>
+    <string name="autofill_log_empty">No autofill activity yet</string>
+    <string name="autofill_log_clear_action">Clear log</string>
+    <string name="autofill_log_clear_title">Clear autofill log?</string>
+    <string name="autofill_log_clear_description">This removes all recorded autofill activity from this device. It can\'t be undone.</string>
+    <string name="autofill_log_candidate_count">%1$d match(es)</string>
+    <string name="autofill_log_target_unknown">Unknown app or site</string>
+    <string name="autofill_log_outcome_no_structure">No form data received</string>
+    <string name="autofill_log_outcome_unknown_package">App not recognized</string>
+    <string name="autofill_log_outcome_no_fields_detected">Login form not recognized</string>
+    <string name="autofill_log_outcome_locked_placeholder">Vault locked — unlock prompt shown</string>
+    <string name="autofill_log_outcome_no_domain_resolved">Could not resolve a site/app to search</string>
+    <string name="autofill_log_outcome_no_matching_entry">No matching item found</string>
+    <string name="autofill_log_outcome_dataset_build_failed">Matching item(s) found but couldn\'t be filled</string>
+    <string name="autofill_log_outcome_manual_search_offered">Offered manual search</string>
+    <string name="autofill_log_outcome_success">Suggestion(s) shown</string>
+    <string name="autofill_log_outcome_error">An error occurred</string>
 
     <!-- Passkey / Credential Provider -->
     <string name="credential_provider_settings_subtitle">Autofill passkeys with kura</string>

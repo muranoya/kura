@@ -56,6 +56,7 @@ object Routes {
     const val LABEL_ENTRIES = "labels/{labelId}/entries"
     const val PASSWORD_GENERATOR = "password_generator"
     const val SETTINGS = "settings"
+    const val AUTOFILL_LOG = "autofill_log"
 
     fun entryDetail(id: String) = "entries/$id"
     fun entryEdit(id: String) = "entries/$id/edit"
@@ -442,10 +443,14 @@ fun MainNavHost(appViewModel: AppViewModel) {
                 SettingsScreen(
                     appViewModel = appViewModel,
                     onOpenDrawer = { scope.launch { drawerState.open() } },
+                    onOpenAutofillLog = { navController.navigate(Routes.AUTOFILL_LOG) },
                     onLogout = {
                         appViewModel.setAppState(AppState.ONBOARDING)
                     }
                 )
+            }
+            composable(Routes.AUTOFILL_LOG) {
+                AutofillLogScreen(onBack = { navController.popBackStack() })
             }
         }
     }
