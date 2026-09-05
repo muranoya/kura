@@ -1,0 +1,17 @@
+{
+  "description": "AWS Amazonログイン",
+  "match": {
+    "type": "domain_suffix",
+    "value": "signin.aws.amazon.com"
+  },
+  "forms": [
+    {
+      "id": "aws-login",
+      "type": "login",
+      "fields": {
+        "username": { "selector": "input[name='username'][id='username']" },
+        "password": { "selector": "input[name='password'][id='password']" }
+      }
+    }
+  ]
+}
