@@ -14,6 +14,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.meshpeak.kura.BuildConfig
 import net.meshpeak.kura.R
+import net.meshpeak.kura.autofill.log.AutofillLogEvent
+import net.meshpeak.kura.autofill.log.AutofillLogOutcome
+import net.meshpeak.kura.autofill.log.AutofillLogStore
 import net.meshpeak.kura.data.repository.IVaultRepository
 import net.meshpeak.kura.data.repository.VaultRepository
 
@@ -46,21 +49,38 @@ class KuraAutofillService : AutofillService() {
         val structure = request.fillContexts.lastOrNull()?.structure
         if (structure == null) {
             if (BuildConfig.DEBUG) Log.d(TAG, "no AssistStructure in request -> onSuccess(null)")
+            AutofillLogStore.record(
+                applicationContext,
+                AutofillLogEvent(target = null, isBrowserRequest = false, outcome = AutofillLogOutcome.NO_STRUCTURE)
+            )
             callback.onSuccess(null)
             return
         }
 
         val parsed = AssistStructureParser.parse(structure, applicationContext)
+        val target = if (parsed.isBrowserRequest) parsed.webDomain else parsed.packageName
         if (!parsed.isBrowserRequest && parsed.packageName == null) {
             // ネイティブアプリ由来だがパッケージ名不明: 対象外
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "skipping: native request with unknown packageName")
             }
+            AutofillLogStore.record(
+                applicationContext,
+                AutofillLogEvent(target = null, isBrowserRequest = false, outcome = AutofillLogOutcome.UNKNOWN_PACKAGE)
+            )
             callback.onSuccess(null)
             return
         }
         if (parsed.usernameFieldId == null && parsed.passwordFieldId == null && parsed.totpFieldId == null) {
             if (BuildConfig.DEBUG) Log.d(TAG, "skipping: no username/password/totp field detected")
+            AutofillLogStore.record(
+                applicationContext,
+                AutofillLogEvent(
+                    target = target,
+                    isBrowserRequest = parsed.isBrowserRequest,
+                    outcome = AutofillLogOutcome.NO_FIELDS_DETECTED
+                )
+            )
             callback.onSuccess(null)
             return
         }
@@ -72,10 +92,30 @@ class KuraAutofillService : AutofillService() {
                 if (unlocked) {
                     FillResponseBuilder.buildUnlocked(applicationContext, repository, parsed)
                 } else {
-                    FillResponseBuilder.buildLockedAuthPlaceholder(applicationContext, parsed)
+                    FillResponseBuilder.buildLockedAuthPlaceholder(applicationContext, parsed).also { placeholder ->
+                        if (placeholder != null) {
+                            AutofillLogStore.record(
+                                applicationContext,
+                                AutofillLogEvent(
+                                    target = target,
+                                    isBrowserRequest = parsed.isBrowserRequest,
+                                    outcome = AutofillLogOutcome.LOCKED_PLACEHOLDER
+                                )
+                            )
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 if (BuildConfig.DEBUG) Log.d(TAG, "failed to build FillResponse", e)
+                AutofillLogStore.record(
+                    applicationContext,
+                    AutofillLogEvent(
+                        target = target,
+                        isBrowserRequest = parsed.isBrowserRequest,
+                        outcome = AutofillLogOutcome.ERROR,
+                        errorClass = e::class.simpleName
+                    )
+                )
                 null
             }
             if (BuildConfig.DEBUG) {

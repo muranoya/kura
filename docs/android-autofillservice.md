@@ -61,9 +61,20 @@ Android標準のベストプラクティスであるDigital Asset Links（`asset
 
 - vaultがアンロック済みの場合: マッチしたエントリをそのまま`Dataset`として提示する
 - vaultがロック中の場合: 認証プレースホルダーの`Dataset`を1件提示し、選択すると認証フローに入る
-- マッチする候補が0件（アンロック済みで該当エントリなし、またはロック中でも該当なしと判定できない場合を除く）の場合、候補自体を提示しない
+- ログインフィールド（username/password）は検出できたが埋める値が見つからなかった場合（ドメイン未解決/マッチ0件/復号失敗等）は、「手動検索」候補を1件提示する（1-4-1参照）
+- ログインフィールド自体が検出できない場合（フォームがログインフォームと認識されない）は、候補自体を提示しない
 
 TOTPフィールドを含む候補は、username/password用の`Dataset`とは**別の`Dataset`**として1件追加で提示する（1候補につき最大2つの`Dataset`が並ぶ）。
+
+### 1-4-1. 手動検索フォールバック
+
+「候補が出なかったとき、なぜ出なかったのか分からない」問題への対応として、username/passwordフィールドは検出できた（＝埋めるべきAutofillIdは分かっている）のに埋める値が見つからなかった場合に限り、「アイテムを探す」候補を1件だけ提示する。フィールド自体が検出できていない場合（埋める対象のAutofillIdが不明な場合）は対象外とし、field-classifierの「検出漏れは許容し誤検出は避ける」保守的方針と整合させている。
+
+- 対象ケース: ドメイン未解決（`domain == null`）／`listLoginCandidates`失敗／マッチ0件／マッチした全候補のDataset構築失敗
+- 実現方式はTOTPと同じ**Dataset単位認証**（`FillResponseBuilder.buildManualSearchDataset`）。選択されると`AutofillPickerActivity`（トランポリンActivity）が起動し、`AutofillPickerScreen`（`EntryListScreen`のUIパターンを踏襲した読み取り専用ピッカー）で検索・選択させる
+- 選択したエントリからusername/passwordを取り出しDatasetを構築するロジックは`FillResponseBuilder.buildLoginDataset`として通常の候補生成（`buildDatasetForCandidate`）と共通化している
+- 選択エントリにusername/passwordどちらも無くDataset構築に失敗した場合は、画面を閉じずにエラー表示のうえ選び直せるようにする（デッドエンドを避ける）
+- 通常候補が1件でも出せた場合は手動検索候補を混ぜない
 
 ## 1-5. TOTPオートフィルの詳細
 
@@ -232,3 +243,13 @@ Androidの「自動入力サービス」設定でkuraを選択してもらうた
 
 - `Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE`インテントを起動し、システム設定でkuraを選択できるようにする
 - `AutofillManager.hasEnabledAutofillServices()`で現在の設定状態を表示する
+
+## 3-4. オートフィル動作ログ
+
+「候補が出なかったとき、なぜ出なかったのか分からない」問題を診断できるようにするため、`onFillRequest`の処理結果を`AutofillLogStore`（`autofill/log/`）へ記録し、設定画面から閲覧できるようにしている。
+
+- **保存形式**: Room等は導入せず、単一テーブルの`SQLiteOpenHelper`で完結させる（本アプリはRoom/WorkManagerを一切使っておらず、このためだけに導入するのは過剰と判断）。書き込みは`record()`の呼び出し元スレッド/ディスパッチャに関わらず即座にreturnし、内部の単一スレッドディスパッチャ（`Dispatchers.IO.limitedParallelism(1)`）へ処理を逃がすfire-and-forget方式。複数のonFillRequest/トランポリンActivityから同時に書き込まれてもSQLiteへの書き込みが競合しない
+- **記録内容**: `timestamp_millis`/`target`（ドメインまたはパッケージ名）/`is_browser_request`/`outcome`/`candidate_count`/`detected_fields`/`error_class`のみ。**username/password/TOTP値など秘匿値は列として一切持たない**（構造的に保持できないスキーマにすることで漏洩を防ぐ）
+- **outcome種別**（`AutofillLogOutcome`）: `NO_STRUCTURE`/`UNKNOWN_PACKAGE`/`NO_FIELDS_DETECTED`/`LOCKED_PLACEHOLDER`/`NO_DOMAIN_RESOLVED`/`NO_MATCHING_ENTRY`/`DATASET_BUILD_FAILED`/`MANUAL_SEARCH_OFFERED`/`SUCCESS`/`ERROR`
+- **保持ポリシー**: 書き込みのたびに24時間より古い行と件数500件超過分（古い順）を削除する。定期実行の仕組み（WorkManager等）は導入せず、書き込みタイミングでの掃除のみで完結させる
+- **閲覧**: 設定画面の「オートフィル動作ログ」から`AutofillLogScreen`（`EntryListScreen`のTopAppBar+LazyColumn構成を踏襲）に遷移し、新しい順に一覧表示する。全消去アクションも提供する

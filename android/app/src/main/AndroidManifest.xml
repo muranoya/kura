@@ -46,6 +46,12 @@
             android:launchMode="singleTask"
             android:theme="@style/Theme.Kura" />
 
+        <activity
+            android:name=".autofill.AutofillPickerActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.Kura" />
+
         <service
             android:name=".autofill.KuraAutofillService"
             android:label="@string/app_name"
