@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import net.meshpeak.kura.R
 import net.meshpeak.kura.data.model.CustomField
+import net.meshpeak.kura.data.model.CustomFieldSelector
 import net.meshpeak.kura.data.model.CustomFieldType
 import net.meshpeak.kura.data.model.Label
 import kotlinx.coroutines.launch
@@ -595,6 +596,32 @@ private fun passkeySummaryText(value: String): String {
     }
 }
 
+/**
+ * 設定済みのオートフィルセレクタを `input[name="account_id"]` 相当のテキストへ
+ * 要約する。値そのものではなく識別情報のみの表示であるため機密性の問題はない。
+ *
+ * 編集画面（[CustomFieldEditor]）だけでなく、詳細画面（`EntryDetailScreen`）
+ * からも同じ要約表示を使うため公開関数にしている。
+ */
+fun formatSelectorSummary(selector: CustomFieldSelector): String {
+    val tag = selector.tag?.takeIf { it.isNotEmpty() } ?: "input"
+    val attrs = buildList {
+        selector.name?.takeIf { it.isNotEmpty() }?.let { add("name=\"$it\"") }
+        selector.id?.takeIf { it.isNotEmpty() }?.let { add("id=\"$it\"") }
+        selector.type?.takeIf { it.isNotEmpty() }?.let { add("type=\"$it\"") }
+    }
+    return if (attrs.isNotEmpty()) "$tag[${attrs.joinToString("][")}]" else tag
+}
+
+/** 4属性すべてが空になったら `null`（未設定）へ正規化する */
+private fun normalizeSelector(selector: CustomFieldSelector): CustomFieldSelector? {
+    val isEmpty = selector.tag.isNullOrEmpty() &&
+        selector.name.isNullOrEmpty() &&
+        selector.id.isNullOrEmpty() &&
+        selector.type.isNullOrEmpty()
+    return if (isEmpty) null else selector
+}
+
 @Composable
 fun CustomFieldEditor(
     field: CustomField,
@@ -612,9 +639,15 @@ fun CustomFieldEditor(
     var showGenerator by remember { mutableStateOf(false) }
     var showTotpQrSource by remember { mutableStateOf(false) }
     var showTotpQrScan by remember { mutableStateOf(false) }
+    var showSelectorEditor by remember { mutableStateOf(false) }
     val showGenerateButton = field.fieldType == "password" && onGeneratePassword != null
     val showTotpQrButton = field.fieldType == "totp" && onValidateTotp != null
     val validateTotp = onValidateTotp
+
+    fun updateSelector(update: (CustomFieldSelector) -> CustomFieldSelector) {
+        val next = update(field.autofillSelector ?: CustomFieldSelector())
+        onFieldChange(field.copy(autofillSelector = normalizeSelector(next)))
+    }
 
     if (field.fieldType == "totp" && validateTotp != null) {
         val launchTotpGallery = TotpQrGalleryImport(
@@ -686,6 +719,21 @@ fun CustomFieldEditor(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+            }
+            IconButton(
+                onClick = { showSelectorEditor = !showSelectorEditor },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.Default.CenterFocusStrong,
+                    contentDescription = stringResource(R.string.cd_autofill_target),
+                    tint = if (field.autofillSelector != null) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        LocalContentColor.current
+                    },
+                    modifier = Modifier.size(20.dp)
                 )
             }
             if (onMoveUp != null || onMoveDown != null) {
@@ -787,6 +835,68 @@ fun CustomFieldEditor(
                     },
                     modifier = Modifier.padding(12.dp)
                 )
+            }
+        }
+
+        field.autofillSelector?.let { selector ->
+            if (!showSelectorEditor) {
+                Text(
+                    text = formatSelectorSummary(selector),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                )
+            }
+        }
+
+        // Desktop側と同じUIパターン（4テキスト入力: タグ名/name/id/type）。
+        if (showSelectorEditor) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextField(
+                            value = field.autofillSelector?.tag ?: "",
+                            onValueChange = { v -> updateSelector { it.copy(tag = v) } },
+                            label = { Text(stringResource(R.string.autofill_target_tag)) },
+                            placeholder = { Text(stringResource(R.string.autofill_target_tag_placeholder)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextField(
+                            value = field.autofillSelector?.type ?: "",
+                            onValueChange = { v -> updateSelector { it.copy(type = v) } },
+                            label = { Text(stringResource(R.string.autofill_target_type)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextField(
+                            value = field.autofillSelector?.name ?: "",
+                            onValueChange = { v -> updateSelector { it.copy(name = v) } },
+                            label = { Text(stringResource(R.string.autofill_target_name)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextField(
+                            value = field.autofillSelector?.id ?: "",
+                            onValueChange = { v -> updateSelector { it.copy(id = v) } },
+                            label = { Text(stringResource(R.string.autofill_target_id)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    if (field.autofillSelector != null) {
+                        TextButton(onClick = { onFieldChange(field.copy(autofillSelector = null)) }) {
+                            Text(stringResource(R.string.autofill_target_clear))
+                        }
+                    }
+                }
             }
         }
     }

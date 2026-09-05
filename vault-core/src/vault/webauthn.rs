@@ -138,6 +138,7 @@ impl UnlockedVault {
             name: "Passkey".to_string(),
             field_type: "passkey".to_string(),
             value: SecretString::from_string(passkey_data.to_json_string()?),
+            autofill_selector: None,
         };
 
         let target_entry_id = match entry_id {

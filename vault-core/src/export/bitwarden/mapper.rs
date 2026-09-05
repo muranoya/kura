@@ -715,12 +715,14 @@ mod tests {
                 value: crate::secret::SecretString::from_string(
                     "otpauth://totp/test?secret=ABC".to_string(),
                 ),
+                autofill_selector: None,
             },
             CustomField {
                 id: "cf2".to_string(),
                 name: "Extra".to_string(),
                 field_type: "text".to_string(),
                 value: crate::secret::SecretString::from_string("some value".to_string()),
+                autofill_selector: None,
             },
         ]);
         let entry = make_entry("login", "With TOTP", data, vec![]);

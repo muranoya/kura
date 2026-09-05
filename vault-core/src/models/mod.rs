@@ -8,7 +8,7 @@ pub mod vault_meta;
 
 pub use argon2_params::Argon2Params;
 pub use entry::{Entry, EntryFilter, EntrySummary, EntryType, SortField, SortOrder};
-pub use entry_data::{CustomField, CustomFieldType, EntryData};
+pub use entry_data::{CustomField, CustomFieldSelector, CustomFieldType, EntryData};
 pub use label::Label;
 pub use passkey_data::PasskeyFieldData;
 pub use typed_value::{

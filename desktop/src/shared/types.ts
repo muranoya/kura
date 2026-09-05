@@ -11,12 +11,23 @@ export type EntryType =
 // Custom field types
 export type CustomFieldType = 'text' | 'password' | 'email' | 'url' | 'phone' | 'totp' | 'passkey'
 
+// DOM要素マッチ条件（タグ名・name属性・id属性・type属性、各項目optional）。
+// Desktopには「今開いているページ」という概念がないため、値は手動テキスト入力で設定する。
+// 詳細: docs/extension-custom-field-autofill.md 2-1節, 5-1節
+export interface CustomFieldSelector {
+  tag?: string
+  name?: string
+  id?: string
+  type?: string
+}
+
 // Custom field
 export interface CustomField {
   id: string
   name: string
   fieldType: CustomFieldType
   value: string
+  autofillSelector?: CustomFieldSelector
 }
 
 // Sort types

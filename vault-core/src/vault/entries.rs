@@ -531,18 +531,21 @@ mod tests {
                 name: "Recovery URL".to_string(),
                 field_type: "url".to_string(),
                 value: SecretString::from_string("https://recovery.example.com".to_string()),
+                autofill_selector: None,
             },
             CustomField {
                 id: "cf2".to_string(),
                 name: "API Endpoint".to_string(),
                 field_type: "url".to_string(),
                 value: SecretString::from_string("https://api.example.com".to_string()),
+                autofill_selector: None,
             },
             CustomField {
                 id: "cf3".to_string(),
                 name: "Note".to_string(),
                 field_type: "text".to_string(),
                 value: SecretString::from_string("not a url".to_string()),
+                autofill_selector: None,
             },
         ]);
         vault
@@ -577,6 +580,7 @@ mod tests {
             name: "Security Q".to_string(),
             field_type: "text".to_string(),
             value: SecretString::from_string("answer".to_string()),
+            autofill_selector: None,
         }]);
         vault
             .create_entry("Login".into(), "login".to_string(), data, vec![])
@@ -758,6 +762,7 @@ mod tests {
             name: "Custom".to_string(),
             field_type: "text".to_string(),
             value: SecretString::from_string("value".to_string()),
+            autofill_selector: None,
         }]);
 
         vault
@@ -788,6 +793,7 @@ mod tests {
             name: "TOTP".to_string(),
             field_type: "totp".to_string(),
             value: SecretString::from_string("JBSWY3DPEHPK3PXP".to_string()),
+            autofill_selector: None,
         }]);
         let created = vault
             .create_entry("WithTotp".into(), "login".to_string(), data, vec![])

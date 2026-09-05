@@ -454,6 +454,7 @@ mod tests {
             name: "Security Question".to_string(),
             field_type: "text".to_string(),
             value: SecretString::from_string("My pet name is Max".to_string()),
+            autofill_selector: None,
         }]);
         assert!(search_filter("Max").matches(&entry));
     }
@@ -467,6 +468,7 @@ mod tests {
             name: "API Key".to_string(),
             field_type: "password".to_string(),
             value: SecretString::from_string("sk-abc123secret".to_string()),
+            autofill_selector: None,
         }]);
         assert!(!search_filter("abc123secret").matches(&entry));
         assert!(search_filter("API Key").matches(&entry)); // name is still searchable
@@ -481,6 +483,7 @@ mod tests {
             name: "Recovery Email".to_string(),
             field_type: "email".to_string(),
             value: SecretString::from_string("recovery@example.com".to_string()),
+            autofill_selector: None,
         }]);
         assert!(search_filter("recovery@example").matches(&entry));
     }
@@ -494,6 +497,7 @@ mod tests {
             name: "TOTP".to_string(),
             field_type: "totp".to_string(),
             value: SecretString::from_string("JBSWY3DPEHPK3PXP".to_string()),
+            autofill_selector: None,
         }]);
         assert!(!search_filter("JBSWY3DPEHPK3PXP").matches(&entry));
     }
@@ -509,6 +513,7 @@ mod tests {
             value: SecretString::from_string(
                 r#"{"rp_id":"example.com","private_key":"secret"}"#.to_string(),
             ),
+            autofill_selector: None,
         }]);
         assert!(!search_filter("example.com").matches(&entry));
     }
@@ -522,6 +527,7 @@ mod tests {
             name: "Custom".to_string(),
             field_type: "future_type".to_string(),
             value: SecretString::from_string("some value".to_string()),
+            autofill_selector: None,
         }]);
         assert!(!search_filter("some value").matches(&entry));
     }

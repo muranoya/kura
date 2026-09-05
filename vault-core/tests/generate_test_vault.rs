@@ -63,6 +63,7 @@ fn generate_test_vault_fixture() {
         name: "TOTP".to_string(),
         field_type: "totp".to_string(),
         value: vault_core::secret::SecretString::from_string("JBSWY3DPEHPK3PXP".to_string()),
+        autofill_selector: None,
     }]);
     unlocked
         .create_entry(

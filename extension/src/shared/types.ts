@@ -11,12 +11,22 @@ export type EntryType =
 // Custom field types
 export type CustomFieldType = 'text' | 'password' | 'email' | 'url' | 'phone' | 'totp' | 'passkey'
 
+// DOM要素マッチ条件（タグ名・name属性・id属性・type属性、各項目optional）。
+// 詳細: docs/extension-custom-field-autofill.md 2-1節
+export interface CustomFieldSelector {
+  tag?: string
+  name?: string
+  id?: string
+  type?: string
+}
+
 // Custom field
 export interface CustomField {
   id: string
   name: string
   fieldType: CustomFieldType
   value: string
+  autofillSelector?: CustomFieldSelector
 }
 
 // Sort types
@@ -107,6 +117,12 @@ export interface AutofillCredentialCandidate {
   totpPeriod?: number
 }
 
+/** カスタムフィールドのセレクタベース充填1件分（セレクタ設定済みのものだけを含む） */
+export interface AutofillCustomFieldFillEntry {
+  selector: CustomFieldSelector
+  value: string
+}
+
 /** Full credential data sent only when the user selects a candidate */
 export interface AutofillFillData {
   username: string | null
@@ -115,6 +131,7 @@ export interface AutofillFillData {
   ccExp?: string | null
   ccCvc?: string | null
   ccName?: string | null
+  customFields?: AutofillCustomFieldFillEntry[]
 }
 
 // Sync conflict reported after a merge

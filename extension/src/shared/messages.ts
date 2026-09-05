@@ -3,6 +3,7 @@
 import type {
   AutofillCredentialCandidate,
   AutofillFillData,
+  CustomFieldSelector,
   EntryFilter,
   EntryRow,
   Label,
@@ -120,6 +121,15 @@ export type Message =
   | { type: 'TOTP_QR_APPLY'; value: string }
   | { type: 'TOTP_QR_CANCEL' }
 
+  // カスタムフィールドのオートフィルセレクタ ピッカー
+  // popup → Service Worker: 既存エントリの編集画面からのみ起動可能（entryId必須）
+  | { type: 'PICKER_START'; entryId: string; fieldId: string }
+  | { type: 'PICKER_CANCEL' }
+  // Content Script → Service Worker: ページ上で要素が確定されたときの結果報告
+  | { type: 'PICKER_RESULT'; fieldId: string; selector: CustomFieldSelector }
+  // popup → Service Worker: popup再起動後、保留中の適用結果があるか問い合わせる
+  | { type: 'PICKER_QUERY_RESULT' }
+
 export type MessageResponse =
   // Common
   | { success: true }
@@ -195,6 +205,11 @@ export type MessageResponse =
   // TOTP QR scan responses
   | ({ success: true } & {
       dataUrl?: string
+    })
+
+  // Picker responses
+  | ({ success: true } & {
+      pickerResult?: { entryId: string; fieldId: string } | null
     })
 
 export function sendMessage<T extends Message>(

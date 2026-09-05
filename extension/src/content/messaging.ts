@@ -1,6 +1,10 @@
 // Content Script ↔ Service Worker messaging
 
-import type { AutofillCredentialCandidate, AutofillFillData } from '../shared/types'
+import type {
+  AutofillCredentialCandidate,
+  AutofillFillData,
+  CustomFieldSelector,
+} from '../shared/types'
 
 interface SuccessResponse {
   success: true
@@ -183,4 +187,26 @@ export async function applyTotpQrValue(
 
 export async function cancelTotpQrScan(): Promise<void> {
   await sendMessage({ type: 'TOTP_QR_CANCEL' })
+}
+
+/**
+ * ピッカーで確定した要素のセレクタをService Workerへ報告する。
+ * Service Worker側で直接 api_update_entry により永続化される
+ * （popupのフォーム状態は経由しない）。
+ * 詳細: docs/extension-custom-field-autofill.md 4-2節, 4-3節
+ */
+export async function sendPickerResult(
+  fieldId: string,
+  selector: CustomFieldSelector,
+): Promise<{ success: boolean; error?: string }> {
+  const response = await sendMessage({ type: 'PICKER_RESULT', fieldId, selector })
+  if (response.success) return { success: true }
+  return {
+    success: false,
+    error: 'error' in response ? String(response.error) : 'Unknown error',
+  }
+}
+
+export async function cancelPicker(): Promise<void> {
+  await sendMessage({ type: 'PICKER_CANCEL' })
 }

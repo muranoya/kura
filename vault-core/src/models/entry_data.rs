@@ -44,12 +44,30 @@ impl CustomFieldType {
     }
 }
 
+/// カスタムフィールドをページ上のDOM要素にマッチさせるためのセレクタ情報。
+///
+/// タグ名・name属性・id属性・type属性の4項目（いずれもoptional）を保持する。
+/// マッチ意味論の詳細は `docs/extension-custom-field-autofill.md` 3-5節を参照。
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+pub struct CustomFieldSelector {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "type")]
+    pub input_type: Option<String>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CustomField {
     pub id: String,
     pub name: String,
     pub field_type: String,
     pub value: SecretString,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub autofill_selector: Option<CustomFieldSelector>,
 }
 
 /// Entry data container for the API/domain layer - sensitive fields are automatically zeroized on drop.
@@ -242,5 +260,46 @@ mod tests {
         let deserialized = EntryData::from_json_string(&json).unwrap();
 
         assert_eq!(deserialized.entry_type, "login".to_string());
+    }
+
+    #[test]
+    fn test_custom_field_autofill_selector_roundtrip() {
+        let field = CustomField {
+            id: "cf1".to_string(),
+            name: "Account ID".to_string(),
+            field_type: "text".to_string(),
+            value: SecretString::from_string("account-id-value".to_string()),
+            autofill_selector: Some(CustomFieldSelector {
+                tag: None,
+                name: Some("account_id".to_string()),
+                id: None,
+                input_type: Some("text".to_string()),
+            }),
+        };
+
+        let json = serde_json::to_string(&field).unwrap();
+        // JSONキーは属性名にそのまま合わせる（`type`は予約語衝突を避けてinput_typeにrenameされる）
+        assert!(json.contains("\"autofill_selector\""));
+        assert!(json.contains("\"name\":\"account_id\""));
+        assert!(json.contains("\"type\":\"text\""));
+        assert!(!json.contains("\"tag\""), "None項目はJSONに出力しない");
+        // トップレベルのCustomField.id（"cf1"）と区別するため、
+        // autofill_selector部分だけ切り出して検証する
+        let selector_part = json.split("\"autofill_selector\":").nth(1).unwrap();
+        assert!(
+            !selector_part.contains("\"id\":"),
+            "None項目はJSONに出力しない"
+        );
+
+        let deserialized: CustomField = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.autofill_selector, field.autofill_selector);
+    }
+
+    #[test]
+    fn test_custom_field_without_autofill_selector_backward_compatible() {
+        // autofill_selectorを知らない旧バージョンが書き出したJSON相当（フィールド自体が存在しない）
+        let json = r#"{"id":"cf1","name":"Note","field_type":"text","value":"hello"}"#;
+        let deserialized: CustomField = serde_json::from_str(json).unwrap();
+        assert_eq!(deserialized.autofill_selector, None);
     }
 }

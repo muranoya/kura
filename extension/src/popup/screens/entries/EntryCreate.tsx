@@ -52,6 +52,7 @@ export default function EntryCreate() {
                 name: f.name,
                 field_type: f.fieldType,
                 value: f.value,
+                autofill_selector: f.autofillSelector,
               })),
             )
           : undefined

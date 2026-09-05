@@ -24,6 +24,7 @@ import { getFromStorage, removeFromStorage, saveToStorage } from '../../../share
 import type { Entry, EntryRow, EntryType, SortConfig } from '../../../shared/types'
 import * as commands from '../../commands'
 import EntryCard from '../../components/entries/EntryCard'
+import { formatSelectorSummary } from '../../components/entries/EntryForm'
 import EntryListPanel from '../../components/entries/EntryListPanel'
 import PasskeyCustomFieldDisplay from '../../components/entries/PasskeyCustomFieldDisplay'
 import TotpCustomFieldDisplay from '../../components/entries/TotpCustomFieldDisplay'
@@ -743,19 +744,17 @@ function EntryDetailPane({
 
       {entry.customFields && entry.customFields.length > 0 && (
         <div className="space-y-0">
-          {entry.customFields.map(
-            (field: { id: string; name: string; value: string; fieldType: string }) =>
-              field.fieldType === 'totp' ? (
-                <TotpCustomFieldDisplay key={field.id} label={field.name} value={field.value} />
+          {entry.customFields.map((field) => (
+            <div key={field.id}>
+              {field.fieldType === 'totp' ? (
+                <TotpCustomFieldDisplay label={field.name} value={field.value} />
               ) : field.fieldType === 'passkey' ? (
                 <PasskeyCustomFieldDisplay
-                  key={field.id}
                   label={t('entries.customFieldTypes.passkey')}
                   value={field.value}
                 />
               ) : (
                 <PaneFieldDisplay
-                  key={field.id}
                   label={field.name}
                   value={field.value}
                   isPassword={field.fieldType === 'password'}
@@ -764,8 +763,17 @@ function EntryDetailPane({
                     field.fieldType === 'password' ? () => onToggleFieldMask(field.id) : undefined
                   }
                 />
-              ),
-          )}
+              )}
+              {field.autofillSelector && (
+                <div className="flex items-center gap-1.5 pl-2 pb-1 text-[11px] text-text-muted">
+                  <Crosshair size={11} className="shrink-0" />
+                  <span className="truncate font-mono">
+                    {formatSelectorSummary(field.autofillSelector)}
+                  </span>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 

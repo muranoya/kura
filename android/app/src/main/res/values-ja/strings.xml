@@ -279,6 +279,15 @@
     <string name="totp_qr_error_invalid">TOTPシークレットまたは otpauth URI ではありません</string>
     <string name="cd_scan_totp_qr">TOTP QRコードをスキャン</string>
 
+    <!-- Custom field autofill selector (docs/extension-custom-field-autofill.md) -->
+    <string name="cd_autofill_target">オートフィル対象を指定</string>
+    <string name="autofill_target_tag">タグ名</string>
+    <string name="autofill_target_tag_placeholder">input</string>
+    <string name="autofill_target_name">name属性</string>
+    <string name="autofill_target_id">id属性</string>
+    <string name="autofill_target_type">type属性</string>
+    <string name="autofill_target_clear">クリア</string>
+
     <!-- Labels (entry form) -->
     <string name="label_new_dialog_title">新しいラベル</string>
     <string name="label_new_name_placeholder">ラベル名</string>

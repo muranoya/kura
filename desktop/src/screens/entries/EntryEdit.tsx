@@ -60,6 +60,7 @@ export default function EntryEdit() {
           name: f.name,
           field_type: f.fieldType,
           value: f.value,
+          autofill_selector: f.autofillSelector,
         })),
       )
       await commands.updateEntry(

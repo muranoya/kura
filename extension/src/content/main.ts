@@ -1,7 +1,7 @@
 // Content Script entry point — injected on-demand when vault is unlocked
 // Handles form detection, credential suggestion, and field filling
 
-import type { AutofillCredentialCandidate } from '../shared/types'
+import type { AutofillCredentialCandidate, AutofillFillData } from '../shared/types'
 import { isCaptureActive, onVaultLockedDuringCapture, startCaptureMode } from './capture'
 import { getEffectivePatterns, handleDevModeMessage, initDevMode } from './dev-mode-bridge'
 import { hideDropdown, showDropdown, showInlineIcon, showLockedDropdown } from './dropdown'
@@ -19,6 +19,13 @@ import {
 } from './messaging'
 import { detectFormByPattern } from './pattern-detector'
 import { findMatchingPattern } from './pattern-matcher'
+import {
+  isPickerActive,
+  onVaultLockedDuringPicker,
+  startPickerMode,
+  stopPickerMode,
+} from './picker'
+import { matchSelector } from './selector-matcher'
 import {
   isTotpQrScanActive,
   onVaultLockedDuringTotpQrScan,
@@ -46,7 +53,7 @@ function init() {
 }
 
 function onVaultMessage(
-  message: { type?: string },
+  message: { type?: string; fieldId?: string },
   _sender: chrome.runtime.MessageSender,
   sendResponse: (response: unknown) => void,
 ): boolean | undefined {
@@ -54,6 +61,7 @@ function onVaultMessage(
     hideDropdown()
     onVaultLockedDuringCapture()
     onVaultLockedDuringTotpQrScan()
+    onVaultLockedDuringPicker()
     return
   }
   if (message.type === 'AUTOFILL_VAULT_UNLOCKED') {
@@ -63,12 +71,14 @@ function onVaultMessage(
   if (message.type === 'AUTOFILL_START_CAPTURE') {
     hideDropdown()
     void stopTotpQrScanMode(true)
+    stopPickerMode()
     startCaptureMode()
     return
   }
   if (message.type === 'TOTP_QR_START') {
     hideDropdown()
     if (isCaptureActive()) return
+    stopPickerMode()
     void startTotpQrScanMode()
     return
   }
@@ -76,6 +86,16 @@ function onVaultMessage(
     // Scan context was replaced by a new tab — tear down without notifying
     // (TOTP_QR_CANCEL would wipe the new context in the Service Worker).
     void stopTotpQrScanMode(false)
+    return
+  }
+  if (message.type === 'PICKER_START') {
+    hideDropdown()
+    if (isCaptureActive() || isTotpQrScanActive()) return
+    if (message.fieldId) void startPickerMode(message.fieldId)
+    return
+  }
+  if (message.type === 'PICKER_CANCEL') {
+    stopPickerMode()
     return
   }
 
@@ -89,7 +109,7 @@ function onVaultMessage(
 let focusDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 function onFocus(e: Event) {
-  if (isCaptureActive() || isTotpQrScanActive()) return
+  if (isCaptureActive() || isTotpQrScanActive() || isPickerActive()) return
 
   // Use composedPath to get the actual target across shadow DOM boundaries
   const target = e.composedPath()[0]
@@ -276,6 +296,27 @@ async function handleInputFocus(input: HTMLInputElement) {
   }
 }
 
+/**
+ * fillData.customFields のうち、検出済みフォームコンテナ内でセレクタにマッチする
+ * 要素が見つかったものだけを充填対象配列として返す。
+ * 詳細: docs/extension-custom-field-autofill.md 3-4節, 3-5節
+ */
+function collectCustomFieldFills(
+  fillData: AutofillFillData,
+  container: HTMLElement,
+): Array<{ element: HTMLInputElement; value: string }> {
+  if (!fillData.customFields || fillData.customFields.length === 0) return []
+
+  const result: Array<{ element: HTMLInputElement; value: string }> = []
+  for (const entry of fillData.customFields) {
+    const element = matchSelector(container, entry.selector)
+    if (element) {
+      result.push({ element, value: entry.value })
+    }
+  }
+  return result
+}
+
 async function onCandidateSelected(candidate: AutofillCredentialCandidate, form: DetectedForm) {
   hideDropdown()
 
@@ -291,25 +332,29 @@ async function onCandidateSelected(candidate: AutofillCredentialCandidate, form:
   const passwordField = form.fields.find((f) => f.type === 'password')
 
   // For LOGIN_USERNAME forms, only fill username and store pending flow
-  if (
-    form.formType === 'LOGIN_USERNAME' &&
-    usernameField &&
-    fillData.username &&
-    isVisible(usernameField.element)
-  ) {
-    fillField(usernameField.element, fillData.username)
-    await storePendingFlow(candidate.entryId, fillData.username, window.location.href)
+  if (form.formType === 'LOGIN_USERNAME') {
+    if (usernameField && fillData.username && isVisible(usernameField.element)) {
+      fillField(usernameField.element, fillData.username)
+      await storePendingFlow(candidate.entryId, fillData.username, window.location.href)
+    }
+    // Account ID欄のようなカスタムフィールドがusername欄と同一画面上にあるケースを
+    // 想定し、このタイミングでも充填する（3-4節3.）
+    const customFills = collectCustomFieldFills(fillData, form.container)
+    if (customFills.length > 0) {
+      await fillFields(customFills)
+    }
     return
   }
 
   // For LOGIN_PASSWORD forms, only fill password
-  if (
-    form.formType === 'LOGIN_PASSWORD' &&
-    passwordField &&
-    fillData.password &&
-    isVisible(passwordField.element)
-  ) {
-    fillField(passwordField.element, fillData.password)
+  if (form.formType === 'LOGIN_PASSWORD') {
+    if (passwordField && fillData.password && isVisible(passwordField.element)) {
+      fillField(passwordField.element, fillData.password)
+    }
+    const customFills = collectCustomFieldFills(fillData, form.container)
+    if (customFills.length > 0) {
+      await fillFields(customFills)
+    }
     return
   }
 
@@ -337,6 +382,8 @@ async function onCandidateSelected(candidate: AutofillCredentialCandidate, form:
       ccFields.push({ element: ccName.element, value: fillData.ccName })
     }
 
+    ccFields.push(...collectCustomFieldFills(fillData, form.container))
+
     if (ccFields.length > 0) {
       await fillFields(ccFields)
     }
@@ -353,6 +400,8 @@ async function onCandidateSelected(candidate: AutofillCredentialCandidate, form:
   if (passwordField && fillData.password && isVisible(passwordField.element)) {
     toFill.push({ element: passwordField.element, value: fillData.password })
   }
+
+  toFill.push(...collectCustomFieldFills(fillData, form.container))
 
   if (toFill.length > 0) {
     await fillFields(toFill)

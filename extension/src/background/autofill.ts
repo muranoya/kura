@@ -2,7 +2,11 @@
 
 import { DEFAULT_VAULT_ID } from '../shared/constants'
 import { extractETldPlus1 } from '../shared/etld'
-import type { AutofillCredentialCandidate, AutofillFillData } from '../shared/types'
+import type {
+  AutofillCredentialCandidate,
+  AutofillCustomFieldFillEntry,
+  AutofillFillData,
+} from '../shared/types'
 
 const LOG_PREFIX = '[kura:autofill:sw]'
 
@@ -101,6 +105,55 @@ export function getMatchedEntryIdsForUrl(url: string): string[] {
   return getCredentialsForUrl(url).map((c) => c.entryId)
 }
 
+interface RawCustomFieldSelector {
+  tag?: string
+  name?: string
+  id?: string
+  type?: string
+}
+
+interface RawCustomField {
+  id: string
+  name: string
+  field_type: string
+  value: string
+  autofill_selector?: RawCustomFieldSelector | null
+}
+
+/**
+ * `raw.custom_fields`（JSON文字列 or 既にパース済みの配列）のうち、
+ * `autofill_selector` が設定されているものだけを AutofillFillData.customFields 用に変換する。
+ * セレクタ未設定の値はDOM充填の対象にならないため含めない（不要な機密データの露出を避ける）。
+ * 詳細: docs/extension-custom-field-autofill.md 3-2節, 3-3節
+ */
+function extractSelectorFillEntries(
+  rawCustomFields: unknown,
+): AutofillCustomFieldFillEntry[] | undefined {
+  let fields = rawCustomFields
+  if (typeof fields === 'string') {
+    try {
+      fields = JSON.parse(fields)
+    } catch {
+      return undefined
+    }
+  }
+  if (!Array.isArray(fields)) return undefined
+
+  const entries = (fields as RawCustomField[])
+    .filter((f) => f.autofill_selector != null)
+    .map((f) => ({
+      selector: {
+        tag: f.autofill_selector?.tag,
+        name: f.autofill_selector?.name,
+        id: f.autofill_selector?.id,
+        type: f.autofill_selector?.type,
+      },
+      value: f.value,
+    }))
+
+  return entries.length > 0 ? entries : undefined
+}
+
 function getFillData(entryId: string): AutofillFillData | null {
   if (!vaultApi || !isUnlocked()) return null
 
@@ -120,6 +173,7 @@ function getFillData(entryId: string): AutofillFillData | null {
 
     const tv = typedValue as Record<string, unknown>
     const entryType = raw.entry_type as string | undefined
+    const customFields = extractSelectorFillEntries(raw.custom_fields)
 
     if (entryType === 'credit_card') {
       return {
@@ -129,12 +183,14 @@ function getFillData(entryId: string): AutofillFillData | null {
         ccExp: (tv.expiry as string) ?? null,
         ccCvc: (tv.cvv as string) ?? null,
         ccName: (tv.cardholder as string) ?? null,
+        customFields,
       }
     }
 
     return {
       username: (tv.username as string) ?? null,
       password: (tv.password as string) ?? null,
+      customFields,
     }
   } catch (e) {
     console.error(LOG_PREFIX, 'getFillData: error:', e)

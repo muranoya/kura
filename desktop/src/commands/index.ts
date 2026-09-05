@@ -1,7 +1,14 @@
 import { invoke } from '@tauri-apps/api/core'
 import { DEFAULT_VAULT_ID, STORAGE_KEYS } from '../shared/constants'
 import { saveToStorage } from '../shared/storage'
-import type { CustomFieldType, Entry, EntryFilter, EntryRow, Label } from '../shared/types'
+import type {
+  CustomFieldSelector,
+  CustomFieldType,
+  Entry,
+  EntryFilter,
+  EntryRow,
+  Label,
+} from '../shared/types'
 
 const vaultId = DEFAULT_VAULT_ID
 
@@ -83,6 +90,8 @@ export async function getEntry(id: string): Promise<Entry> {
       name: f.name as string,
       fieldType: f.field_type as CustomFieldType,
       value: f.value as string,
+      autofillSelector:
+        (f.autofill_selector as CustomFieldSelector | null | undefined) ?? undefined,
     })),
   }
 }

@@ -20,6 +20,7 @@ import {
   onVaultLocked,
   onVaultUnlocked,
 } from './autofill'
+import { clearPickerContext, handlePickerMessage, initPicker } from './picker'
 import { clearTotpQrScanContext, handleTotpQrMessage, initTotpQrScan } from './totp-qr-scan'
 import { initWasmManual } from './wasm-init'
 import { handleWebauthnMessage, initWebauthn, resumeLockedWebauthnRituals } from './webauthn'
@@ -219,6 +220,15 @@ initTotpQrScan(
   autoSync,
 )
 
+initPicker(
+  new Proxy({} as WasmApi, {
+    get: (_target, prop) => (vault as unknown as Record<string | symbol, unknown>)[prop],
+  }),
+  () => unlocked,
+  saveLocally,
+  autoSync,
+)
+
 // WebAuthn/Passkeyの初期化（vault はプロキシ経由でlazy参照）
 initWebauthn(
   new Proxy({} as WasmApi, {
@@ -254,12 +264,23 @@ function normalizeEntry(raw: Record<string, unknown>): Record<string, unknown> {
     typedValue: raw.typed_value ?? {},
     labels: raw.labels ?? raw.label_ids ?? [],
     customFields: ((raw.custom_fields as Record<string, unknown>[] | undefined) ?? []).map(
-      (f: Record<string, unknown>) => ({
-        id: f.id,
-        name: f.name,
-        fieldType: f.field_type,
-        value: f.value,
-      }),
+      (f: Record<string, unknown>) => {
+        const rawSelector = f.autofill_selector as Record<string, unknown> | null | undefined
+        return {
+          id: f.id,
+          name: f.name,
+          fieldType: f.field_type,
+          value: f.value,
+          autofillSelector: rawSelector
+            ? {
+                tag: rawSelector.tag,
+                name: rawSelector.name,
+                id: rawSelector.id,
+                type: rawSelector.type,
+              }
+            : undefined,
+        }
+      },
     ),
   }
 }
@@ -502,6 +523,10 @@ async function handleMessage(
       return handleTotpQrMessage(message, _sender, sendResponse)
     }
 
+    if (typeof message.type === 'string' && message.type.startsWith('PICKER_')) {
+      return handlePickerMessage(message, _sender, sendResponse)
+    }
+
     // Delegate WebAuthn/Passkey messages to the webauthn module
     if (typeof message.type === 'string' && message.type.startsWith('WEBAUTHN_')) {
       return handleWebauthnMessage(message, _sender, sendResponse)
@@ -647,6 +672,7 @@ async function handleMessage(
           // オートフィル: 全タブに通知してContent Scriptを無効化
           onVaultLocked()
           clearTotpQrScanContext()
+          clearPickerContext()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -1348,6 +1374,7 @@ async function handleAutolockAlarm() {
     chrome.alarms.clear('autosync')
     onVaultLocked()
     clearTotpQrScanContext()
+    clearPickerContext()
   } catch (err) {
     console.error('[SW] Autolock failed:', err)
   }

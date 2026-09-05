@@ -46,12 +46,28 @@ data class Label(
     val name: String
 )
 
+/**
+ * カスタムフィールドをページ上のDOM要素にマッチさせるためのセレクタ情報。
+ * タグ名・name属性・id属性・type属性の4項目（いずれもoptional）を保持する。
+ * Androidアプリ自体はこの情報を消費しない（V1スコープ外）が、Rust側
+ * `CustomField.autofill_selector` を strict Json でも安全にデコードするために、
+ * 型定義として保持する必要がある。
+ */
+@Serializable
+data class CustomFieldSelector(
+    val tag: String? = null,
+    val name: String? = null,
+    val id: String? = null,
+    val type: String? = null
+)
+
 @Serializable
 data class CustomField(
     val id: String,
     val name: String,
     @SerialName("field_type") val fieldType: String,
-    val value: String
+    val value: String,
+    @SerialName("autofill_selector") val autofillSelector: CustomFieldSelector? = null
 )
 
 @Serializable

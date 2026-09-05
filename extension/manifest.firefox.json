@@ -27,7 +27,8 @@
         "wasm/wasm_bridge_bg.wasm",
         "src/content/dropdown.css",
         "src/content/capture.css",
-        "src/content/totp-qr-scan.css"
+        "src/content/totp-qr-scan.css",
+        "src/content/picker.css"
       ],
       "matches": ["<all_urls>"]
     }
