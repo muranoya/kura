@@ -305,7 +305,14 @@
         "no_qr": "No QR code found in the image",
         "empty": "QR code was empty",
         "invalid_totp": "QR code is not a valid TOTP secret or otpauth URI"
-      }
+      },
+      "autofillTarget": "Set autofill target",
+      "autofillTargetTag": "Tag name",
+      "autofillTargetTagPlaceholder": "input",
+      "autofillTargetName": "name attribute",
+      "autofillTargetId": "id attribute",
+      "autofillTargetType": "type attribute",
+      "clearSelector": "Clear"
     },
     "typeSelectDialog": {
       "title": "Select item type",

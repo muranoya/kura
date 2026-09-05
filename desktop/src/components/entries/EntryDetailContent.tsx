@@ -1,4 +1,4 @@
-import { Check, Copy, Eye, EyeOff, Maximize2, Pencil, Star, Trash2 } from 'lucide-react'
+import { Check, Copy, Crosshair, Eye, EyeOff, Maximize2, Pencil, Star, Trash2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -10,6 +10,7 @@ import type { Entry, Label } from '../../shared/types'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { LargeTextDialog } from '../ui/large-text-dialog'
+import { formatSelectorSummary } from './EntryForm'
 import PasskeyCustomFieldDisplay from './PasskeyCustomFieldDisplay'
 import TotpCustomFieldDisplay from './TotpCustomFieldDisplay'
 
@@ -434,28 +435,36 @@ export default function EntryDetailContent({
         {/* カスタムフィールド */}
         {entry.customFields && entry.customFields.length > 0 && (
           <div className="space-y-0.5">
-            {entry.customFields.map((field) =>
-              field.fieldType === 'totp' ? (
-                <TotpCustomFieldDisplay key={field.id} label={field.name} value={field.value} />
-              ) : field.fieldType === 'passkey' ? (
-                <PasskeyCustomFieldDisplay
-                  key={field.id}
-                  label={t('customFieldTypes.passkey')}
-                  value={field.value}
-                />
-              ) : (
-                <FieldDisplay
-                  key={field.id}
-                  label={field.name}
-                  value={field.value}
-                  isPassword={field.fieldType === 'password'}
-                  isMasked={field.fieldType === 'password' && !unmaskedFields.has(field.id)}
-                  onToggleMask={
-                    field.fieldType === 'password' ? () => toggleFieldMask(field.id) : undefined
-                  }
-                />
-              ),
-            )}
+            {entry.customFields.map((field) => (
+              <div key={field.id}>
+                {field.fieldType === 'totp' ? (
+                  <TotpCustomFieldDisplay label={field.name} value={field.value} />
+                ) : field.fieldType === 'passkey' ? (
+                  <PasskeyCustomFieldDisplay
+                    label={t('customFieldTypes.passkey')}
+                    value={field.value}
+                  />
+                ) : (
+                  <FieldDisplay
+                    label={field.name}
+                    value={field.value}
+                    isPassword={field.fieldType === 'password'}
+                    isMasked={field.fieldType === 'password' && !unmaskedFields.has(field.id)}
+                    onToggleMask={
+                      field.fieldType === 'password' ? () => toggleFieldMask(field.id) : undefined
+                    }
+                  />
+                )}
+                {field.autofillSelector && (
+                  <div className="flex items-center gap-1.5 pl-3 pb-1 text-[11px] text-text-muted">
+                    <Crosshair size={11} className="shrink-0" />
+                    <span className="truncate font-mono">
+                      {formatSelectorSummary(field.autofillSelector)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
 

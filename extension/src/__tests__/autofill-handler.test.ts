@@ -16,7 +16,12 @@ interface MockEntry {
   url?: string
   username?: string
   typed_value: Record<string, unknown>
-  custom_fields?: Array<{ field_type: string; value: string }>
+  custom_fields?: Array<{
+    id?: string
+    field_type: string
+    value: string
+    autofill_selector?: { tag?: string; name?: string; id?: string; type?: string } | null
+  }>
   subtitle?: string | null
 }
 
@@ -361,6 +366,72 @@ describe('handleAutofillMessage', () => {
         entryId: 'non-existent',
       })
       expect(result).toEqual({ success: false, error: 'Entry not found' })
+    })
+
+    it('includes custom fields with an autofill_selector in fillData.customFields', async () => {
+      const entries: MockEntry[] = [
+        {
+          id: 'with-selector',
+          name: 'AWS Login',
+          entry_type: 'login',
+          typed_value: { username: 'user', password: 'pass' },
+          custom_fields: [
+            {
+              id: 'cf1',
+              field_type: 'text',
+              value: 'account-id-value',
+              autofill_selector: { name: 'account_id', type: 'text' },
+            },
+            // セレクタ未設定のフィールドは含めない（不要な機密データの露出を避ける）
+            { id: 'cf2', field_type: 'text', value: 'no selector here' },
+          ],
+        },
+      ]
+      initAutofill(
+        createMockVaultApi(entries),
+        () => true,
+        async () => {},
+        async () => {},
+      )
+
+      const result = (await callHandler({
+        type: 'AUTOFILL_FILL_REQUEST',
+        entryId: 'with-selector',
+      })) as { success: boolean; fillData: { customFields?: Array<Record<string, unknown>> } }
+
+      expect(result.success).toBe(true)
+      expect(result.fillData.customFields).toEqual([
+        {
+          selector: { tag: undefined, name: 'account_id', id: undefined, type: 'text' },
+          value: 'account-id-value',
+        },
+      ])
+    })
+
+    it('omits customFields when no custom field has an autofill_selector', async () => {
+      const entries: MockEntry[] = [
+        {
+          id: 'no-selector',
+          name: 'Plain Login',
+          entry_type: 'login',
+          typed_value: { username: 'user', password: 'pass' },
+          custom_fields: [{ id: 'cf1', field_type: 'text', value: 'note' }],
+        },
+      ]
+      initAutofill(
+        createMockVaultApi(entries),
+        () => true,
+        async () => {},
+        async () => {},
+      )
+
+      const result = (await callHandler({
+        type: 'AUTOFILL_FILL_REQUEST',
+        entryId: 'no-selector',
+      })) as { success: boolean; fillData: { customFields?: unknown } }
+
+      expect(result.success).toBe(true)
+      expect(result.fillData.customFields).toBeUndefined()
     })
 
     it('handles typed_value as JSON string (double-parse)', async () => {

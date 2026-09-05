@@ -279,6 +279,15 @@
     <string name="totp_qr_error_invalid">QR code is not a valid TOTP secret or otpauth URI</string>
     <string name="cd_scan_totp_qr">Scan TOTP QR code</string>
 
+    <!-- Custom field autofill selector (docs/extension-custom-field-autofill.md) -->
+    <string name="cd_autofill_target">Set autofill target</string>
+    <string name="autofill_target_tag">Tag name</string>
+    <string name="autofill_target_tag_placeholder">input</string>
+    <string name="autofill_target_name">name attribute</string>
+    <string name="autofill_target_id">id attribute</string>
+    <string name="autofill_target_type">type attribute</string>
+    <string name="autofill_target_clear">Clear</string>
+
     <!-- Labels (entry form) -->
     <string name="label_new_dialog_title">New label</string>
     <string name="label_new_name_placeholder">Label name</string>

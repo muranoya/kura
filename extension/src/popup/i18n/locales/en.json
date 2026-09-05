@@ -256,7 +256,16 @@
         "no_qr": "No QR code found",
         "empty": "QR code was empty",
         "invalid_totp": "QR code is not a valid TOTP secret or otpauth URI"
-      }
+      },
+      "selectPageElement": "Select element on page",
+      "pickerStarting": "Starting element picker…",
+      "autofillTarget": "Set autofill target",
+      "autofillTargetTag": "Tag name",
+      "autofillTargetTagPlaceholder": "input",
+      "autofillTargetName": "name attribute",
+      "autofillTargetId": "id attribute",
+      "autofillTargetType": "type attribute",
+      "clearSelector": "Clear"
     },
     "customFieldTypes": {
       "text": "Text",
@@ -606,6 +615,14 @@
       "save": "Save",
       "rescan": "Scan again",
       "saving": "Saving…"
+    },
+    "picker": {
+      "banner": "Click an element on this page to select it (Esc to cancel)",
+      "cancel": "Cancel",
+      "applying": "Saving…",
+      "success": "Selected element saved",
+      "applyFailed": "Failed to save",
+      "locked": "Stopped because the vault was locked"
     }
   }
 }

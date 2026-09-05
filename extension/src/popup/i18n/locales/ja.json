@@ -256,7 +256,16 @@
         "no_qr": "QRコードが見つかりません",
         "empty": "QRコードが空でした",
         "invalid_totp": "TOTP用のシークレットまたはotpauth URIではありません"
-      }
+      },
+      "selectPageElement": "ページ上の要素を選択",
+      "pickerStarting": "ページの要素選択を開始中…",
+      "autofillTarget": "オートフィル対象を指定",
+      "autofillTargetTag": "タグ名",
+      "autofillTargetTagPlaceholder": "input",
+      "autofillTargetName": "name属性",
+      "autofillTargetId": "id属性",
+      "autofillTargetType": "type属性",
+      "clearSelector": "クリア"
     },
     "customFieldTypes": {
       "text": "テキスト",
@@ -606,6 +615,14 @@
       "save": "保存",
       "rescan": "再スキャン",
       "saving": "保存中…"
+    },
+    "picker": {
+      "banner": "ページ上の要素をクリックして選択してください（Escでキャンセル）",
+      "cancel": "キャンセル",
+      "applying": "保存中…",
+      "success": "選択した要素を保存しました",
+      "applyFailed": "保存に失敗しました",
+      "locked": "Vault がロックされたため終了しました"
     }
   }
 }

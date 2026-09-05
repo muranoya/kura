@@ -1,6 +1,7 @@
 import {
   ChevronDown,
   ChevronUp,
+  Crosshair,
   Link,
   Lock,
   Mail,
@@ -21,7 +22,7 @@ import * as commands from '../../commands'
 import { TotpQrDecodeError, decodeTotpQrFromImageFile } from '../../lib/totp-qr'
 import { cn } from '../../lib/utils'
 import { getEntryTypeLabel } from '../../shared/constants'
-import type { CustomField, CustomFieldType, Label } from '../../shared/types'
+import type { CustomField, CustomFieldSelector, CustomFieldType, Label } from '../../shared/types'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -42,6 +43,23 @@ function passkeySummary(
     // fall through to generic label below
   }
   return t('customFieldTypes.passkey')
+}
+
+/**
+ * 設定済みのオートフィルセレクタを `input[name="account_id"]` 相当のテキストへ
+ * 要約する。値そのものではなく識別情報のみの表示であるため機密性の問題はない。
+ * 詳細: docs/extension-custom-field-autofill.md 4-1節
+ *
+ * 編集フォームだけでなく、読み取り専用のアイテム詳細画面（`EntryDetailContent.tsx`）
+ * からも同じ要約表示を使うため named export にしている。
+ */
+export function formatSelectorSummary(selector: CustomFieldSelector): string {
+  const tag = selector.tag || 'input'
+  const attrs: string[] = []
+  if (selector.name) attrs.push(`name="${selector.name}"`)
+  if (selector.id) attrs.push(`id="${selector.id}"`)
+  if (selector.type) attrs.push(`type="${selector.type}"`)
+  return attrs.length > 0 ? `${tag}[${attrs.join('][')}]` : tag
 }
 
 export interface EntryFormProps {
@@ -187,6 +205,7 @@ export default function EntryForm({
   const [scanningTotpQr, setScanningTotpQr] = useState(false)
   const [totpQrError, setTotpQrError] = useState<string | null>(null)
   const totpQrFileInputRef = useRef<HTMLInputElement>(null)
+  const [expandedSelectorFieldId, setExpandedSelectorFieldId] = useState<string | null>(null)
 
   const updateTypedValue = useCallback(
     (key: string, value: string | null) => {
@@ -251,6 +270,22 @@ export default function EntryForm({
       onCustomFieldsChange(customFields.filter((f) => f.id !== fieldId))
     },
     [customFields, onCustomFieldsChange],
+  )
+
+  /**
+   * オートフィルセレクタの1属性を更新する。全属性が空文字になったら
+   * autofillSelector自体をundefinedへ正規化する（「常にマッチしない」無効な
+   * 状態を保持しない）。
+   */
+  const updateSelectorAttr = useCallback(
+    (fieldId: string, attr: keyof CustomFieldSelector, value: string) => {
+      const field = customFields.find((f) => f.id === fieldId)
+      if (!field) return
+      const next: CustomFieldSelector = { ...field.autofillSelector, [attr]: value || undefined }
+      const isEmpty = !next.tag && !next.name && !next.id && !next.type
+      updateCustomField(fieldId, { autofillSelector: isEmpty ? undefined : next })
+    },
+    [customFields, updateCustomField],
   )
 
   const moveCustomField = useCallback(
@@ -786,6 +821,20 @@ export default function EntryForm({
                   <ScanQrCode size={14} />
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() =>
+                  setExpandedSelectorFieldId(expandedSelectorFieldId === field.id ? null : field.id)
+                }
+                className={cn(
+                  'p-1 shrink-0 mt-1 transition-colors',
+                  field.autofillSelector ? 'text-accent' : 'text-text-muted hover:text-accent',
+                )}
+                title={t('entries.form.autofillTarget')}
+                aria-label={t('entries.form.autofillTarget')}
+              >
+                <Crosshair size={14} />
+              </button>
               {customFields.length > 1 && (
                 <div className="flex flex-col shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
@@ -822,6 +871,73 @@ export default function EntryForm({
                     setActiveGeneratorFieldId(null)
                   }}
                 />
+              </div>
+            )}
+            {field.autofillSelector && expandedSelectorFieldId !== field.id && (
+              <div className="pl-[3.75rem] flex items-center gap-2 text-[11px] text-text-muted">
+                <span className="truncate font-mono">
+                  {formatSelectorSummary(field.autofillSelector)}
+                </span>
+              </div>
+            )}
+            {expandedSelectorFieldId === field.id && (
+              <div className="pl-[3.75rem] pr-2 space-y-2 rounded-md bg-bg-elevated border border-border p-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <UILabel htmlFor={`selector-tag-${field.id}`} className="text-[10px]">
+                      {t('entries.form.autofillTargetTag')}
+                    </UILabel>
+                    <Input
+                      id={`selector-tag-${field.id}`}
+                      value={field.autofillSelector?.tag ?? ''}
+                      onChange={(e) => updateSelectorAttr(field.id, 'tag', e.target.value)}
+                      placeholder={t('entries.form.autofillTargetTagPlaceholder')}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <UILabel htmlFor={`selector-type-${field.id}`} className="text-[10px]">
+                      {t('entries.form.autofillTargetType')}
+                    </UILabel>
+                    <Input
+                      id={`selector-type-${field.id}`}
+                      value={field.autofillSelector?.type ?? ''}
+                      onChange={(e) => updateSelectorAttr(field.id, 'type', e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <UILabel htmlFor={`selector-name-${field.id}`} className="text-[10px]">
+                      {t('entries.form.autofillTargetName')}
+                    </UILabel>
+                    <Input
+                      id={`selector-name-${field.id}`}
+                      value={field.autofillSelector?.name ?? ''}
+                      onChange={(e) => updateSelectorAttr(field.id, 'name', e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <UILabel htmlFor={`selector-id-${field.id}`} className="text-[10px]">
+                      {t('entries.form.autofillTargetId')}
+                    </UILabel>
+                    <Input
+                      id={`selector-id-${field.id}`}
+                      value={field.autofillSelector?.id ?? ''}
+                      onChange={(e) => updateSelectorAttr(field.id, 'id', e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                </div>
+                {field.autofillSelector && (
+                  <button
+                    type="button"
+                    onClick={() => updateCustomField(field.id, { autofillSelector: undefined })}
+                    className="text-[11px] text-text-muted hover:text-danger transition-colors"
+                  >
+                    {t('entries.form.clearSelector')}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -876,6 +992,8 @@ export default function EntryForm({
     fieldTypeLabels,
     openTotpQrPicker,
     scanningTotpQr,
+    expandedSelectorFieldId,
+    updateSelectorAttr,
     t,
   ])
 

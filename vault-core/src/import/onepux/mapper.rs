@@ -346,6 +346,7 @@ fn build_all_custom_fields(item: &ParsedItem) -> Vec<CustomField> {
             name: f.field_title.clone(),
             field_type: f.value.custom_field_type().to_string(),
             value: SecretString::from_string(f.value.to_string_value()),
+            autofill_selector: None,
         })
         .collect()
 }
@@ -374,6 +375,7 @@ fn build_filtered_fields(
             name: f.field_title.clone(),
             field_type: f.value.custom_field_type().to_string(),
             value: SecretString::from_string(f.value.to_string_value()),
+            autofill_selector: None,
         })
         .collect()
 }

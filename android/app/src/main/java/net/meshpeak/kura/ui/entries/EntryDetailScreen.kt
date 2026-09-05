@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.outlined.StarOutline
 import net.meshpeak.kura.R
 import net.meshpeak.kura.data.model.CustomField
+import net.meshpeak.kura.data.model.CustomFieldSelector
 import net.meshpeak.kura.data.model.Entry
 import net.meshpeak.kura.data.model.Label
 import net.meshpeak.kura.ui.components.ConfirmDialog
@@ -45,6 +46,7 @@ import net.meshpeak.kura.ui.components.LargeTextDialog
 import net.meshpeak.kura.ui.components.MarkdownText
 import net.meshpeak.kura.ui.components.EntryTypeIcon
 import net.meshpeak.kura.ui.components.entryTypeDisplayName
+import net.meshpeak.kura.ui.components.formatSelectorSummary
 import net.meshpeak.kura.util.ClipboardUtil
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
@@ -288,6 +290,9 @@ fun EntryDetailScreen(
                                                 context = context,
                                                 clipboardClearSeconds = clipboardClearSeconds,
                                             )
+                                        }
+                                        field.autofillSelector?.let { selector ->
+                                            AutofillSelectorCaption(selector)
                                         }
                                     }
                                 }
@@ -619,6 +624,33 @@ fun TotpField(
             label = label,
             value = totpCode,
             onDismiss = { largeTextOpen = false }
+        )
+    }
+}
+
+/**
+ * カスタムフィールドに設定されたオートフィルセレクタの要約を、
+ * フィールド値の下に読み取り専用で表示する（Desktop/ブラウザ拡張の
+ * 常時表示のセレクタ要約と同じ情報を、Android詳細画面でも確認できるようにする）。
+ * 値そのものではなく `input[name="..."]` 相当の識別情報のみなので機密性の問題はない。
+ */
+@Composable
+private fun AutofillSelectorCaption(selector: CustomFieldSelector) {
+    Row(
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            Icons.Default.CenterFocusStrong,
+            contentDescription = null,
+            modifier = Modifier.size(12.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = formatSelectorSummary(selector),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

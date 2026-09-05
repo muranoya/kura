@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import * as commands from './commands'
 import { BottomNav } from './components/BottomNav'
 import ErrorBar from './components/layout/ErrorBar'
 import { ErrorProvider } from './contexts/ErrorContext'
@@ -33,6 +34,7 @@ function shouldShowBottomNav(pathname: string, appState: AppState): boolean {
 
 function AppContent() {
   const location = useLocation()
+  const navigate = useNavigate()
   const [appState, setAppState] = useState<AppState>('loading')
 
   // ポップアップの接続を維持し、オートロックタイマーを管理
@@ -95,6 +97,28 @@ function AppContent() {
 
     checkVaultState()
   }, [location.state])
+
+  // ピッカーの選択結果を反映するためにpopupが再起動された場合、保留中の結果が
+  // あれば該当エントリの編集画面へ遷移する（TOTP QRスキャンと異なり、ピッカーは
+  // Service Worker側で直接永続化済みなので、ここでは画面遷移のみでよい）。
+  // 詳細: docs/extension-custom-field-autofill.md 4-2節, 4-3節
+  useEffect(() => {
+    if (appState !== 'unlocked') return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const result = await commands.queryPickerResult()
+        if (!cancelled && result?.entryId) {
+          navigate(`/entries/${result.entryId}/edit`, { replace: true })
+        }
+      } catch {
+        // ベストエフォート: 失敗してもpopupの通常起動を妨げない
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [appState, navigate])
 
   if (appState === 'loading') {
     return (

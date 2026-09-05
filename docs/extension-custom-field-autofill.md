@@ -1,7 +1,7 @@
-<!-- doc-status: design -->
+<!-- doc-status: implemented -->
 # カスタムフィールドのオートフィル対応（セレクタベース）
 
-本ドキュメントは未実装の設計書である。実装が進み次第、`docs/extension-autofill.md`（Part 3）に統合し、本ドキュメントの `doc-status` を更新する。
+本ドキュメントの設計に基づき、V1スコープ（Part 1-3節）はvault-core / ブラウザ拡張 / Desktop / Android の4プラットフォームで実装済みである。Part 7に記載の将来課題は、当初からV1スコープ外と定めた項目であり未実装のまま残っている（該当セクションに `未実装（将来対応予定）` マーカーを付与している）。将来的には `docs/extension-autofill.md`（Part 3）への統合を検討する。
 
 **本機能はパターンDB（[`docs/extension-pattern-db.md`](extension-pattern-db.md)）とは独立した並行の仕組みである。** `extension/patterns/`、`extension/src/content/pattern-detector.ts`、`extension/src/content/pattern-types.ts`、`extension/src/content/field-classifier.ts` には一切変更を加えない。
 
@@ -229,13 +229,21 @@ export function matchSelector(
 
 `extension/src/popup/components/entries/EntryForm.tsx` のカスタムフィールド一覧描画部分に、以下を追加する:
 
-- 各カスタムフィールド行に「ページ上の要素を選択」ボタンを追加する（既存のTOTP用QRスキャンボタンと同様の配置パターン）。
-- クリックすると4-2節のピッカーフローを開始する。
-- 選択結果（tag/name/id/type）が返ってきたら、フォーム状態の該当カスタムフィールドの `autofillSelector` に反映する。
-- 設定済みのセレクタがある場合、フィールド行に読み取り専用のサマリ表示（例: `input[name=account_id]` 相当のテキスト）を出す。値そのものではなく識別情報のみの表示であるため機密性の問題はない。
-- 「クリア」ボタンでセレクタ設定を未設定に戻せるようにする。
+- 各カスタムフィールド行に「ページ上の要素を選択」ボタン（ピッカー起動、`MousePointerClick`アイコン）と、Desktop版と同じ「オートフィル対象を指定」トグルボタン（`Crosshair`アイコン）の2つを並べて配置する（既存のTOTP用QRスキャンボタンと同様の配置パターン）。
+- ピッカーボタンをクリックすると4-2節のピッカーフローを開始する。選択結果（tag/name/id/type）が返ってきたら、フォーム状態の該当カスタムフィールドの `autofillSelector` に反映する。
+- トグルボタンをクリックすると、当該フィールド行の下に4つのテキスト入力（タグ名 / name属性 / id属性 / type属性）を展開し、Desktop版（`desktop/src/components/entries/EntryForm.tsx`）と同じUIパターン・同じ正規化ロジック（4属性すべて空になったら `autofillSelector` 自体を `undefined` に戻す）で手動編集できるようにする。ページ上の要素にアクセスできない状況（新規作成中でページを開いていない、対象要素がJSで動的生成される等）でも設定できるようにするため、ピッカーとは独立に常時利用可能とする（`entryId` の有無に依存しない）。
+- 展開中は読み取り専用のサマリ表示を隠し、代わりに上記の編集フォームを表示する。折りたたみ時（未展開）に設定済みのセレクタがある場合は、フィールド行に読み取り専用のサマリ表示（例: `input[name=account_id]` 相当のテキスト）を出す。値そのものではなく識別情報のみの表示であるため機密性の問題はない。
+- 「クリア」ボタンでセレクタ設定を未設定に戻せるようにする（折りたたみ時のサマリ横、および展開時の編集フォーム内の両方に配置）。
 
-CLAUDE.mdに定める通り、拡張機能のポップアップではRadix UIのPortal系コンポーネントが動作しないため、このUIも自前実装（`extension/src/popup/components/ui/` 配下の既存パターン）に従う。
+ピッカーと手動編集は排他ではなく併存する: ピッカーで取得した結果を後から手動編集で微調整する、あるいはピッカーが使えない状況では最初から手動入力する、といった使い分けができる。
+
+CLAUDE.mdに定める通り、拡張機能のポップアップではRadix UIのPortal系コンポーネントが動作しないため、このUIも自前実装（`extension/src/popup/components/ui/` 配下の既存パターン）に従う。ただし `@radix-ui/react-label`（`ui/label.tsx`）はPortalを使わないラッパーであるため、Desktop版と同様に4入力のラベル表示に利用してよい。
+
+## 4-1-2. アイテム詳細画面（読み取り専用ペイン）での表示
+
+拡張機能には編集フォームとは別に、`extension/src/popup/screens/entries/EntryList.tsx` 内の `EntryDetailPane`（一覧選択時に表示される読み取り専用の詳細ペイン）が存在する。ここでもカスタムフィールドの下に、設定済みのオートフィルセレクタがあれば要約テキスト（`Crosshair`アイコン + `formatSelectorSummary()`の結果）を表示する。値そのものではなく識別情報のみの表示であるため機密性の問題はない。
+
+`formatSelectorSummary()` は `EntryForm.tsx` からnamed exportし、編集フォームと詳細ペインの双方が同一実装を参照する（表示フォーマットの二重実装によるズレを防ぐため）。詳細ペインは読み取り専用であり、セレクタの変更・クリアはできない（変更するには「編集」ボタンから編集フォームに入る）。
 
 ## 4-2. ピッカー起動〜結果反映のメッセージフロー
 
@@ -304,6 +312,8 @@ Chrome拡張のaction popupは、ユーザーがpopup外（対象ページ）を
 
 `desktop/src/components/entries/EntryForm.tsx` のカスタムフィールド描画部分に、折りたたみ可能な「オートフィル対象を指定」サブセクションを追加する。中身は4つのテキスト入力（タグ名 / name属性 / id属性 / type属性）。Desktopには「今開いているページ」という概念がないため、すべて手動テキスト入力とする。UIパターンは既存のカスタムフィールドタイプ選択UIと同じReact実装で構わない。
 
+読み取り専用のアイテム詳細画面（`desktop/src/components/entries/EntryDetailContent.tsx`）のカスタムフィールド一覧でも、設定済みのオートフィルセレクタがあればその下に要約テキスト（`Crosshair`アイコン + 要約）を表示する。値そのものではなく識別情報のみの表示であるため機密性の問題はない。要約フォーマットは `EntryForm.tsx` の `formatSelectorSummary()` をnamed exportして両画面で共有し、表示フォーマットの二重実装によるズレを防ぐ（ブラウザ拡張の4-1-2節と同じ方針）。詳細画面は読み取り専用であり、セレクタの変更・クリアは編集画面からのみ行う。
+
 ## 5-2. Android: 手動入力フォーム
 
 `android/app/src/main/java/net/meshpeak/kura/ui/components/EntryForm.kt` の `CustomFieldEditor` / `CustomFieldsSection` に、Desktop同様の4テキストフィールド入力UIを追加する。
@@ -323,12 +333,8 @@ Rust側 `CustomField` にJSONキー（`autofill_selector`）が追加された�
 
 対処方針（2案。実装時にいずれか、または両方を選択する）:
 
-- **案A（推奨）**: `Models.kt` の `CustomField` に `autofillSelector: CustomFieldSelector? = null` を追加する。型が一致すればstrict Jsonでも問題なくデコードできる。
-- **案B**: 上記4箇所を `Json { ignoreUnknownKeys = true }` に変更する。コードベース内には既に同パターンの前例（他のJSONデコード箇所）が複数存在する。将来の同種フィールド追加に対する恒久対策として、案Aと並行して採用することが望ましい。
-
-## 5-4. Android: ビルド運用上の注意
-
-Android版のvault-coreは通常のGradleビルドに含まれず、`cargo ndk` による手動ビルドと `.so` の配置が必要である。本機能の実装後、実機での動作確認前にこの手動ビルド手順を忘れないこと。
+- **案A（採用済み）**: `Models.kt` の `CustomField` に `autofillSelector: CustomFieldSelector? = null` を追加する。型が一致すればstrict Jsonでも問題なくデコードできる。
+- **案B（未実装）**: 上記4箇所を `Json { ignoreUnknownKeys = true }` に変更する。コードベース内には既に同パターンの前例（他のJSONデコード箇所）が複数存在する。将来の同種フィールド追加に対する恒久対策だが、本機能の実装スコープでは必須ではないため見送った。
 
 # Part 6: 検討した代替案
 
@@ -341,6 +347,8 @@ Android版のvault-coreは通常のGradleビルドに含まれず、`cargo ndk` 
 カスタムフィールド名（例:「Account ID」）とDOM要素のlabel/placeholderテキストをあいまい一致させる案。多言語対応・表記ゆれの吸収が困難で誤マッチのリスクが高く、確定的な属性マッチの方がユーザーにとって挙動が予測可能であるため不採用とした。
 
 # Part 7: 将来課題（V1スコープ外）
+
+> **未実装（将来対応予定）**
 
 - セレクタ専用フィールド自体にフォーカスした際のドロップダウン表示。
 - `<select>` 要素・`<textarea>` への対応。

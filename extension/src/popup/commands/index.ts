@@ -203,6 +203,25 @@ export async function startTotpQrScan(entryId: string, fieldId: string): Promise
   if (!res.success) throw new Error(field<'error', string>(res, 'error'))
 }
 
+// カスタムフィールドのオートフィルセレクタ ピッカー
+// 詳細: docs/extension-custom-field-autofill.md 4-2節, 4-3節
+export async function startPicker(entryId: string, fieldId: string): Promise<void> {
+  const res = await sendMessage({ type: 'PICKER_START', entryId, fieldId })
+  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
+}
+
+/**
+ * popup再起動時に、直前のピッカー操作で適用された結果（あれば）を取り出す。
+ * 呼ぶたびに一度だけ消費される。
+ */
+export async function queryPickerResult(): Promise<{ entryId: string; fieldId: string } | null> {
+  const res = await sendMessage({ type: 'PICKER_QUERY_RESULT' })
+  if (!res.success) return null
+  return (
+    field<'pickerResult', { entryId: string; fieldId: string } | null>(res, 'pickerResult') ?? null
+  )
+}
+
 // Export
 export async function exportBitwardenJson(): Promise<string> {
   const res = await sendMessage({ type: 'EXPORT_BITWARDEN_JSON' })

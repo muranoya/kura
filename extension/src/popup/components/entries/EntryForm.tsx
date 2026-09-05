@@ -1,9 +1,11 @@
 import {
   ChevronDown,
   ChevronUp,
+  Crosshair,
   Link,
   Lock,
   Mail,
+  MousePointerClick,
   Phone,
   Plus,
   ScanQrCode,
@@ -16,7 +18,12 @@ import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { CustomField, CustomFieldType, Label } from '../../../shared/types'
+import type {
+  CustomField,
+  CustomFieldSelector,
+  CustomFieldType,
+  Label,
+} from '../../../shared/types'
 import { cn } from '../../lib/utils'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
@@ -44,6 +51,12 @@ export interface EntryFormProps {
   /** When set with onScanTotpQr, page TOTP QR scan is available. */
   entryId?: string
   onScanTotpQr?: (fieldId: string) => Promise<void>
+  /**
+   * When set with entryId, the "select element on page" picker is available.
+   * V1では既存エントリの編集画面からのみ起動可能（新規作成中は非対応）。
+   * 詳細: docs/extension-custom-field-autofill.md 4-3節ケースB
+   */
+  onStartPicker?: (fieldId: string) => Promise<void>
 }
 
 // 'passkey' はここに含めない: パスキーは通常のカスタムフィールド追加UIからは
@@ -73,6 +86,23 @@ function passkeySummary(
   return t('entries.customFieldTypes.passkey')
 }
 
+/**
+ * 設定済みのオートフィルセレクタを `input[name="account_id"]` 相当のテキストへ
+ * 要約する。値そのものではなく識別情報のみの表示であるため機密性の問題はない。
+ * 詳細: docs/extension-custom-field-autofill.md 4-1節
+ *
+ * 編集フォームだけでなく、読み取り専用のアイテム詳細画面（`EntryList.tsx`の
+ * `EntryDetailPane`）からも同じ要約表示を使うため named export にしている。
+ */
+export function formatSelectorSummary(selector: CustomFieldSelector): string {
+  const tag = selector.tag || 'input'
+  const attrs: string[] = []
+  if (selector.name) attrs.push(`name="${selector.name}"`)
+  if (selector.id) attrs.push(`id="${selector.id}"`)
+  if (selector.type) attrs.push(`type="${selector.type}"`)
+  return attrs.length > 0 ? `${tag}[${attrs.join('][')}]` : tag
+}
+
 export default function EntryForm({
   entryType,
   name,
@@ -90,6 +120,7 @@ export default function EntryForm({
   error,
   entryId,
   onScanTotpQr,
+  onStartPicker,
 }: EntryFormProps) {
   const { t } = useTranslation()
   const [secureNotePreviewMode, setSecureNotePreviewMode] = useState(false)
@@ -101,6 +132,9 @@ export default function EntryForm({
   const [pendingFieldType, setPendingFieldType] = useState(false)
   const [scanningTotpQr, setScanningTotpQr] = useState(false)
   const [totpQrError, setTotpQrError] = useState<string | null>(null)
+  const [startingPickerFieldId, setStartingPickerFieldId] = useState<string | null>(null)
+  const [pickerError, setPickerError] = useState<string | null>(null)
+  const [expandedSelectorFieldId, setExpandedSelectorFieldId] = useState<string | null>(null)
 
   const updateTypedValue = useCallback(
     (key: string, value: string) => {
@@ -143,6 +177,37 @@ export default function EntryForm({
       }
     },
     [entryId, onScanTotpQr],
+  )
+
+  const startPicker = useCallback(
+    async (fieldId: string) => {
+      if (!entryId || !onStartPicker) return
+      setPickerError(null)
+      setStartingPickerFieldId(fieldId)
+      try {
+        await onStartPicker(fieldId)
+      } catch (err) {
+        setPickerError(String(err))
+        setStartingPickerFieldId(null)
+      }
+    },
+    [entryId, onStartPicker],
+  )
+
+  /**
+   * オートフィルセレクタの1属性を更新する。全属性が空文字になったら
+   * autofillSelector自体をundefinedへ正規化する（「常にマッチしない」無効な
+   * 状態を保持しない）。Desktop版（EntryForm.tsx）と同じロジック。
+   */
+  const updateSelectorAttr = useCallback(
+    (fieldId: string, attr: keyof CustomFieldSelector, value: string) => {
+      const field = customFields.find((f) => f.id === fieldId)
+      if (!field) return
+      const next: CustomFieldSelector = { ...field.autofillSelector, [attr]: value || undefined }
+      const isEmpty = !next.tag && !next.name && !next.id && !next.type
+      updateCustomField(fieldId, { autofillSelector: isEmpty ? undefined : next })
+    },
+    [customFields, updateCustomField],
   )
 
   const deleteCustomField = useCallback(
@@ -689,6 +754,36 @@ export default function EntryForm({
                   <ScanQrCode size={14} />
                 </button>
               )}
+              {entryId && onStartPicker && (
+                <button
+                  type="button"
+                  onClick={() => void startPicker(field.id)}
+                  disabled={startingPickerFieldId !== null}
+                  className="p-1 shrink-0 mt-1 text-text-muted hover:text-accent disabled:opacity-50 transition-colors"
+                  title={
+                    startingPickerFieldId === field.id
+                      ? t('entries.fields.pickerStarting')
+                      : t('entries.fields.selectPageElement')
+                  }
+                  aria-label={t('entries.fields.selectPageElement')}
+                >
+                  <MousePointerClick size={14} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() =>
+                  setExpandedSelectorFieldId(expandedSelectorFieldId === field.id ? null : field.id)
+                }
+                className={cn(
+                  'p-1 shrink-0 mt-1 transition-colors',
+                  field.autofillSelector ? 'text-accent' : 'text-text-muted hover:text-accent',
+                )}
+                title={t('entries.fields.autofillTarget')}
+                aria-label={t('entries.fields.autofillTarget')}
+              >
+                <Crosshair size={14} />
+              </button>
               {customFields.length > 1 && (
                 <div className="flex flex-col shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
@@ -726,6 +821,83 @@ export default function EntryForm({
                   }}
                 />
               </div>
+            )}
+            {field.autofillSelector && expandedSelectorFieldId !== field.id && (
+              <div className="flex items-center gap-2 pl-[3.75rem] text-[11px] text-text-muted">
+                <span className="truncate font-mono">
+                  {formatSelectorSummary(field.autofillSelector)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => updateCustomField(field.id, { autofillSelector: undefined })}
+                  className="shrink-0 hover:text-danger transition-colors"
+                >
+                  {t('entries.fields.clearSelector')}
+                </button>
+              </div>
+            )}
+            {expandedSelectorFieldId === field.id && (
+              <div className="pl-[3.75rem] pr-2 space-y-2 rounded-md bg-bg-elevated border border-border p-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <UILabel htmlFor={`selector-tag-${field.id}`} className="text-[10px]">
+                      {t('entries.fields.autofillTargetTag')}
+                    </UILabel>
+                    <Input
+                      id={`selector-tag-${field.id}`}
+                      value={field.autofillSelector?.tag ?? ''}
+                      onChange={(e) => updateSelectorAttr(field.id, 'tag', e.target.value)}
+                      placeholder={t('entries.fields.autofillTargetTagPlaceholder')}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <UILabel htmlFor={`selector-type-${field.id}`} className="text-[10px]">
+                      {t('entries.fields.autofillTargetType')}
+                    </UILabel>
+                    <Input
+                      id={`selector-type-${field.id}`}
+                      value={field.autofillSelector?.type ?? ''}
+                      onChange={(e) => updateSelectorAttr(field.id, 'type', e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <UILabel htmlFor={`selector-name-${field.id}`} className="text-[10px]">
+                      {t('entries.fields.autofillTargetName')}
+                    </UILabel>
+                    <Input
+                      id={`selector-name-${field.id}`}
+                      value={field.autofillSelector?.name ?? ''}
+                      onChange={(e) => updateSelectorAttr(field.id, 'name', e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <UILabel htmlFor={`selector-id-${field.id}`} className="text-[10px]">
+                      {t('entries.fields.autofillTargetId')}
+                    </UILabel>
+                    <Input
+                      id={`selector-id-${field.id}`}
+                      value={field.autofillSelector?.id ?? ''}
+                      onChange={(e) => updateSelectorAttr(field.id, 'id', e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                </div>
+                {field.autofillSelector && (
+                  <button
+                    type="button"
+                    onClick={() => updateCustomField(field.id, { autofillSelector: undefined })}
+                    className="text-[11px] text-text-muted hover:text-danger transition-colors"
+                  >
+                    {t('entries.fields.clearSelector')}
+                  </button>
+                )}
+              </div>
+            )}
+            {startingPickerFieldId === field.id && pickerError && (
+              <div className="pl-[3.75rem] text-[11px] text-danger">{pickerError}</div>
             )}
           </div>
         ))}
@@ -780,6 +952,12 @@ export default function EntryForm({
     scanningTotpQr,
     entryId,
     onScanTotpQr,
+    onStartPicker,
+    startPicker,
+    startingPickerFieldId,
+    pickerError,
+    expandedSelectorFieldId,
+    updateSelectorAttr,
   ])
 
   return (

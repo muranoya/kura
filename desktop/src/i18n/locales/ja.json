@@ -305,7 +305,14 @@
         "no_qr": "画像からQRコードを検出できませんでした",
         "empty": "QRコードが空でした",
         "invalid_totp": "TOTPシークレットまたは otpauth URI ではありません"
-      }
+      },
+      "autofillTarget": "オートフィル対象を指定",
+      "autofillTargetTag": "タグ名",
+      "autofillTargetTagPlaceholder": "input",
+      "autofillTargetName": "name属性",
+      "autofillTargetId": "id属性",
+      "autofillTargetType": "type属性",
+      "clearSelector": "クリア"
     },
     "typeSelectDialog": {
       "title": "アイテム種別を選択",

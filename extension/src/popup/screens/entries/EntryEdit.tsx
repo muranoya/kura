@@ -7,6 +7,19 @@ import EntryForm from '../../components/entries/EntryForm'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 
+/** camelCase(CustomField[]) → vault-core永続化用のsnake_case JSON文字列 */
+function toCustomFieldsJson(customFields: CustomField[]): string {
+  return JSON.stringify(
+    customFields.map((f) => ({
+      id: f.id,
+      name: f.name,
+      field_type: f.fieldType,
+      value: f.value,
+      autofill_selector: f.autofillSelector,
+    })),
+  )
+}
+
 export default function EntryEdit() {
   const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
@@ -55,14 +68,7 @@ export default function EntryEdit() {
     setError('')
     try {
       const typedValueJson = JSON.stringify(typedValue)
-      const customFieldsJson = JSON.stringify(
-        customFields.map((f) => ({
-          id: f.id,
-          name: f.name,
-          field_type: f.fieldType,
-          value: f.value,
-        })),
-      )
+      const customFieldsJson = toCustomFieldsJson(customFields)
       if (!id) return
       await commands.updateEntry(
         id,
@@ -88,14 +94,7 @@ export default function EntryEdit() {
     }
     setError('')
     const typedValueJson = JSON.stringify(typedValue)
-    const customFieldsJson = JSON.stringify(
-      customFields.map((f) => ({
-        id: f.id,
-        name: f.name,
-        field_type: f.fieldType,
-        value: f.value,
-      })),
-    )
+    const customFieldsJson = toCustomFieldsJson(customFields)
     await commands.updateEntry(
       id,
       name,
@@ -105,6 +104,32 @@ export default function EntryEdit() {
       customFieldsJson,
     )
     await commands.startTotpQrScan(id, fieldId)
+    window.close()
+  }
+
+  const handleStartPicker = async (fieldId: string) => {
+    if (!id) return
+    if (!name.trim()) {
+      setError(t('entries.edit.nameRequired'))
+      throw new Error(t('entries.edit.nameRequired'))
+    }
+    setError('')
+    // ピッカー起動前に編集中の内容を保存しておく（TOTP QRスキャンと同じ理由:
+    // ピッカーはpopupを閉じて対象ページをクリックする操作のため、popupの
+    // フォーム状態は失われる）。ピッカーの選択結果自体はService Worker側で
+    // 直接 api_update_entry により永続化される（popup状態を経由しない）。
+    // 詳細: docs/extension-custom-field-autofill.md 4-3節
+    const typedValueJson = JSON.stringify(typedValue)
+    const customFieldsJson = toCustomFieldsJson(customFields)
+    await commands.updateEntry(
+      id,
+      name,
+      typedValueJson,
+      notes ?? undefined,
+      selectedLabelIds,
+      customFieldsJson,
+    )
+    await commands.startPicker(id, fieldId)
     window.close()
   }
 
@@ -147,6 +172,7 @@ export default function EntryEdit() {
           onSelectedLabelIdsChange={setSelectedLabelIds}
           entryId={id}
           onScanTotpQr={handleScanTotpQr}
+          onStartPicker={handleStartPicker}
           onCreateLabel={async (name) => {
             const labelId = await commands.createLabel(name)
             const newLabel: Label = { id: labelId, name }
