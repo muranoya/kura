@@ -148,8 +148,12 @@ attestationObject（`{fmt: "none", attStmt: {}, authData: <bytes>}`）とauthent
 
 **検証の多段防御:**
 
-1. ISOLATED world content script（`webauthn-bridge.ts`）が、自身の（ページに汚染されていない）`window.location`から独立してorigin/hostnameを読み取る。MAIN world側から転送された値は信用の起点にしない。
-2. Service Workerが、ISOLATED由来のoriginと、ページが要求した`rp.id`を突き合わせ、`etld.ts`のsuffix判定ロジックで検証してから初めてvault-core問い合わせ・UI表示に進む。不一致は即座にreject。
+1. Service Workerは、ブラウザが付与する`sender.url`（送信元フレームのURL）からorigin/hostnameを確定させる。content scriptやMAIN world側から転送された値は信用の起点にしない（ISOLATED world content script `webauthn-bridge.ts`も自身の`window.location`から読み取った値を送るが、Service Workerは上書きする）。
+2. 標準のWebAuthnが課す制約をkuraが判定できない要求は、kuraで処理せず`passthrough`してブラウザに委ねる。
+   - 非セキュアコンテキスト（`https:`以外。`http://localhost`/`127.0.0.1`は除く）: WebAuthnはセキュアコンテキスト必須
+   - クロスオリジンiframe（`sender.frameId !== 0`かつタブのトップレベルとoriginが異なる）: 標準では親ページのpermissions policy（`publickey-credentials-get`/`-create`）による許可が必要
+3. Service Workerが、確定したoriginと、ページが要求した`rp.id`を突き合わせ、`etld.ts`のsuffix判定ロジックで検証してから初めてvault-core問い合わせ・UI表示に進む。不一致は即座にreject。
+4. 儀式ウィンドウからの応答（`WEBAUTHN_RITUAL_*`）は拡張機能自身のページからのみ受け付ける（content scriptからは送れない）。
 
 ## 3-6. メッセージフロー
 

@@ -536,18 +536,60 @@ function handleRitualDecision(
 
 // ========== Entry point (delegated from background/index.ts) ==========
 
+/**
+ * ページからのcreate()/get()要求に、ブラウザが付与した送信元情報で origin/hostname を
+ * 確定させる。kuraで処理すべきでない要求（ブラウザ標準のWebAuthnが拒否または
+ * 権限ポリシーで判断するもの）はnullを返し、passthroughさせる。
+ *
+ * - 非セキュアコンテキスト（http等）: WebAuthnはHTTPS必須
+ * - クロスオリジンiframe: 標準では親ページの permissions policy
+ *   （publickey-credentials-get/create）の許可が必要。kuraはそれを判定できないため
+ *   ブラウザに委ねる
+ */
+function resolveTrustedRequest(
+  req: WebauthnSwRequest,
+  sender: chrome.runtime.MessageSender,
+): WebauthnSwRequest | null {
+  if (!sender.tab || !sender.url) return null
+  let frameUrl: URL
+  try {
+    frameUrl = new URL(sender.url)
+  } catch {
+    return null
+  }
+  const isLocalhost = frameUrl.hostname === 'localhost' || frameUrl.hostname === '127.0.0.1'
+  if (frameUrl.protocol !== 'https:' && !(frameUrl.protocol === 'http:' && isLocalhost)) {
+    return null
+  }
+  if (sender.frameId !== 0) {
+    try {
+      if (!sender.tab.url || new URL(sender.tab.url).origin !== frameUrl.origin) return null
+    } catch {
+      return null
+    }
+  }
+  return { ...req, origin: frameUrl.origin, hostname: frameUrl.hostname }
+}
+
 export async function handleWebauthnMessage(
   // biome-ignore lint/suspicious/noExplicitAny: message shape varies by type
   message: Record<string, any>,
-  _sender: chrome.runtime.MessageSender,
+  sender: chrome.runtime.MessageSender,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies by handler
   sendResponse: (response?: any) => void,
 ) {
   switch (message.type) {
     case 'WEBAUTHN_CREATE_REQUEST':
-      return handleCreateRequest(message as WebauthnSwRequest, sendResponse)
-    case 'WEBAUTHN_GET_REQUEST':
-      return handleGetRequest(message as WebauthnSwRequest, sendResponse)
+    case 'WEBAUTHN_GET_REQUEST': {
+      const req = resolveTrustedRequest(message as WebauthnSwRequest, sender)
+      if (!req) {
+        sendResponse({ success: true, status: 'passthrough' })
+        return
+      }
+      return message.type === 'WEBAUTHN_CREATE_REQUEST'
+        ? handleCreateRequest(req, sendResponse)
+        : handleGetRequest(req, sendResponse)
+    }
     case 'WEBAUTHN_RITUAL_GET_CONTEXT':
       return handleRitualGetContext(message as { requestId: string }, sendResponse)
     case 'WEBAUTHN_RITUAL_DECISION':
