@@ -18,6 +18,40 @@ let lockedMode = false
 let onUnlockCallback: (() => void) | null = null
 let currentPageProtocol: string | null = null
 let lastAnchorRect: { top: number; left: number } | null = null
+
+// ========== Clickjacking / synthetic event guards ==========
+
+/**
+ * ドロップダウンがページ側のCSSで透明化・隠蔽されていないかを確認する。
+ * shadow host はページDOM内にあるため、closed shadow root でも祖先要素の
+ * opacity / filter / visibility や、host 自体の style 書き換えは防げない。
+ * 見えていないUIへのクリック・Enterで認証情報が充填されるのを防ぐ。
+ */
+function isDropdownObscured(target: Element, point?: { x: number; y: number }): boolean {
+  if (!shadowHost?.isConnected) return true
+  let opacity = 1
+  for (let el: Element | null = shadowHost; el; el = el.parentElement) {
+    const style = getComputedStyle(el)
+    if (style.display === 'none' || style.visibility !== 'visible') return true
+    if (style.filter !== 'none' && style.filter.includes('opacity')) return true
+    opacity *= Number.parseFloat(style.opacity)
+  }
+  if (opacity < 0.9) return true
+
+  // 操作点（キー操作時は項目の中心）で最前面にあるのが自分の shadow host か
+  // （closed shadow 内の要素は host に retarget される）
+  const rect = target.getBoundingClientRect()
+  const x = point?.x ?? rect.left + rect.width / 2
+  const y = point?.y ?? rect.top + rect.height / 2
+  return document.elementFromPoint(x, y) !== shadowHost
+}
+
+function selectCandidate(index: number, point?: { x: number; y: number }) {
+  const candidate = currentCandidates[index]
+  const item = dropdownEl?.querySelector(`[data-index="${index}"]`)
+  if (!candidate || !item || isDropdownObscured(item, point)) return
+  onSelectCallback?.(candidate)
+}
 const SCROLL_HIDE_THRESHOLD = 100
 let totpTimerInterval: ReturnType<typeof setInterval> | null = null
 
@@ -188,7 +222,8 @@ function renderItems() {
     item.addEventListener('mousedown', (e) => {
       e.preventDefault() // Prevent blur on the input
       e.stopPropagation()
-      onSelectCallback?.(candidate)
+      if (!e.isTrusted) return
+      selectCandidate(i, { x: e.clientX, y: e.clientY })
     })
 
     item.addEventListener('mouseenter', () => {
@@ -228,6 +263,8 @@ function updateSelection() {
 
 function handleKeydown(e: KeyboardEvent) {
   if (!dropdownEl) return
+  // ページのスクリプトが dispatchEvent した合成キーイベントでは操作させない
+  if (!e.isTrusted) return
 
   if (lockedMode) {
     switch (e.key) {
@@ -262,7 +299,7 @@ function handleKeydown(e: KeyboardEvent) {
     case 'Enter':
       if (selectedIndex >= 0 && selectedIndex < currentCandidates.length) {
         e.preventDefault()
-        onSelectCallback?.(currentCandidates[selectedIndex])
+        selectCandidate(selectedIndex)
       }
       break
     case 'Escape':
@@ -473,6 +510,7 @@ export function showInlineIcon(anchor: HTMLInputElement, onClick: () => void) {
   iconEl.addEventListener('mousedown', (e) => {
     e.preventDefault()
     e.stopPropagation()
+    if (!e.isTrusted) return
     if (blurTimeout) {
       clearTimeout(blurTimeout)
       blurTimeout = null
@@ -545,6 +583,7 @@ export function showLockedDropdown(anchor: HTMLInputElement, onUnlockClick: () =
   item.addEventListener('mousedown', (e) => {
     e.preventDefault()
     e.stopPropagation()
+    if (!e.isTrusted) return
     onUnlockClick()
   })
 

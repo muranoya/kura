@@ -188,7 +188,15 @@ Content ScriptはISOLATED world（ページスクリプトとは分離された�
 
 ### 2-3.3 不可視フォームへの入力防止
 
-フィールドへの入力前に対象要素の視認性をチェックし、不可視のフォーム（invisible form攻撃）へのクレデンシャル書き込みを防ぐ。正規サイトのページ内に広告等でinvisible formが埋め込まれている場合の攻撃を無効化する。
+フィールドへの入力前に対象要素の視認性をチェックし、不可視のフォーム（invisible form攻撃）へのクレデンシャル書き込みを防ぐ。正規サイトのページ内に広告等でinvisible formが埋め込まれている場合の攻撃を無効化する。祖先要素の`opacity:0`/`visibility:hidden`で隠したフォームも対象とするため、`Element.checkVisibility({ opacityProperty, visibilityProperty })`を使う（未対応環境では要素自身のスタイルのみ確認）。
+
+### 2-3.5 ページスクリプトによる操作の防止
+
+ドロップダウンはclosed Shadow DOM内にあるが、shadow hostと入力欄はページDOM内にある。
+
+- **合成イベントの無視**: ページが`dispatchEvent`で送るキーイベント・マウスイベント（`isTrusted === false`）では候補を選択しない。これがないと、ページが`input.focus()`と合成`ArrowDown`/`Enter`でユーザー操作なしに充填させられる（ドメインを問わないクレジットカードは任意のサイトから盗まれうる）
+- **クリックジャッキング対策**: 候補の選択時に、shadow hostと祖先要素の実効opacity・`visibility`・`filter: opacity()`を確認し、操作点で最前面の要素が自分のshadow hostであることを`document.elementFromPoint`で確認する。透明化・覆い隠しを検出した場合は充填しない
+- **既知の限界**: `pointer-events: none`の要素を上に重ねる偽装は`elementFromPoint`では検出できない
 
 # Part 3: 個別設計
 
