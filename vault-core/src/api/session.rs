@@ -28,9 +28,12 @@ impl VaultManager {
         Ok(())
     }
 
-    /// マスターパスワードでアンロック
-    pub fn api_unlock(&self, master_password: String) -> Result<(), String> {
-        let master_password = MasterPassword::from_string(master_password);
+    /// ロック中のvaultを`unlock`でアンロックし、失敗時はロック状態に戻す
+    fn unlock_session(
+        &self,
+        unlock: impl FnOnce(LockedVault) -> crate::error::Result<crate::vault::UnlockedVault>,
+        error_context: &str,
+    ) -> Result<(), String> {
         let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
 
         let locked = match session.take() {
@@ -42,42 +45,49 @@ impl VaultManager {
         // Clone as backup for rollback on unlock failure.
         // This copies only ciphertext (encrypted DEK), not plaintext key material.
         let backup = locked.clone();
-        match locked.unlock(&master_password) {
+        match unlock(locked) {
             Ok(unlocked) => {
                 *session = Some(SessionState::Unlocked(unlocked));
                 Ok(())
             }
             Err(e) => {
                 *session = Some(SessionState::Locked(backup));
-                Err(format!("Failed to unlock: {}", e))
+                Err(format!("{}: {}", error_context, e))
             }
         }
+    }
+
+    /// マスターパスワードでアンロック
+    pub fn api_unlock(&self, master_password: String) -> Result<(), String> {
+        let master_password = MasterPassword::from_string(master_password);
+        self.unlock_session(|locked| locked.unlock(&master_password), "Failed to unlock")
     }
 
     /// リカバリーキーでアンロック（新しいマスターパスワード設定フロー）
     pub fn api_unlock_with_recovery_key(&self, recovery_key: String) -> Result<(), String> {
         let recovery_key = RecoveryKeyInput::from_string(recovery_key);
-        let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
+        self.unlock_session(
+            |locked| locked.unlock_with_recovery_key(&recovery_key),
+            "Failed to unlock with recovery key",
+        )
+    }
 
-        let locked = match session.take() {
-            Some(SessionState::Locked(v)) => v,
-            Some(SessionState::Unlocked(_)) => return Err("Already unlocked".to_string()),
-            None => return Err("No vault loaded".to_string()),
-        };
+    /// マスターパスワードからセッション鍵（KEK, base64）を導出する。
+    ///
+    /// プロセス再起動をまたいでアンロック状態を復元するプラットフォーム（ブラウザ拡張の
+    /// Service Worker）が、マスターパスワードそのものを保持せずに済むようにするためのもの。
+    /// 鍵はこのvaultのアンロックとS3設定の復号に使えるため、マスターパスワード同等の
+    /// 秘匿値として扱うこと。パスワードの正否は検証しない（アンロック時に判明する）。
+    pub fn api_derive_session_key(&self, master_password: String) -> Result<String, String> {
+        let master_password = MasterPassword::from_string(master_password);
+        let kek = self.derive_kek(&master_password)?;
+        Ok(super::encode_session_key(&kek))
+    }
 
-        // Clone as backup for rollback on unlock failure.
-        // This copies only ciphertext (encrypted DEK), not plaintext key material.
-        let backup = locked.clone();
-        match locked.unlock_with_recovery_key(&recovery_key) {
-            Ok(unlocked) => {
-                *session = Some(SessionState::Unlocked(unlocked));
-                Ok(())
-            }
-            Err(e) => {
-                *session = Some(SessionState::Locked(backup));
-                Err(format!("Failed to unlock with recovery key: {}", e))
-            }
-        }
+    /// `api_derive_session_key`で得たセッション鍵でアンロック
+    pub fn api_unlock_with_session_key(&self, session_key: String) -> Result<(), String> {
+        let kek = super::decode_session_key(session_key)?;
+        self.unlock_session(|locked| locked.unlock_with_kek(&kek), "Failed to unlock")
     }
 
     /// ロック（vault_bytesを返す）

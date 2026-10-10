@@ -31,6 +31,8 @@ interface WasmApi {
   api_load_vault(vaultId: string, vaultBytes: Uint8Array, etag: string): void
   api_unlock(vaultId: string, masterPassword: string): boolean
   api_unlock_with_recovery_key(vaultId: string, recoveryKey: string): void
+  api_derive_session_key(vaultId: string, masterPassword: string): string
+  api_unlock_with_session_key(vaultId: string, sessionKey: string): void
   api_lock(vaultId: string): Uint8Array
   api_get_vault_bytes(vaultId: string): Uint8Array
   api_get_vault_etag(vaultId: string): string | null
@@ -96,6 +98,11 @@ interface WasmApi {
   api_regenerate_recovery_key(vaultId: string, password: string): string
   api_encrypt_config(vaultId: string, password: string, plaintext: string): string
   api_decrypt_config(vaultId: string, password: string, encryptedB64: string): string
+  api_decrypt_config_with_session_key(
+    vaultId: string,
+    sessionKey: string,
+    encryptedB64: string,
+  ): string
   api_encrypt_transfer_config(password: string, configJson: string): string
   api_decrypt_transfer_config(password: string, transferString: string): string
   api_export_bitwarden_json(vaultId: string): string
@@ -480,9 +487,23 @@ async function loadSettings(): Promise<AppSettings> {
 
 // ========== セッション復元 ==========
 
+/**
+ * SW再起動時のアンロック状態復元用に、マスターパスワードから導出したセッション鍵を
+ * chrome.storage.session に保持する。マスターパスワード自体は保持しない。
+ */
+async function saveSessionKey(sessionKey: string) {
+  await saveToSessionStorage(STORAGE_KEYS.SESSION_KEY, sessionKey)
+}
+
+async function saveSessionKeyFromPassword(password: string) {
+  await saveSessionKey(vault.api_derive_session_key(DEFAULT_VAULT_ID, password))
+}
+
 async function tryRestoreSession(): Promise<boolean> {
-  const password = await getFromSessionStorage<string>(STORAGE_KEYS.SESSION_PASSWORD)
-  if (!password) return false
+  // 旧バージョンが平文で保持していたマスターパスワードを消去する
+  await removeFromSessionStorage(STORAGE_KEYS.LEGACY_SESSION_PASSWORD)
+  const sessionKey = await getFromSessionStorage<string>(STORAGE_KEYS.SESSION_KEY)
+  if (!sessionKey) return false
 
   try {
     await initWasm()
@@ -491,13 +512,17 @@ async function tryRestoreSession(): Promise<boolean> {
     if (!vaultBytes) return false
 
     vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
-    vault.api_unlock(DEFAULT_VAULT_ID, password)
+    vault.api_unlock_with_session_key(DEFAULT_VAULT_ID, sessionKey)
 
     // S3設定の復号
     const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
     if (encryptedConfig) {
       try {
-        const configJson = vault.api_decrypt_config(DEFAULT_VAULT_ID, password, encryptedConfig)
+        const configJson = vault.api_decrypt_config_with_session_key(
+          DEFAULT_VAULT_ID,
+          sessionKey,
+          encryptedConfig,
+        )
         decryptedS3Config = JSON.parse(configJson)
       } catch (e) {
         console.error('[SW] Failed to decrypt S3 config during session restore:', e)
@@ -509,7 +534,7 @@ async function tryRestoreSession(): Promise<boolean> {
     return true
   } catch (e) {
     console.error('[SW] Session restore failed:', e)
-    await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
+    await removeFromSessionStorage(STORAGE_KEYS.SESSION_KEY)
     return false
   }
 }
@@ -586,16 +611,17 @@ async function handleMessage(
             sendResponse({ success: false, error: 'Vault not found' })
             break
           }
-          // vault をロードしてアンロック
+          // vault をロードしてアンロック（KEK導出は1回だけ行い、S3設定の復号にも使う）
           vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
-          vault.api_unlock(DEFAULT_VAULT_ID, message.password)
+          const sessionKey = vault.api_derive_session_key(DEFAULT_VAULT_ID, message.password)
+          vault.api_unlock_with_session_key(DEFAULT_VAULT_ID, sessionKey)
           // 暗号化されたS3設定を復号してメモリに保持
           const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
           if (encryptedConfig) {
             try {
-              const configJson = vault.api_decrypt_config(
+              const configJson = vault.api_decrypt_config_with_session_key(
                 DEFAULT_VAULT_ID,
-                message.password,
+                sessionKey,
                 encryptedConfig,
               )
               decryptedS3Config = JSON.parse(configJson)
@@ -605,7 +631,7 @@ async function handleMessage(
           }
           unlocked = true
           updateExtensionIcon(true)
-          await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.password)
+          await saveSessionKey(sessionKey)
           // ポップアップが閉じている場合のみオートロック alarm を設定
           if (!popupConnected) {
             const settings = await loadSettings()
@@ -671,7 +697,7 @@ async function handleMessage(
           }
           unlocked = true
           updateExtensionIcon(true)
-          await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.password)
+          await saveSessionKeyFromPassword(message.password)
           // ポップアップが閉じている場合のみオートロック alarm を設定
           if (!popupConnected) {
             const settings = await loadSettings()
@@ -700,7 +726,7 @@ async function handleMessage(
           unlocked = false
           updateExtensionIcon(false)
           decryptedS3Config = null
-          await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
+          await removeFromSessionStorage(STORAGE_KEYS.SESSION_KEY)
           chrome.alarms.clear('autolock')
           chrome.alarms.clear('autosync')
           // オートフィル: 全タブに通知してContent Scriptを無効化
@@ -737,7 +763,7 @@ async function handleMessage(
             decryptedS3Config = message.s3Config
           }
           unlocked = true
-          await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.masterPassword)
+          await saveSessionKeyFromPassword(message.masterPassword)
           if (!popupConnected) {
             const settings = await loadSettings()
             if (settings.autolockMinutes > 0) {
@@ -770,7 +796,7 @@ async function handleMessage(
           await autoSync()
           unlocked = true
           updateExtensionIcon(true)
-          await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.newPassword)
+          await saveSessionKeyFromPassword(message.newPassword)
           if (!popupConnected) {
             const settings = await loadSettings()
             if (settings.autolockMinutes > 0) {
@@ -1132,7 +1158,7 @@ async function handleMessage(
             )
             await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
           }
-          await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.newPassword)
+          await saveSessionKeyFromPassword(message.newPassword)
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -1404,7 +1430,7 @@ async function handleAutolockAlarm() {
     unlocked = false
     updateExtensionIcon(false)
     decryptedS3Config = null
-    await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
+    await removeFromSessionStorage(STORAGE_KEYS.SESSION_KEY)
     chrome.alarms.clear('autosync')
     onVaultLocked()
     clearTotpQrScanContext()

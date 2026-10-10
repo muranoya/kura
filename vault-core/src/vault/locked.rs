@@ -66,13 +66,17 @@ impl LockedVault {
 
     /// Unlock vault with master password
     pub fn unlock(self, master_password: &MasterPassword) -> Result<UnlockedVault> {
-        use base64::Engine;
-
         // Derive KEK from password
         let kek = crate::crypto::kdf::derive_kek_from_master_password(
             master_password,
             &self.vault_file.meta.argon2_params,
         )?;
+        self.unlock_with_kek(&kek)
+    }
+
+    /// Unlock vault with a KEK already derived from the master password
+    pub(crate) fn unlock_with_kek(self, kek: &crate::crypto::Kek) -> Result<UnlockedVault> {
+        use base64::Engine;
 
         // Decode and unwrap DEK
         let engine = base64::engine::general_purpose::STANDARD;
@@ -81,7 +85,7 @@ impl LockedVault {
             .map_err(|_| {
                 VaultError::DecryptionError("Invalid base64 in encrypted_dek_master".to_string())
             })?;
-        let dek = Dek::unwrap(&encrypted_dek_bytes, &kek)?;
+        let dek = Dek::unwrap(&encrypted_dek_bytes, kek)?;
 
         // Decrypt vault contents
         let contents =

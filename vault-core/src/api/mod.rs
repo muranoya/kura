@@ -117,6 +117,26 @@ fn unix_now() -> i64 {
     crate::get_timestamp()
 }
 
+fn encode_session_key(kek: &crate::crypto::Kek) -> String {
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD.encode(kek.as_bytes())
+}
+
+fn decode_session_key(session_key: String) -> Result<crate::crypto::Kek, String> {
+    use base64::Engine;
+    let session_key = zeroize::Zeroizing::new(session_key);
+    let bytes = zeroize::Zeroizing::new(
+        base64::engine::general_purpose::STANDARD
+            .decode(session_key.as_bytes())
+            .map_err(|_| "Invalid session key".to_string())?,
+    );
+    let bytes: [u8; 32] = bytes
+        .as_slice()
+        .try_into()
+        .map_err(|_| "Invalid session key".to_string())?;
+    Ok(crate::crypto::Kek::from_bytes(bytes))
+}
+
 impl VaultManager {
     /// Read-only access to the unlocked vault session.
     pub(crate) fn with_unlocked<F, T>(&self, f: F) -> Result<T, String>
@@ -128,6 +148,21 @@ impl VaultManager {
             Some(SessionState::Unlocked(v)) => f(v),
             _ => Err("Vault not unlocked".to_string()),
         }
+    }
+
+    /// 現在のvault（Locked/Unlocked問わず）のArgon2パラメータでKEKを導出する
+    pub(crate) fn derive_kek(
+        &self,
+        password: &crate::secret::MasterPassword,
+    ) -> Result<crate::crypto::Kek, String> {
+        let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
+        let argon2_params = match session.as_ref() {
+            Some(SessionState::Locked(locked)) => &locked.vault_file.meta.argon2_params,
+            Some(SessionState::Unlocked(unlocked)) => &unlocked.meta.argon2_params,
+            None => return Err("Vault not loaded".to_string()),
+        };
+        crate::crypto::kdf::derive_kek_from_master_password(password, argon2_params)
+            .map_err(|e| format!("Failed to derive KEK: {}", e))
     }
 
     /// Mutable access to the unlocked vault session.

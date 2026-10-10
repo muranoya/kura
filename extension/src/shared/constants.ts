@@ -35,5 +35,8 @@ export const STORAGE_KEYS = {
   LABEL_FILTER: 'entryLabelFilter',
   SELECTED_ENTRY_ID: 'entrySelectedId',
   FAVORITES_FILTER: 'entryFavoritesFilter',
-  SESSION_PASSWORD: 'sessionPassword',
+  // マスターパスワードから導出したKEK（SW再起動時のセッション復元用）
+  SESSION_KEY: 'sessionKey',
+  // 旧バージョンが平文マスターパスワードを保持していたキー（起動時に消去する）
+  LEGACY_SESSION_PASSWORD: 'sessionPassword',
 }

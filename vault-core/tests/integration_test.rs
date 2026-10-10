@@ -526,6 +526,37 @@ mod vault_manager_api {
         (m, recovery_key)
     }
 
+    #[test]
+    fn test_session_key_unlock_and_config_decrypt() {
+        let (m, _) = setup_unlocked_vault();
+        let encrypted = m
+            .api_encrypt_config(TEST_PASSWORD.to_string(), r#"{"bucket":"b"}"#.to_string())
+            .unwrap();
+        let session_key = m.api_derive_session_key(TEST_PASSWORD.to_string()).unwrap();
+        m.api_lock().unwrap();
+
+        m.api_unlock_with_session_key(session_key.clone()).unwrap();
+        assert!(m.api_is_unlocked());
+        assert_eq!(
+            m.api_decrypt_config_with_session_key(session_key, encrypted)
+                .unwrap(),
+            r#"{"bucket":"b"}"#
+        );
+    }
+
+    #[test]
+    fn test_session_key_from_wrong_password_fails_and_stays_locked() {
+        let (m, _) = setup_unlocked_vault();
+        m.api_lock().unwrap();
+        let wrong = m.api_derive_session_key("wrong".to_string()).unwrap();
+        assert!(m.api_unlock_with_session_key(wrong).is_err());
+        assert!(m
+            .api_unlock_with_session_key("not-base64!".to_string())
+            .is_err());
+        // ロック状態が保たれ、正しいパスワードでアンロックできる
+        m.api_unlock(TEST_PASSWORD.to_string()).unwrap();
+    }
+
     // A. Initial Setup
 
     #[test]
