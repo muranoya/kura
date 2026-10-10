@@ -73,7 +73,8 @@ S3上に単一ファイルとして保存。単一ファイルにすることで
     "memory": 67108864, /* >= 64 MiB (64 * 1024 * 1024) */
     "parallelism": 1
   },
-  "created_at": 1234567890
+  "created_at": 1234567890,
+  "keys_updated_at": 1234567890  /* optional: 鍵ラップの最終更新時刻（同期時に新しい方のmetaを採用する。docs/sync-algorithm.md） */
 }
 ```
 

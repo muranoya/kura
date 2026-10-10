@@ -1245,4 +1245,61 @@ mod sync_api {
         let vault_file = VaultFile::from_bytes(&raw_bytes).expect("Failed to parse VaultFile");
         assert!(vault_file.schema_version >= 1);
     }
+
+    fn remote_unlocks_with(storage: &MockStorage, password: &str) -> bool {
+        let (bytes, etag) = storage.data.lock().unwrap().clone().unwrap();
+        let m = VaultManager::new();
+        m.api_load_vault(bytes, etag).unwrap();
+        m.api_unlock(password.to_string()).is_ok()
+    }
+
+    /// 端末Bにロード済みの、端末Aと同じvaultを用意する
+    async fn setup_two_devices(storage: &MockStorage) -> (VaultManager, VaultManager) {
+        let (a, _) = setup_unlocked_vault();
+        a.api_sync(storage).await.unwrap();
+        let (bytes, etag) = storage.data.lock().unwrap().clone().unwrap();
+        let b = VaultManager::new();
+        b.api_load_vault(bytes, etag).unwrap();
+        b.api_unlock(TEST_PASSWORD.to_string()).unwrap();
+        (a, b)
+    }
+
+    #[tokio::test]
+    async fn test_password_change_not_reverted_by_stale_device() {
+        let storage = MockStorage::new();
+        let (a, b) = setup_two_devices(&storage).await;
+
+        a.api_change_master_password(TEST_PASSWORD.to_string(), "new-password".to_string())
+            .unwrap();
+        a.api_push(&storage).await.unwrap();
+
+        // 古いmetaのまま開いている端末Bが通常の編集→同期
+        b.api_create_entry(
+            "secure_note".to_string(),
+            "from B".to_string(),
+            None,
+            r#"{"content":"b"}"#.to_string(),
+            vec![],
+            None,
+        )
+        .unwrap();
+        b.api_sync(&storage).await.unwrap();
+
+        assert!(remote_unlocks_with(&storage, "new-password"));
+        assert!(!remote_unlocks_with(&storage, TEST_PASSWORD));
+    }
+
+    #[tokio::test]
+    async fn test_local_newer_meta_wins_over_stale_remote() {
+        let storage = MockStorage::new();
+        let (_a, b) = setup_two_devices(&storage).await;
+
+        // 端末Bでパスワード変更（push前）→ 通常の同期で反映される
+        b.api_change_master_password(TEST_PASSWORD.to_string(), "new-password".to_string())
+            .unwrap();
+        b.api_sync(&storage).await.unwrap();
+
+        assert!(remote_unlocks_with(&storage, "new-password"));
+        assert!(!remote_unlocks_with(&storage, TEST_PASSWORD));
+    }
 }
