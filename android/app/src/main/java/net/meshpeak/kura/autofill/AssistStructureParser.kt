@@ -32,7 +32,8 @@ private data class ClassifiedFields(
 
 /**
  * AssistStructureを再帰的に走査し、ログインフォームのusername/password/totpフィールドを検出する。
- * リクエスト元（ネイティブアプリ/ブラウザ）はいずれかのノードのgetWebDomain()の有無で判定する
+ * リクエスト元（ネイティブアプリ/ブラウザ）はいずれかのノードのgetWebDomain()の有無と、
+ * 要求元が署名検証済みのブラウザか（[TrustedBrowserVerifier]）で判定する
  * （docs/android-autofillservice.md 3-1-2）。祖先ノードではwebDomainが空/nullになるケースがある
  * （1-6-1(d)）ため、走査は打ち切らずに全ノードを収集してから判定する。判定結果に応じて
  * ネイティブ向け（[FieldClassifier], Section 3-1-1）とブラウザ向け（[BrowserFieldClassifier],
@@ -72,7 +73,12 @@ object AssistStructureParser {
             walk(structure.getWindowNodeAt(i).rootViewNode)
         }
 
-        val resolvedWebDomain = webDomain
+        val packageName = structure.activityComponent?.packageName
+        // webDomainは任意のアプリがViewStructure.setWebDomain()で設定できるため、
+        // 署名検証済みのブラウザ由来の場合のみ信用する。それ以外はネイティブアプリとして扱う。
+        val resolvedWebDomain = webDomain?.takeIf {
+            packageName != null && TrustedBrowserVerifier.isTrustedBrowser(context, packageName)
+        }
         val isBrowserRequest = resolvedWebDomain != null
         val classified = if (resolvedWebDomain != null) {
             classifyBrowserCandidates(context, resolvedWebDomain, candidates)
@@ -81,9 +87,9 @@ object AssistStructureParser {
         }
 
         val result = ParsedLoginForm(
-            packageName = structure.activityComponent?.packageName,
+            packageName = packageName,
             isBrowserRequest = isBrowserRequest,
-            webDomain = webDomain,
+            webDomain = resolvedWebDomain,
             usernameFieldId = classified.usernameFieldId,
             passwordFieldId = classified.passwordFieldId,
             totpFieldId = classified.totpFieldId
