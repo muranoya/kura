@@ -83,6 +83,7 @@ impl VaultManager {
         // セッション更新
         unlocked.contents.entries = merged_contents.entries;
         unlocked.contents.labels = merged_contents.labels;
+        unlocked.adopt_remote_meta_if_newer(&remote_vault_file.meta);
         unlocked.set_etag(remote_etag);
 
         Ok(())

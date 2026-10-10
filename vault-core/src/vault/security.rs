@@ -35,6 +35,7 @@ impl UnlockedVault {
         // Update vault_meta
         let engine = base64::engine::general_purpose::STANDARD;
         self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
+        self.meta.touch_keys();
 
         Ok(())
     }
@@ -71,6 +72,7 @@ impl UnlockedVault {
         self.dek = new_dek;
         self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
         self.meta.encrypted_dek_recovery = engine.encode(&encrypted_dek_recovery);
+        self.meta.touch_keys();
 
         Ok(new_recovery_key)
     }
@@ -108,6 +110,7 @@ impl UnlockedVault {
         self.meta.argon2_params = new_params;
         self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
         self.meta.encrypted_dek_recovery = engine.encode(&encrypted_dek_recovery);
+        self.meta.touch_keys();
 
         Ok(new_recovery_key)
     }
@@ -137,6 +140,7 @@ impl UnlockedVault {
 
         // Update vault_meta
         self.meta.encrypted_dek_recovery = engine.encode(&encrypted_dek_recovery);
+        self.meta.touch_keys();
 
         Ok(new_recovery_key)
     }

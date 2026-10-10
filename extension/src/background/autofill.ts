@@ -273,6 +273,32 @@ function getCreditCards(): AutofillCredentialCandidate[] {
   }
 }
 
+// ========== Sender validation ==========
+
+/**
+ * content script の送信元フレームURL。メッセージ本文の url は content script
+ * （＝侵害されうるレンダラー）が自由に詰められるため信用せず、ブラウザが付与する
+ * sender.url を使う。
+ */
+function senderPageUrl(sender: chrome.runtime.MessageSender): string | null {
+  return sender.tab && sender.url ? sender.url : null
+}
+
+function isSecurePageUrl(url: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(url)
+    return protocol === 'https:' || hostname === 'localhost' || hostname === '127.0.0.1'
+  } catch {
+    return false
+  }
+}
+
+/** 送信元ページに対して、そのエントリの秘匿値を渡してよいか */
+function isEntryAllowedForPage(entryId: string, pageUrl: string): boolean {
+  if (getCredentialsForUrl(pageUrl).some((c) => c.entryId === entryId)) return true
+  return isSecurePageUrl(pageUrl) && getCreditCards().some((c) => c.entryId === entryId)
+}
+
 // ========== Pending login flow (split login) ==========
 
 interface PendingLoginFlow {
@@ -346,23 +372,23 @@ export function onVaultLocked() {
 
 export async function handleAutofillMessage(
   message: Record<string, unknown>,
-  _sender: chrome.runtime.MessageSender,
+  sender: chrome.runtime.MessageSender,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies
   sendResponse: (response?: any) => void,
 ) {
+  const pageUrl = senderPageUrl(sender)
   switch (message.type) {
     case 'AUTOFILL_GET_CREDENTIALS': {
       if (!isUnlocked()) {
         sendResponse({ success: false, error: 'Vault not unlocked' })
         break
       }
-      const url = message.url as string
-      if (!url) {
+      if (!pageUrl) {
         sendResponse({ success: false, error: 'URL required' })
         break
       }
       const strictSubdomain = message.strictSubdomain as boolean | undefined
-      const credentials = getCredentialsForUrl(url, strictSubdomain)
+      const credentials = getCredentialsForUrl(pageUrl, strictSubdomain)
       sendResponse({ success: true, credentials })
       break
     }
@@ -375,6 +401,10 @@ export async function handleAutofillMessage(
       const entryId = message.entryId as string
       if (!entryId) {
         sendResponse({ success: false, error: 'Entry ID required' })
+        break
+      }
+      if (!pageUrl || !isEntryAllowedForPage(entryId, pageUrl)) {
+        sendResponse({ success: false, error: 'Entry not allowed for this page' })
         break
       }
       const fillData = getFillData(entryId)
@@ -392,6 +422,10 @@ export async function handleAutofillMessage(
         break
       }
       const totpEntryId = message.entryId as string
+      if (!pageUrl || !getCredentialsForUrl(pageUrl).some((c) => c.entryId === totpEntryId)) {
+        sendResponse({ success: false, error: 'Entry not allowed for this page' })
+        break
+      }
       const totpResult = getTotpForEntry(totpEntryId)
 
       if (totpResult) {
@@ -407,8 +441,7 @@ export async function handleAutofillMessage(
         sendResponse({ success: false, error: 'Vault not unlocked' })
         break
       }
-      const totpCandidateUrl = message.url as string
-      const totpCandidates = getTotpCandidatesForUrl(totpCandidateUrl)
+      const totpCandidates = pageUrl ? getTotpCandidatesForUrl(pageUrl) : []
       sendResponse({ success: true, totpCandidates })
       break
     }
@@ -418,18 +451,19 @@ export async function handleAutofillMessage(
         sendResponse({ success: false, error: 'Vault not unlocked' })
         break
       }
-      const creditCards = getCreditCards()
+      // 非HTTPSページにはカード情報を候補として出さない（ブラウザ標準のカード自動入力と同じ方針）
+      const creditCards = pageUrl && isSecurePageUrl(pageUrl) ? getCreditCards() : []
       sendResponse({ success: true, creditCards })
       break
     }
 
     case 'AUTOFILL_PENDING_FLOW_STORE': {
-      const storeTabId = _sender.tab?.id
+      const storeTabId = sender.tab?.id
       if (!storeTabId) {
         sendResponse({ success: false, error: 'No tab ID' })
         break
       }
-      const storeUrl = message.url as string
+      const storeUrl = pageUrl
       if (!storeUrl) {
         sendResponse({ success: false, error: 'URL required' })
         break
@@ -441,10 +475,15 @@ export async function handleAutofillMessage(
         sendResponse({ success: false, error: 'Invalid URL' })
         break
       }
+      const storeEntryId = message.entryId as string
+      if (!isEntryAllowedForPage(storeEntryId, storeUrl)) {
+        sendResponse({ success: false, error: 'Entry not allowed for this page' })
+        break
+      }
       storePendingLoginFlow(
         storeTabId,
         storeDomain,
-        message.entryId as string,
+        storeEntryId,
         (message.username as string) || '',
       )
       sendResponse({ success: true })
@@ -452,12 +491,12 @@ export async function handleAutofillMessage(
     }
 
     case 'AUTOFILL_PENDING_FLOW_QUERY': {
-      const queryTabId = _sender.tab?.id
+      const queryTabId = sender.tab?.id
       if (!queryTabId) {
         sendResponse({ success: false, error: 'No tab ID' })
         break
       }
-      const queryUrl = message.url as string
+      const queryUrl = pageUrl
       if (!queryUrl) {
         sendResponse({ success: false, error: 'URL required' })
         break
@@ -514,7 +553,7 @@ export async function handleAutofillMessage(
         break
       }
       const syncFn = autoSyncFn
-      const captureUrl = message.url as string
+      const captureUrl = pageUrl
       const captureName = (message.name as string | null) ?? null
       const captureUsername = (message.username as string | null) ?? null
       const capturePassword = message.password as string

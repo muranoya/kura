@@ -5,6 +5,15 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!-- オートフィル要求元ブラウザの署名検証（TrustedBrowserVerifier）のため、ブラウザを可視化する -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+
     <application
         android:name=".KuraApplication"
         android:allowBackup="false"

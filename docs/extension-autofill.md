@@ -116,14 +116,16 @@ Service Worker
 
 | タイプ | ペイロード | レスポンス | 説明 |
 |--------|----------|----------|------|
-| `AUTOFILL_GET_CREDENTIALS` | `{ url: string, strictSubdomain?: boolean }` | `{ credentials: AutofillCredentialCandidate[] }` | 指定URLに一致するクレデンシャル候補のリストを要求 |
-| `AUTOFILL_FILL_REQUEST` | `{ entryId: string }` | `{ fillData: AutofillFillData }` | 選択されたエントリの完全なクレデンシャルを要求 |
+| `AUTOFILL_GET_CREDENTIALS` | `{ url: string, strictSubdomain?: boolean }` | `{ credentials: AutofillCredentialCandidate[] }` | 送信元フレームのURLに一致するクレデンシャル候補のリストを要求 |
+| `AUTOFILL_FILL_REQUEST` | `{ entryId: string }` | `{ fillData: AutofillFillData }` | 選択されたエントリの完全なクレデンシャルを要求。送信元フレームのURLに一致するログイン、またはHTTPSページでのクレジットカードのみ応答する |
 | `AUTOFILL_GET_TOTP` | `{ url: string, entryId?: string }` | `{ totpCode: string \| null, totpEntryName: string }` | TOTP コードを要求。`entryId`指定時はそのエントリから取得、未指定時はURLマッチで検索 |
-| `AUTOFILL_GET_CREDIT_CARDS` | `{}` | `{ creditCards: AutofillCredentialCandidate[] }` | 全クレジットカードエントリのリストを要求 |
+| `AUTOFILL_GET_CREDIT_CARDS` | `{}` | `{ creditCards: AutofillCredentialCandidate[] }` | 全クレジットカードエントリのリストを要求（非HTTPSページでは空） |
 | `AUTOFILL_PENDING_FLOW_STORE` | `{ url: string, entryId: string, username: string }` | `{ success: boolean }` | 分割ログインフローの状態をService Workerに保存（Section 3-5参照） |
 | `AUTOFILL_PENDING_FLOW_QUERY` | `{ url: string }` | `{ pendingFlow: { entryId, username, password } \| null }` | 分割ログインフローの保存状態を問い合わせ。非破壊（TOTPステップでも再利用可能） |
 | `AUTOFILL_SAVE_CAPTURED` | `{ url: string, name: string \| null, username: string \| null, password: string }` | `{ success: boolean, entryId: string }` | 手動キャプチャしたクレデンシャルを新規エントリとしてvaultに保存（Section 1-6参照） |
 | `AUTOFILL_OPEN_POPUP` | `{}` | `{ success: boolean }` | ポップアップを開く（ロック状態のドロップダウンから使用） |
+
+ペイロードの`url`は互換性のために残っているが、Service Workerは使用しない。URLは常にブラウザが付与する`sender.url`（送信元フレームのURL）を使う（Section 2-3.4）。
 
 **Popup → Service Worker（`chrome.runtime.sendMessage`）：**
 
@@ -188,7 +190,23 @@ Content ScriptはISOLATED world（ページスクリプトとは分離された�
 
 ### 2-3.3 不可視フォームへの入力防止
 
-フィールドへの入力前に対象要素の視認性をチェックし、不可視のフォーム（invisible form攻撃）へのクレデンシャル書き込みを防ぐ。正規サイトのページ内に広告等でinvisible formが埋め込まれている場合の攻撃を無効化する。
+フィールドへの入力前に対象要素の視認性をチェックし、不可視のフォーム（invisible form攻撃）へのクレデンシャル書き込みを防ぐ。正規サイトのページ内に広告等でinvisible formが埋め込まれている場合の攻撃を無効化する。祖先要素の`opacity:0`/`visibility:hidden`で隠したフォームも対象とするため、`Element.checkVisibility({ opacityProperty, visibilityProperty })`を使う（未対応環境では要素自身のスタイルのみ確認）。
+
+### 2-3.4 Content Scriptを信用しない
+
+Content Scriptは全サイト・全フレームに注入され、ページと同じレンダラープロセスで動く。レンダラーが侵害された場合はContent Scriptの権限で任意のメッセージを送れるため、Service Workerは次のように扱う。
+
+- **送信元の制限**: Content Scriptから受け付けるのはオートフィル・TOTP QR・ピッカー・WebAuthn要求など必要最小限のメッセージのみ（`background/index.ts`の`CONTENT_SCRIPT_MESSAGE_TYPES`）。保管庫全体の読み出し（`LIST_ENTRIES`/`GET_ENTRY`/エクスポート）、S3設定の取得、設定変更などは、`sender.url`が拡張機能自身のページ（popup / WebAuthn儀式ウィンドウ / offscreen）の場合のみ受け付ける
+- **URLはsender.urlを使う**: メッセージ本文の`url`は使わず、ブラウザが付与する送信元フレームのURLでドメインマッチングする
+- **エントリIDの検証**: `AUTOFILL_FILL_REQUEST`/`AUTOFILL_GET_TOTP`/`AUTOFILL_PENDING_FLOW_STORE`は、指定されたエントリが送信元URLの候補（またはHTTPSページでのクレジットカード）である場合のみ応答する
+
+### 2-3.5 ページスクリプトによる操作の防止
+
+ドロップダウンはclosed Shadow DOM内にあるが、shadow hostと入力欄はページDOM内にある。
+
+- **合成イベントの無視**: ページが`dispatchEvent`で送るキーイベント・マウスイベント（`isTrusted === false`）では候補を選択しない。これがないと、ページが`input.focus()`と合成`ArrowDown`/`Enter`でユーザー操作なしに充填させられる（ドメインを問わないクレジットカードは任意のサイトから盗まれうる）
+- **クリックジャッキング対策**: 候補の選択時に、shadow hostと祖先要素の実効opacity・`visibility`・`filter: opacity()`を確認し、操作点で最前面の要素が自分のshadow hostであることを`document.elementFromPoint`で確認する。透明化・覆い隠しを検出した場合は充填しない
+- **既知の限界**: `pointer-events: none`の要素を上に重ねる偽装は`elementFromPoint`では検出できない
 
 # Part 3: 個別設計
 

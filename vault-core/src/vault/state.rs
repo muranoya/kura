@@ -38,6 +38,7 @@ impl UnlockedVault {
         // Apply merged state to current vault
         self.contents.entries = merge_result.merged_entries;
         self.contents.labels = merge_result.merged_labels;
+        self.adopt_remote_meta_if_newer(&remote_vault_file.meta);
         self.etag = Some(remote_etag.clone());
 
         // Apply garbage collection to remove old tombstones
@@ -52,6 +53,17 @@ impl UnlockedVault {
     }
 
     /// Get current ETag
+    /// リモートのmetaが自端末より新しい鍵ラップを持つ場合に採用する。
+    ///
+    /// 他端末でのマスターパスワード変更・リカバリーキー再発行・Argon2強化を、
+    /// 古いmetaを持つ端末の同期で巻き戻さないための処理。リモートの暗号文が
+    /// 自端末のDEKで復号できたことを確認した後に呼ぶこと。
+    pub(crate) fn adopt_remote_meta_if_newer(&mut self, remote_meta: &crate::models::VaultMeta) {
+        if remote_meta.has_newer_keys_than(&self.meta) {
+            self.meta = remote_meta.clone();
+        }
+    }
+
     pub fn get_etag(&self) -> Option<&String> {
         self.etag.as_ref()
     }

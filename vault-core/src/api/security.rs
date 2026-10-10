@@ -1,6 +1,5 @@
 use crate::crypto;
 use crate::secret::{MasterPassword, PlaintextConfig};
-use crate::sync::engine::SessionState;
 
 use super::VaultManager;
 
@@ -14,16 +13,7 @@ impl VaultManager {
     ) -> Result<String, String> {
         let password = MasterPassword::from_string(password);
         let plaintext = PlaintextConfig::from_string(plaintext);
-        let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-
-        let argon2_params = match session.as_ref() {
-            Some(SessionState::Locked(locked)) => &locked.vault_file.meta.argon2_params,
-            Some(SessionState::Unlocked(unlocked)) => &unlocked.meta.argon2_params,
-            None => return Err("Vault not loaded".to_string()),
-        };
-
-        let kek = crypto::kdf::derive_kek_from_master_password(&password, argon2_params)
-            .map_err(|e| format!("Failed to derive KEK: {}", e))?;
+        let kek = self.derive_kek(&password)?;
 
         crypto::config::encrypt_with_kek(plaintext.as_bytes(), &kek)
             .map_err(|e| format!("Failed to encrypt config: {}", e))
@@ -37,22 +27,18 @@ impl VaultManager {
         encrypted_b64: String,
     ) -> Result<String, String> {
         let password = MasterPassword::from_string(password);
-        let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
+        let kek = self.derive_kek(&password)?;
+        decrypt_config_with_kek(&encrypted_b64, &kek)
+    }
 
-        let argon2_params = match session.as_ref() {
-            Some(SessionState::Locked(locked)) => &locked.vault_file.meta.argon2_params,
-            Some(SessionState::Unlocked(unlocked)) => &unlocked.meta.argon2_params,
-            None => return Err("Vault not loaded".to_string()),
-        };
-
-        let kek = crypto::kdf::derive_kek_from_master_password(&password, argon2_params)
-            .map_err(|e| format!("Failed to derive KEK: {}", e))?;
-
-        let decrypted_bytes = crypto::config::decrypt_with_kek(&encrypted_b64, &kek)
-            .map_err(|e| format!("Failed to decrypt config: {}", e))?;
-
-        String::from_utf8(decrypted_bytes.to_vec())
-            .map_err(|e| format!("Decrypted config is not valid UTF-8: {}", e))
+    /// `api_derive_session_key`で得たセッション鍵で、マスターパスワードで暗号化されたデータを復号
+    pub fn api_decrypt_config_with_session_key(
+        &self,
+        session_key: String,
+        encrypted_b64: String,
+    ) -> Result<String, String> {
+        let kek = super::decode_session_key(session_key)?;
+        decrypt_config_with_kek(&encrypted_b64, &kek)
     }
 
     /// マスターパスワードの検証（KEK導出→DEK復号を試みる）
@@ -136,4 +122,12 @@ impl VaultManager {
             Ok(recovery_key.to_display_string())
         })
     }
+}
+
+fn decrypt_config_with_kek(encrypted_b64: &str, kek: &crypto::Kek) -> Result<String, String> {
+    let decrypted_bytes = crypto::config::decrypt_with_kek(encrypted_b64, kek)
+        .map_err(|e| format!("Failed to decrypt config: {}", e))?;
+
+    String::from_utf8(decrypted_bytes.to_vec())
+        .map_err(|e| format!("Decrypted config is not valid UTF-8: {}", e))
 }

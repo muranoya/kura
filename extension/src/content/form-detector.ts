@@ -14,14 +14,13 @@ export interface DetectedForm {
 
 export function isVisible(el: HTMLElement): boolean {
   const rect = el.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) return false
+  // 祖先要素の opacity:0 / visibility:hidden も考慮する（透明な親で隠したフォームへの充填防止）
+  if (typeof el.checkVisibility === 'function') {
+    return el.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+  }
   const style = getComputedStyle(el)
-  return (
-    rect.width > 0 &&
-    rect.height > 0 &&
-    style.visibility !== 'hidden' &&
-    style.display !== 'none' &&
-    style.opacity !== '0'
-  )
+  return style.visibility !== 'hidden' && style.display !== 'none' && style.opacity !== '0'
 }
 
 // ========== Form container discovery ==========

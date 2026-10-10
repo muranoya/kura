@@ -282,6 +282,7 @@ mod tests {
                 encrypted_dek_recovery: String::new(),
                 argon2_params: Argon2Params::default(),
                 created_at: 0,
+                keys_updated_at: None,
             },
             contents: VaultContents::default(),
             dek: Dek::generate(),

@@ -213,8 +213,12 @@ extension側の重み付きシグナル方式と同じ**考え方**（複数シ�
 
 ### 3-1-2. リクエスト元の判定
 
-- `structure.getWebDomain()`（`ViewNode`単位、いずれかのノードで取得できればブラウザ由来と判定）が非nullの場合、ブラウザ由来リクエストとしてSection 1-6-2のフィールド検出方針に進む
-- 取得できない場合（ネイティブアプリ由来）は`structure.getActivityComponent().getPackageName()`でパッケージ名を取得し、Section 1-3のマッチングに進む
+- `structure.getWebDomain()`（`ViewNode`単位、いずれかのノードで取得できればブラウザ由来と判定）が非nullで、**かつ要求元が署名検証済みのブラウザである**場合、ブラウザ由来リクエストとしてSection 1-6-2のフィールド検出方針に進む
+- それ以外（ネイティブアプリ由来、または`webDomain`を持つが信頼できるブラウザではない）は`structure.getActivityComponent().getPackageName()`でパッケージ名を取得し、Section 1-3のマッチングに進む
+
+**webDomainの信頼条件**: `webDomain`は任意のアプリが`ViewStructure.setWebDomain()`で設定できるため、そのまま信用すると悪意あるアプリが「bank.com」を名乗って銀行の認証情報を候補に出させられる。`TrustedBrowserVerifier`が、Passkeyと同じGoogle公開の特権ブラウザ許可リスト（`assets/gpm_privileged_allowlist.json`）にパッケージ名が掲載され、かつインストール済みアプリの署名証明書のSHA-256が掲載値と一致する場合のみブラウザとして扱う。他アプリの署名を参照するため、AndroidManifestの`<queries>`でブラウザ（`https`の`VIEW`/`BROWSABLE`を処理するアプリ）を可視化している。許可リスト外のブラウザや、アプリ内WebViewのログインは、ネイティブアプリとしてパッケージ名で照合する（未登録なら手動検索）。
+
+> **未対策（将来課題）**: ネイティブアプリ由来の照合（`package_domains.json`）はパッケージ名のみで行い、署名を検証していない。正規アプリが未インストールの端末に同じパッケージ名の偽アプリをサイドロードされると候補が表示される。
 
 `AssistStructureParser.parse()`は、祖先ノードでは`webDomain`が空/nullになるケースがある実態（1-6-1(d)）を踏まえ、木構造の走査中にブラウザ由来と判明した時点で打ち切るのではなく、全ノードを収集してから判定する2段階方式で実装している。ネイティブアプリ向け（`FieldClassifier`, Section 3-1-1）とブラウザ向け（`BrowserFieldClassifier`, Section 1-6-2, 1-5）は別クラスとして独立実装されている。
 

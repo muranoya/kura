@@ -85,9 +85,9 @@ pub async fn sync_with_storage(
             }
             Some((remote_bytes, remote_etag)) => {
                 // リモート存在 → UUID検証 → 復号してマージ
+                let remote_vault_file = VaultFile::from_bytes(&remote_bytes)
+                    .map_err(|e| format!("Failed to parse remote vault: {}", e))?;
                 let remote_contents = {
-                    let remote_vault_file = VaultFile::from_bytes(&remote_bytes)
-                        .map_err(|e| format!("Failed to parse remote vault: {}", e))?;
                     let session = vault_session
                         .lock()
                         .map_err(|_| "Session lock poisoned".to_string())?;
@@ -130,6 +130,7 @@ pub async fn sync_with_storage(
                     if let Some(SessionState::Unlocked(ref mut u)) = session.as_mut() {
                         u.contents.entries = merged_contents.entries;
                         u.contents.labels = merged_contents.labels;
+                        u.adopt_remote_meta_if_newer(&remote_vault_file.meta);
                         u.set_etag(remote_etag.clone());
                     }
                 }

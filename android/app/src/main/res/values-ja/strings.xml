@@ -157,6 +157,8 @@
     <string name="lock_passcode_required">パスコードを入力してください</string>
     <string name="lock_unlock_failed">アンロックに失敗しました</string>
     <string name="lock_passcode_unlock_failed">パスコードでのアンロックに失敗しました</string>
+    <string name="lock_passcode_wrong_remaining">パスコードが違います（残り%1$d回）</string>
+    <string name="lock_passcode_locked_out">パスコードを%1$d回間違えたため、パスコードアンロックを無効にしました。マスターパスワードでアンロックしてください。</string>
 
     <!-- Recovery screen -->
     <string name="recovery_title">リカバリーキーでアンロック</string>

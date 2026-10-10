@@ -75,6 +75,20 @@ pub fn api_unlock(vault_id: String, master_password: String) -> Result<(), JsVal
     with_manager(&vault_id, |m| m.api_unlock(master_password)).map_err(to_js_err)
 }
 
+/// マスターパスワードからセッション鍵を導出（SW再起動時の復元用。パスワード自体を保持しないため）
+#[wasm_bindgen]
+pub fn api_derive_session_key(
+    vault_id: String,
+    master_password: String,
+) -> Result<String, JsValue> {
+    with_manager(&vault_id, |m| m.api_derive_session_key(master_password)).map_err(to_js_err)
+}
+
+#[wasm_bindgen]
+pub fn api_unlock_with_session_key(vault_id: String, session_key: String) -> Result<(), JsValue> {
+    with_manager(&vault_id, |m| m.api_unlock_with_session_key(session_key)).map_err(to_js_err)
+}
+
 #[wasm_bindgen]
 pub fn api_unlock_with_recovery_key(vault_id: String, recovery_key: String) -> Result<(), JsValue> {
     with_manager(&vault_id, |m| m.api_unlock_with_recovery_key(recovery_key)).map_err(to_js_err)
@@ -351,6 +365,18 @@ pub fn api_decrypt_config(
     encrypted_b64: String,
 ) -> Result<String, JsValue> {
     with_manager(&vault_id, |m| m.api_decrypt_config(password, encrypted_b64)).map_err(to_js_err)
+}
+
+#[wasm_bindgen]
+pub fn api_decrypt_config_with_session_key(
+    vault_id: String,
+    session_key: String,
+    encrypted_b64: String,
+) -> Result<String, JsValue> {
+    with_manager(&vault_id, |m| {
+        m.api_decrypt_config_with_session_key(session_key, encrypted_b64)
+    })
+    .map_err(to_js_err)
 }
 
 /// S3設定を転送用に暗号化（VaultManager不要）
