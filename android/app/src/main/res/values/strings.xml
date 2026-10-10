@@ -157,6 +157,8 @@
     <string name="lock_passcode_required">Please enter your passcode</string>
     <string name="lock_unlock_failed">Failed to unlock</string>
     <string name="lock_passcode_unlock_failed">Failed to unlock with passcode</string>
+    <string name="lock_passcode_wrong_remaining">Incorrect passcode (%1$d attempts left)</string>
+    <string name="lock_passcode_locked_out">Passcode unlock was disabled after %1$d failed attempts. Unlock with your master password.</string>
 
     <!-- Recovery screen -->
     <string name="recovery_title">Unlock with Recovery Key</string>

@@ -26,6 +26,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import net.meshpeak.kura.R
+import net.meshpeak.kura.data.auth.PasscodeHelper
+import net.meshpeak.kura.data.auth.PasscodeLockedOutException
+import net.meshpeak.kura.data.auth.WrongPasscodeException
 import net.meshpeak.kura.ui.components.ConfirmDialog
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.flow.first
@@ -48,7 +51,9 @@ fun LockScreen(
     val context = LocalContext.current
     val passcodeEnabled by appViewModel.preferences.passcodeEnabledFlow
         .collectAsState(initial = false)
-    val passcodeAvailable = passcodeEnabled && appViewModel.passcodeHelper.isSetUp()
+    // 失敗回数超過でパスコードデータが消去された場合に再コンポーズで反映するための状態
+    var passcodeLockedOut by remember { mutableStateOf(false) }
+    val passcodeAvailable = passcodeEnabled && !passcodeLockedOut && appViewModel.passcodeHelper.isSetUp()
 
     LaunchedEffect(passcodeAvailable) {
         if (passcodeAvailable) {
@@ -190,6 +195,13 @@ fun LockScreen(
                         }
                         appViewModel.repository.unlock(masterPassword)
                         onUnlocked()
+                    } catch (e: WrongPasscodeException) {
+                        error = context.getString(R.string.lock_passcode_wrong_remaining, e.remainingAttempts)
+                    } catch (e: PasscodeLockedOutException) {
+                        appViewModel.preferences.setPasscodeEnabled(false)
+                        passcodeLockedOut = true
+                        password = ""
+                        error = context.getString(R.string.lock_passcode_locked_out, PasscodeHelper.MAX_FAILED_ATTEMPTS)
                     } catch (e: Exception) {
                         error = context.getString(if (usePasscode) R.string.lock_passcode_unlock_failed else R.string.lock_unlock_failed)
                     } finally { isLoading = false }

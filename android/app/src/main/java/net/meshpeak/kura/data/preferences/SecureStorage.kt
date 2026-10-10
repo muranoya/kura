@@ -7,7 +7,21 @@ import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
-class SecureStorage(context: Context) {
+/** パスコードアンロック用データの保存先（[net.meshpeak.kura.data.auth.PasscodeHelper]が使用） */
+interface PasscodeStore {
+    fun savePasscodeData(encryptedPassword: String, iv: String, salt: String)
+    fun getPasscodeEncryptedPassword(): String?
+    fun getPasscodeIv(): String?
+    fun getPasscodeSalt(): String?
+    fun hasPasscodeData(): Boolean
+    fun clearPasscodeData()
+    fun getPasscodeFailedAttempts(): Int
+
+    /** 試行回数の改ざん回避のため、呼び出しから戻った時点でディスクへ書き込み済みであること */
+    fun setPasscodeFailedAttempts(count: Int)
+}
+
+class SecureStorage(context: Context) : PasscodeStore {
 
     companion object {
         private const val FILE_NAME = "kura_secure_prefs"
@@ -17,6 +31,7 @@ class SecureStorage(context: Context) {
         private const val KEY_PASSCODE_ENCRYPTED_PW = "passcode_encrypted_password"
         private const val KEY_PASSCODE_IV = "passcode_iv"
         private const val KEY_PASSCODE_SALT = "passcode_salt"
+        private const val KEY_PASSCODE_FAILED_ATTEMPTS = "passcode_failed_attempts"
     }
 
     private val masterKey = MasterKey.Builder(context)
@@ -66,32 +81,42 @@ class SecureStorage(context: Context) {
             .apply()
     }
 
-    fun savePasscodeData(encryptedPassword: String, iv: String, salt: String) {
+    override fun savePasscodeData(encryptedPassword: String, iv: String, salt: String) {
         prefs.edit()
             .putString(KEY_PASSCODE_ENCRYPTED_PW, encryptedPassword)
             .putString(KEY_PASSCODE_IV, iv)
             .putString(KEY_PASSCODE_SALT, salt)
+            .remove(KEY_PASSCODE_FAILED_ATTEMPTS)
             .apply()
     }
 
-    fun getPasscodeEncryptedPassword(): String? =
+    override fun getPasscodeEncryptedPassword(): String? =
         prefs.getString(KEY_PASSCODE_ENCRYPTED_PW, null)
 
-    fun getPasscodeIv(): String? =
+    override fun getPasscodeIv(): String? =
         prefs.getString(KEY_PASSCODE_IV, null)
 
-    fun getPasscodeSalt(): String? =
+    override fun getPasscodeSalt(): String? =
         prefs.getString(KEY_PASSCODE_SALT, null)
 
-    fun hasPasscodeData(): Boolean =
+    override fun hasPasscodeData(): Boolean =
         getPasscodeEncryptedPassword() != null && getPasscodeIv() != null && getPasscodeSalt() != null
 
-    fun clearPasscodeData() {
+    override fun clearPasscodeData() {
         prefs.edit()
             .remove(KEY_PASSCODE_ENCRYPTED_PW)
             .remove(KEY_PASSCODE_IV)
             .remove(KEY_PASSCODE_SALT)
-            .apply()
+            .remove(KEY_PASSCODE_FAILED_ATTEMPTS)
+            .commit()
+    }
+
+    override fun getPasscodeFailedAttempts(): Int =
+        prefs.getInt(KEY_PASSCODE_FAILED_ATTEMPTS, 0)
+
+    override fun setPasscodeFailedAttempts(count: Int) {
+        // apply()は非同期書き込みのため、プロセス強制終了で加算が失われないようcommit()を使う
+        prefs.edit().putInt(KEY_PASSCODE_FAILED_ATTEMPTS, count).commit()
     }
 
     fun clearAll() {
