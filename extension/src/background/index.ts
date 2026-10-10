@@ -151,8 +151,42 @@ async function initWasm() {
 
 // ========== メッセージハンドラーのセットアップ ==========
 
+// content script（全サイト・全フレームに注入される）から受け付けるメッセージ。
+// content script はページと同じレンダラープロセスで動くため、レンダラーが侵害されると
+// 任意のメッセージを送れる。保管庫全体の読み出しや設定変更は拡張機能自身のページ
+// （popup / WebAuthnリチュアル / offscreen）からのみ受け付ける。
+const CONTENT_SCRIPT_MESSAGE_TYPES = new Set([
+  'AUTOFILL_GET_CREDENTIALS',
+  'AUTOFILL_FILL_REQUEST',
+  'AUTOFILL_OPEN_POPUP',
+  'AUTOFILL_GET_TOTP',
+  'AUTOFILL_GET_TOTP_CANDIDATES',
+  'AUTOFILL_GET_CREDIT_CARDS',
+  'AUTOFILL_PENDING_FLOW_STORE',
+  'AUTOFILL_PENDING_FLOW_QUERY',
+  'AUTOFILL_SAVE_CAPTURED',
+  'TOTP_QR_CAPTURE',
+  'TOTP_QR_APPLY',
+  'TOTP_QR_CANCEL',
+  'PICKER_RESULT',
+  'PICKER_CANCEL',
+  'WEBAUTHN_CREATE_REQUEST',
+  'WEBAUTHN_GET_REQUEST',
+  'CLIPBOARD_COPIED',
+  'GENERATE_PASSWORD',
+])
+
+function isExtensionPageSender(sender: chrome.runtime.MessageSender): boolean {
+  return sender.id === chrome.runtime.id && !!sender.url?.startsWith(chrome.runtime.getURL(''))
+}
+
 function setupMessageHandlers() {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (!isExtensionPageSender(sender) && !CONTENT_SCRIPT_MESSAGE_TYPES.has(message?.type)) {
+      console.warn('[SW] Rejected message from untrusted sender:', message?.type, sender.url)
+      sendResponse({ success: false, error: 'Forbidden' })
+      return false
+    }
     // async 処理を fire-and-forget で実行し、Promise で sendResponse を呼ぶ
     handleMessage(message, sender, sendResponse).catch((err) => {
       console.error('[SW] Unhandled error in message handler:', message.type, err)
