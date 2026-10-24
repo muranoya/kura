@@ -125,6 +125,23 @@ purge済みtombstoneは永続保持するとvault.jsonが肥大化するため�
 
 ---
 
+## マージの対象と secret ブロックの扱い（schema_version 2）
+
+vault.json は index（全エントリの非秘匿値）と、エントリごとの secret ブロックに分かれている（`docs/vault-format-v2.md`）。上記の判定ロジック（B / C / D ケース、tie-breaking、GC）は index の行に対して適用し、secret は一切復号しない。
+
+1. リモートの vault.json から **index だけを復号**する（リモートが schema_version 1 の場合は、同じ DEK で一括復号して v2 の構造に変換してからマージする）
+2. index 同士をエントリ単位・ラベル単位にマージする。`auto_merge` はエントリごとに採用した側（`MergeSide::Local` / `MergeSide::Remote`）を返す
+3. 各エントリについて、**採用した側の secret ブロックを暗号文のまま使う**。index 行の `secret_rev` は secret の AAD に含まれるため、行と secret の組み合わせを取り違えても復号失敗（破損エントリ）として検出できる
+4. GC で削除されたエントリ、purged エントリ、index に行がない孤立ブロックの secret は削除する
+5. index を再暗号化して Conditional Write で push する
+
+- 2 台で同じエントリを同時に編集した場合でも、`secret_rev` はランダム値なので両者の secret は区別され、採用した側の index 行と secret が組のまま残る
+- secret ブロックが欠けている・復号できないエントリは、vault 全体のエラーにはせずそのエントリだけを破損として扱い、暗号文はそのまま保持して書き戻す（`VaultError::CorruptedEntry`）
+
+実装: `vault-core/src/sync/mod.rs`（`auto_merge`）、`vault-core/src/vault/state.rs`（`UnlockedVault::merge_remote`）
+
+---
+
 ## 実装上の注意
 
 ### Labelの削除

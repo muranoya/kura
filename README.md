@@ -43,13 +43,13 @@ KEK (Key Encryption Key)
     |
     v
 DEK (Data Encryption Key)  -- encrypted by KEK, stored in vault metadata
-    |
+    |  HKDF-SHA256 sub-key derivation
     v
-Vault data encrypted with AES-256-GCM
+Vault data encrypted with XChaCha20-Poly1305 (a searchable index + per-entry secrets)
 ```
 
 - **Client-side only** -- Encryption keys never leave your device. The storage provider only sees encrypted blobs.
-- **AES-256-GCM** -- Industry-standard authenticated encryption for vault data.
+- **XChaCha20-Poly1305** -- Authenticated encryption for vault data. Secrets such as passwords are encrypted per entry and decrypted only when you need that entry.
 - **Argon2id** -- Memory-hard key derivation to resist brute-force attacks.
 - **Recovery key** -- Generated during setup. If you forget your master password, the recovery key can unlock your vault and set a new one.
 

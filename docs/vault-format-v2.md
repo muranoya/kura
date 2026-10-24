@@ -1,4 +1,4 @@
-<!-- doc-status: design -->
+<!-- doc-status: implemented -->
 
 # vault.json フォーマット v2（エントリ単位暗号化）
 
@@ -126,7 +126,9 @@ v1 で一括暗号化を採用したのはエントリの検索機能のため�
 
 - `entry_type` / `field_type` は v1 と同様に String で保存する
 - 知らないエントリタイプ・フィールドタイプでも、`public_fields` と `custom_fields` が index にあるので、表示・検索ができる。secret ブロックはマージ時に暗号文のまま引き継ぐ
-- 新しいクライアントが追加したフィールドを古いクライアントが書き込み時に失わないよう、`VaultFile` / `VaultIndex` の各エントリ / `EntrySecret` では、未知のフィールドを `#[serde(flatten)]` で保持してそのまま書き戻す
+- 新しいクライアントが追加したフィールドを古いクライアントが書き込み時に失わないよう、`VaultFile` / `VaultIndex`（とその各エントリ・各カスタムフィールド）/ `EntrySecret` では、未知のフィールドを保持してそのまま書き戻す
+  - `VaultFile` / `VaultIndex` 側は `#[serde(flatten)]` で保持する
+  - `EntrySecret` は flatten を使わず、手書きの `Deserialize` で既知のキーを直接 `SecretString` 等に読み込み、残りを保持する。flatten は構造体全体をいったん serde 内部のバッファ（ゼロ化されない文字列の複製）に読み込むため、秘匿値の平文コピーがヒープに残ってしまうため
 
 ## 4. フィールドの振り分け
 
@@ -173,7 +175,7 @@ index にある以下の値を検索対象とする。
 - `name`
 - `public_fields` の全値
 - `custom_fields[].name`（全フィールド）
-- `custom_fields[].value`（`secret == false` かつ field_type が tさｚext / email / url / phone のもの）
+- `custom_fields[].value`（`secret == false` かつ field_type が text / email / url / phone のもの）
 
 ## 5. 暗号化
 
@@ -245,13 +247,14 @@ UnlockedVault (v2)
 ├ dek: Dek                                   ゼロ化対象
 ├ keys: { index_key, secret_key }            ゼロ化対象
 ├ index: VaultIndex                          平文で常駐。ロック時にゼロ化
-├ secrets: HashMap<entry_id, Vec<u8>>        暗号文のまま保持
+├ secrets: HashMap<entry_id, String>         暗号文（base64）のまま保持
 └ etag
 ```
 
-- index 由来の文字列（username・URL 等）も個人情報なので、ロック時にゼロ化する。ただし型名は秘匿値（`SecretString`）と区別できるものにする
+- index 由来の文字列（エントリ名・username・URL・カスタムフィールドの名前と値等）も個人情報なので、ロック時にゼロ化する。型名は秘匿値（`SecretString`）と区別できるよう `PublicString` / `PublicJson` とする（ラベル名は対象外）
+- secret の暗号文を base64 のまま保持するのは、マージ・書き戻しで暗号文をそのまま使い回すため（壊れた暗号文も変更せずに書き戻せる）
 - secret の復号は `Zeroizing` バッファに対して行い、パース結果も `SecretString` で保持する。呼び出し元が使い終わった時点でドロップされ、ゼロ化される
-- `LockedVault` は `VaultFile`（v2）をそのまま保持する
+- `LockedVault` は読み込んだ vault.json をそのまま保持する（v2、または移行前の v1。v1 はアンロック時に v2 へ変換する）
 
 ---
 
@@ -269,7 +272,10 @@ UnlockedVault (v2)
 
 ### 7-1. 異常系
 
-- index 行に `secret_rev` があるのに `secrets` に該当ブロックがない、または復号に失敗した場合: vault 全体のエラーにはせず、**そのエントリだけを「破損」として扱う**。暗号文はそのまま保持して書き戻し、勝手に消さない
+- index 行に `secret_rev` があるのに `secrets` に該当ブロックがない、または復号に失敗した場合: vault 全体のエラーにはせず、**そのエントリだけを「破損」として扱う**（`VaultError::CorruptedEntry`）。暗号文はそのまま保持して書き戻し、勝手に消さない
+  - 一覧表示・検索は index だけで処理するため影響を受けない。詳細表示・TOTP コード生成・Passkey 署名などそのエントリの secret が必要な操作だけが失敗する
+  - 破損エントリも編集画面からは開けないが、内部的には新しい内容での上書き（`update_entry`）は可能
+  - `rotate_dek` は、破損エントリが 1 件でもあれば vault の状態を変えずにエラーにする（新しい DEK に切り替えると、その secret は二度と復号できなくなるため）
 - `secrets` にあって index に行がない孤立ブロックは、書き込み時に削除する
 
 ---
@@ -304,6 +310,8 @@ UnlockedVault (v2)
 
 ### 9-2. フェーズ 2（デスクトップ版 Slint 化 / 拡張機能のサイドバー化に合わせて行う）
 
+> **未実装（将来対応予定）**: デスクトップ版 Slint 化 / 拡張機能のサイドバー化に合わせて行う
+
 - `api_get_entry` が秘匿値を返さないようにし（秘匿値の有無だけを返す）、秘匿値は `api_get_secret_field(entry_id, field_key)` で 1 フィールドずつ取得するようにする
 - これにより、FFI 境界の向こう側（JS ヒープ等）に秘匿値が渡るのを、ユーザーが表示・コピーしたフィールドに限定できる
 
@@ -313,7 +321,8 @@ UnlockedVault (v2)
 
 - **notes**: マスク表示せず、エントリ詳細を開いたら secret から読み込んでそのまま表示する。保存先は secret だが、表示上は通常のテキストとして扱う。フェーズ 2（9-2）以降も、詳細を開いた時点で `notes` を取得する
 - **カスタムフィールド**: 「フィールド」と「秘匿フィールド」の 2 セクションに分けて表示する。作成・編集画面では、text / email / url / phone 型に「秘匿」の切り替えを設ける
-- **typed_value**: `secret_field_keys` に含まれるフィールドを秘匿値として表示する（マスク表示）
+- **typed_value**: `secret_field_keys` に含まれるフィールドを秘匿値として表示する（マスク表示）。ただし `secure_note.content` は notes と同じく長文のノートなので、マスクせず（Markdown として）表示する
+- **秘匿カスタムフィールド**: 「秘匿フィールド」セクションの text / email / url / phone 型はマスク表示する（password 型と同様）。秘匿にした url 型はオートフィル候補の判定に使わないため、リンクとしても扱わない
 
 対象クライアント: Android / デスクトップ（Tauri）/ ブラウザ拡張
 
@@ -341,13 +350,15 @@ UnlockedVault (v2)
 
 ### 11-3. 複数端末で同時に移行した場合
 
-同じ v1 エントリを 2 台が別々に変換すると、`updated_at` と内容は同じで `secret_rev` だけが異なる 2 つの版ができる。マージでは C-4（`updated_at` が同じで内容が違う → リモート採用）に該当し、どちらか一方に決まる。中身は同じなので問題はない。push の競合は If-Match で検出され、既存のリトライで解消される。
+同じ v1 エントリを 2 台が別々に変換すると、`updated_at` と内容は同じで `secret_rev` だけが異なる 2 つの版ができる。マージでは `updated_at` が同じ場合の tie-breaking により、どちらか一方の index 行と secret の組が採用される。中身は同じなので問題はない。push の競合は If-Match で検出され、既存のリトライで解消される。
 
 ### 11-4. 未対応クライアント
 
 v2 が書き込まれた時点で、v1 しか読めないクライアントは vault を開けなくなる（`schema_version` の不一致で拒否されるため、上書き事故は起きない）。すべてのクライアント（Android / デスクトップ / ブラウザ拡張）の v2 対応版を同時にリリースする。
 
 ### 11-5. v1 読み込みコードの削除後
+
+> **未実装（将来対応予定）**: すべての端末の移行が済んだ後に v1 読み込みコードを削除する際に対応する
 
 v1 のデータを開いた場合は「古い形式のため、v2 対応の旧バージョンで一度開いて移行してください」という明示的なエラーを出す。
 
@@ -361,12 +372,17 @@ v1 のデータを開いた場合は「古い形式のため、v2 対応の旧�
 
 ---
 
-## 13. 実装の進め方（案）
+## 13. 実装箇所
 
-1. vault-core: 暗号処理（HKDF・XChaCha20-Poly1305・AAD）と v2 のデータ構造、その単体テスト
-2. vault-core: `UnlockedVault` を index + secrets 構造に置き換え、エントリ操作・検索・オートフィル・passkey・TOTP を対応させる
-3. vault-core: 同期（7 章）。既存の B / C / D ケースのテストを v2 構造で通す
-4. vault-core: v1 → v2 の移行（11 章）。v1 のフィクスチャから変換するテスト、v1 リモートと v2 ローカルのマージのテスト
-5. API（フェーズ 1）と各 FFI（wasm-bridge / rust-jni / Tauri commands）の対応
-6. 各クライアントの UI 対応（10 章）。Android は rust-jni の `.so` を `cargo ndk` で再ビルドする
-7. ドキュメント更新（12 章）
+| 内容 | 場所 |
+|---|---|
+| HKDF・XChaCha20-Poly1305・AAD（5章） | `vault-core/src/crypto/aead.rs` |
+| v2 のデータ構造（3章） | `vault-core/src/store/mod.rs` |
+| フィールドの振り分け（4章） | `vault-core/src/store/layout.rs` |
+| secret の復号・書き込み・vault.json との相互変換（5-4・6章） | `vault-core/src/vault/secrets.rs` |
+| エントリ操作・検索・TOTP（4-3・8章） | `vault-core/src/vault/entries.rs`、`vault-core/src/models/entry.rs` |
+| Passkey（4-2） | `vault-core/src/vault/webauthn.rs` |
+| 同期（7章） | `vault-core/src/sync/mod.rs`、`vault-core/src/vault/state.rs`、`vault-core/src/sync/engine.rs` |
+| v1 → v2 の移行（11章） | `vault-core/src/vault/migration.rs`、`vault-core/src/store/v1.rs`、`vault-core/src/crypto/v1.rs` |
+| API（9-1） | `vault-core/src/api/entries.rs`（`EntryDetail.secret_field_keys`、`custom_fields[].secret`） |
+| UI（10章） | デスクトップ `desktop/src/components/entries/`、拡張機能 `extension/src/popup/`、Android `android/app/src/main/java/net/meshpeak/kura/ui/` |
