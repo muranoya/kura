@@ -634,7 +634,9 @@ fun CustomFieldEditor(
     onGeneratePassword: (suspend (Int, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean) -> String)? = null,
     onValidateTotp: (suspend (String) -> Boolean)? = null,
 ) {
-    val isSecret = field.fieldType == "password" || field.fieldType == "totp"
+    val canToggleSecret = field.fieldType in CustomField.SECRET_TOGGLEABLE_FIELD_TYPES
+    val isSecret = field.fieldType == "password" || field.fieldType == "totp" ||
+        (canToggleSecret && field.secret)
     var isValueFocused by remember { mutableStateOf(false) }
     var showGenerator by remember { mutableStateOf(false) }
     var showTotpQrSource by remember { mutableStateOf(false) }
@@ -720,6 +722,25 @@ fun CustomFieldEditor(
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                 )
+            }
+            if (canToggleSecret) {
+                IconButton(
+                    onClick = { onFieldChange(field.copy(secret = !field.secret)) },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        if (field.secret) Icons.Default.Lock else Icons.Default.LockOpen,
+                        contentDescription = stringResource(
+                            if (field.secret) R.string.cd_secret_field_off else R.string.cd_secret_field_on
+                        ),
+                        tint = if (field.secret) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            LocalContentColor.current
+                        },
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
             IconButton(
                 onClick = { showSelectorEditor = !showSelectorEditor },

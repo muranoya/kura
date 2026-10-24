@@ -237,7 +237,8 @@ fun EntryDetailScreen(
                                             }
                                         }
                                     } else {
-                                        val isSecret = key in listOf("password", "pin", "cvv", "private_key", "number")
+                                        // vault 内で秘匿値として保存されているフィールドをマスク表示する
+                                        val isSecret = key in e.secretFieldKeys
                                         DetailField(
                                             label = fieldDisplayName(key),
                                             value = strValue,
@@ -253,49 +254,26 @@ fun EntryDetailScreen(
                             }
                         }
 
-                        // Custom fields
-                        if (customFields.isNotEmpty()) {
-                            Surface(
-                                tonalElevation = 1.dp,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column {
-                                    customFields.forEachIndexed { index, field ->
-                                        if (index > 0) {
-                                            HorizontalDivider(
-                                                modifier = Modifier.padding(horizontal = 16.dp),
-                                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                                            )
-                                        }
-                                        if (field.fieldType == "totp" && field.value.isNotEmpty()) {
-                                            TotpField(
-                                                label = field.name,
-                                                value = field.value,
-                                                appViewModel = appViewModel,
-                                                context = context,
-                                                clipboardClearSeconds = clipboardClearSeconds,
-                                            )
-                                        } else if (field.fieldType == "passkey") {
-                                            PasskeyField(
-                                                label = stringResource(R.string.custom_field_passkey),
-                                                value = field.value,
-                                            )
-                                        } else {
-                                            DetailField(
-                                                label = field.name,
-                                                value = field.value,
-                                                isSecret = field.fieldType == "password",
-                                                isEmpty = field.value.isEmpty(),
-                                                context = context,
-                                                clipboardClearSeconds = clipboardClearSeconds,
-                                            )
-                                        }
-                                        field.autofillSelector?.let { selector ->
-                                            AutofillSelectorCaption(selector)
-                                        }
-                                    }
-                                }
+                        // Custom fields（非秘匿 / 秘匿の2セクションに分けて表示する）
+                        val (secretCustomFields, publicCustomFields) = customFields.partition { it.isSecretField }
+                        if (publicCustomFields.isNotEmpty()) {
+                            DetailSection(title = stringResource(R.string.section_custom_fields)) {
+                                CustomFieldRows(
+                                    fields = publicCustomFields,
+                                    appViewModel = appViewModel,
+                                    context = context,
+                                    clipboardClearSeconds = clipboardClearSeconds,
+                                )
+                            }
+                        }
+                        if (secretCustomFields.isNotEmpty()) {
+                            DetailSection(title = stringResource(R.string.section_secret_custom_fields)) {
+                                CustomFieldRows(
+                                    fields = secretCustomFields,
+                                    appViewModel = appViewModel,
+                                    context = context,
+                                    clipboardClearSeconds = clipboardClearSeconds,
+                                )
                             }
                         }
 
@@ -380,6 +358,49 @@ fun EntryDetailScreen(
             },
             onCancel = { showDeleteDialog = false }
         )
+    }
+}
+
+@Composable
+private fun CustomFieldRows(
+    fields: List<CustomField>,
+    appViewModel: AppViewModel,
+    context: Context,
+    clipboardClearSeconds: Int,
+) {
+    fields.forEachIndexed { index, field ->
+        if (index > 0) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+        }
+        if (field.fieldType == "totp" && field.value.isNotEmpty()) {
+            TotpField(
+                label = field.name,
+                value = field.value,
+                appViewModel = appViewModel,
+                context = context,
+                clipboardClearSeconds = clipboardClearSeconds,
+            )
+        } else if (field.fieldType == "passkey") {
+            PasskeyField(
+                label = stringResource(R.string.custom_field_passkey),
+                value = field.value,
+            )
+        } else {
+            DetailField(
+                label = field.name,
+                value = field.value,
+                isSecret = field.isSecretField,
+                isEmpty = field.value.isEmpty(),
+                context = context,
+                clipboardClearSeconds = clipboardClearSeconds,
+            )
+        }
+        field.autofillSelector?.let { selector ->
+            AutofillSelectorCaption(selector)
+        }
     }
 }
 

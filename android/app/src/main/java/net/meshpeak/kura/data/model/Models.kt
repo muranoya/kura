@@ -29,7 +29,9 @@ data class Entry(
     val notes: String? = null,
     @SerialName("typed_value") val typedValue: String = "{}",
     val labels: List<String> = emptyList(),
-    @SerialName("custom_fields") val customFields: String? = null
+    @SerialName("custom_fields") val customFields: String? = null,
+    // typedValue のうち秘匿値のキー（マスク表示の対象）
+    @SerialName("secret_field_keys") val secretFieldKeys: List<String> = emptyList()
 )
 
 @Serializable
@@ -67,8 +69,21 @@ data class CustomField(
     val name: String,
     @SerialName("field_type") val fieldType: String,
     val value: String,
+    // 秘匿フィールド（vault 内で secret ブロックに保存され、検索対象外になる）かどうか。
+    // password / totp / passkey は常に true。text / email / url / phone はユーザーが選べる。
+    // 詳細: docs/vault-format-v2.md 4-2節
+    val secret: Boolean = false,
     @SerialName("autofill_selector") val autofillSelector: CustomFieldSelector? = null
-)
+) {
+    /** 型で固定されているものを含め、秘匿フィールドかどうか */
+    val isSecretField: Boolean
+        get() = if (fieldType in SECRET_TOGGLEABLE_FIELD_TYPES) secret else true
+
+    companion object {
+        /** ユーザーが「秘匿」を切り替えられるカスタムフィールドの型 */
+        val SECRET_TOGGLEABLE_FIELD_TYPES = setOf("text", "email", "url", "phone")
+    }
+}
 
 @Serializable
 data class SyncResult(
