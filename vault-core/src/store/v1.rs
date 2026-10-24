@@ -1,66 +1,52 @@
+//! schema_version 1 の vault.json（`VaultContents` 全体を単一の AES-256-GCM ブロックとして
+//! 暗号化する形式）のデータ構造。
+//!
+//! v2 への移行（`docs/vault-format-v2.md` 11章）のためだけに残している。
+//! すべての端末の移行が済んだら削除する。
 use crate::secret::{EntrySecretJson, SecretString};
-/// Data structures for vault.json serialization/deserialization
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use zeroize::Zeroizing;
 
-/// Top-level vault.json structure stored in S3
-/// schema_version and meta are in plaintext, encrypted_vault is AES-256-GCM encrypted
+use super::LabelValue;
+
+/// v1 の vault.json のトップレベル構造。
+/// schema_version と meta は平文、encrypted_vault は AES-256-GCM で暗号化されている。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VaultFile {
+pub struct VaultFileV1 {
     pub schema_version: u32,
     pub meta: crate::models::VaultMeta,
     pub encrypted_vault: String, // base64-encoded [12-byte IV | ciphertext | 16-byte GCM tag]
 }
 
-/// In-memory vault contents after decryption
+/// v1 の復号後の中身
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct VaultContents {
+pub struct VaultContentsV1 {
     pub labels: HashMap<String, LabelValue>,
-    pub entries: HashMap<String, VaultEntry>,
+    pub entries: HashMap<String, VaultEntryV1>,
 }
 
-/// Label value in the vault
+/// v1 のエントリ（秘匿値・非秘匿値を区別せずに保持する）
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LabelValue {
-    pub name: String,
-    #[serde(default)]
-    pub created_at: i64,
-    /// Tombstone marker for deleted labels (no soft-delete for labels)
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub deleted_at: Option<i64>,
-}
-
-/// Entry value in the vault
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VaultEntry {
+pub struct VaultEntryV1 {
     #[serde(rename = "type")]
     pub entry_type: String,
     pub name: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub deleted_at: Option<i64>,
-    /// Tombstone marker for purged entries. Combined with deleted_at:
-    /// - (None, None) = active
-    /// - (Some, None) = soft-deleted (in trash)
-    /// - (Some, Some) = purged (tombstone)
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub purged_at: Option<i64>,
     pub is_favorite: bool,
     pub label_ids: Vec<String>,
-    /// Stored as `EntrySecretJson` (raw JSON, automatically zeroized on drop).
-    /// In the domain layer (`EntryData`), this is represented as `serde_json::Value`.
     pub typed_value: EntrySecretJson,
     pub notes: Option<SecretString>,
+    /// v1 には `secret` 属性がないため、デシリアライズ時は `secret == false` になる。
+    /// 移行時に `field_type` から既定値を決め直す。
     pub custom_fields: Option<Vec<crate::models::entry_data::CustomField>>,
 }
 
-impl VaultContents {
-    /// Create an empty vault
-    pub fn new() -> Self {
-        Self::default()
-    }
-
+impl VaultContentsV1 {
     /// JSONバイト列に変換する。
     /// `Zeroizing`バッファへ直接シリアライズすることで、平文（全エントリの
     /// 秘匿値を含む）が非保護の`Vec<u8>`として一瞬たりとも存在しないようにする。
@@ -112,7 +98,7 @@ mod tests {
             }
         }"#;
 
-        let contents = VaultContents::from_bytes(json.as_bytes())
+        let contents = VaultContentsV1::from_bytes(json.as_bytes())
             .expect("Should deserialize vault with unknown entry type");
 
         assert_eq!(contents.entries.len(), 2);
@@ -149,7 +135,7 @@ mod tests {
             }
         }"#;
 
-        let contents = VaultContents::from_bytes(json.as_bytes())
+        let contents = VaultContentsV1::from_bytes(json.as_bytes())
             .expect("Should deserialize vault with unknown custom field type");
 
         let entry = &contents.entries["id-1"];
@@ -158,50 +144,5 @@ mod tests {
         assert_eq!(fields[0].field_type, "date");
         assert_eq!(fields[0].value.as_str(), "2000-01-01");
         assert_eq!(fields[1].field_type, "text");
-    }
-
-    #[test]
-    fn test_roundtrip_preserves_unknown_types() {
-        let json = r#"{
-            "labels": {},
-            "entries": {
-                "id-1": {
-                    "type": "future_type",
-                    "name": "Future Entry",
-                    "created_at": 1000,
-                    "updated_at": 1000,
-                    "deleted_at": null,
-                    "is_favorite": false,
-                    "label_ids": ["label-1"],
-                    "typed_value": {"key": "value"},
-                    "notes": "some notes",
-                    "custom_fields": [
-                        {"id": "cf-1", "name": "Field", "field_type": "future_field", "value": "data"}
-                    ]
-                }
-            }
-        }"#;
-
-        let contents = VaultContents::from_bytes(json.as_bytes()).unwrap();
-        let bytes = contents.to_bytes().unwrap();
-        let roundtripped = VaultContents::from_bytes(&bytes).unwrap();
-
-        let entry = &roundtripped.entries["id-1"];
-        assert_eq!(entry.entry_type, "future_type");
-        assert_eq!(entry.name, "Future Entry");
-        let fields = entry.custom_fields.as_ref().unwrap();
-        assert_eq!(fields[0].field_type, "future_field");
-    }
-}
-
-impl VaultFile {
-    /// Convert to JSON bytes for transmission/storage
-    pub fn to_bytes(&self) -> crate::error::Result<Vec<u8>> {
-        serde_json::to_vec(self).map_err(crate::error::VaultError::JsonError)
-    }
-
-    /// Create from JSON bytes
-    pub fn from_bytes(bytes: &[u8]) -> crate::error::Result<Self> {
-        serde_json::from_slice(bytes).map_err(crate::error::VaultError::JsonError)
     }
 }

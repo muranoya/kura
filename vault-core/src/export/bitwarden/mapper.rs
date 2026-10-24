@@ -9,10 +9,12 @@ fn unix_to_iso8601(ts: i64) -> String {
         .unwrap_or_default()
 }
 
-/// Map kura custom field type string to Bitwarden field type.
-fn map_custom_field_type(kura_type: &str) -> u8 {
-    match kura_type {
+/// Map kura custom field to Bitwarden field type.
+/// 秘匿フィールド（`secret == true`）は型によらず hidden にする。
+fn map_custom_field_type(field: &crate::models::CustomField) -> u8 {
+    match field.field_type.as_str() {
         "password" | "totp" => BITWARDEN_FIELD_HIDDEN,
+        _ if field.secret => BITWARDEN_FIELD_HIDDEN,
         _ => BITWARDEN_FIELD_TEXT,
     }
 }
@@ -29,7 +31,7 @@ fn map_custom_fields(entry: &Entry) -> Vec<BitwardenField> {
                 .map(|f| BitwardenField {
                     name: f.name.clone(),
                     value: f.value.as_str().to_string(),
-                    field_type: map_custom_field_type(&f.field_type),
+                    field_type: map_custom_field_type(f),
                 })
                 .collect()
         })
@@ -50,7 +52,7 @@ fn extract_totp(entry: &Entry) -> (Option<String>, Vec<BitwardenField>) {
                 fields.push(BitwardenField {
                     name: f.name.clone(),
                     value: f.value.as_str().to_string(),
-                    field_type: map_custom_field_type(&f.field_type),
+                    field_type: map_custom_field_type(f),
                 });
             }
         }
@@ -672,6 +674,7 @@ mod tests {
             deleted_at: None,
             data,
             labels,
+            secret_field_keys: vec![],
         }
     }
 
@@ -715,6 +718,7 @@ mod tests {
                 value: crate::secret::SecretString::from_string(
                     "otpauth://totp/test?secret=ABC".to_string(),
                 ),
+                secret: false,
                 autofill_selector: None,
             },
             CustomField {
@@ -722,6 +726,7 @@ mod tests {
                 name: "Extra".to_string(),
                 field_type: "text".to_string(),
                 value: crate::secret::SecretString::from_string("some value".to_string()),
+                secret: false,
                 autofill_selector: None,
             },
         ]);

@@ -32,57 +32,25 @@ impl VaultManager {
     /// リモートvaultをローカルとマージしてセッションを更新
     ///
     /// プラットフォーム側がS3からダウンロードしたバイト列とETagを受け取り、
-    /// DEKで復号 → auto_merge → GC → セッション更新を行う。
+    /// index を復号 → auto_merge → GC → セッション更新を行う（secret は復号しない）。
     pub fn api_merge_remote_vault(
         &self,
         remote_bytes: Vec<u8>,
         remote_etag: String,
     ) -> Result<(), String> {
-        use crate::store::{VaultContents, VaultFile};
-
-        let remote_vault_file = VaultFile::from_bytes(&remote_bytes)
+        let remote = crate::store::StoredVault::from_bytes(&remote_bytes)
             .map_err(|e| format!("Failed to parse remote vault: {}", e))?;
 
         let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
-
         let unlocked = match session.as_mut() {
             Some(SessionState::Unlocked(ref mut u)) => u,
             _ => return Err("Vault not unlocked".to_string()),
         };
 
-        // Vault UUIDの一致を検証
-        if remote_vault_file.meta.vault_uuid != unlocked.meta.vault_uuid {
-            return Err(format!(
-                "Vault UUID mismatch: local={}, remote={}",
-                unlocked.meta.vault_uuid, remote_vault_file.meta.vault_uuid
-            ));
-        }
-
-        // ローカルcontentsを取得
-        let local_contents = unlocked.contents.clone();
-
-        // リモートvaultを復号
-        let remote_contents = crate::crypto::encryption::decrypt_vault(
-            &remote_vault_file.encrypted_vault,
-            &unlocked.dek,
-        )
-        .map_err(|e| format!("Failed to decrypt remote vault: {}", e))?;
-
-        // マージ
-        let merge_result = crate::sync::auto_merge(&local_contents, &remote_contents)
-            .map_err(|e| format!("Merge failed: {}", e))?;
-
-        // GC
-        let mut merged_contents = VaultContents {
-            entries: merge_result.merged_entries,
-            labels: merge_result.merged_labels,
-        };
-        let now = crate::get_timestamp();
-        crate::sync::apply_gc_to_contents(&mut merged_contents, now);
-
-        // セッション更新
-        unlocked.contents.entries = merged_contents.entries;
-        unlocked.contents.labels = merged_contents.labels;
+        // Vault UUIDの検証・index の復号（v1 なら v2 への変換）・マージ・GC
+        unlocked
+            .merge_remote(&remote)
+            .map_err(|e| format!("Failed to merge remote vault: {}", e))?;
         unlocked.set_etag(remote_etag);
 
         Ok(())

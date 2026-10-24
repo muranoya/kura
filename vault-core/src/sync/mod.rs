@@ -1,7 +1,7 @@
 pub mod engine;
 
 use crate::error::Result;
-use crate::store::{LabelValue, VaultContents, VaultEntry};
+use crate::store::{LabelValue, VaultEntry, VaultIndex};
 use std::collections::{HashMap, HashSet};
 
 /// GC retention period for purged tombstones (in days)
@@ -35,11 +35,20 @@ impl EntryState {
     }
 }
 
+/// マージでどちらの版が採用されたか
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MergeSide {
+    Local,
+    Remote,
+}
+
 /// Result of auto-merge operation
 #[derive(Debug, Clone)]
 pub struct MergeResult {
     pub merged_entries: HashMap<String, VaultEntry>,
     pub merged_labels: HashMap<String, LabelValue>,
+    /// エントリごとに採用された側。secret ブロックは、ここで示す側の暗号文をそのまま使う
+    pub entry_sources: HashMap<String, MergeSide>,
 }
 
 #[derive(Debug, Clone)]
@@ -57,10 +66,14 @@ impl SyncResult {
     }
 }
 
-/// Automatically merge local and remote vault contents using LWW + Tombstone strategy
-/// Note: This does NOT perform garbage collection. Call apply_gc_to_contents() separately.
-pub fn auto_merge(local: &VaultContents, remote: &VaultContents) -> Result<MergeResult> {
+/// Automatically merge local and remote vault index using LWW + Tombstone strategy
+/// Note: This does NOT perform garbage collection. Call apply_gc_to_index() separately.
+///
+/// マージの対象は index（非秘匿値と `secret_rev`）のみで、secret は復号しない。
+/// どちらの secret を採用するかは `MergeResult::entry_sources` で返す。
+pub fn auto_merge(local: &VaultIndex, remote: &VaultIndex) -> Result<MergeResult> {
     let mut merged_entries: HashMap<String, VaultEntry> = HashMap::new();
+    let mut entry_sources: HashMap<String, MergeSide> = HashMap::new();
 
     // Collect all entry IDs from both local and remote
     let all_ids: HashSet<&String> = local.entries.keys().chain(remote.entries.keys()).collect();
@@ -69,9 +82,15 @@ pub fn auto_merge(local: &VaultContents, remote: &VaultContents) -> Result<Merge
         let local_entry = local.entries.get(id);
         let remote_entry = remote.entries.get(id);
 
-        let winner = merge_entry(local_entry, remote_entry);
-        if let Some(entry) = winner {
-            merged_entries.insert(id.clone(), entry);
+        if let Some(side) = merge_entry(local_entry, remote_entry) {
+            let winner = match side {
+                MergeSide::Local => local_entry,
+                MergeSide::Remote => remote_entry,
+            };
+            if let Some(entry) = winner {
+                merged_entries.insert(id.clone(), entry.clone());
+                entry_sources.insert(id.clone(), side);
+            }
         }
     }
 
@@ -84,32 +103,35 @@ pub fn auto_merge(local: &VaultContents, remote: &VaultContents) -> Result<Merge
     Ok(MergeResult {
         merged_entries,
         merged_labels,
+        entry_sources,
     })
 }
 
-/// Apply garbage collection to vault contents
+/// Apply garbage collection to vault index
 /// Removes tombstones (purged entries and deleted labels) older than GC_RETENTION_DAYS
-/// Apply GC to purged tombstones older than retention period
 /// now: current timestamp in seconds since epoch
-pub fn apply_gc_to_contents(contents: &mut VaultContents, now: i64) -> usize {
+///
+/// purged エントリは secret を持たないため、index 行の削除だけで済む
+/// （孤立した secret が残っていれば `UnlockedVault::prune_secrets` で削除される）。
+pub fn apply_gc_to_index(index: &mut VaultIndex, now: i64) -> usize {
     let mut gc_count = 0;
-    gc_count += apply_gc_entries(&mut contents.entries, now);
-    apply_gc_labels(&mut contents.labels, now);
+    gc_count += apply_gc_entries(&mut index.entries, now);
+    apply_gc_labels(&mut index.labels, now);
     gc_count
 }
 
-/// Merge a single entry using LWW + Tombstone strategy
-fn merge_entry(local: Option<&VaultEntry>, remote: Option<&VaultEntry>) -> Option<VaultEntry> {
+/// Merge a single entry using LWW + Tombstone strategy. Returns which side wins.
+fn merge_entry(local: Option<&VaultEntry>, remote: Option<&VaultEntry>) -> Option<MergeSide> {
     match (local, remote) {
         // Group B: Only one exists -> auto-adopt
-        (Some(l), None) => Some(l.clone()),
-        (None, Some(r)) => Some(r.clone()),
+        (Some(_), None) => Some(MergeSide::Local),
+        (None, Some(_)) => Some(MergeSide::Remote),
 
         // Group C/D: Both exist -> LWW + tie-breaking
         (Some(l), Some(r)) => {
             match l.updated_at.cmp(&r.updated_at) {
-                std::cmp::Ordering::Greater => Some(l.clone()),
-                std::cmp::Ordering::Less => Some(r.clone()),
+                std::cmp::Ordering::Greater => Some(MergeSide::Local),
+                std::cmp::Ordering::Less => Some(MergeSide::Remote),
                 std::cmp::Ordering::Equal => {
                     // Same timestamp -> apply tie-breaking rules
                     let l_state = EntryState::from_entry(l);
@@ -117,15 +139,15 @@ fn merge_entry(local: Option<&VaultEntry>, remote: Option<&VaultEntry>) -> Optio
 
                     // D-13/D-17: Special case - soft-deleted newer than purged
                     if is_soft_delete_newer_than_purge(l_state, r_state, l, r) {
-                        Some(l.clone())
+                        Some(MergeSide::Local)
                     } else if is_soft_delete_newer_than_purge(r_state, l_state, r, l) {
-                        Some(r.clone())
+                        Some(MergeSide::Remote)
                     } else {
                         // Default tie-breaking: deletion priority (purged > soft-deleted > active)
                         if l_state.deletion_priority() >= r_state.deletion_priority() {
-                            Some(l.clone())
+                            Some(MergeSide::Local)
                         } else {
-                            Some(r.clone())
+                            Some(MergeSide::Remote)
                         }
                     }
                 }
@@ -246,25 +268,11 @@ fn apply_gc_labels(labels: &mut HashMap<String, LabelValue>, now: i64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::secret::EntrySecretJson;
 
     fn create_entry(id: &str, name: &str, timestamp: i64) -> (String, VaultEntry) {
-        (
-            id.to_string(),
-            VaultEntry {
-                entry_type: "login".to_string(),
-                name: name.to_string(),
-                created_at: timestamp,
-                updated_at: timestamp,
-                deleted_at: None,
-                purged_at: None,
-                is_favorite: false,
-                label_ids: vec![],
-                typed_value: EntrySecretJson::from_string("{}".to_string()),
-                notes: None,
-                custom_fields: None,
-            },
-        )
+        let mut entry = VaultEntry::new("login", name, timestamp);
+        entry.secret_rev = Some(format!("rev-{}-{}", name, timestamp));
+        (id.to_string(), entry)
     }
 
     fn create_soft_deleted(
@@ -289,25 +297,26 @@ mod tests {
         entry.updated_at = updated_at;
         entry.deleted_at = Some(deleted_at);
         entry.purged_at = Some(purged_at);
-        entry.typed_value = EntrySecretJson::from_string(String::new());
+        entry.secret_rev = None;
         (id, entry)
     }
 
     fn make_contents(
         entries: Vec<(String, VaultEntry)>,
         labels: Vec<(String, LabelValue)>,
-    ) -> VaultContents {
-        VaultContents {
+    ) -> VaultIndex {
+        VaultIndex {
             entries: entries.into_iter().collect(),
             labels: labels.into_iter().collect(),
+            extra: Default::default(),
         }
     }
 
-    fn empty_contents() -> VaultContents {
+    fn empty_contents() -> VaultIndex {
         make_contents(vec![], vec![])
     }
 
-    fn merge(local: &VaultContents, remote: &VaultContents) -> MergeResult {
+    fn merge(local: &VaultIndex, remote: &VaultIndex) -> MergeResult {
         auto_merge(local, remote).expect("auto_merge failed")
     }
 
@@ -416,6 +425,66 @@ mod tests {
         let result = merge(&local, &remote);
         // 実装上はローカルが採用される（deletion_priority同値でlocal >= remote）
         assert_eq!(result.merged_entries[&id].name, "Local");
+    }
+
+    // ===== secret ブロックの採用元 =====
+
+    #[test]
+    fn test_entry_sources_follow_winner() {
+        let (id_local, local_only) = create_entry("local", "L", 1000);
+        let (id_remote, remote_only) = create_entry("remote", "R", 1000);
+        let (id_both, mut both_local) = create_entry("both", "Old", 1000);
+        let (_, mut both_remote) = create_entry("both", "New", 2000);
+        both_local.secret_rev = Some("rev-local".to_string());
+        both_remote.secret_rev = Some("rev-remote".to_string());
+
+        let local = make_contents(
+            vec![
+                (id_local.clone(), local_only),
+                (id_both.clone(), both_local),
+            ],
+            vec![],
+        );
+        let remote = make_contents(
+            vec![
+                (id_remote.clone(), remote_only),
+                (id_both.clone(), both_remote),
+            ],
+            vec![],
+        );
+        let result = merge(&local, &remote);
+
+        assert_eq!(result.entry_sources[&id_local], MergeSide::Local);
+        assert_eq!(result.entry_sources[&id_remote], MergeSide::Remote);
+        assert_eq!(result.entry_sources[&id_both], MergeSide::Remote);
+        // 採用された index 行の secret_rev は、採用元の secret と対応する
+        assert_eq!(
+            result.merged_entries[&id_both].secret_rev.as_deref(),
+            Some("rev-remote")
+        );
+    }
+
+    #[test]
+    fn test_entry_sources_same_timestamp_different_secret_rev() {
+        // 2 台で別々に v1 から移行した場合（11-3）: updated_at と内容は同じで secret_rev だけが違う。
+        // どちらか一方の index 行と secret の組が、組のまま採用される
+        let (id, mut local_entry) = create_entry("id1", "Same", 1000);
+        let (_, mut remote_entry) = create_entry("id1", "Same", 1000);
+        local_entry.secret_rev = Some("rev-x".to_string());
+        remote_entry.secret_rev = Some("rev-y".to_string());
+
+        let local = make_contents(vec![(id.clone(), local_entry)], vec![]);
+        let remote = make_contents(vec![(id.clone(), remote_entry)], vec![]);
+        let result = merge(&local, &remote);
+
+        let expected_rev = match result.entry_sources[&id] {
+            MergeSide::Local => "rev-x",
+            MergeSide::Remote => "rev-y",
+        };
+        assert_eq!(
+            result.merged_entries[&id].secret_rev.as_deref(),
+            Some(expected_rev)
+        );
     }
 
     // ===== Group D: active vs soft-deleted =====
@@ -788,7 +857,7 @@ mod tests {
             vec![],
         );
 
-        let gc_count = apply_gc_to_contents(&mut contents, now);
+        let gc_count = apply_gc_to_index(&mut contents, now);
         assert_eq!(gc_count, 1);
         assert!(!contents.entries.contains_key(&id_old));
         assert!(contents.entries.contains_key(&id_recent));
@@ -804,7 +873,7 @@ mod tests {
         let mut contents = make_contents(vec![(id.clone(), entry)], vec![]);
 
         // cutoff = now - 180*86400 = 0, purged_at = 0, 0 < 0 は false なので残る
-        let gc_count = apply_gc_to_contents(&mut contents, now);
+        let gc_count = apply_gc_to_index(&mut contents, now);
         assert_eq!(gc_count, 0);
         assert!(contents.entries.contains_key(&id));
     }
@@ -818,7 +887,7 @@ mod tests {
         let mut contents = make_contents(vec![(id.clone(), entry)], vec![]);
 
         // cutoff = 1, purged_at = 0, 0 < 1 なので削除される
-        let gc_count = apply_gc_to_contents(&mut contents, now);
+        let gc_count = apply_gc_to_index(&mut contents, now);
         assert_eq!(gc_count, 1);
         assert!(!contents.entries.contains_key(&id));
     }
@@ -838,7 +907,7 @@ mod tests {
             ],
         );
 
-        apply_gc_to_contents(&mut contents, now);
+        apply_gc_to_index(&mut contents, now);
         assert!(!contents.labels.contains_key("old"));
         assert!(contents.labels.contains_key("recent"));
         assert!(contents.labels.contains_key("active"));
@@ -850,7 +919,7 @@ mod tests {
         let (id, entry) = create_entry("active", "Active", now);
         let mut contents = make_contents(vec![(id.clone(), entry)], vec![]);
 
-        let gc_count = apply_gc_to_contents(&mut contents, now);
+        let gc_count = apply_gc_to_index(&mut contents, now);
         assert_eq!(gc_count, 0);
         assert!(contents.entries.contains_key(&id));
     }

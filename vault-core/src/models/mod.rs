@@ -10,7 +10,7 @@ pub use argon2_params::Argon2Params;
 pub use entry::{Entry, EntryFilter, EntrySummary, EntryType, SortField, SortOrder};
 pub use entry_data::{CustomField, CustomFieldSelector, CustomFieldType, EntryData};
 pub use label::Label;
-pub use passkey_data::PasskeyFieldData;
+pub use passkey_data::{PasskeyFieldData, PasskeyPublicData};
 pub use typed_value::{
     BankData, CreditCardData, LoginData, PasswordData, SecureNoteData, SoftwareLicenseData,
     SshKeyData, TypedValue,

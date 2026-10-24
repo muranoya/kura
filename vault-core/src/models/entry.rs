@@ -103,12 +103,14 @@ pub struct Entry {
     pub deleted_at: Option<i64>,
     pub data: EntryData,
     pub labels: Vec<String>,
+    /// typed_value のうち秘匿値（secret ブロックに置かれている）のキー。
+    /// UI はこれに含まれるフィールドをマスク表示する。
+    #[serde(default)]
+    pub secret_field_keys: Vec<String>,
 }
 
 /// 一覧表示・オートフィル候補抽出に必要な最小限の情報のみを持つエントリサマリ。
-/// password/cvv/pin/notes/custom_fields等の秘匿値は含まない。
-/// `typed_value`はサブタイトル抽出に必要な非秘匿フィールドのみを部分的に読むため、
-/// `Entry`と異なり秘匿フィールドの復号・cloneが発生しない。
+/// index だけから作るため、secret ブロックの復号は発生しない。
 #[derive(Debug, Clone)]
 pub struct EntrySummary {
     pub id: String,
@@ -198,42 +200,7 @@ impl EntryFilter {
             }
         }
         if let Some(query) = &self.search_query {
-            let q = query.to_lowercase();
-            let name_match = entry.name.to_lowercase().contains(&q);
-            let notes_match = entry
-                .notes
-                .as_ref()
-                .map(|n| n.as_str().to_lowercase().contains(&q))
-                .unwrap_or(false);
-            let custom_match = entry
-                .custom_fields
-                .as_ref()
-                .map(|fields| {
-                    fields.iter().any(|f| {
-                        if f.name.to_lowercase().contains(&q) {
-                            return true;
-                        }
-                        match f.field_type.as_str() {
-                            "text" | "email" | "url" | "phone" => {
-                                f.value.as_str().to_lowercase().contains(&q)
-                            }
-                            _ => false,
-                        }
-                    })
-                })
-                .unwrap_or(false);
-            let typed_value_match = searchable_typed_value_keys(&entry.entry_type)
-                .and_then(|keys| {
-                    // 検索可能な（非秘匿）フィールドのみを持つ構造体へdeserializeする。
-                    // ここに列挙していないフィールド（password, cvv, pin,
-                    // ssh秘密鍵等）はserdeの未知フィールド無視により、
-                    // `serde_json::Value`として所有コピーを持つことなく破棄される。
-                    serde_json::from_str::<TypedValuePreviewFields>(entry.typed_value.as_str())
-                        .ok()
-                        .map(|fields| keys.iter().any(|key| fields.matches(key, &q)))
-                })
-                .unwrap_or(false);
-            if !name_match && !notes_match && !custom_match && !typed_value_match {
+            if !matches_search(entry, &query.to_lowercase()) {
                 return false;
             }
         }
@@ -241,129 +208,72 @@ impl EntryFilter {
     }
 }
 
-/// 全エントリタイプを通して検索・一覧表示に使いうる`typed_value`フィールドのサブセット。
-/// 秘匿フィールド（password, cvv, pin, ssh秘密鍵等）は意図的に含めておらず、
-/// 読み取らない値のために所有コピーを確保することなく、deserialize時にserdeが
-/// 無視するようにしている。検索（`EntryFilter::matches`）と一覧表示のsubtitle/
-/// オートフィル用URL抽出（`vault_entry_to_summary`）の両方から利用される。
-#[derive(Deserialize)]
-pub(crate) struct TypedValuePreviewFields {
-    #[serde(default)]
-    url: Option<String>,
-    #[serde(default)]
-    username: Option<String>,
-    #[serde(default)]
-    bank_name: Option<String>,
-    #[serde(default)]
-    branch_code: Option<String>,
-    #[serde(default)]
-    account_type: Option<String>,
-    #[serde(default)]
-    account_holder: Option<String>,
-    #[serde(default)]
-    account_number: Option<String>,
-    #[serde(default)]
-    content: Option<String>,
-    #[serde(default)]
-    cardholder: Option<String>,
-    #[serde(default)]
-    expiry: Option<String>,
-    #[serde(default)]
-    license_key: Option<String>,
-}
+/// 検索対象は index にある値だけ（`docs/vault-format-v2.md` 4-3）。
+/// - `name`
+/// - `public_fields` の全値（文字列のもの）
+/// - カスタムフィールドの名前（全フィールド）
+/// - カスタムフィールドの値（`secret == false` かつ text / email / url / phone のもの）
+///
+/// secret ブロックにある値（password・notes 等）は検索対象外で、検索のために復号もしない。
+fn matches_search(entry: &crate::store::VaultEntry, query_lower: &str) -> bool {
+    let contains = |s: &str| s.to_lowercase().contains(query_lower);
 
-impl TypedValuePreviewFields {
-    fn matches(&self, key: &str, query_lower: &str) -> bool {
-        let value = match key {
-            "url" => self.url.as_deref(),
-            "username" => self.username.as_deref(),
-            "bank_name" => self.bank_name.as_deref(),
-            "branch_code" => self.branch_code.as_deref(),
-            "account_type" => self.account_type.as_deref(),
-            "account_holder" => self.account_holder.as_deref(),
-            "account_number" => self.account_number.as_deref(),
-            "content" => self.content.as_deref(),
-            "cardholder" => self.cardholder.as_deref(),
-            "expiry" => self.expiry.as_deref(),
-            "license_key" => self.license_key.as_deref(),
-            _ => None,
-        };
-        value
-            .map(|s| s.to_lowercase().contains(query_lower))
-            .unwrap_or(false)
+    if contains(&entry.name) {
+        return true;
     }
-
-    /// エントリ一覧のsubtitleとして表示する非秘匿な代表フィールドを返す。
-    /// `api/entries.rs`の旧`extract_subtitle`（`TypedValue`版）と同じ対応関係。
-    pub(crate) fn subtitle(&self, entry_type: &str) -> Option<String> {
-        let s = match entry_type {
-            "login" | "password" => self.username.as_deref(),
-            "bank" => self.bank_name.as_deref(),
-            "credit_card" => self.cardholder.as_deref(),
-            _ => None,
-        }?;
-        if s.is_empty() {
-            None
-        } else {
-            Some(s.to_string())
+    if entry
+        .public_fields
+        .values()
+        .filter_map(|v| v.as_str())
+        .any(contains)
+    {
+        return true;
+    }
+    entry.custom_fields.iter().any(|f| {
+        if contains(&f.name) {
+            return true;
         }
-    }
-
-    /// entry_type == "login" のオートフィル候補抽出用URL
-    pub(crate) fn login_url(&self) -> Option<String> {
-        self.url
-            .as_deref()
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-    }
-}
-
-/// Returns the list of searchable (non-sensitive) typed_value field keys for known entry types.
-/// Returns None for unknown types (typed_value is not searched).
-fn searchable_typed_value_keys(entry_type: &str) -> Option<&'static [&'static str]> {
-    match entry_type {
-        "login" => Some(&["url", "username"]),
-        "bank" => Some(&[
-            "bank_name",
-            "branch_code",
-            "account_type",
-            "account_holder",
-            "account_number",
-        ]),
-        "ssh_key" => Some(&[]),
-        "secure_note" => Some(&["content"]),
-        "credit_card" => Some(&["cardholder", "expiry"]),
-        "password" => Some(&["username"]),
-        "software_license" => Some(&["license_key"]),
-        _ => None,
-    }
+        !f.secret
+            && crate::store::layout::is_searchable_custom_field_type(&f.field_type)
+            && f.value.as_deref().is_some_and(contains)
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::models::entry_data::CustomField;
-    use crate::secret::{EntrySecretJson, SecretString};
+    use crate::secret::SecretString;
+    use crate::store::layout::{split_custom_fields, split_typed_value};
     use crate::store::VaultEntry;
 
     fn make_entry(entry_type: &str, typed_value_json: &str) -> VaultEntry {
-        VaultEntry {
-            entry_type: entry_type.to_string(),
-            name: "Test Entry".to_string(),
-            created_at: 1000,
-            updated_at: 1000,
-            deleted_at: None,
-            purged_at: None,
-            is_favorite: false,
-            label_ids: vec![],
-            typed_value: EntrySecretJson::from_string(typed_value_json.to_string()),
-            notes: None,
-            custom_fields: None,
-        }
+        let mut entry = VaultEntry::new(entry_type, "Test Entry", 1000);
+        let (public_fields, _) = split_typed_value(entry_type, typed_value_json, None).unwrap();
+        entry.public_fields = public_fields;
+        entry
+    }
+
+    fn set_custom_field(entry: &mut VaultEntry, name: &str, field_type: &str, value: &str) {
+        let field = CustomField {
+            id: "cf1".to_string(),
+            name: name.to_string(),
+            field_type: field_type.to_string(),
+            value: SecretString::from_string(value.to_string()),
+            secret: false,
+            autofill_selector: None,
+        };
+        entry.custom_fields = split_custom_fields(&[field], &[]).0;
     }
 
     fn search_filter(query: &str) -> EntryFilter {
         EntryFilter::new().with_search(query.to_string())
+    }
+
+    fn empty_login() -> VaultEntry {
+        let mut entry = make_entry("login", r#"{"url":"","username":"","password":""}"#);
+        entry.name = "Something".into();
+        entry
     }
 
     #[test]
@@ -403,6 +313,8 @@ mod tests {
         assert!(search_filter("田中").matches(&entry));
         assert!(search_filter("001").matches(&entry));
         assert!(!search_filter("9999").matches(&entry)); // pin excluded
+                                                         // v2 から account_number は秘匿値（検索対象外）
+        assert!(!search_filter("1234567").matches(&entry));
     }
 
     #[test]
@@ -414,7 +326,7 @@ mod tests {
         assert!(search_filter("Taro").matches(&entry));
         assert!(search_filter("12/25").matches(&entry));
         assert!(!search_filter("4111").matches(&entry)); // number excluded
-        assert!(!search_filter("123").matches(&entry)); // cvv excluded - but "123" could match elsewhere
+        assert!(!search_filter("123").matches(&entry)); // cvv excluded
         assert!(!search_filter("0000").matches(&entry)); // pin excluded
     }
 
@@ -425,19 +337,22 @@ mod tests {
     }
 
     #[test]
-    fn test_search_secure_note_content() {
+    fn test_search_secure_note_content_excluded() {
+        // v2 から secure_note.content は秘匿値（検索対象外）
         let entry = make_entry("secure_note", r#"{"content":"important memo here"}"#);
-        assert!(search_filter("memo").matches(&entry));
+        assert!(!search_filter("memo").matches(&entry));
     }
 
     #[test]
-    fn test_search_software_license_key() {
+    fn test_search_software_license_key_excluded() {
+        // v2 から license_key は秘匿値（検索対象外）
         let entry = make_entry("software_license", r#"{"license_key":"ABCD-EFGH-1234"}"#);
-        assert!(search_filter("EFGH").matches(&entry));
+        assert!(!search_filter("EFGH").matches(&entry));
     }
 
     #[test]
     fn test_search_unknown_type_typed_value_not_searched() {
+        // 未知タイプは書き込み時に全フィールドが secret に置かれる
         let entry = make_entry(
             "wifi_password",
             r#"{"ssid":"MyNetwork","password":"wifipass"}"#,
@@ -446,89 +361,90 @@ mod tests {
     }
 
     #[test]
+    fn test_search_unknown_type_public_fields_searched() {
+        // 未知タイプでも、書き込んだクライアントが index に置いた値は検索できる
+        let mut entry = make_entry("wifi_password", r#"{"password":"wifipass"}"#);
+        entry.public_fields.insert(
+            "ssid".to_string(),
+            crate::secret::PublicJson::from_value(serde_json::json!("MyNetwork")),
+        );
+        assert!(search_filter("MyNetwork").matches(&entry));
+        assert!(!search_filter("wifipass").matches(&entry));
+    }
+
+    #[test]
     fn test_search_custom_field_value_text() {
-        let mut entry = make_entry("login", r#"{"url":"","username":"","password":""}"#);
-        entry.name = "Something".to_string();
-        entry.custom_fields = Some(vec![CustomField {
-            id: "cf1".to_string(),
-            name: "Security Question".to_string(),
-            field_type: "text".to_string(),
-            value: SecretString::from_string("My pet name is Max".to_string()),
-            autofill_selector: None,
-        }]);
+        let mut entry = empty_login();
+        set_custom_field(
+            &mut entry,
+            "Security Question",
+            "text",
+            "My pet name is Max",
+        );
         assert!(search_filter("Max").matches(&entry));
     }
 
     #[test]
-    fn test_search_custom_field_value_password_excluded() {
-        let mut entry = make_entry("login", r#"{"url":"","username":"","password":""}"#);
-        entry.name = "Something".to_string();
-        entry.custom_fields = Some(vec![CustomField {
+    fn test_search_custom_field_value_secret_text_excluded() {
+        let mut entry = empty_login();
+        let field = CustomField {
             id: "cf1".to_string(),
-            name: "API Key".to_string(),
-            field_type: "password".to_string(),
-            value: SecretString::from_string("sk-abc123secret".to_string()),
+            name: "PIN".to_string(),
+            field_type: "text".to_string(),
+            value: SecretString::from_string("4321".to_string()),
+            secret: true,
             autofill_selector: None,
-        }]);
+        };
+        entry.custom_fields = split_custom_fields(&[field], &[]).0;
+        assert!(!search_filter("4321").matches(&entry));
+        assert!(search_filter("PIN").matches(&entry)); // name is still searchable
+    }
+
+    #[test]
+    fn test_search_custom_field_value_password_excluded() {
+        let mut entry = empty_login();
+        set_custom_field(&mut entry, "API Key", "password", "sk-abc123secret");
         assert!(!search_filter("abc123secret").matches(&entry));
         assert!(search_filter("API Key").matches(&entry)); // name is still searchable
     }
 
     #[test]
     fn test_search_custom_field_value_email() {
-        let mut entry = make_entry("login", r#"{"url":"","username":"","password":""}"#);
-        entry.name = "Something".to_string();
-        entry.custom_fields = Some(vec![CustomField {
-            id: "cf1".to_string(),
-            name: "Recovery Email".to_string(),
-            field_type: "email".to_string(),
-            value: SecretString::from_string("recovery@example.com".to_string()),
-            autofill_selector: None,
-        }]);
+        let mut entry = empty_login();
+        set_custom_field(
+            &mut entry,
+            "Recovery Email",
+            "email",
+            "recovery@example.com",
+        );
         assert!(search_filter("recovery@example").matches(&entry));
     }
 
     #[test]
     fn test_search_custom_field_value_totp_excluded() {
-        let mut entry = make_entry("login", r#"{"url":"","username":"","password":""}"#);
-        entry.name = "Something".to_string();
-        entry.custom_fields = Some(vec![CustomField {
-            id: "cf1".to_string(),
-            name: "TOTP".to_string(),
-            field_type: "totp".to_string(),
-            value: SecretString::from_string("JBSWY3DPEHPK3PXP".to_string()),
-            autofill_selector: None,
-        }]);
+        let mut entry = empty_login();
+        set_custom_field(&mut entry, "TOTP", "totp", "JBSWY3DPEHPK3PXP");
         assert!(!search_filter("JBSWY3DPEHPK3PXP").matches(&entry));
+        // 公開部（周期）も検索対象外
+        assert!(!search_filter("period").matches(&entry));
     }
 
     #[test]
     fn test_search_custom_field_value_passkey_excluded() {
-        let mut entry = make_entry("login", r#"{"url":"","username":"","password":""}"#);
-        entry.name = "Something".to_string();
-        entry.custom_fields = Some(vec![CustomField {
-            id: "cf1".to_string(),
-            name: "Passkey".to_string(),
-            field_type: "passkey".to_string(),
-            value: SecretString::from_string(
-                r#"{"rp_id":"example.com","private_key":"secret"}"#.to_string(),
-            ),
-            autofill_selector: None,
-        }]);
+        let mut entry = empty_login();
+        set_custom_field(
+            &mut entry,
+            "Passkey",
+            "passkey",
+            r#"{"rp_id":"example.com","user_handle":"h","user_name":"u","user_display_name":"U","credential_id":"c","private_key":"secret"}"#,
+        );
         assert!(!search_filter("example.com").matches(&entry));
     }
 
     #[test]
     fn test_search_custom_field_unknown_type_excluded() {
-        let mut entry = make_entry("login", r#"{"url":"","username":"","password":""}"#);
-        entry.name = "Something".to_string();
-        entry.custom_fields = Some(vec![CustomField {
-            id: "cf1".to_string(),
-            name: "Custom".to_string(),
-            field_type: "future_type".to_string(),
-            value: SecretString::from_string("some value".to_string()),
-            autofill_selector: None,
-        }]);
+        let mut entry = empty_login();
+        set_custom_field(&mut entry, "Custom", "future_type", "some value");
         assert!(!search_filter("some value").matches(&entry));
     }
 
@@ -546,14 +462,5 @@ mod tests {
     fn test_search_name_still_works() {
         let entry = make_entry("login", r#"{"url":"","username":"","password":""}"#);
         assert!(search_filter("Test Entry").matches(&entry));
-    }
-
-    #[test]
-    fn test_search_notes_still_works() {
-        let mut entry = make_entry("login", r#"{"url":"","username":"","password":""}"#);
-        entry.notes = Some(SecretString::from_string(
-            "Remember to update quarterly".to_string(),
-        ));
-        assert!(search_filter("quarterly").matches(&entry));
     }
 }

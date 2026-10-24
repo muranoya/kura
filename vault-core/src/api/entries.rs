@@ -44,9 +44,8 @@ impl VaultManager {
                 filter = filter.favorites_only();
             }
 
-            // password/cvv/pin等の秘匿値は一覧表示に不要なため、list_entry_summariesで
-            // 復号・cloneを避ける（メモリ安全性の設計方針は docs/architecture.md の
-            // 「メモリ安全性」セクション参照）
+            // 一覧表示は index だけで処理し、secret は復号しない（メモリ安全性の設計方針は
+            // docs/architecture.md の「メモリ安全性」セクション参照）
             let entries = unlocked.list_entry_summaries(&filter);
 
             Ok(entries
@@ -65,7 +64,7 @@ impl VaultManager {
         })
     }
 
-    /// エントリ詳細（復号済み）
+    /// エントリ詳細（復号済み）。対象エントリの secret だけを復号する
     pub fn api_get_entry(&self, id: String) -> Result<EntryDetail, String> {
         self.with_unlocked(|unlocked| {
             let entry = unlocked
@@ -91,6 +90,7 @@ impl VaultManager {
                     .unwrap_or_else(|_| "{}".to_string()),
                 labels: entry.labels,
                 custom_fields,
+                secret_field_keys: entry.secret_field_keys,
             })
         })
     }
@@ -269,7 +269,7 @@ impl VaultManager {
         self.with_unlocked(|unlocked| {
             let filter = EntryFilter::new().with_type("login".to_string());
 
-            // password等の秘匿値は不要なため、list_entry_summariesで復号・cloneを避ける
+            // password等の秘匿値は不要なため、index だけで処理する（secret は復号しない）
             let entries = unlocked.list_entry_summaries(&filter);
             let page_hostname_lower = page_hostname.to_lowercase();
 
@@ -293,7 +293,7 @@ impl VaultManager {
         })
     }
 
-    /// エントリのTOTPコードを生成する（password等の他フィールドは取得しない）
+    /// エントリのTOTPコードを生成する（対象エントリの secret だけを復号する）
     pub fn api_get_totp_code(&self, id: String) -> Result<Option<String>, String> {
         self.with_unlocked(|unlocked| {
             unlocked
@@ -302,7 +302,8 @@ impl VaultManager {
         })
     }
 
-    /// 複数エントリのTOTP周期をまとめて取得する（オートフィル候補抽出用のN+1回避）
+    /// 複数エントリのTOTP周期をまとめて取得する（オートフィル候補抽出用のN+1回避）。
+    /// totp フィールドの公開部（周期）から返し、secret は復号しない
     pub fn api_list_totp_periods(&self, ids: Vec<String>) -> Result<Vec<TotpPeriodRow>, String> {
         self.with_unlocked(|unlocked| {
             Ok(unlocked

@@ -58,6 +58,7 @@ mod tests {
                     None,
                 ),
                 labels: vec!["l1".to_string()],
+                secret_field_keys: vec![],
             },
             Entry {
                 id: "e2".to_string(),
@@ -69,6 +70,7 @@ mod tests {
                 deleted_at: None,
                 data: EntryData::new_secure_note("content".into(), None),
                 labels: vec![],
+                secret_field_keys: vec![],
             },
         ];
         let labels = vec![Label {

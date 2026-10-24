@@ -1,13 +1,17 @@
 //! Reads and writes `passkey` custom fields on `login` entries. Cryptographic
 //! operations (key generation, signing, CBOR construction) live in
 //! `crate::webauthn`; this module only knows about `CustomField`/`VaultEntry`.
+//!
+//! 候補の列挙は index にある Passkey の公開部（`PasskeyPublicData`）だけで行い、
+//! 秘密鍵（secret ブロック）は署名するときだけ復号する（`docs/vault-format-v2.md` 4-2）。
 
 use std::collections::HashMap;
 
 use crate::error::{Result, VaultError};
-use crate::models::{CustomField, EntryData, PasskeyFieldData};
+use crate::models::{CustomField, EntryData, PasskeyFieldData, PasskeyPublicData};
 use crate::secret::SecretString;
-use crate::store::VaultEntry;
+use crate::store::layout::combine_custom_fields;
+use crate::store::{IndexCustomField, VaultEntry};
 
 use super::UnlockedVault;
 
@@ -49,7 +53,7 @@ impl UnlockedVault {
         allow_credential_ids: &[String],
     ) -> Vec<PasskeyCandidate> {
         let mut result = Vec::new();
-        for (entry_id, vault_entry) in &self.contents.entries {
+        for (entry_id, vault_entry) in &self.index.entries {
             if vault_entry.entry_type != "login"
                 || vault_entry.deleted_at.is_some()
                 || vault_entry.purged_at.is_some()
@@ -57,7 +61,11 @@ impl UnlockedVault {
                 continue;
             }
             for field in find_passkey_fields(vault_entry) {
-                let Ok(data) = PasskeyFieldData::from_json_string(field.value.as_str()) else {
+                let Some(data) = field
+                    .value
+                    .as_deref()
+                    .and_then(|v| PasskeyPublicData::from_json_string(v).ok())
+                else {
                     continue;
                 };
                 if data.rp_id != rp_id {
@@ -70,7 +78,7 @@ impl UnlockedVault {
                 }
                 result.push(PasskeyCandidate {
                     entry_id: entry_id.clone(),
-                    entry_name: vault_entry.name.clone(),
+                    entry_name: vault_entry.name.to_string(),
                     custom_field_id: field.id.clone(),
                     credential_id: data.credential_id,
                     user_handle: data.user_handle,
@@ -138,6 +146,7 @@ impl UnlockedVault {
             name: "Passkey".to_string(),
             field_type: "passkey".to_string(),
             value: SecretString::from_string(passkey_data.to_json_string()?),
+            secret: true,
             autofill_selector: None,
         };
 
@@ -185,13 +194,7 @@ impl UnlockedVault {
         custom_field_id: &str,
         client_data_json: &str,
     ) -> Result<PasskeyAssertion> {
-        let vault_entry = find_active_login_entry(&self.contents.entries, entry_id)?;
-
-        let field = find_passkey_fields(vault_entry)
-            .find(|f| f.id == custom_field_id)
-            .ok_or_else(|| VaultError::EntryNotFound(custom_field_id.to_string()))?;
-
-        let data = PasskeyFieldData::from_json_string(field.value.as_str())?;
+        let data = self.load_passkey(entry_id, custom_field_id)?;
         let assertion =
             crate::webauthn::get_assertion(&data.rp_id, &data.private_key, client_data_json)?;
 
@@ -213,13 +216,7 @@ impl UnlockedVault {
         custom_field_id: &str,
         client_data_hash: &[u8; 32],
     ) -> Result<PasskeyAssertion> {
-        let vault_entry = find_active_login_entry(&self.contents.entries, entry_id)?;
-
-        let field = find_passkey_fields(vault_entry)
-            .find(|f| f.id == custom_field_id)
-            .ok_or_else(|| VaultError::EntryNotFound(custom_field_id.to_string()))?;
-
-        let data = PasskeyFieldData::from_json_string(field.value.as_str())?;
+        let data = self.load_passkey(entry_id, custom_field_id)?;
         let assertion = crate::webauthn::get_assertion_with_hash(
             &data.rp_id,
             &data.private_key,
@@ -235,14 +232,27 @@ impl UnlockedVault {
     }
 }
 
-/// `VaultEntry`の`custom_fields`から`field_type == "passkey"`のものだけを走査する。
-/// `custom_fields`全体をclone/パースしない（`find_totp_value`と同じ設計、
-/// `vault/entries.rs`参照）。
-fn find_passkey_fields(e: &VaultEntry) -> impl Iterator<Item = &CustomField> {
-    e.custom_fields
-        .iter()
-        .flatten()
-        .filter(|f| f.field_type == "passkey")
+impl UnlockedVault {
+    /// 署名に使う Passkey を、対象エントリの secret だけを復号して取り出す
+    fn load_passkey(&self, entry_id: &str, custom_field_id: &str) -> Result<PasskeyFieldData> {
+        let vault_entry = find_active_login_entry(&self.index.entries, entry_id)?;
+        let field = find_passkey_fields(vault_entry)
+            .find(|f| f.id == custom_field_id)
+            .ok_or_else(|| VaultError::EntryNotFound(custom_field_id.to_string()))?;
+
+        let secret = self.read_secret(entry_id)?;
+        let combined = combine_custom_fields(std::slice::from_ref(field), &secret.custom_fields);
+        let value = &combined
+            .first()
+            .ok_or_else(|| VaultError::EntryNotFound(custom_field_id.to_string()))?
+            .value;
+        PasskeyFieldData::from_json_string(value.as_str())
+    }
+}
+
+/// index 上のエントリの`custom_fields`から`field_type == "passkey"`のものだけを走査する。
+fn find_passkey_fields(e: &VaultEntry) -> impl Iterator<Item = &IndexCustomField> {
+    e.custom_fields.iter().filter(|f| f.field_type == "passkey")
 }
 
 /// `entry_id`が存在し、かつ`login`タイプでゴミ箱・tombstoneでもない場合のみエントリを
@@ -272,21 +282,75 @@ mod tests {
     use super::*;
     use crate::crypto::Dek;
     use crate::models::{Argon2Params, VaultMeta};
-    use crate::store::VaultContents;
 
     fn make_vault() -> UnlockedVault {
-        UnlockedVault {
-            meta: VaultMeta {
+        UnlockedVault::new_empty(
+            VaultMeta {
                 vault_uuid: "test-uuid".to_string(),
                 encrypted_dek_master: String::new(),
                 encrypted_dek_recovery: String::new(),
                 argon2_params: Argon2Params::default(),
                 created_at: 0,
             },
-            contents: VaultContents::default(),
-            dek: Dek::generate(),
-            etag: None,
-        }
+            Dek::generate(),
+        )
+    }
+
+    #[test]
+    fn test_private_key_is_kept_out_of_index() {
+        let mut vault = make_vault();
+        let attestation = vault
+            .create_passkey_credential(
+                None,
+                "example.com".to_string(),
+                None,
+                "handle".to_string(),
+                "user".to_string(),
+                "User".to_string(),
+                &[],
+            )
+            .unwrap();
+
+        let entry = &vault.index.entries[&attestation.entry_id];
+        let field = &entry.custom_fields[0];
+        assert!(field.secret);
+        let public = field.value.as_deref().unwrap();
+        assert!(public.contains(&attestation.credential_id));
+        assert!(!public.contains("private_key"));
+
+        // 秘密鍵は secret ブロックにある
+        let secret = vault.read_secret(&attestation.entry_id).unwrap();
+        assert!(!secret.custom_fields[&field.id].as_str().is_empty());
+    }
+
+    #[test]
+    fn test_find_credentials_does_not_need_secrets() {
+        let mut vault = make_vault();
+        let attestation = vault
+            .create_passkey_credential(
+                None,
+                "example.com".to_string(),
+                None,
+                "handle".to_string(),
+                "user".to_string(),
+                "User".to_string(),
+                &[],
+            )
+            .unwrap();
+
+        // secret ブロックが無くても候補列挙はできる（index だけで処理している）
+        vault.secrets.clear();
+        let candidates = vault.find_passkey_credentials("example.com", &[]);
+        assert_eq!(candidates.len(), 1);
+        // 署名には秘密鍵が必要なので、破損エントリとして失敗する
+        assert!(matches!(
+            vault.get_passkey_assertion(
+                &attestation.entry_id,
+                &attestation.custom_field_id,
+                r#"{"type":"webauthn.get"}"#,
+            ),
+            Err(VaultError::CorruptedEntry(_))
+        ));
     }
 
     #[test]

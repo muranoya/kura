@@ -19,14 +19,10 @@ pub fn generate_preview(
 ) -> Result<ImportPreview> {
     let (account_name, vault_names) = extract_metadata(file_bytes)?;
 
-    // Collect existing active entries for duplicate detection
-    let existing: Vec<(&str, &crate::store::VaultEntry)> = unlocked
-        .contents
-        .entries
-        .iter()
-        .filter(|(_, e)| e.deleted_at.is_none())
-        .map(|(id, e)| (id.as_str(), e))
-        .collect();
+    // Collect existing active entries for duplicate detection.
+    // 重複判定はカード番号・口座番号・秘密鍵など秘匿値も比較するため、インポート時
+    // （ユーザーが明示的に行う操作）に限って既存エントリの secret を復号する。
+    let existing = unlocked.list_entries(&crate::models::EntryFilter::new())?;
 
     let mut items = Vec::new();
     let mut type_counts: HashMap<String, usize> = HashMap::new();

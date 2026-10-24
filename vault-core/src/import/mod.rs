@@ -266,7 +266,7 @@ fn create_entry_from_parsed(
     let entry = unlocked.create_entry(mapped.name, mapped.entry_type, mapped.data, label_ids)?;
 
     // Overwrite timestamps with original 1pux values
-    if let Some(ve) = unlocked.contents.entries.get_mut(&entry.id) {
+    if let Some(ve) = unlocked.index.entries.get_mut(&entry.id) {
         ve.created_at = mapped.created_at;
         ve.updated_at = mapped.updated_at;
     }
@@ -294,7 +294,7 @@ fn overwrite_entry_from_parsed(
     unlocked.set_entry_labels(existing_id, label_ids)?;
 
     // Overwrite timestamps with original 1pux values
-    if let Some(ve) = unlocked.contents.entries.get_mut(existing_id) {
+    if let Some(ve) = unlocked.index.entries.get_mut(existing_id) {
         ve.created_at = mapped.created_at;
         ve.updated_at = mapped.updated_at;
     }

@@ -1,4 +1,4 @@
-use crate::crypto::Dek;
+use crate::crypto::{Dek, SubKeys};
 use crate::error::{Result, VaultError};
 use crate::models::Argon2Params;
 use crate::secret::{MasterPassword, RecoveryKeyInput};
@@ -90,6 +90,16 @@ impl UnlockedVault {
             .map_err(|_| VaultError::DecryptionError("Invalid base64".to_string()))?;
         let _verified_dek = Dek::unwrap(&encrypted_dek_bytes, &kek_master)?;
 
+        // 旧 DEK のうちに全 secret を復号しておく。1 件でも復号できなければ、
+        // vault の状態を変えずにエラーを返す（新しい DEK に切り替えると、その secret は
+        // 二度と復号できなくなるため）
+        let mut plaintexts = Vec::new();
+        for (id, entry) in &self.index.entries {
+            if entry.secret_rev.is_some() {
+                plaintexts.push((id.clone(), self.read_secret(id)?.to_bytes()?));
+            }
+        }
+
         // Generate new DEK
         let new_dek = Dek::generate();
         let encrypted_dek_master = new_dek.wrap(&kek_master)?;
@@ -100,9 +110,16 @@ impl UnlockedVault {
         let encrypted_dek_recovery = new_dek.wrap(&kek_recovery)?;
 
         // Update vault state
+        self.keys = SubKeys::derive(&new_dek);
         self.dek = new_dek;
         self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
         self.meta.encrypted_dek_recovery = engine.encode(&encrypted_dek_recovery);
+
+        // 全 secret を新しいサブ鍵で再暗号化する（secret_rev も再生成する）。
+        // index は次の書き込み時に新しいサブ鍵で暗号化される
+        for (id, plaintext) in plaintexts {
+            self.seal_secret_with_new_rev(&id, &plaintext)?;
+        }
 
         Ok(new_recovery_key)
     }
@@ -177,8 +194,6 @@ impl UnlockedVault {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::secret::EntrySecretJson;
-    use crate::store::VaultEntry;
     use crate::vault::LockedVault;
 
     const PASSWORD: &str = "test-master-password";
@@ -238,29 +253,32 @@ mod tests {
         let mut vault = create_unlocked_vault();
 
         // Add an entry to verify data survives rotation
-        vault.contents.entries.insert(
-            uuid::Uuid::new_v4().to_string(),
-            VaultEntry {
-                entry_type: "secure_note".to_string(),
-                name: "test-note".to_string(),
-                created_at: 1000,
-                updated_at: 1000,
-                deleted_at: None,
-                purged_at: None,
-                is_favorite: false,
-                label_ids: vec![],
-                typed_value: EntrySecretJson::from_string(r#"{"content":"secret"}"#.to_string()),
-                notes: None,
-                custom_fields: None,
-            },
-        );
+        let entry = vault
+            .create_entry(
+                "test-note".to_string(),
+                "secure_note".to_string(),
+                crate::models::EntryData::new_secure_note("secret".to_string(), None),
+                vec![],
+            )
+            .unwrap();
+        let rev_before = vault.index.entries[&entry.id].secret_rev.clone();
+        let sealed_before = vault.secrets[&entry.id].clone();
 
         let recovery_key = vault.rotate_dek(&mp(PASSWORD)).unwrap();
+
+        // secret は新しい鍵で再暗号化され、secret_rev も再生成される
+        assert_ne!(vault.index.entries[&entry.id].secret_rev, rev_before);
+        assert_ne!(vault.secrets[&entry.id], sealed_before);
 
         // Should still unlock with master password after lock
         let locked = vault.lock().unwrap();
         let unlocked = locked.unlock(&mp(PASSWORD)).unwrap();
-        assert_eq!(unlocked.contents.entries.len(), 1);
+        assert_eq!(unlocked.index.entries.len(), 1);
+        let restored = unlocked.get_entry(&entry.id).unwrap().unwrap();
+        match restored.data.typed_value {
+            crate::models::TypedValue::SecureNote(d) => assert_eq!(d.content.as_str(), "secret"),
+            _ => panic!("Expected SecureNote"),
+        }
 
         // New recovery key should work
         let locked2 = unlocked.lock().unwrap();
@@ -355,7 +373,7 @@ mod tests {
 
         let locked = vault.lock().unwrap();
         let unlocked = locked.unlock(&mp(new_password)).unwrap();
-        assert!(unlocked.contents.entries.is_empty());
+        assert!(unlocked.index.entries.is_empty());
 
         let locked2 = unlocked.lock().unwrap();
         let _unlocked2 = locked2

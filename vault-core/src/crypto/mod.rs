@@ -1,10 +1,10 @@
 pub mod aead;
 pub mod config;
 pub mod dek;
-pub mod encryption;
 pub mod kdf;
 pub mod recovery;
 pub mod transfer;
+pub mod v1;
 
 pub use aead::SubKeys;
 pub use dek::Dek;

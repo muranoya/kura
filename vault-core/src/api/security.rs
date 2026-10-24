@@ -17,7 +17,7 @@ impl VaultManager {
         let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
 
         let argon2_params = match session.as_ref() {
-            Some(SessionState::Locked(locked)) => &locked.vault_file.meta.argon2_params,
+            Some(SessionState::Locked(locked)) => &locked.meta().argon2_params,
             Some(SessionState::Unlocked(unlocked)) => &unlocked.meta.argon2_params,
             None => return Err("Vault not loaded".to_string()),
         };
@@ -40,7 +40,7 @@ impl VaultManager {
         let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
 
         let argon2_params = match session.as_ref() {
-            Some(SessionState::Locked(locked)) => &locked.vault_file.meta.argon2_params,
+            Some(SessionState::Locked(locked)) => &locked.meta().argon2_params,
             Some(SessionState::Unlocked(unlocked)) => &unlocked.meta.argon2_params,
             None => return Err("Vault not loaded".to_string()),
         };

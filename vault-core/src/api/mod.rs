@@ -50,8 +50,12 @@ pub struct EntryDetail {
     pub typed_value: String,
     pub labels: Vec<String>,
     /// FFI境界越しに構造体の配列を渡せないため、JSON文字列として返す。
+    /// 各要素は `secret: bool`（秘匿フィールドかどうか）を持つ。
     #[serde(default)]
     pub custom_fields: Option<String>,
+    /// typed_value のうち秘匿値のキー。UI はこれに含まれるフィールドをマスク表示する
+    #[serde(default)]
+    pub secret_field_keys: Vec<String>,
 }
 
 /// オートフィル候補データ（パスワードを含まない）

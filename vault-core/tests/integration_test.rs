@@ -4,7 +4,7 @@ use vault_core::{EntryData, LockedVault};
 #[cfg(any(feature = "desktop", feature = "android", feature = "wasm"))]
 use vault_core::api::VaultManager;
 #[cfg(any(feature = "desktop", feature = "android", feature = "wasm"))]
-use vault_core::store::VaultFile;
+use vault_core::store::StoredVault;
 
 fn mp(value: &str) -> MasterPassword {
     MasterPassword::from_string(value.to_string())
@@ -526,6 +526,69 @@ mod vault_manager_api {
         (m, recovery_key)
     }
 
+    #[test]
+    fn test_entry_detail_reports_secret_fields() {
+        let (m, _) = setup_unlocked_vault();
+        let custom_fields = r#"[
+            {"id":"cf1","name":"Recovery email","field_type":"email","value":"alt@example.com"},
+            {"id":"cf2","name":"PIN","field_type":"text","value":"1234","secret":true},
+            {"id":"cf3","name":"API key","field_type":"password","value":"sk-xxx","secret":false}
+        ]"#;
+        let id = m
+            .api_create_entry(
+                "login".to_string(),
+                "GitHub".to_string(),
+                Some("recovery codes".to_string()),
+                r#"{"url":"https://github.com","username":"octo","password":"pw"}"#.to_string(),
+                vec![],
+                Some(custom_fields.to_string()),
+            )
+            .expect("Failed to create entry");
+
+        let detail = m.api_get_entry(id.clone()).expect("Failed to get entry");
+        assert_eq!(detail.secret_field_keys, vec!["password".to_string()]);
+        assert_eq!(detail.notes.as_deref(), Some("recovery codes"));
+        let fields: serde_json::Value =
+            serde_json::from_str(detail.custom_fields.as_deref().unwrap()).unwrap();
+        assert_eq!(fields[0]["secret"], false);
+        assert_eq!(fields[1]["secret"], true);
+        assert_eq!(fields[1]["value"], "1234");
+        // password 型は secret: false を指定しても秘匿フィールドになる
+        assert_eq!(fields[2]["secret"], true);
+
+        // 秘匿値・notes は検索対象外。非秘匿のカスタムフィールドは検索できる
+        let search = |q: &str| {
+            m.api_list_entries(Some(q.to_string()), None, None, false, false, None, None)
+                .unwrap()
+                .len()
+        };
+        assert_eq!(search("alt@example"), 1);
+        assert_eq!(search("octo"), 1);
+        assert_eq!(search("1234"), 0);
+        assert_eq!(search("recovery codes"), 0);
+        assert_eq!(search("sk-xxx"), 0);
+
+        // 編集画面から secret 属性を切り替えられる
+        let updated = r#"[
+            {"id":"cf1","name":"Recovery email","field_type":"email","value":"alt@example.com","secret":true}
+        ]"#;
+        m.api_update_entry(
+            id.clone(),
+            None,
+            None,
+            None,
+            None,
+            Some(updated.to_string()),
+        )
+        .expect("Failed to update entry");
+        assert_eq!(search("alt@example"), 0);
+        let detail = m.api_get_entry(id).unwrap();
+        let fields: serde_json::Value =
+            serde_json::from_str(detail.custom_fields.as_deref().unwrap()).unwrap();
+        assert_eq!(fields[0]["secret"], true);
+        assert_eq!(fields[0]["value"], "alt@example.com");
+    }
+
     // A. Initial Setup
 
     #[test]
@@ -991,12 +1054,16 @@ mod vault_manager_api {
 
         assert!(meta["created_at"].is_i64());
 
-        assert!(json["encrypted_vault"].is_string());
-        assert!(!json["encrypted_vault"].as_str().unwrap().is_empty());
+        assert_eq!(json["schema_version"], 2);
+        assert!(json["index"].is_string());
+        assert!(!json["index"].as_str().unwrap().is_empty());
+        assert!(json["secrets"].is_object());
 
-        let vault_file = VaultFile::from_bytes(&vault_bytes).expect("Failed to parse VaultFile");
-        assert!(vault_file.schema_version >= 1);
-        assert!(!vault_file.encrypted_vault.is_empty());
+        let vault_file = StoredVault::from_bytes(&vault_bytes).expect("Failed to parse vault file");
+        match vault_file {
+            StoredVault::V2(f) => assert!(!f.index.is_empty()),
+            StoredVault::V1(_) => panic!("new vaults must be written as v2"),
+        }
     }
 
     #[test]
@@ -1240,9 +1307,9 @@ mod sync_api {
             serde_json::from_slice(&raw_bytes).expect("Not valid JSON in storage");
         assert!(json["schema_version"].is_u64());
         assert!(json["meta"].is_object());
-        assert!(json["encrypted_vault"].is_string());
+        assert!(json["index"].is_string());
 
-        let vault_file = VaultFile::from_bytes(&raw_bytes).expect("Failed to parse VaultFile");
-        assert!(vault_file.schema_version >= 1);
+        let vault_file = StoredVault::from_bytes(&raw_bytes).expect("Failed to parse vault file");
+        assert_eq!(vault_file.schema_version(), 2);
     }
 }

@@ -66,8 +66,25 @@ pub struct CustomField {
     pub name: String,
     pub field_type: String,
     pub value: SecretString,
+    /// 値を秘匿値として secret ブロックに置くかどうか（`docs/vault-format-v2.md` 4-2）。
+    /// `field_type` が入力形式を表すのに対し、こちらは保存先を表す。
+    /// password / totp / passkey は常に true として扱われ、text / email / url / phone は
+    /// ユーザーが選べる。省略時は false（保存時に `field_type` に応じて正規化される）。
+    #[serde(default)]
+    pub secret: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub autofill_selector: Option<CustomFieldSelector>,
+}
+
+impl CustomField {
+    /// `field_type` に対して `secret` の値が固定されている場合はその値を返す。
+    /// ユーザーが選べる型（text / email / url / phone）と未知の型では None。
+    pub fn fixed_secret_flag(field_type: &str) -> Option<bool> {
+        match field_type {
+            "password" | "totp" | "passkey" => Some(true),
+            _ => None,
+        }
+    }
 }
 
 /// Entry data container for the API/domain layer - sensitive fields are automatically zeroized on drop.
@@ -269,6 +286,7 @@ mod tests {
             name: "Account ID".to_string(),
             field_type: "text".to_string(),
             value: SecretString::from_string("account-id-value".to_string()),
+            secret: false,
             autofill_selector: Some(CustomFieldSelector {
                 tag: None,
                 name: Some("account_id".to_string()),
@@ -301,5 +319,7 @@ mod tests {
         let json = r#"{"id":"cf1","name":"Note","field_type":"text","value":"hello"}"#;
         let deserialized: CustomField = serde_json::from_str(json).unwrap();
         assert_eq!(deserialized.autofill_selector, None);
+        // secretを知らない旧クライアントのJSONでも読める（保存時にfield_typeに応じて正規化される）
+        assert!(!deserialized.secret);
     }
 }

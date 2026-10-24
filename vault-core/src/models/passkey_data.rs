@@ -32,6 +32,57 @@ impl PasskeyFieldData {
     pub fn from_json_string(json_str: &str) -> Result<Self> {
         serde_json::from_str(json_str).map_err(VaultError::JsonError)
     }
+
+    /// index に置く公開部と、secret に置く `private_key` に分ける
+    pub fn into_parts(self) -> (PasskeyPublicData, String) {
+        (
+            PasskeyPublicData {
+                rp_id: self.rp_id,
+                rp_name: self.rp_name,
+                user_handle: self.user_handle,
+                user_name: self.user_name,
+                user_display_name: self.user_display_name,
+                credential_id: self.credential_id,
+            },
+            self.private_key,
+        )
+    }
+
+    pub fn from_parts(public: PasskeyPublicData, private_key: String) -> Self {
+        PasskeyFieldData {
+            rp_id: public.rp_id,
+            rp_name: public.rp_name,
+            user_handle: public.user_handle,
+            user_name: public.user_name,
+            user_display_name: public.user_display_name,
+            credential_id: public.credential_id,
+            private_key,
+        }
+    }
+}
+
+/// Passkey カスタムフィールドの非秘匿部分（`private_key` 以外）。
+/// index の `custom_fields[].value` に JSON 文字列として置き、RP ごとの候補列挙
+/// （`find_passkey_credentials`）で秘密鍵を復号せずに済むようにする。
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PasskeyPublicData {
+    pub rp_id: String,
+    #[serde(default)]
+    pub rp_name: Option<String>,
+    pub user_handle: String,
+    pub user_name: String,
+    pub user_display_name: String,
+    pub credential_id: String,
+}
+
+impl PasskeyPublicData {
+    pub fn to_json_string(&self) -> Result<String> {
+        serde_json::to_string(self).map_err(VaultError::JsonError)
+    }
+
+    pub fn from_json_string(json_str: &str) -> Result<Self> {
+        serde_json::from_str(json_str).map_err(VaultError::JsonError)
+    }
 }
 
 impl fmt::Debug for PasskeyFieldData {
@@ -98,6 +149,23 @@ mod tests {
     fn test_invalid_json_returns_error() {
         let result = PasskeyFieldData::from_json_string("not json");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parts_roundtrip() {
+        let data = sample();
+        let (public, private_key) = data.clone().into_parts();
+        let public_json = public.to_json_string().unwrap();
+        assert!(!public_json.contains(&data.private_key));
+        assert!(!public_json.contains("private_key"));
+
+        let restored = PasskeyFieldData::from_parts(
+            PasskeyPublicData::from_json_string(&public_json).unwrap(),
+            private_key,
+        );
+        assert_eq!(restored.credential_id, data.credential_id);
+        assert_eq!(restored.private_key, data.private_key);
+        assert_eq!(restored.rp_name, data.rp_name);
     }
 
     #[test]
