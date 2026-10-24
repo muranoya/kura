@@ -297,6 +297,7 @@ function normalizeEntry(raw: Record<string, unknown>): Record<string, unknown> {
     notes: raw.notes ?? null,
     typedValue: raw.typed_value ?? {},
     labels: raw.labels ?? raw.label_ids ?? [],
+    secretFieldKeys: raw.secret_field_keys ?? [],
     customFields: ((raw.custom_fields as Record<string, unknown>[] | undefined) ?? []).map(
       (f: Record<string, unknown>) => {
         const rawSelector = f.autofill_selector as Record<string, unknown> | null | undefined
@@ -305,6 +306,7 @@ function normalizeEntry(raw: Record<string, unknown>): Record<string, unknown> {
           name: f.name,
           fieldType: f.field_type,
           value: f.value,
+          secret: f.secret === true,
           autofillSelector: rawSelector
             ? {
                 tag: rawSelector.tag,

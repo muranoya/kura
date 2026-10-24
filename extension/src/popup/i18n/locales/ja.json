@@ -259,6 +259,8 @@
       "selectPageElement": "ページ上の要素を選択",
       "pickerStarting": "ページの要素選択を開始中…",
       "autofillTarget": "オートフィル対象を指定",
+      "secretFieldOn": "秘匿フィールドにする（検索対象外になり、表示するときだけ復号されます）",
+      "secretFieldOff": "秘匿フィールドを解除する",
       "autofillTargetTag": "タグ名",
       "autofillTargetTagPlaceholder": "input",
       "autofillTargetName": "name属性",
@@ -314,6 +316,8 @@
       "passwordInfo": "パスワード情報",
       "licenseInfo": "ライセンス情報",
       "notesSection": "メモ",
+      "customFieldsSection": "フィールド",
+      "secretCustomFieldsSection": "秘匿フィールド",
       "moveToTrashConfirmTitle": "ゴミ箱に移動",
       "moveToTrashConfirmDesc": "このアイテムをゴミ箱に移動しますか？復元可能です。"
     },

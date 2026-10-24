@@ -259,6 +259,8 @@
       "selectPageElement": "Select element on page",
       "pickerStarting": "Starting element picker…",
       "autofillTarget": "Set autofill target",
+      "secretFieldOn": "Make this a secret field (excluded from search, decrypted only when shown)",
+      "secretFieldOff": "Make this a regular field",
       "autofillTargetTag": "Tag name",
       "autofillTargetTagPlaceholder": "input",
       "autofillTargetName": "name attribute",
@@ -314,6 +316,8 @@
       "passwordInfo": "Password info",
       "licenseInfo": "License info",
       "notesSection": "Notes",
+      "customFieldsSection": "Fields",
+      "secretCustomFieldsSection": "Secret fields",
       "moveToTrashConfirmTitle": "Move to trash",
       "moveToTrashConfirmDesc": "Move this item to the trash? You can restore it later."
     },
