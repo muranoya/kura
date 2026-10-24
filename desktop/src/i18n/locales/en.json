@@ -87,7 +87,9 @@
     "secure_note": "Note",
     "password": "Password info",
     "software_license": "License info",
-    "notes": "Notes"
+    "notes": "Notes",
+    "customFields": "Fields",
+    "secretCustomFields": "Secret fields"
   },
   "customFieldTypes": {
     "text": "Text",
@@ -312,7 +314,9 @@
       "autofillTargetName": "name attribute",
       "autofillTargetId": "id attribute",
       "autofillTargetType": "type attribute",
-      "clearSelector": "Clear"
+      "clearSelector": "Clear",
+      "secretFieldOn": "Make this a secret field (excluded from search, decrypted only when shown)",
+      "secretFieldOff": "Make this a regular field"
     },
     "typeSelectDialog": {
       "title": "Select item type",
