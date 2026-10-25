@@ -175,9 +175,11 @@ export function handleTotpQrMessage(
           const typedValue = raw.typed_value ?? {}
           const labelIds =
             (raw.labels as string[] | undefined) ?? (raw.label_ids as string[] | undefined) ?? []
-          let customFields = (
+          // 元のフィールドを展開して、secret・autofill_selector 等の属性を落とさずに書き戻す
+          let customFields: Record<string, unknown>[] = (
             (raw.custom_fields as Record<string, unknown>[] | undefined) ?? []
           ).map((f) => ({
+            ...f,
             id: String(f.id ?? ''),
             name: String(f.name ?? ''),
             field_type: String(f.field_type ?? 'text'),
