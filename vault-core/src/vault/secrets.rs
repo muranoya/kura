@@ -86,8 +86,12 @@ impl UnlockedVault {
             .get(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
         let Some(secret_rev) = entry.secret_rev.as_deref() else {
-            // purged エントリは secret を持たない
-            return Ok(EntrySecret::default());
+            // purged エントリは secret を持たない。active な行に secret_rev がないのは破損
+            return if entry.purged_at.is_some() {
+                Ok(EntrySecret::default())
+            } else {
+                Err(VaultError::CorruptedEntry(id.to_string()))
+            };
         };
         let sealed = self
             .secrets
@@ -100,27 +104,10 @@ impl UnlockedVault {
         EntrySecret::from_bytes(&plaintext).map_err(|_| VaultError::CorruptedEntry(id.to_string()))
     }
 
-    /// 指定エントリの secret ブロックを書き込む。
-    /// 既存の secret を復号して比較し、平文が同じなら暗号文と `secret_rev` を維持する（5-4）。
-    /// 変わった場合だけ新しい `secret_rev` を生成して再暗号化する。
-    pub(crate) fn write_secret(&mut self, id: &str, secret: &EntrySecret) -> Result<()> {
-        let plaintext = secret.to_bytes()?;
-        if let Ok(current) = self.read_secret(id) {
-            let has_block = self.index.entries[id].secret_rev.is_some();
-            // 比較用のバッファも Zeroizing で扱う
-            if has_block && *current.to_bytes()? == *plaintext {
-                return Ok(());
-            }
-        }
-        self.seal_secret_with_new_rev(id, &plaintext)
-    }
-
     /// 平文の比較をせず、新しい `secret_rev` で secret ブロックを暗号化する
     pub(crate) fn seal_secret_with_new_rev(&mut self, id: &str, plaintext: &[u8]) -> Result<()> {
         let secret_rev = new_secret_rev();
-        let sealed = self
-            .keys
-            .seal_secret(&self.meta.vault_uuid, id, &secret_rev, plaintext)?;
+        let sealed = self.seal_secret(id, &secret_rev, plaintext)?;
         let entry = self
             .index
             .entries
@@ -129,6 +116,17 @@ impl UnlockedVault {
         entry.secret_rev = Some(secret_rev);
         self.secrets.insert(id.to_string(), sealed);
         Ok(())
+    }
+
+    /// secret ブロックを暗号化した暗号文を返す（vault の状態は変えない）
+    pub(crate) fn seal_secret(
+        &self,
+        id: &str,
+        secret_rev: &str,
+        plaintext: &[u8],
+    ) -> Result<String> {
+        self.keys
+            .seal_secret(&self.meta.vault_uuid, id, secret_rev, plaintext)
     }
 
     /// index に行がない孤立ブロックと、purged エントリのブロックを削除する（7-1）

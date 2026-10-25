@@ -6,6 +6,7 @@ use crate::secret::PublicString;
 use crate::store::layout::{combine_entry_data, split_custom_fields, split_typed_value};
 use crate::store::{EntrySecret, VaultEntry};
 
+use super::secrets::new_secret_rev;
 use super::UnlockedVault;
 
 impl UnlockedVault {
@@ -110,8 +111,7 @@ impl UnlockedVault {
 
         let mut vault_entry = VaultEntry::new(entry_type, name, now);
         vault_entry.label_ids = label_ids;
-        self.index.entries.insert(id.clone(), vault_entry);
-        self.apply_entry_data(&id, &data)?;
+        self.store_entry(&id, vault_entry, &data)?;
 
         self.get_entry(&id)?
             .ok_or_else(|| VaultError::EntryNotFound(id.clone()))
@@ -123,29 +123,37 @@ impl UnlockedVault {
         let entry = self
             .index
             .entries
-            .get_mut(id)
+            .get(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
 
         if entry.deleted_at.is_some() || entry.purged_at.is_some() {
             return Err(VaultError::EntryNotFound(id.to_string()));
         }
 
+        let mut entry = entry.clone();
         entry.name = PublicString::new(name);
         entry.updated_at = crate::get_timestamp();
-        self.apply_entry_data(id, &data)
+        self.store_entry(id, entry, &data)
     }
 
-    /// `EntryData` を index（非秘匿値）と secret（秘匿値）に振り分けて書き込む。
+    /// `EntryData` を index（非秘匿値）と secret（秘匿値）に振り分け、`entry` を `id` の行として書き込む。
     /// 既存のエントリでは、未知のエントリタイプ・フィールドタイプの配置と、
     /// 未知のフィールド（`extra`）を引き継ぐ。
-    pub(crate) fn apply_entry_data(&mut self, id: &str, data: &EntryData) -> Result<()> {
+    ///
+    /// 振り分けと暗号化をすべて済ませてから index と secret を書き換えるため、
+    /// 途中で失敗しても vault の状態は変わらない。
+    pub(crate) fn store_entry(
+        &mut self,
+        id: &str,
+        mut entry: VaultEntry,
+        data: &EntryData,
+    ) -> Result<()> {
         // 既存の secret が破損していても、新しい内容で上書きできるようにする
-        let previous_secret = self.read_secret(id).ok();
-        let entry = self
-            .index
-            .entries
-            .get(id)
-            .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
+        let previous_secret = if self.index.entries.contains_key(id) {
+            self.read_secret(id).ok()
+        } else {
+            None
+        };
 
         let typed_value_json = Zeroizing::new(data.typed_value.to_json_string());
         let (public_fields, secret_fields) = split_typed_value(
@@ -157,6 +165,10 @@ impl UnlockedVault {
             data.custom_fields.as_deref().unwrap_or_default(),
             &entry.custom_fields,
         );
+        entry.public_fields = public_fields;
+        entry.custom_fields = custom_fields;
+
+        let previous_plaintext = previous_secret.as_ref().map(|s| s.to_bytes()).transpose()?;
         let secret = EntrySecret {
             fields: secret_fields,
             notes: data.notes.clone(),
@@ -164,14 +176,24 @@ impl UnlockedVault {
             extra: previous_secret.map(|s| s.extra).unwrap_or_default(),
         };
 
-        let entry = self
-            .index
-            .entries
-            .get_mut(id)
-            .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
-        entry.public_fields = public_fields;
-        entry.custom_fields = custom_fields;
-        self.write_secret(id, &secret)
+        // 平文が変わっていなければ、暗号文と `secret_rev` を維持する（5-4）
+        let plaintext = secret.to_bytes()?;
+        let unchanged = entry.secret_rev.is_some()
+            && previous_plaintext.is_some_and(|previous| *previous == *plaintext);
+        let sealed = if unchanged {
+            None
+        } else {
+            let secret_rev = new_secret_rev();
+            let sealed = self.seal_secret(id, &secret_rev, &plaintext)?;
+            entry.secret_rev = Some(secret_rev);
+            Some(sealed)
+        };
+
+        self.index.entries.insert(id.to_string(), entry);
+        if let Some(sealed) = sealed {
+            self.secrets.insert(id.to_string(), sealed);
+        }
+        Ok(())
     }
 
     /// Delete entry (soft delete to trash)
@@ -407,8 +429,7 @@ mod tests {
         let data = make_login_data();
         let mut entry = VaultEntry::new("login", name, created_at);
         entry.updated_at = created_at;
-        vault.index.entries.insert(id.to_string(), entry);
-        vault.apply_entry_data(id, &data).unwrap();
+        vault.store_entry(id, entry, &data).unwrap();
     }
 
     #[test]
@@ -424,6 +445,55 @@ mod tests {
         assert!(!entry.is_favorite);
         assert!(entry.deleted_at.is_none());
         assert!(vault.index.entries.contains_key(&entry.id));
+    }
+
+    /// typed_value として JSON オブジェクト以外を持つ（振り分けに失敗する）データ
+    fn invalid_data() -> EntryData {
+        EntryData {
+            entry_type: "future_type".to_string(),
+            typed_value: crate::models::TypedValue::parse("future_type", "[1]").unwrap(),
+            notes: None,
+            custom_fields: None,
+        }
+    }
+
+    #[test]
+    fn test_create_entry_failure_leaves_no_entry() {
+        let mut vault = make_vault();
+        let result =
+            vault.create_entry("Ghost".into(), "future_type".into(), invalid_data(), vec![]);
+        assert!(result.is_err());
+        assert!(vault.index.entries.is_empty());
+        assert!(vault.secrets.is_empty());
+    }
+
+    #[test]
+    fn test_update_entry_failure_keeps_entry_unchanged() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "Before", 1000);
+        let before_rev = vault.index.entries["e1"].secret_rev.clone();
+
+        assert!(vault
+            .update_entry("e1", "After".into(), invalid_data())
+            .is_err());
+
+        let entry = &vault.index.entries["e1"];
+        assert_eq!(entry.name, "Before");
+        assert_eq!(entry.updated_at, 1000);
+        assert_eq!(entry.secret_rev, before_rev);
+        assert!(vault.get_entry("e1").is_ok());
+    }
+
+    #[test]
+    fn test_active_entry_without_secret_rev_is_corrupted() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "Entry1", 1000);
+        vault.index.entries.get_mut("e1").unwrap().secret_rev = None;
+
+        assert!(matches!(
+            vault.get_entry("e1"),
+            Err(VaultError::CorruptedEntry(_))
+        ));
     }
 
     #[test]
@@ -449,8 +519,7 @@ mod tests {
         let data = make_login_data();
         let mut entry = VaultEntry::new("login", name, created_at);
         entry.updated_at = updated_at;
-        vault.index.entries.insert(id.to_string(), entry);
-        vault.apply_entry_data(id, &data).unwrap();
+        vault.store_entry(id, entry, &data).unwrap();
     }
 
     #[test]
