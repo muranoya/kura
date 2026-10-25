@@ -42,7 +42,8 @@ impl UnlockedVault {
     ///
     /// 1. リモートの index だけを復号する（secret は復号しない）
     /// 2. index 同士をエントリ単位・ラベル単位に既存アルゴリズムでマージする
-    /// 3. 各エントリについて、勝った側の secret ブロックを暗号文のまま採用する。
+    /// 3. 各エントリについて、勝った側の secret ブロックを暗号文のまま採用する
+    ///    （勝った側で欠けていれば、負けた側の同じ `secret_rev` のブロックを使う）。
     ///    採用した index 行の `secret_rev` と secret の AAD の一致は復号時に必ず検証されるため、
     ///    取り違えが起きても復号失敗（破損エントリ）として検出できる
     /// 4. GC で削除されたエントリの secret も削除する
@@ -61,10 +62,21 @@ impl UnlockedVault {
 
         let mut merged_secrets = HashMap::with_capacity(merge_result.entry_sources.len());
         for (id, side) in &merge_result.entry_sources {
-            let sealed = match side {
-                MergeSide::Local => self.secrets.remove(id),
-                MergeSide::Remote => remote_secrets.remove(id),
+            let local = (self.secrets.remove(id), self.index.entries.get(id));
+            let remote = (remote_secrets.remove(id), remote_index.entries.get(id));
+            let ((winner, _), (loser, loser_row)) = match side {
+                MergeSide::Local => (local, remote),
+                MergeSide::Remote => (remote, local),
             };
+            // 勝った側でブロックが欠けていても、負けた側が同じ secret_rev のブロックを持っていれば
+            // それを使う（同じ版の暗号文なので、取り違えても AAD の検証で検出される）
+            let winner_rev = merge_result
+                .merged_entries
+                .get(id)
+                .and_then(|e| e.secret_rev.as_deref());
+            let loser_rev = loser_row.and_then(|e| e.secret_rev.as_deref());
+            let sealed = winner
+                .or_else(|| loser.filter(|_| winner_rev.is_some() && winner_rev == loser_rev));
             if let Some(sealed) = sealed {
                 merged_secrets.insert(id.clone(), sealed);
             }
@@ -191,6 +203,50 @@ mod tests {
         assert_eq!(local.index.extra["settings"], "new");
         assert!(!local.index.extra.contains_key("removed"));
         assert_eq!(local.file_extra["file_level"], "new");
+    }
+
+    #[test]
+    fn test_merge_uses_losing_side_block_with_same_secret_rev() {
+        let base = UnlockedVault::new_empty(meta(), Dek::from_bytes(DEK_BYTES));
+        let mut local = device(&base.to_vault_file().unwrap());
+        let entry = local
+            .create_entry("E".into(), "login".into(), login("pw"), vec![])
+            .unwrap();
+        local.index.entries.get_mut(&entry.id).unwrap().updated_at = 1;
+
+        // リモートでは index だけを変更（secret_rev は同じ）し、secret ブロックが欠けている
+        let mut remote = device(&local.to_vault_file().unwrap());
+        remote.set_favorite(&entry.id, true).unwrap();
+        remote.secrets.remove(&entry.id);
+
+        local.merge_remote(&remote_of(&remote)).unwrap();
+
+        assert!(local.index.entries[&entry.id].is_favorite);
+        assert_eq!(password_of(&local, &entry.id), "pw");
+    }
+
+    #[test]
+    fn test_merge_does_not_use_losing_side_block_with_other_secret_rev() {
+        let base = UnlockedVault::new_empty(meta(), Dek::from_bytes(DEK_BYTES));
+        let mut local = device(&base.to_vault_file().unwrap());
+        let entry = local
+            .create_entry("E".into(), "login".into(), login("old"), vec![])
+            .unwrap();
+        local.index.entries.get_mut(&entry.id).unwrap().updated_at = 1;
+
+        // リモートでは secret も変更した（secret_rev が違う）うえで、ブロックが欠けている
+        let mut remote = device(&local.to_vault_file().unwrap());
+        remote
+            .update_entry(&entry.id, "E".into(), login("new"))
+            .unwrap();
+        remote.secrets.remove(&entry.id);
+
+        local.merge_remote(&remote_of(&remote)).unwrap();
+
+        assert!(matches!(
+            local.get_entry(&entry.id),
+            Err(crate::error::VaultError::CorruptedEntry(_))
+        ));
     }
 
     #[test]
