@@ -2,6 +2,8 @@
 //! （`docs/vault-format-v2.md` 5〜7章）。
 use std::collections::HashMap;
 
+use zeroize::Zeroizing;
+
 use crate::crypto::{Dek, SubKeys};
 use crate::error::{Result, VaultError};
 use crate::models::VaultMeta;
@@ -16,6 +18,39 @@ use super::UnlockedVault;
 /// index と secret の組み合わせの取り違えを AAD で検出できなくなるため（5-4）。
 pub(crate) fn new_secret_rev() -> String {
     uuid::Uuid::new_v4().to_string()
+}
+
+/// secret ブロックの平文を埋める最小の長さ（3-3）
+const SECRET_PADDING_MIN: usize = 256;
+
+/// secret ブロックの平文を埋めた後の長さを返す（3-3）。
+/// `SECRET_PADDING_MIN` 以下はその長さに揃え、それより長いものは Padmé 方式で丸める
+/// （長さから漏れる情報を O(log log L) ビットに抑えつつ、増加量を最大でも約 12% にする）
+fn padded_secret_len(len: usize) -> usize {
+    if len <= SECRET_PADDING_MIN {
+        return SECRET_PADDING_MIN;
+    }
+    let exponent = len.ilog2();
+    let last_bits = exponent - (exponent.ilog2() + 1);
+    let mask = (1usize << last_bits) - 1;
+    (len + mask) & !mask
+}
+
+/// secret ブロックを暗号化する。暗号文の長さから秘匿値の長さを推測されないよう、
+/// 平文の末尾を空白で埋めてから暗号化する。JSON は末尾の空白を許すので、
+/// 復号する側は何もしなくてよい（3-3）
+pub(crate) fn seal_secret_block(
+    keys: &SubKeys,
+    vault_uuid: &str,
+    id: &str,
+    secret_rev: &str,
+    plaintext: &[u8],
+) -> Result<String> {
+    let padded_len = padded_secret_len(plaintext.len());
+    let mut padded = Zeroizing::new(Vec::with_capacity(padded_len));
+    padded.extend_from_slice(plaintext);
+    padded.resize(padded_len, b' ');
+    keys.seal_secret(vault_uuid, id, secret_rev, &padded)
 }
 
 impl UnlockedVault {
@@ -125,8 +160,7 @@ impl UnlockedVault {
         secret_rev: &str,
         plaintext: &[u8],
     ) -> Result<String> {
-        self.keys
-            .seal_secret(&self.meta.vault_uuid, id, secret_rev, plaintext)
+        seal_secret_block(&self.keys, &self.meta.vault_uuid, id, secret_rev, plaintext)
     }
 
     /// index に行がない孤立ブロックと、purged エントリのブロックを削除する（7-1）
@@ -169,4 +203,46 @@ impl UnlockedVault {
 fn open_index(keys: &SubKeys, file: &VaultFile) -> Result<VaultIndex> {
     let plaintext = keys.open_index(&file.meta.vault_uuid, &file.index)?;
     VaultIndex::from_bytes(&plaintext)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::store::EntrySecret;
+
+    #[test]
+    fn test_padded_secret_len() {
+        assert_eq!(padded_secret_len(0), 256);
+        assert_eq!(padded_secret_len(256), 256);
+        assert_eq!(padded_secret_len(257), 272);
+        assert_eq!(padded_secret_len(1000), 1024);
+        for len in [257, 300, 1000, 4097, 100_000] {
+            let padded = padded_secret_len(len);
+            assert!(padded >= len);
+            // Padmé の増加量は最大でも約 12%
+            assert!(padded as f64 <= len as f64 * 1.12, "{}", len);
+        }
+    }
+
+    #[test]
+    fn test_secret_length_is_hidden() {
+        let keys = SubKeys::derive(&Dek::from_bytes([7u8; 32]));
+        let seal = |password: &str| {
+            let json = format!(
+                r#"{{"fields":{{"password":"{}"}},"custom_fields":{{}}}}"#,
+                password
+            );
+            seal_secret_block(&keys, "uuid", "id", "rev", json.as_bytes()).unwrap()
+        };
+        assert_eq!(
+            seal("").len(),
+            seal("a-much-longer-password-1234567890").len()
+        );
+
+        // 埋めた空白は JSON の末尾の空白として読み飛ばされる
+        let sealed = seal("pw");
+        let plaintext = keys.open_secret("uuid", "id", "rev", &sealed).unwrap();
+        let secret = EntrySecret::from_bytes(&plaintext).unwrap();
+        assert_eq!(secret.fields["password"].value(), "pw");
+    }
 }

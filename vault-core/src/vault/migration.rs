@@ -11,7 +11,7 @@ use crate::store::layout::{split_custom_fields, split_typed_value};
 use crate::store::v1::{VaultContentsV1, VaultEntryV1, VaultFileV1};
 use crate::store::{EntrySecret, ExtraFields, VaultEntry, VaultIndex};
 
-use super::secrets::new_secret_rev;
+use super::secrets::{new_secret_rev, seal_secret_block};
 use super::UnlockedVault;
 
 impl UnlockedVault {
@@ -51,7 +51,7 @@ pub(crate) fn migrate_v1_contents(
     for (id, v1) in contents.entries {
         let (entry, secret) = migrate_v1_entry(&id, v1)?;
         if let (Some(secret_rev), Some(secret)) = (&entry.secret_rev, secret) {
-            let sealed = keys.seal_secret(vault_uuid, &id, secret_rev, &secret.to_bytes()?)?;
+            let sealed = seal_secret_block(keys, vault_uuid, &id, secret_rev, &secret.to_bytes()?)?;
             secrets.insert(id.clone(), sealed);
         }
         index.entries.insert(id, entry);
