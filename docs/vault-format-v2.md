@@ -299,7 +299,7 @@ UnlockedVault (v2)
 | 編集 | 行を更新し、`updated_at` を更新 | 平文が変わった場合のみ再暗号化（5-4） |
 | お気に入り・ラベル変更 | 行を更新 | 変更なし |
 | ソフト削除 / 復元 | `deleted_at` を更新 | 変更なし |
-| purge | `name`・`public_fields`・`custom_fields` を空にし、`secret_rev = null` | 削除 |
+| purge | `name`・`public_fields`・`custom_fields`・`label_ids`・未知フィールドを空にし、`is_favorite = false`・`secret_rev = null` | 削除 |
 
 ---
 

@@ -270,6 +270,8 @@ impl UnlockedVault {
         entry.public_fields.clear();
         entry.custom_fields.clear();
         entry.label_ids.clear();
+        entry.is_favorite = false;
+        entry.extra.clear();
         entry.secret_rev = None;
         self.secrets.remove(id);
 
@@ -876,6 +878,11 @@ mod tests {
     fn test_purge_entry() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "Secret", 1000);
+        vault.set_favorite("e1", true).unwrap();
+        vault.index.entries.get_mut("e1").unwrap().extra.insert(
+            "icon".to_string(),
+            serde_json::json!("https://example.com/icon.png"),
+        );
 
         vault.purge_entry("e1").unwrap();
 
@@ -887,6 +894,8 @@ mod tests {
         assert!(ve.secret_rev.is_none());
         assert!(ve.custom_fields.is_empty());
         assert!(ve.label_ids.is_empty());
+        assert!(!ve.is_favorite);
+        assert!(ve.extra.is_empty());
     }
 
     #[test]
