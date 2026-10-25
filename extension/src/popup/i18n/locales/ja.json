@@ -174,6 +174,7 @@
     "deleteConfirm": "このエントリを削除しますか？",
     "noResults": "該当するアイテムがありません",
     "noResultsDescription": "別のキーワードで検索してください",
+    "detailLoadFailed": "アイテムを読み込めませんでした",
     "selectEntry": "アイテムを選択してください",
     "favoritesFilter": "お気に入りのみ",
     "favoritesFilterEnable": "お気に入りのみ表示",

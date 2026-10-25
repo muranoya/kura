@@ -167,6 +167,7 @@ export default function EntryList() {
   }
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
   const [selectedLoading, setSelectedLoading] = useState(false)
+  const [selectedError, setSelectedError] = useState<string | null>(null)
   const [allLabels, setAllLabels] = useState<Array<{ id: string; name: string }>>([])
   const [unmaskedFields, setUnmaskedFields] = useState<Set<string>>(new Set())
   const toggleFieldMask = (key: string) => {
@@ -229,8 +230,14 @@ export default function EntryList() {
       } catch (err) {
         if (seq !== detailRequestSeqRef.current) return
         console.error('Failed to load entry:', err)
-        // 完全に削除された等。別のエントリの内容が残らないよう選択を解除する
-        clearSelection()
+        if (showLoading) {
+          // 選んだエントリが破損している等。前のエントリの内容は残さずエラーを表示する
+          setSelectedEntry(null)
+          setSelectedError(String(err))
+        } else {
+          // 表示中に完全に削除された等。別のエントリの内容が残らないよう選択を解除する
+          clearSelection()
+        }
       } finally {
         if (seq === detailRequestSeqRef.current) setSelectedLoading(false)
       }
@@ -242,9 +249,11 @@ export default function EntryList() {
     // マスク解除の状態はフィールド種別のキーで持つため、別のエントリへ持ち越さない
     // （サイドバーは開いたままなので、一度の表示で以降のエントリまで平文になってしまう）
     setUnmaskedFields(new Set())
+    setSelectedError(null)
+    // 前のエントリの内容を、選び直したエントリのものとして表示しない
+    setSelectedEntry(null)
     if (!selectedId) {
       detailRequestSeqRef.current++
-      setSelectedEntry(null)
       return
     }
     loadDetail(selectedId, true)
@@ -445,7 +454,23 @@ export default function EntryList() {
               onFavorite={() => handleFavorite(selectedId, selectedEntry.isFavorite)}
               onBack={() => setShowDetail(false)}
             />
-          ) : (
+          ) : selectedId && selectedError ? (
+            <div className="h-full flex flex-col">
+              <div className="p-3 twopane:hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowDetail(false)}
+                  className="p-1 -ml-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors"
+                  title={t('common.back')}
+                >
+                  <ArrowLeft size={14} />
+                </button>
+              </div>
+              <div className="flex-1 flex items-center justify-center">
+                <EmptyState title={t('entries.detailLoadFailed')} description={selectedError} />
+              </div>
+            </div>
+          ) : selectedId && selectedLoading ? null : (
             <div className="h-full flex items-center justify-center">
               <EmptyState title={t('entries.selectEntry')} />
             </div>
