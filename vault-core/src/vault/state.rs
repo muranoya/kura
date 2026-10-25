@@ -72,16 +72,13 @@ impl UnlockedVault {
 
         self.index.entries = merge_result.merged_entries;
         self.index.labels = merge_result.merged_labels;
-        // 未知のトップレベルフィールドは、ローカルにないものだけリモートから引き継ぐ
-        for (key, value) in remote_index.extra {
-            self.index.extra.entry(key).or_insert(value);
-        }
+        // 未知のトップレベルフィールドは、このクライアントが書き換えることはないので、
+        // ローカルの値は過去に読んだリモートの古い複製にすぎない。リモートの値で丸ごと置き換える
+        // （新しいクライアントによる変更・削除を巻き戻さないため）。
+        // v1 のリモートは未知フィールドを持たないので、ローカルの値を残す
         if let StoredVault::V2(remote_file) = remote {
-            for (key, value) in &remote_file.extra {
-                self.file_extra
-                    .entry(key.clone())
-                    .or_insert_with(|| value.clone());
-            }
+            self.index.extra = remote_index.extra;
+            self.file_extra = remote_file.extra.clone();
         }
         self.secrets = merged_secrets;
 
@@ -162,6 +159,38 @@ mod tests {
 
     fn remote_of(vault: &UnlockedVault) -> StoredVault {
         StoredVault::V2(vault.to_vault_file().unwrap())
+    }
+
+    #[test]
+    fn test_merge_replaces_unknown_fields_with_remote() {
+        // 未知フィールドはこのクライアントが書き換えないので、新しいクライアントによる
+        // リモートでの変更・削除をそのまま受け入れる
+        let mut base = UnlockedVault::new_empty(meta(), Dek::from_bytes(DEK_BYTES));
+        base.index
+            .extra
+            .insert("settings".into(), serde_json::json!("old"));
+        base.index
+            .extra
+            .insert("removed".into(), serde_json::json!(1));
+        base.file_extra
+            .insert("file_level".into(), serde_json::json!("old"));
+        let mut local = device(&base.to_vault_file().unwrap());
+
+        let mut remote = device(&base.to_vault_file().unwrap());
+        remote
+            .index
+            .extra
+            .insert("settings".into(), serde_json::json!("new"));
+        remote.index.extra.remove("removed");
+        remote
+            .file_extra
+            .insert("file_level".into(), serde_json::json!("new"));
+
+        local.merge_remote(&remote_of(&remote)).unwrap();
+
+        assert_eq!(local.index.extra["settings"], "new");
+        assert!(!local.index.extra.contains_key("removed"));
+        assert_eq!(local.file_extra["file_level"], "new");
     }
 
     #[test]
