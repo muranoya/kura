@@ -168,16 +168,13 @@ fn split_secret_custom_value(
             )
         }
         // 公開部を index に置き、RP ごとの候補列挙で秘密鍵を復号せずに済むようにする
-        "passkey" => match PasskeyFieldData::from_json_string(value) {
-            Ok(data) => {
-                let (public, private_key) = data.into_parts();
-                match public.to_json_string() {
-                    Ok(public_json) => (Some(PublicString::new(public_json)), private_key),
-                    Err(_) => (None, SecretString::from_string(value.to_string())),
-                }
-            }
-            // 解釈できない値は丸ごと secret に置く
-            Err(_) => (None, SecretString::from_string(value.to_string())),
+        "passkey" => match split_passkey_value(value) {
+            Some((public_json, private_key)) => (Some(PublicString::new(public_json)), private_key),
+            // 解釈できない値は丸ごと secret に置き、既存の公開部はそのまま残す
+            None => (
+                previous.and_then(|p| p.value.clone()),
+                SecretString::from_string(value.to_string()),
+            ),
         },
         // 未知の型の公開部は解釈できないので、既存の公開部をそのまま残す
         field_type
@@ -222,14 +219,60 @@ pub fn combine_custom_fields(
         .collect()
 }
 
-fn combine_passkey_value(public: Option<&str>, secret: Option<&str>) -> SecretString {
-    let parsed = public.and_then(|p| PasskeyPublicData::from_json_string(p).ok());
-    match (parsed, secret) {
-        (Some(public), Some(private_key)) => {
-            PasskeyFieldData::from_parts(public, SecretString::from_string(private_key.to_string()))
-                .to_json_string()
-                .unwrap_or_else(|_| SecretString::from_string(String::new()))
+/// passkey の値で秘密鍵を持つキー。それ以外のキーはすべて公開部として index に置く
+const PASSKEY_PRIVATE_KEY: &str = "private_key";
+
+/// passkey の値（JSON オブジェクト）を、`private_key` を除いた公開部の JSON と秘密鍵に分ける。
+/// 公開部は構造体を経由せずオブジェクトのまま扱い、新しいクライアントが追加したキーも残す。
+/// JSON オブジェクトでない、または `private_key` が文字列でなければ None
+fn split_passkey_value(value: &str) -> Option<(String, SecretString)> {
+    // 秘密鍵を含むので、途中で抜けてもゼロ化されるようにしておく
+    let mut parsed = SecretJson::from_value(serde_json::from_str(value).ok()?);
+    let object = parsed.value_mut().as_object_mut()?;
+    let private_key = match object.remove(PASSKEY_PRIVATE_KEY)? {
+        serde_json::Value::String(private_key) => SecretString::from_string(private_key),
+        other => {
+            // 取り出した値もゼロ化されるよう、元に戻してから抜ける
+            object.insert(PASSKEY_PRIVATE_KEY.to_string(), other);
+            return None;
         }
+    };
+    let public_json = serde_json::to_string(object).ok()?;
+    Some((public_json, private_key))
+}
+
+fn combine_passkey_value(public: Option<&str>, secret: Option<&str>) -> SecretString {
+    /// 公開部のオブジェクトに `private_key` を足して 1 つのオブジェクトとして書き出す
+    /// （秘密鍵を JSON 値に複製しない）
+    struct Combined<'a> {
+        public: &'a serde_json::Map<String, serde_json::Value>,
+        private_key: &'a str,
+    }
+
+    impl serde::Serialize for Combined<'_> {
+        fn serialize<S: serde::Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
+            use serde::ser::SerializeMap;
+            let mut map = s.serialize_map(None)?;
+            for (key, value) in self.public {
+                if key != PASSKEY_PRIVATE_KEY {
+                    map.serialize_entry(key, value)?;
+                }
+            }
+            map.serialize_entry(PASSKEY_PRIVATE_KEY, self.private_key)?;
+            map.end()
+        }
+    }
+
+    let parsed = public.and_then(|p| match serde_json::from_str(p) {
+        Ok(serde_json::Value::Object(object)) => Some(object),
+        _ => None,
+    });
+    match (parsed, secret) {
+        (Some(public), Some(private_key)) => crate::secret::to_json_secret_string(&Combined {
+            public: &public,
+            private_key,
+        })
+        .unwrap_or_else(|_| SecretString::from_string(String::new())),
         // 分割できずに丸ごと secret に置いた値
         (None, Some(raw)) => SecretString::from_string(raw.to_string()),
         (_, None) => SecretString::from_string(public.unwrap_or_default().to_string()),
@@ -466,6 +509,62 @@ mod tests {
         assert_eq!(secrets["p"].as_str(), "not json");
         let combined = combine_custom_fields(&index, &secrets);
         assert_eq!(combined[0].value.as_str(), "not json");
+    }
+
+    /// index 上の passkey フィールド（公開部は `public_json`、秘密鍵は "PRIVATE"）と、
+    /// それを表示用に戻したものを、編集せずに保存し直した結果を返す
+    fn resave_passkey(
+        public_json: &str,
+    ) -> (Vec<IndexCustomField>, BTreeMap<String, SecretString>) {
+        let index = vec![IndexCustomField {
+            id: "p".to_string(),
+            name: PublicString::new("Passkey"),
+            field_type: "passkey".to_string(),
+            secret: true,
+            value: Some(PublicString::new(public_json)),
+            autofill_selector: None,
+            extra: Default::default(),
+        }];
+        let secrets = BTreeMap::from([(
+            "p".to_string(),
+            SecretString::from_string("PRIVATE".to_string()),
+        )]);
+        let combined = combine_custom_fields(&index, &secrets);
+        split_custom_fields(&combined, &index)
+    }
+
+    #[test]
+    fn test_resave_passkey_preserves_unknown_public_keys() {
+        // 新しいクライアントが公開部に追加したキーを、編集しただけで失わない
+        let public = r#"{"rp_id":"example.com","user_handle":"h","user_name":"u","user_display_name":"U","credential_id":"cid","algorithm":-8}"#;
+        let (index, secrets) = resave_passkey(public);
+        let saved: serde_json::Value =
+            serde_json::from_str(index[0].value.as_deref().unwrap()).unwrap();
+        assert_eq!(saved["algorithm"], -8);
+        assert_eq!(saved["credential_id"], "cid");
+        assert_eq!(secrets["p"].as_str(), "PRIVATE");
+    }
+
+    #[test]
+    fn test_resave_passkey_with_unparseable_public_part_keeps_it() {
+        // 公開部を解釈できなくても（必須キーの欠落など）、編集しただけで公開部を失わない
+        let public =
+            r#"{"rp_id":"example.com","user_handle":"h","user_name":"u","credential_id":"cid"}"#;
+        let (index, secrets) = resave_passkey(public);
+        let saved: serde_json::Value =
+            serde_json::from_str(index[0].value.as_deref().unwrap()).unwrap();
+        assert_eq!(
+            saved,
+            serde_json::from_str::<serde_json::Value>(public).unwrap()
+        );
+        assert_eq!(secrets["p"].as_str(), "PRIVATE");
+    }
+
+    #[test]
+    fn test_resave_passkey_with_non_json_public_part_keeps_it() {
+        let (index, secrets) = resave_passkey("not json");
+        assert_eq!(index[0].value.as_deref(), Some("not json"));
+        assert_eq!(secrets["p"].as_str(), "PRIVATE");
     }
 
     #[test]

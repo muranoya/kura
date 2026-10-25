@@ -320,6 +320,11 @@ impl SecretJson {
     pub fn value(&self) -> &serde_json::Value {
         &self.0 .0
     }
+
+    /// 中身を書き換える。取り出した値の扱い（ゼロ化）は呼び出し側の責任になる
+    pub(crate) fn value_mut(&mut self) -> &mut serde_json::Value {
+        &mut self.0 .0
+    }
 }
 
 impl fmt::Debug for SecretJson {
