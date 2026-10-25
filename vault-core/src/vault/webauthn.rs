@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use crate::error::{Result, VaultError};
 use crate::models::{CustomField, EntryData, PasskeyFieldData, PasskeyPublicData};
 use crate::secret::SecretString;
-use crate::store::layout::combine_custom_fields;
+use crate::store::layout::passkey_field_data;
 use crate::store::{IndexCustomField, VaultEntry};
 
 use super::UnlockedVault;
@@ -138,14 +138,14 @@ impl UnlockedVault {
             user_name: user_name.clone(),
             user_display_name,
             credential_id: attestation.credential_id_b64url.clone(),
-            private_key: attestation.private_key_b64,
+            private_key: SecretString::from_string(attestation.private_key_b64),
         };
         let custom_field_id = uuid::Uuid::new_v4().to_string();
         let custom_field = CustomField {
             id: custom_field_id.clone(),
             name: "Passkey".to_string(),
             field_type: "passkey".to_string(),
-            value: SecretString::from_string(passkey_data.to_json_string()?),
+            value: passkey_data.to_json_string()?,
             secret: true,
             autofill_selector: None,
         };
@@ -195,8 +195,11 @@ impl UnlockedVault {
         client_data_json: &str,
     ) -> Result<PasskeyAssertion> {
         let data = self.load_passkey(entry_id, custom_field_id)?;
-        let assertion =
-            crate::webauthn::get_assertion(&data.rp_id, &data.private_key, client_data_json)?;
+        let assertion = crate::webauthn::get_assertion(
+            &data.rp_id,
+            data.private_key.as_str(),
+            client_data_json,
+        )?;
 
         Ok(PasskeyAssertion {
             credential_id: data.credential_id,
@@ -219,7 +222,7 @@ impl UnlockedVault {
         let data = self.load_passkey(entry_id, custom_field_id)?;
         let assertion = crate::webauthn::get_assertion_with_hash(
             &data.rp_id,
-            &data.private_key,
+            data.private_key.as_str(),
             client_data_hash,
         )?;
 
@@ -241,12 +244,7 @@ impl UnlockedVault {
             .ok_or_else(|| VaultError::EntryNotFound(custom_field_id.to_string()))?;
 
         let secret = self.read_secret(entry_id)?;
-        let combined = combine_custom_fields(std::slice::from_ref(field), &secret.custom_fields);
-        let value = &combined
-            .first()
-            .ok_or_else(|| VaultError::EntryNotFound(custom_field_id.to_string()))?
-            .value;
-        PasskeyFieldData::from_json_string(value.as_str())
+        passkey_field_data(field, &secret.custom_fields)
     }
 }
 

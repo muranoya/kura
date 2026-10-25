@@ -98,7 +98,7 @@ fn migrate_v1_entry(id: &str, v1: VaultEntryV1) -> Result<(VaultEntry, Option<En
         fields: secret_fields,
         notes: v1.notes,
         custom_fields: secret_custom_fields,
-        extra: ExtraFields::new(),
+        extra: Default::default(),
     };
     Ok((entry, Some(secret)))
 }

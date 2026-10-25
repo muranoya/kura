@@ -111,9 +111,7 @@ impl VaultIndex {
 
     /// JSONバイト列に変換する（index も個人情報を含むため`Zeroizing`バッファへ直接書く）
     pub fn to_bytes(&self) -> Result<Zeroizing<Vec<u8>>> {
-        let mut buf = Zeroizing::new(Vec::new());
-        serde_json::to_writer(&mut *buf, self).map_err(VaultError::JsonError)?;
-        Ok(buf)
+        crate::secret::to_json_zeroizing(self).map_err(VaultError::JsonError)
     }
 
     /// Create from JSON bytes
@@ -215,16 +213,15 @@ pub struct EntrySecret {
     pub notes: Option<SecretString>,
     /// field_id → 秘匿値
     pub custom_fields: BTreeMap<String, SecretString>,
-    pub extra: ExtraFields,
+    /// 新しいクライアントが追加した未知のフィールド。秘匿値でありうるので、drop 時にゼロ化する
+    pub extra: BTreeMap<String, SecretJson>,
 }
 
 impl EntrySecret {
     /// JSONバイト列に変換する（`Zeroizing`バッファへ直接書く）。
     /// キーは BTreeMap で整列されるため、同じ内容なら同じバイト列になる（5-4 の比較に使う）
     pub fn to_bytes(&self) -> Result<Zeroizing<Vec<u8>>> {
-        let mut buf = Zeroizing::new(Vec::new());
-        serde_json::to_writer(&mut *buf, self).map_err(VaultError::JsonError)?;
-        Ok(buf)
+        crate::secret::to_json_zeroizing(self).map_err(VaultError::JsonError)
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
@@ -270,7 +267,7 @@ impl<'de> Deserialize<'de> for EntrySecret {
                         "notes" => secret.notes = map.next_value()?,
                         "custom_fields" => secret.custom_fields = map.next_value()?,
                         _ => {
-                            let value = map.next_value()?;
+                            let value: SecretJson = map.next_value()?;
                             secret.extra.insert(key, value);
                         }
                     }

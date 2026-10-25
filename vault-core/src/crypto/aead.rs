@@ -99,11 +99,12 @@ impl SubKeys {
 }
 
 fn expand(hk: &Hkdf<Sha256>, info: &str) -> SubKey {
-    let mut okm = [0u8; 32];
+    // 一時バッファを経由せず SubKey に直接書き込み、鍵素材の複製をスタックに残さない
+    let mut key = SubKey([0u8; 32]);
     // L = 32 は HKDF-SHA256 の上限（255 * 32）を大きく下回るため失敗しない
-    hk.expand(info.as_bytes(), &mut okm)
+    hk.expand(info.as_bytes(), &mut key.0)
         .expect("32 bytes is a valid HKDF-SHA256 output length");
-    SubKey(okm)
+    key
 }
 
 /// `enc(x) = u32_be(len(x)) || utf8(x)`。長さプレフィックスで連結の曖昧さをなくす

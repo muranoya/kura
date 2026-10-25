@@ -120,6 +120,44 @@ impl fmt::Debug for SecretBytes {
     }
 }
 
+/// 値を JSON にシリアライズして `Zeroizing` バッファに書く。
+///
+/// 空の `Vec` に書くと、伸長のたびに再確保され、平文の断片がゼロ化されないまま
+/// 解放済みメモリに残る。先に必要なバイト数を数えてから確保し、再確保を起こさない
+pub(crate) fn to_json_zeroizing<T: serde::Serialize + ?Sized>(
+    value: &T,
+) -> serde_json::Result<Zeroizing<Vec<u8>>> {
+    struct ByteCounter(usize);
+
+    impl std::io::Write for ByteCounter {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0 += buf.len();
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let mut counter = ByteCounter(0);
+    serde_json::to_writer(&mut counter, value)?;
+    let mut buf = Zeroizing::new(Vec::with_capacity(counter.0));
+    serde_json::to_writer(&mut *buf, value)?;
+    Ok(buf)
+}
+
+/// [`to_json_zeroizing`] の結果を `SecretString` として返す
+pub(crate) fn to_json_secret_string<T: serde::Serialize + ?Sized>(
+    value: &T,
+) -> serde_json::Result<SecretString> {
+    let mut buf = to_json_zeroizing(value)?;
+    // serde_json の出力は常に UTF-8
+    let json = String::from_utf8(std::mem::take(&mut *buf))
+        .expect("serde_json always produces valid UTF-8");
+    Ok(SecretString::from_string(json))
+}
+
 /// `serde_json::Value` 内の全文字列（オブジェクトのキーを含む）をゼロ埋めする
 fn wipe_json_value(value: &mut serde_json::Value) {
     use zeroize::Zeroize;
@@ -335,3 +373,16 @@ secret_string_newtype!(RecoveryKeyInput);
 secret_string_newtype!(TransferPassword);
 secret_string_newtype!(PlaintextConfig);
 secret_string_newtype!(TotpSecretInput);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_to_json_zeroizing_allocates_exact_capacity() {
+        let value = serde_json::json!({ "password": "p".repeat(1000), "notes": "改行\nを含む" });
+        let buf = to_json_zeroizing(&value).unwrap();
+        assert_eq!(buf.capacity(), buf.len());
+        assert_eq!(*buf, serde_json::to_vec(&value).unwrap());
+    }
+}

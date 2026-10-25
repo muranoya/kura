@@ -95,8 +95,8 @@ pub fn combine_typed_value(
         }
     }
 
-    let mut buf = Zeroizing::new(Vec::new());
-    serde_json::to_writer(&mut *buf, &Merged { public, secret }).map_err(VaultError::JsonError)?;
+    let mut buf = crate::secret::to_json_zeroizing(&Merged { public, secret })
+        .map_err(VaultError::JsonError)?;
     let json = String::from_utf8(std::mem::take(&mut *buf))
         .map_err(|_| VaultError::InvalidInput("typed_value is not valid UTF-8".to_string()))?;
     Ok(Zeroizing::new(json))
@@ -172,10 +172,7 @@ fn split_secret_custom_value(
             Ok(data) => {
                 let (public, private_key) = data.into_parts();
                 match public.to_json_string() {
-                    Ok(public_json) => (
-                        Some(PublicString::new(public_json)),
-                        SecretString::from_string(private_key),
-                    ),
+                    Ok(public_json) => (Some(PublicString::new(public_json)), private_key),
                     Err(_) => (None, SecretString::from_string(value.to_string())),
                 }
             }
@@ -207,17 +204,17 @@ pub fn combine_custom_fields(
             let public = f.value.as_ref().map(|v| v.as_str());
             let secret = secret_values.get(&f.id).map(|v| v.as_str());
             let value = if !f.secret {
-                public.unwrap_or_default().to_string()
+                SecretString::from_string(public.unwrap_or_default().to_string())
             } else if f.field_type == "passkey" {
                 combine_passkey_value(public, secret)
             } else {
-                secret.or(public).unwrap_or_default().to_string()
+                SecretString::from_string(secret.or(public).unwrap_or_default().to_string())
             };
             CustomField {
                 id: f.id.clone(),
                 name: f.name.to_string(),
                 field_type: f.field_type.clone(),
-                value: SecretString::from_string(value),
+                value,
                 secret: f.secret,
                 autofill_selector: f.autofill_selector.clone(),
             }
@@ -225,17 +222,37 @@ pub fn combine_custom_fields(
         .collect()
 }
 
-fn combine_passkey_value(public: Option<&str>, secret: Option<&str>) -> String {
+fn combine_passkey_value(public: Option<&str>, secret: Option<&str>) -> SecretString {
     let parsed = public.and_then(|p| PasskeyPublicData::from_json_string(p).ok());
     match (parsed, secret) {
         (Some(public), Some(private_key)) => {
-            PasskeyFieldData::from_parts(public, private_key.to_string())
+            PasskeyFieldData::from_parts(public, SecretString::from_string(private_key.to_string()))
                 .to_json_string()
-                .unwrap_or_default()
+                .unwrap_or_else(|_| SecretString::from_string(String::new()))
         }
         // 分割できずに丸ごと secret に置いた値
-        (None, Some(raw)) => raw.to_string(),
-        (_, None) => public.unwrap_or_default().to_string(),
+        (None, Some(raw)) => SecretString::from_string(raw.to_string()),
+        (_, None) => SecretString::from_string(public.unwrap_or_default().to_string()),
+    }
+}
+
+/// index 上の Passkey フィールドと secret から、署名に使う `PasskeyFieldData` を取り出す。
+/// 表示用の JSON 文字列を経由しないため、秘密鍵の平文を余分に複製しない
+pub fn passkey_field_data(
+    field: &IndexCustomField,
+    secret_values: &BTreeMap<String, SecretString>,
+) -> Result<PasskeyFieldData> {
+    let secret = secret_values
+        .get(&field.id)
+        .ok_or_else(|| VaultError::CorruptedEntry(field.id.clone()))?;
+    let public = field
+        .value
+        .as_ref()
+        .and_then(|p| PasskeyPublicData::from_json_string(p.as_str()).ok());
+    match public {
+        Some(public) => Ok(PasskeyFieldData::from_parts(public, secret.clone())),
+        // 分割できずに丸ごと secret に置いた値
+        None => PasskeyFieldData::from_json_string(secret.as_str()),
     }
 }
 
@@ -424,10 +441,11 @@ mod tests {
             user_name: "u".to_string(),
             user_display_name: "U".to_string(),
             credential_id: "cid".to_string(),
-            private_key: "PRIVATE".to_string(),
+            private_key: SecretString::from_string("PRIVATE".to_string()),
         };
         let value = passkey.to_json_string().unwrap();
-        let (index, secrets) = split_custom_fields(&[field("p", "passkey", &value, false)], &[]);
+        let (index, secrets) =
+            split_custom_fields(&[field("p", "passkey", value.as_str(), false)], &[]);
         let public = index[0].value.as_deref().unwrap();
         assert!(!public.contains("PRIVATE"));
         assert!(public.contains("example.com"));
@@ -435,7 +453,7 @@ mod tests {
 
         let combined = combine_custom_fields(&index, &secrets);
         let restored = PasskeyFieldData::from_json_string(combined[0].value.as_str()).unwrap();
-        assert_eq!(restored.private_key, "PRIVATE");
+        assert_eq!(restored.private_key.as_str(), "PRIVATE");
         assert_eq!(restored.credential_id, "cid");
         assert!(combined[0].secret);
     }
