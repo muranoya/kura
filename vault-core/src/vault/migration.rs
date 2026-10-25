@@ -2,11 +2,11 @@
 //!
 //! v1 を読み込むコード（AES-256-GCM による一括復号と変換処理）は、すべての端末の
 //! 移行が済んだ後に削除する。
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::crypto::{Dek, SubKeys};
-use crate::error::{Result, VaultError};
-use crate::secret::PublicString;
+use crate::error::Result;
+use crate::secret::{PublicString, SecretJson};
 use crate::store::layout::{split_custom_fields, split_typed_value};
 use crate::store::v1::{VaultContentsV1, VaultEntryV1, VaultFileV1};
 use crate::store::{EntrySecret, ExtraFields, VaultEntry, VaultIndex};
@@ -29,6 +29,9 @@ impl UnlockedVault {
     }
 }
 
+/// v1 から移行できなかった typed_value の原文を置く、secret の未知フィールドのキー
+const UNMIGRATED_TYPED_VALUE_KEY: &str = "unmigrated_v1_typed_value";
+
 /// v1 の中身を、4 章の振り分け表に従って index と（暗号化済みの）secret に分ける。
 ///
 /// - 既知のエントリタイプ: 4-1 の表に従う
@@ -49,7 +52,7 @@ pub(crate) fn migrate_v1_contents(
     let mut secrets = HashMap::with_capacity(contents.entries.len());
 
     for (id, v1) in contents.entries {
-        let (entry, secret) = migrate_v1_entry(&id, v1)?;
+        let (entry, secret) = migrate_v1_entry(v1);
         if let (Some(secret_rev), Some(secret)) = (&entry.secret_rev, secret) {
             let sealed = seal_secret_block(keys, vault_uuid, &id, secret_rev, &secret.to_bytes()?)?;
             secrets.insert(id.clone(), sealed);
@@ -60,7 +63,7 @@ pub(crate) fn migrate_v1_contents(
     Ok((index, secrets))
 }
 
-fn migrate_v1_entry(id: &str, v1: VaultEntryV1) -> Result<(VaultEntry, Option<EntrySecret>)> {
+fn migrate_v1_entry(v1: VaultEntryV1) -> (VaultEntry, Option<EntrySecret>) {
     let mut entry = VaultEntry {
         entry_type: v1.entry_type,
         name: PublicString::new(v1.name),
@@ -80,13 +83,29 @@ fn migrate_v1_entry(id: &str, v1: VaultEntryV1) -> Result<(VaultEntry, Option<En
     if entry.purged_at.is_some() {
         entry.name = PublicString::default();
         entry.label_ids.clear();
-        return Ok((entry, None));
+        return (entry, None);
     }
 
-    let (public_fields, secret_fields) =
-        split_typed_value(&entry.entry_type, v1.typed_value.as_str(), None).map_err(|e| {
-            VaultError::InvalidInput(format!("Failed to migrate entry {}: {}", id, e))
-        })?;
+    // 解釈できない typed_value（JSON オブジェクトでない等）があっても移行全体は止めず、
+    // そのエントリの typed_value は空にして、原文を secret の未知フィールドとして残す（11-2）。
+    // 未知フィールドは以後の書き込みでも引き継がれるので失われない
+    let (public_fields, secret_fields, secret_extra) =
+        match split_typed_value(&entry.entry_type, v1.typed_value.as_str(), None) {
+            Ok((public_fields, secret_fields)) => {
+                (public_fields, secret_fields, Default::default())
+            }
+            Err(_) => {
+                let raw = serde_json::Value::String(v1.typed_value.as_str().to_string());
+                (
+                    Default::default(),
+                    Default::default(),
+                    BTreeMap::from([(
+                        UNMIGRATED_TYPED_VALUE_KEY.to_string(),
+                        SecretJson::from_value(raw),
+                    )]),
+                )
+            }
+        };
     let (custom_fields, secret_custom_fields) =
         split_custom_fields(v1.custom_fields.as_deref().unwrap_or_default(), &[]);
 
@@ -98,9 +117,9 @@ fn migrate_v1_entry(id: &str, v1: VaultEntryV1) -> Result<(VaultEntry, Option<En
         fields: secret_fields,
         notes: v1.notes,
         custom_fields: secret_custom_fields,
-        extra: Default::default(),
+        extra: secret_extra,
     };
-    Ok((entry, Some(secret)))
+    (entry, Some(secret))
 }
 
 #[cfg(test)]
@@ -149,7 +168,7 @@ mod tests {
             v1_field("p", "password", "hidden"),
             v1_field("u", "future_type", "unknown"),
         ]);
-        let (entry, secret) = migrate_v1_entry("e1", v1).unwrap();
+        let (entry, secret) = migrate_v1_entry(v1);
         let secret = secret.unwrap();
 
         assert_eq!(entry.name, "Name");
@@ -177,9 +196,41 @@ mod tests {
     #[test]
     fn test_migrate_unknown_entry_type_puts_everything_in_secret() {
         let v1 = v1_entry("wifi", r#"{"ssid":"home","password":"pw"}"#);
-        let (entry, secret) = migrate_v1_entry("e1", v1).unwrap();
+        let (entry, secret) = migrate_v1_entry(v1);
         assert!(entry.public_fields.is_empty());
         assert_eq!(secret.unwrap().fields.len(), 2);
+    }
+
+    #[test]
+    fn test_migrate_invalid_typed_value_keeps_raw_value_in_secret() {
+        for raw in ["null", "[1]", "not json"] {
+            let (entry, secret) = migrate_v1_entry(v1_entry("login", raw));
+            let secret = secret.unwrap();
+            assert!(entry.public_fields.is_empty());
+            assert!(secret.fields.is_empty());
+            assert_eq!(
+                secret.extra[UNMIGRATED_TYPED_VALUE_KEY].value(),
+                &serde_json::Value::String(raw.to_string())
+            );
+            // notes 等、他の値は通常どおり移行する
+            assert_eq!(secret.notes.as_ref().unwrap().as_str(), "recovery codes");
+        }
+    }
+
+    #[test]
+    fn test_migrate_contents_continues_past_invalid_entry() {
+        let keys = SubKeys::derive(&Dek::generate());
+        let mut contents = VaultContentsV1::default();
+        contents
+            .entries
+            .insert("bad".to_string(), v1_entry("login", "null"));
+        contents.entries.insert(
+            "good".to_string(),
+            v1_entry("login", r#"{"username":"u","password":"pw"}"#),
+        );
+        let (index, secrets) = migrate_v1_contents(contents, &keys, UUID).unwrap();
+        assert_eq!(index.entries.len(), 2);
+        assert_eq!(secrets.len(), 2);
     }
 
     #[test]
@@ -187,7 +238,7 @@ mod tests {
         let mut v1 = v1_entry("login", "");
         v1.deleted_at = Some(1500);
         v1.purged_at = Some(1500);
-        let (entry, secret) = migrate_v1_entry("e1", v1).unwrap();
+        let (entry, secret) = migrate_v1_entry(v1);
         assert!(secret.is_none());
         assert!(entry.secret_rev.is_none());
         assert_eq!(entry.purged_at, Some(1500));
