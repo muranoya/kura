@@ -46,8 +46,16 @@ impl UnlockedVault {
     ///    採用した index 行の `secret_rev` と secret の AAD の一致は復号時に必ず検証されるため、
     ///    取り違えが起きても復号失敗（破損エントリ）として検出できる
     /// 4. GC で削除されたエントリの secret も削除する
+    /// 5. meta は `updated_at` による LWW で、新しい方を丸ごと採用する。
+    ///    リモートの index を復号できた（同じ DEK を使っている）ので、どちらの meta も同じ DEK を包んでいる
     pub(crate) fn merge_remote(&mut self, remote: &StoredVault) -> Result<()> {
         let (remote_index, mut remote_secrets) = self.open_remote(remote)?;
+
+        // 同時刻の場合はローカルを残す（エントリの LWW と同じ）
+        let remote_meta = remote.meta();
+        if remote_meta.updated_at > self.meta.updated_at {
+            self.meta = remote_meta.clone();
+        }
 
         let merge_result = crate::sync::auto_merge(&self.index, &remote_index)?;
 
@@ -127,6 +135,7 @@ mod tests {
             encrypted_dek_recovery: String::new(),
             argon2_params: Argon2Params::default(),
             created_at: 0,
+            updated_at: 0,
         }
     }
 

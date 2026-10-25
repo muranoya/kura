@@ -35,6 +35,7 @@ impl UnlockedVault {
         // Update vault_meta
         let engine = base64::engine::general_purpose::STANDARD;
         self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
+        self.meta.updated_at = crate::get_timestamp();
 
         Ok(())
     }
@@ -114,6 +115,7 @@ impl UnlockedVault {
         self.dek = new_dek;
         self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
         self.meta.encrypted_dek_recovery = engine.encode(&encrypted_dek_recovery);
+        self.meta.updated_at = crate::get_timestamp();
 
         // 全 secret を新しいサブ鍵で再暗号化する（secret_rev も再生成する）。
         // index は次の書き込み時に新しいサブ鍵で暗号化される
@@ -157,6 +159,7 @@ impl UnlockedVault {
         self.meta.argon2_params = new_params;
         self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
         self.meta.encrypted_dek_recovery = engine.encode(&encrypted_dek_recovery);
+        self.meta.updated_at = crate::get_timestamp();
 
         Ok(new_recovery_key)
     }
@@ -186,6 +189,7 @@ impl UnlockedVault {
 
         // Update vault_meta
         self.meta.encrypted_dek_recovery = engine.encode(&encrypted_dek_recovery);
+        self.meta.updated_at = crate::get_timestamp();
 
         Ok(new_recovery_key)
     }
@@ -224,6 +228,53 @@ mod tests {
         // Lock and unlock with new password should work
         let locked = vault.lock().unwrap();
         let _unlocked = locked.unlock(&mp(new_password)).unwrap();
+    }
+
+    /// 同じ vault を開いている 2 台の端末を作る（meta の更新時刻は過去にしておく）
+    fn two_devices() -> (UnlockedVault, UnlockedVault) {
+        let mut a = create_unlocked_vault();
+        a.meta.updated_at = 0;
+        let locked = LockedVault {
+            vault_file: crate::store::StoredVault::V2(a.to_vault_file().unwrap()),
+            etag: None,
+        };
+        let b = locked.unlock(&mp(PASSWORD)).unwrap();
+        (a, b)
+    }
+
+    #[test]
+    fn test_merge_keeps_password_change_from_other_device() {
+        let (mut a, mut b) = two_devices();
+        a.change_master_password(&mp(PASSWORD), &mp("new-password"))
+            .unwrap();
+
+        // 端末 B は古い meta のまま編集し、A の変更をマージしてから push する
+        b.create_entry(
+            "note".into(),
+            "secure_note".into(),
+            crate::models::EntryData::new_secure_note("s".into(), None),
+            vec![],
+        )
+        .unwrap();
+        b.merge_remote(&crate::store::StoredVault::V2(a.to_vault_file().unwrap()))
+            .unwrap();
+
+        let locked = b.lock().unwrap();
+        assert!(locked.clone().unlock(&mp(PASSWORD)).is_err());
+        assert!(locked.unlock(&mp("new-password")).is_ok());
+    }
+
+    #[test]
+    fn test_merge_keeps_local_password_change_not_yet_pushed() {
+        let (mut a, b) = two_devices();
+        // 端末 A で変更し、push する前に（古い meta のままの）リモートをマージする
+        a.change_master_password(&mp(PASSWORD), &mp("new-password"))
+            .unwrap();
+        a.merge_remote(&crate::store::StoredVault::V2(b.to_vault_file().unwrap()))
+            .unwrap();
+
+        let locked = a.lock().unwrap();
+        assert!(locked.unlock(&mp("new-password")).is_ok());
     }
 
     #[test]

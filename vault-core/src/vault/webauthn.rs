@@ -289,6 +289,7 @@ mod tests {
                 encrypted_dek_recovery: String::new(),
                 argon2_params: Argon2Params::default(),
                 created_at: 0,
+                updated_at: 0,
             },
             Dek::generate(),
         )

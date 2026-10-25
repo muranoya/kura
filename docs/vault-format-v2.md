@@ -58,6 +58,7 @@ v1 で一括暗号化を採用したのはエントリの検索機能のため�
 ```
 
 - `meta` は v1 と同一（`encrypted_dek_master` / `encrypted_dek_recovery` / `argon2_params` 等）。DEK のラップ方式（AES-256-GCM）も変更しない
+  - ただし、同期時のマージに使う `updated_at`（meta を最後に変更した時刻）を追加する。持たない vault は 0 として扱う
 - `secrets` のキーは entry_id。purged（完全削除）エントリは secret を持たない
 
 ### 3-2. index の平文（VaultIndex）
@@ -272,7 +273,9 @@ UnlockedVault (v2)
 3. マージ結果の各エントリについて、**勝った側の secret ブロックを暗号文のまま採用する**
    - 採用した index 行の `secret_rev` が、その secret の AAD と一致することは復号時に必ず検証される。このため、マージ処理のバグで取り違えが起きても、復号失敗として検出できる
 4. GC で削除されるエントリ（purge から 180 日経過）は、index 行と secret の両方を削除する
-5. index を再暗号化して push する（If-Match。412 の場合は既存のリトライ処理で再ダウンロードからやり直す）
+5. `meta` は `updated_at` による LWW で、新しい方を丸ごと採用する（同時刻ならローカルを残す）。マスターパスワードの変更・リカバリーキーの再発行・Argon2 パラメータの更新・DEK のローテーションで `updated_at` を更新する
+   - リモートの index を復号できた時点で両者は同じ DEK を使っているので、どちらの meta を採用しても vault は開ける
+6. index を再暗号化して push する（If-Match。412 の場合は既存のリトライ処理で再ダウンロードからやり直す）
 
 ### 7-1. 異常系
 

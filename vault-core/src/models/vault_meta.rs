@@ -8,6 +8,10 @@ pub struct VaultMeta {
     pub encrypted_dek_recovery: String, // base64-encoded
     pub argon2_params: Argon2Params,
     pub created_at: i64,
+    /// meta を最後に変更した時刻。同期時に meta 全体を LWW でマージするのに使う。
+    /// この値を持たない vault（追加前に作られたもの）は 0 として扱う
+    #[serde(default)]
+    pub updated_at: i64,
 }
 
 impl VaultMeta {
@@ -19,12 +23,14 @@ impl VaultMeta {
         use base64::Engine;
         let engine = base64::engine::general_purpose::STANDARD;
 
+        let now = crate::get_timestamp();
         VaultMeta {
             vault_uuid: uuid::Uuid::new_v4().to_string(),
             encrypted_dek_master: engine.encode(&encrypted_dek_master),
             encrypted_dek_recovery: engine.encode(&encrypted_dek_recovery),
             argon2_params,
-            created_at: crate::get_timestamp(),
+            created_at: now,
+            updated_at: now,
         }
     }
 }
