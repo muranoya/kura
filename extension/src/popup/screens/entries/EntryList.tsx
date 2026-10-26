@@ -197,8 +197,10 @@ export default function EntryList() {
   }, [loadEntries])
 
   useEffect(() => {
+    // サイドバーは開いたままになるため、同期だけでなくSW側での保存（キャプチャ・
+    // 他ウィンドウでの編集等）でも一覧を更新する
     const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
-      if (changes[STORAGE_KEYS.LAST_SYNC_TIME]) {
+      if (changes[STORAGE_KEYS.LAST_SYNC_TIME] || changes[STORAGE_KEYS.VAULT_BYTES]) {
         loadEntries()
       }
     }
