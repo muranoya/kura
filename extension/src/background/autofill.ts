@@ -2,6 +2,7 @@
 
 import { DEFAULT_VAULT_ID } from '../shared/constants'
 import { extractETldPlus1 } from '../shared/etld'
+import { broadcastToExtensionPages } from '../shared/messages'
 import type {
   AutofillCredentialCandidate,
   AutofillCustomFieldFillEntry,
@@ -318,6 +319,7 @@ export function cleanupPendingFlow(tabId: number) {
 
 /** Called when vault is unlocked — notify all tabs to dismiss locked UI */
 export function onVaultUnlocked() {
+  broadcastToExtensionPages({ type: 'VAULT_LOCK_STATE_CHANGED', unlocked: true })
   chrome.tabs.query({}, (tabs) => {
     for (const tab of tabs) {
       if (tab.id) {
@@ -331,6 +333,7 @@ export function onVaultUnlocked() {
 
 /** Called when vault is locked — notify all tabs to hide UI */
 export function onVaultLocked() {
+  broadcastToExtensionPages({ type: 'VAULT_LOCK_STATE_CHANGED', unlocked: false })
   chrome.tabs.query({}, (tabs) => {
     for (const tab of tabs) {
       if (tab.id) {

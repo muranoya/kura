@@ -214,6 +214,15 @@ export type MessageResponse =
       pickerResult?: { entryId: string; fieldId: string } | null
     })
 
+// Service Worker → 拡張機能ページ（サイドバー）へのブロードキャスト。
+// サイドバーは開いたままになるため、SW側で起きた状態変化をその場で反映する必要がある。
+export type ExtensionPageBroadcast = { type: 'VAULT_LOCK_STATE_CHANGED'; unlocked: boolean }
+
+export function broadcastToExtensionPages(message: ExtensionPageBroadcast) {
+  // 受信側（サイドバー）が開いていない場合は reject されるので無視する
+  chrome.runtime.sendMessage(message).catch(() => {})
+}
+
 export function sendMessage<T extends Message>(
   message: T,
   maxRetries = 2,

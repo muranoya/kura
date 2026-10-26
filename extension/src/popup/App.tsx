@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import type { ExtensionPageBroadcast } from '../shared/messages'
 import * as commands from './commands'
 import { BottomNav } from './components/BottomNav'
 import ErrorBar from './components/layout/ErrorBar'
@@ -39,6 +40,20 @@ function AppContent() {
   const [appState, setAppState] = useState<AppState>('loading')
 
   useUserActivity()
+
+  // サイドバーは開いたままになるため、オートロックや他画面（Passkeyの儀式ウィンドウ等）で
+  // 起きたロック状態の変化を受けて画面を切り替える
+  useEffect(() => {
+    const listener = (message: ExtensionPageBroadcast) => {
+      if (message?.type !== 'VAULT_LOCK_STATE_CHANGED') return
+      setAppState((prev) => {
+        if (message.unlocked) return prev === 'locked' ? 'unlocked' : prev
+        return prev === 'unlocked' ? 'locked' : prev
+      })
+    }
+    chrome.runtime.onMessage.addListener(listener)
+    return () => chrome.runtime.onMessage.removeListener(listener)
+  }, [])
 
   useEffect(() => {
     const checkVaultState = async () => {
