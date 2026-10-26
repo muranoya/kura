@@ -1,12 +1,12 @@
 // カスタムフィールドのオートフィルセレクタ ピッカー — Service Worker側ハンドラ
 //
-// popupのライフサイクル問題（対象ページをクリックするとpopupが閉じ、Reactの状態が
-// 破棄される）への対処として、TOTP QRスキャン（totp-qr-scan.ts）と同じ方式を採る。
-// ピッカーの選択結果は popup のフォーム状態を経由せず、Service Worker側で直接
-// api_update_entry により該当カスタムフィールドへ書き込む。
+// TOTP QRスキャン（totp-qr-scan.ts）と同じ方式を採る。ピッカーの選択結果は
+// サイドバーのフォーム状態を経由せず、Service Worker側で直接 api_update_entry により
+// 該当カスタムフィールドへ書き込み、開いている編集画面へはブロードキャストで反映する。
 // 詳細: docs/extension-custom-field-autofill.md 4-3節
 
 import { DEFAULT_VAULT_ID } from '../shared/constants'
+import { broadcastToExtensionPages } from '../shared/messages'
 
 const LOG_PREFIX = '[kura:picker:sw]'
 
@@ -42,8 +42,6 @@ let saveLocallyFn: (() => Promise<void>) | null = null
 let autoSyncFn: (() => Promise<void>) | null = null
 
 let pickerContext: PickerContext | null = null
-// popup再起動後にPICKER_QUERY_RESULTで一度だけ取り出される、直近の適用結果
-let pendingResult: { entryId: string; fieldId: string } | null = null
 
 export function initPicker(
   api: VaultApi,
@@ -173,26 +171,15 @@ export function handlePickerMessage(
           await saveFn()
           syncFn().catch((e) => console.error(LOG_PREFIX, 'Sync failed:', e))
 
-          pendingResult = { entryId, fieldId }
           pickerContext = null
           sendResponse({ success: true })
-
-          // popupは対象ページのクリックで閉じているため、結果を反映できるよう再起動する
-          chrome.action.openPopup().catch((e) => {
-            console.warn(LOG_PREFIX, 'openPopup failed (user may need to reopen manually):', e)
-          })
+          broadcastToExtensionPages({ type: 'ENTRY_UPDATED_IN_BACKGROUND', entryId, fieldId })
         } catch (e) {
           console.error(LOG_PREFIX, 'PICKER_RESULT failed:', e)
           sendResponse({ success: false, error: String(e) })
         }
       })()
       return true
-    }
-
-    case 'PICKER_QUERY_RESULT': {
-      sendResponse({ success: true, pickerResult: pendingResult })
-      pendingResult = null
-      break
     }
 
     case 'PICKER_CANCEL': {

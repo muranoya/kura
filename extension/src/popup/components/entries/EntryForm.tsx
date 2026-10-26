@@ -173,6 +173,7 @@ export default function EntryForm({
         await onScanTotpQr(fieldId)
       } catch (err) {
         setTotpQrError(String(err))
+      } finally {
         setScanningTotpQr(false)
       }
     },
@@ -188,6 +189,7 @@ export default function EntryForm({
         await onStartPicker(fieldId)
       } catch (err) {
         setPickerError(String(err))
+      } finally {
         setStartingPickerFieldId(null)
       }
     },

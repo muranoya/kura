@@ -1,6 +1,7 @@
 // TOTP QR scan via page screenshot — Service Worker handlers
 
 import { DEFAULT_VAULT_ID } from '../shared/constants'
+import { broadcastToExtensionPages } from '../shared/messages'
 
 const LOG_PREFIX = '[kura:totp-qr:sw]'
 
@@ -212,6 +213,7 @@ export function handleTotpQrMessage(
 
           scanContext = null
           sendResponse({ success: true })
+          broadcastToExtensionPages({ type: 'ENTRY_UPDATED_IN_BACKGROUND', entryId, fieldId })
         } catch (e) {
           console.error(LOG_PREFIX, 'TOTP_QR_APPLY failed:', e)
           sendResponse({ success: false, error: String(e) })

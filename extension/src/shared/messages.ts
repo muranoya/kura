@@ -129,8 +129,6 @@ export type Message =
   | { type: 'PICKER_CANCEL' }
   // Content Script → Service Worker: ページ上で要素が確定されたときの結果報告
   | { type: 'PICKER_RESULT'; fieldId: string; selector: CustomFieldSelector }
-  // popup → Service Worker: popup再起動後、保留中の適用結果があるか問い合わせる
-  | { type: 'PICKER_QUERY_RESULT' }
 
 export type MessageResponse =
   // Common
@@ -209,14 +207,12 @@ export type MessageResponse =
       dataUrl?: string
     })
 
-  // Picker responses
-  | ({ success: true } & {
-      pickerResult?: { entryId: string; fieldId: string } | null
-    })
-
 // Service Worker → 拡張機能ページ（サイドバー）へのブロードキャスト。
 // サイドバーは開いたままになるため、SW側で起きた状態変化をその場で反映する必要がある。
-export type ExtensionPageBroadcast = { type: 'VAULT_LOCK_STATE_CHANGED'; unlocked: boolean }
+export type ExtensionPageBroadcast =
+  | { type: 'VAULT_LOCK_STATE_CHANGED'; unlocked: boolean }
+  // ピッカー / TOTP QRスキャンの結果をSW側でエントリへ書き込んだ
+  | { type: 'ENTRY_UPDATED_IN_BACKGROUND'; entryId: string; fieldId: string }
 
 export function broadcastToExtensionPages(message: ExtensionPageBroadcast) {
   // 受信側（サイドバー）が開いていない場合は reject されるので無視する

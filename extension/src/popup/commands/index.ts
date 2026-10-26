@@ -210,18 +210,6 @@ export async function startPicker(entryId: string, fieldId: string): Promise<voi
   if (!res.success) throw new Error(field<'error', string>(res, 'error'))
 }
 
-/**
- * popup再起動時に、直前のピッカー操作で適用された結果（あれば）を取り出す。
- * 呼ぶたびに一度だけ消費される。
- */
-export async function queryPickerResult(): Promise<{ entryId: string; fieldId: string } | null> {
-  const res = await sendMessage({ type: 'PICKER_QUERY_RESULT' })
-  if (!res.success) return null
-  return (
-    field<'pickerResult', { entryId: string; fieldId: string } | null>(res, 'pickerResult') ?? null
-  )
-}
-
 // Export
 export async function exportBitwardenJson(): Promise<string> {
   const res = await sendMessage({ type: 'EXPORT_BITWARDEN_JSON' })

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
+import type { ExtensionPageBroadcast } from '../../../shared/messages'
 import type { CustomField, Entry, Label } from '../../../shared/types'
 import * as commands from '../../commands'
 import EntryForm from '../../components/entries/EntryForm'
@@ -58,6 +59,29 @@ export default function EntryEdit() {
     load()
   }, [id, t])
 
+  // ピッカー / TOTP QRスキャンの結果はSW側でエントリへ直接書き込まれるため、
+  // 該当フィールドだけを最新値に差し替える（他の編集中の内容は保持する）
+  useEffect(() => {
+    if (!id) return
+    const listener = (message: ExtensionPageBroadcast) => {
+      if (message?.type !== 'ENTRY_UPDATED_IN_BACKGROUND' || message.entryId !== id) return
+      commands
+        .getEntry(id)
+        .then((latest) => {
+          const updated = latest.customFields?.find((f) => f.id === message.fieldId)
+          if (!updated) return
+          setCustomFields((prev) =>
+            prev.some((f) => f.id === updated.id)
+              ? prev.map((f) => (f.id === updated.id ? updated : f))
+              : [...prev, updated],
+          )
+        })
+        .catch((err) => setError(t('entries.edit.loadFailed', { error: String(err) })))
+    }
+    chrome.runtime.onMessage.addListener(listener)
+    return () => chrome.runtime.onMessage.removeListener(listener)
+  }, [id, t])
+
   const handleSave = async () => {
     if (!name.trim()) {
       setError(t('entries.edit.nameRequired'))
@@ -104,7 +128,6 @@ export default function EntryEdit() {
       customFieldsJson,
     )
     await commands.startTotpQrScan(id, fieldId)
-    window.close()
   }
 
   const handleStartPicker = async (fieldId: string) => {
@@ -114,10 +137,9 @@ export default function EntryEdit() {
       throw new Error(t('entries.edit.nameRequired'))
     }
     setError('')
-    // ピッカー起動前に編集中の内容を保存しておく（TOTP QRスキャンと同じ理由:
-    // ピッカーはpopupを閉じて対象ページをクリックする操作のため、popupの
-    // フォーム状態は失われる）。ピッカーの選択結果自体はService Worker側で
-    // 直接 api_update_entry により永続化される（popup状態を経由しない）。
+    // ピッカー起動前に編集中の内容を保存しておく。ピッカーの選択結果は
+    // Service Worker側で直接 api_update_entry により永続化されるため、保存前の
+    // 内容が残っているとその上書きで編集内容が失われる。
     // 詳細: docs/extension-custom-field-autofill.md 4-3節
     const typedValueJson = JSON.stringify(typedValue)
     const customFieldsJson = toCustomFieldsJson(customFields)
@@ -130,7 +152,6 @@ export default function EntryEdit() {
       customFieldsJson,
     )
     await commands.startPicker(id, fieldId)
-    window.close()
   }
 
   if (loading) return <PageHeader title={t('common.loading')} showBackButton={true} />
