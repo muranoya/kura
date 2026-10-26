@@ -565,18 +565,6 @@ export async function handleAutofillMessage(
       break
     }
 
-    case 'AUTOFILL_OPEN_POPUP': {
-      chrome.action
-        .openPopup()
-        .then(() => {
-          sendResponse({ success: true })
-        })
-        .catch((e) => {
-          sendResponse({ success: false, error: String(e) })
-        })
-      return true // Keep message channel open for async response
-    }
-
     default:
       sendResponse({ success: false, error: `Unknown autofill message type: ${message.type}` })
   }

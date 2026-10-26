@@ -124,7 +124,7 @@ export type Message =
   | { type: 'TOTP_QR_CANCEL' }
 
   // カスタムフィールドのオートフィルセレクタ ピッカー
-  // popup → Service Worker: 既存エントリの編集画面からのみ起動可能（entryId必須）
+  // サイドバー → Service Worker: 既存エントリの編集画面からのみ起動可能（entryId必須）
   | { type: 'PICKER_START'; entryId: string; fieldId: string }
   | { type: 'PICKER_CANCEL' }
   // Content Script → Service Worker: ページ上で要素が確定されたときの結果報告

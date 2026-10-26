@@ -323,7 +323,6 @@ export default function EntryList() {
           size="sm"
           onClick={() => {
             sendMessage({ type: 'AUTOFILL_START_CAPTURE' }).catch(() => {})
-            window.close()
           }}
           className="gap-1 text-sm flex-shrink-0"
           title={t('entries.captureCredentials')}

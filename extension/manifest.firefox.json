@@ -8,12 +8,23 @@
   "permissions": ["storage", "alarms", "clipboardWrite", "clipboardRead", "tabs", "activeTab"],
 
   "action": {
-    "default_popup": "src/popup/index.html",
+    "default_title": "__MSG_appName__",
     "default_icon": {
       "16": "icons/locked-16.png",
       "48": "icons/locked-48.png",
       "128": "icons/locked-128.png"
     }
+  },
+
+  "sidebar_action": {
+    "default_title": "__MSG_appName__",
+    "default_panel": "src/popup/index.html",
+    "default_icon": {
+      "16": "icons/locked-16.png",
+      "48": "icons/locked-48.png",
+      "128": "icons/locked-128.png"
+    },
+    "open_at_install": false
   },
 
   "background": {

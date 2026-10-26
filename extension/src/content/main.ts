@@ -12,7 +12,7 @@ import {
   queryPendingFlow,
   requestCreditCards,
   requestFillData,
-  requestOpenPopup,
+  requestOpenSidebar,
   requestTotp,
   requestTotpCandidates,
   storePendingFlow,
@@ -263,7 +263,7 @@ async function handleInputFocus(input: HTMLInputElement) {
     const showLocked = () => {
       showLockedDropdown(input, () => {
         hideDropdown()
-        requestOpenPopup()
+        requestOpenSidebar()
       })
     }
     showInlineIcon(input, showLocked)

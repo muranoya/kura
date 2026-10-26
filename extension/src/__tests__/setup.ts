@@ -88,9 +88,6 @@ globalThis.chrome = {
       addListener: vi.fn(noop),
     },
   },
-  action: {
-    openPopup: vi.fn(() => Promise.resolve()),
-  },
   storage: {
     local: chromeStorageLocal,
     onChanged: {

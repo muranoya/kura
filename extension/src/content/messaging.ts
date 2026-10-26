@@ -59,8 +59,8 @@ export async function requestFillData(entryId: string): Promise<AutofillFillData
   return null
 }
 
-export async function requestOpenPopup(): Promise<boolean> {
-  const response = await sendMessage({ type: 'AUTOFILL_OPEN_POPUP' })
+export async function requestOpenSidebar(): Promise<boolean> {
+  const response = await sendMessage({ type: 'AUTOFILL_OPEN_SIDEBAR' })
   return response.success
 }
 

@@ -266,7 +266,8 @@ export default function Settings() {
           resolve()
         }
       })
-      window.close()
+      // サイドバーは閉じないため、再読み込みしてオンボーディング画面へ戻す
+      window.location.reload()
     } catch (err) {
       pushError(t('errors.logoutFailed', { error: String(err) }))
     }

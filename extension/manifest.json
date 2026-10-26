@@ -12,16 +12,21 @@
     "clipboardRead",
     "offscreen",
     "tabs",
-    "activeTab"
+    "activeTab",
+    "sidePanel"
   ],
 
   "action": {
-    "default_popup": "src/popup/index.html",
+    "default_title": "__MSG_appName__",
     "default_icon": {
       "16": "icons/locked-16.png",
       "48": "icons/locked-48.png",
       "128": "icons/locked-128.png"
     }
+  },
+
+  "side_panel": {
+    "default_path": "src/popup/index.html"
   },
 
   "background": {

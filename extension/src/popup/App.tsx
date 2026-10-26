@@ -125,7 +125,7 @@ function AppContent() {
   const showBottomNav = shouldShowBottomNav(location.pathname, appState)
 
   return (
-    <div className="relative w-full flex flex-col" style={{ height: '504px' }}>
+    <div className="relative w-full h-full flex flex-col">
       <ErrorBar />
       <div className="flex-1 overflow-hidden relative">
         <Routes>

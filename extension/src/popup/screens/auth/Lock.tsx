@@ -53,7 +53,8 @@ export default function LockScreen() {
         }
       })
 
-      window.close()
+      // サイドバーは閉じないため、再読み込みしてオンボーディング画面へ戻す
+      window.location.reload()
     } catch (err) {
       setError(t('errors.logoutFailed', { error: String(err) }))
       setShowLogoutDialog(false)

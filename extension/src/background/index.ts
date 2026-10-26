@@ -21,6 +21,7 @@ import {
   onVaultUnlocked,
 } from './autofill'
 import { clearPickerContext, handlePickerMessage, initPicker } from './picker'
+import { initSidebar, openSidebar } from './sidebar'
 import { clearTotpQrScanContext, handleTotpQrMessage, initTotpQrScan } from './totp-qr-scan'
 import { initWasmManual } from './wasm-init'
 import { handleWebauthnMessage, initWebauthn, resumeLockedWebauthnRituals } from './webauthn'
@@ -152,6 +153,15 @@ async function initWasm() {
 
 function setupMessageHandlers() {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // サイドバーの表示はユーザー操作の文脈内で同期的に呼ぶ必要があるため、
+    // await を含む handleMessage より前に処理する
+    if (message?.type === 'AUTOFILL_OPEN_SIDEBAR') {
+      openSidebar(sender)
+        .then(() => sendResponse({ success: true }))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
+      return true
+    }
+
     // async 処理を fire-and-forget で実行し、Promise で sendResponse を呼ぶ
     handleMessage(message, sender, sendResponse).catch((err) => {
       console.error('[SW] Unhandled error in message handler:', message.type, err)
@@ -167,6 +177,7 @@ function setupMessageHandlers() {
 
 // メッセージハンドラーを最初に登録（スクリプト読み込み時）
 setupMessageHandlers()
+initSidebar()
 
 // オートロックは「拡張機能UIでの最後の操作」からの経過時間で判定する。
 // サイドバーは開いたままになるため、接続の有無ではなく操作（USER_ACTIVITY）で
