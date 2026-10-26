@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   Check,
   Copy,
   Crosshair,
@@ -129,6 +130,9 @@ export default function EntryList() {
 
   const initialSelectedId = (location.state as { selectedId?: string } | null)?.selectedId ?? null
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId)
+  // 狭いサイドバー（1カラム）で詳細を表示中か。前回の選択の復元では一覧のまま開き、
+  // ユーザーが選択したとき・編集画面から戻ったときだけ詳細を表示する
+  const [showDetail, setShowDetail] = useState(initialSelectedId !== null)
 
   useEffect(() => {
     if (!initialSelectedId) {
@@ -140,6 +144,7 @@ export default function EntryList() {
 
   const handleSelectEntry = (id: string | null) => {
     setSelectedId(id)
+    setShowDetail(id !== null)
     if (id) {
       saveToStorage(STORAGE_KEYS.SELECTED_ENTRY_ID, id)
     } else {
@@ -335,16 +340,21 @@ export default function EntryList() {
           size="sm"
           onClick={() => navigate('/entries/create')}
           className="gap-1 text-sm flex-shrink-0"
+          title={t('entries.newAddButton')}
         >
           <Plus size={14} />
-          {t('entries.newAddButton')}
+          <span className="hidden twopane:inline">{t('entries.newAddButton')}</span>
         </Button>
 
         <SyncActions onSyncComplete={loadEntries} />
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="w-60 border-r border-border bg-sidebar flex flex-col">
+        <div
+          className={`w-full twopane:w-60 twopane:border-r border-border bg-sidebar flex-col ${
+            showDetail ? 'hidden twopane:flex' : 'flex'
+          }`}
+        >
           {error && (
             <div className="mx-2 mt-2 p-2 rounded-md bg-danger/10 border border-danger/20">
               <p className="text-sm text-danger">{error}</p>
@@ -384,7 +394,9 @@ export default function EntryList() {
           />
         </div>
 
-        <div className="flex-1 bg-bg-surface overflow-y-auto">
+        <div
+          className={`flex-1 bg-bg-surface overflow-y-auto ${showDetail ? '' : 'hidden twopane:block'}`}
+        >
           {selectedId && selectedEntry ? (
             <EntryDetailPane
               entry={selectedEntry}
@@ -395,6 +407,7 @@ export default function EntryList() {
               onEdit={() => navigate(`/entries/${selectedId}/edit`)}
               onDelete={() => handleDelete(selectedId)}
               onFavorite={() => handleFavorite(selectedId, selectedEntry.isFavorite)}
+              onBack={() => setShowDetail(false)}
             />
           ) : (
             <div className="h-full flex items-center justify-center">
@@ -416,6 +429,8 @@ interface EntryDetailPaneProps {
   onEdit: () => void
   onDelete: () => void
   onFavorite: () => void
+  /** 1カラム表示時に一覧へ戻る */
+  onBack: () => void
 }
 
 function PaneFieldDisplay({
@@ -562,6 +577,7 @@ function EntryDetailPane({
   onEdit,
   onDelete,
   onFavorite,
+  onBack,
 }: EntryDetailPaneProps) {
   const { t } = useTranslation()
 
@@ -578,6 +594,14 @@ function EntryDetailPane({
   return (
     <div className="p-3">
       <div className="flex items-start justify-between gap-2 mb-1">
+        <button
+          type="button"
+          onClick={onBack}
+          className="twopane:hidden p-1 -ml-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors shrink-0"
+          title={t('common.back')}
+        >
+          <ArrowLeft size={14} />
+        </button>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-bold text-text-primary truncate">{entry.name}</h2>
           <Badge variant="muted" className="text-[11px] mt-0.5">

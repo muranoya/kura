@@ -8,6 +8,11 @@
   font-display: swap;
 }
 
+/* サイドバーの幅がこれ以上なら一覧と詳細を左右に並べる（twopane:） */
+@theme {
+  --breakpoint-twopane: 35rem;
+}
+
 @theme inline {
   /* 背景 */
   --color-bg-base: var(--bg-base);
