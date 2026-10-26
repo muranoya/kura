@@ -5,6 +5,7 @@ import * as commands from './commands'
 import { BottomNav } from './components/BottomNav'
 import ErrorBar from './components/layout/ErrorBar'
 import { ErrorProvider } from './contexts/ErrorContext'
+import { useUserActivity } from './hooks/useUserActivity'
 import Lock from './screens/auth/Lock'
 import Recovery from './screens/auth/Recovery'
 import EntryCreate from './screens/entries/EntryCreate'
@@ -37,11 +38,7 @@ function AppContent() {
   const navigate = useNavigate()
   const [appState, setAppState] = useState<AppState>('loading')
 
-  // ポップアップの接続を維持し、オートロックタイマーを管理
-  useEffect(() => {
-    const port = chrome.runtime.connect({ name: 'popup' })
-    return () => port.disconnect()
-  }, [])
+  useUserActivity()
 
   useEffect(() => {
     const checkVaultState = async () => {

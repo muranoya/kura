@@ -123,7 +123,6 @@ let vault: WasmApi = null as unknown as WasmApi
 
 let wasmInitialized = false
 let unlocked = false
-let popupConnected = false
 let decryptedS3Config: S3Config | null = null
 
 function updateExtensionIcon(isUnlocked: boolean) {
@@ -169,21 +168,17 @@ function setupMessageHandlers() {
 // メッセージハンドラーを最初に登録（スクリプト読み込み時）
 setupMessageHandlers()
 
-// ポップアップの接続/切断を検知してオートロックを管理
-chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== 'popup') return
-  popupConnected = true
-  chrome.alarms.clear('autolock')
-
-  port.onDisconnect.addListener(async () => {
-    popupConnected = false
-    if (!unlocked) return
-    const settings = await loadSettings()
-    if (settings.autolockMinutes > 0) {
-      chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
-    }
-  })
-})
+// オートロックは「拡張機能UIでの最後の操作」からの経過時間で判定する。
+// サイドバーは開いたままになるため、接続の有無ではなく操作（USER_ACTIVITY）で
+// タイマーを延長する。
+async function resetAutolockAlarm() {
+  const settings = await loadSettings()
+  if (settings.autolockMinutes > 0) {
+    chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
+  } else {
+    chrome.alarms.clear('autolock')
+  }
+}
 
 // Service Worker 起動時に初期化
 self.addEventListener('install', (event: Event) => {
@@ -572,13 +567,7 @@ async function handleMessage(
           unlocked = true
           updateExtensionIcon(true)
           await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.password)
-          // ポップアップが閉じている場合のみオートロック alarm を設定
-          if (!popupConnected) {
-            const settings = await loadSettings()
-            if (settings.autolockMinutes > 0) {
-              chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
-            }
-          }
+          await resetAutolockAlarm()
           // 定期同期アラームを設定
           chrome.alarms.create('autosync', { periodInMinutes: 1 })
           // WebAuthnリチュアルがアンロック待ちの場合、確認/選択画面へ進める
@@ -638,13 +627,7 @@ async function handleMessage(
           unlocked = true
           updateExtensionIcon(true)
           await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.password)
-          // ポップアップが閉じている場合のみオートロック alarm を設定
-          if (!popupConnected) {
-            const settings = await loadSettings()
-            if (settings.autolockMinutes > 0) {
-              chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
-            }
-          }
+          await resetAutolockAlarm()
           // 定期同期アラームを設定
           chrome.alarms.create('autosync', { periodInMinutes: 1 })
           await resumeLockedWebauthnRituals()
@@ -704,12 +687,7 @@ async function handleMessage(
           }
           unlocked = true
           await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.masterPassword)
-          if (!popupConnected) {
-            const settings = await loadSettings()
-            if (settings.autolockMinutes > 0) {
-              chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
-            }
-          }
+          await resetAutolockAlarm()
           sendResponse({ success: true, recoveryKey })
         } catch (err) {
           console.error('[SW] CREATE_VAULT: Error:', err)
@@ -737,12 +715,7 @@ async function handleMessage(
           unlocked = true
           updateExtensionIcon(true)
           await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.newPassword)
-          if (!popupConnected) {
-            const settings = await loadSettings()
-            if (settings.autolockMinutes > 0) {
-              chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
-            }
-          }
+          await resetAutolockAlarm()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -1241,6 +1214,12 @@ async function handleMessage(
         break
       }
 
+      case 'USER_ACTIVITY': {
+        if (unlocked) await resetAutolockAlarm()
+        sendResponse({ success: true })
+        break
+      }
+
       // ========== Settings ==========
 
       case 'GET_SETTINGS': {
@@ -1253,7 +1232,7 @@ async function handleMessage(
         try {
           await saveToStorage(STORAGE_KEYS.APP_SETTINGS, message.settings)
           if (unlocked) {
-            if (message.settings.autolockMinutes > 0 && !popupConnected) {
+            if (message.settings.autolockMinutes > 0) {
               chrome.alarms.create('autolock', { delayInMinutes: message.settings.autolockMinutes })
             } else {
               chrome.alarms.clear('autolock')
