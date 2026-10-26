@@ -57,7 +57,7 @@ FFI構成：JNI → Android / ネイティブFFI → デスクトップ / WASM �
 
 ### ブラウザ拡張機能でのUIコンポーネント制約
 
-ブラウザ拡張機能のポップアップ（`extension/`）では、Radix UIのPortalを使用するコンポーネント（`Select`, `DropdownMenu`等）が動作しない。ポップアップのisolatedなDOMコンテキストでPortalが正しくレンダリングされないため。
+ブラウザ拡張機能（`extension/`）では、Radix UIのPortalを使用するコンポーネント（`Select`, `DropdownMenu`等）を使わない。UIがポップアップだった頃、isolatedなDOMコンテキストでPortalが正しくレンダリングされなかったため（現在のUIはサイドバー。サイドバーで動作するかは未検証）。
 
 - **拡張機能**: `extension/src/popup/components/ui/type-filter-dropdown.tsx` などの自前ドロップダウンを使用
 - **デスクトップ**: `desktop/` ではRadix UIをそのまま使用可

@@ -78,7 +78,7 @@ inputフィールドにフォーカスが当たり、かつ該当ドメインの
 
 ## 1-5. 手動クレデンシャルキャプチャ
 
-ウェブページ上でユーザーが入力したクレデンシャルを、手動操作でvaultに保存する機能。フォーム送信の自動検知は行わず、ユーザーがポップアップから明示的にキャプチャモードを開始する。
+ウェブページ上でユーザーが入力したクレデンシャルを、手動操作でvaultに保存する機能。フォーム送信の自動検知は行わず、ユーザーがサイドバーから明示的にキャプチャモードを開始する。
 
 **設計判断:** フォーム送信の自動検知（submitイベント、beforeunload、MutationObserver等）によるクレデンシャルキャプチャは、以下の理由から採用しない:
 
@@ -87,7 +87,7 @@ inputフィールドにフォーカスが当たり、かつ該当ドメインの
 - `beforeunload`でのService Workerへのメッセージ送信は到達が保証されない
 - MutationObserverではフォーム送信と単なるページ遷移の区別がつかない
 
-パスワード生成はポップアップUIの既存機能で対応する。
+パスワード生成はサイドバーUIの既存機能で対応する。
 
 # Part 2: アーキテクチャ
 
@@ -123,9 +123,9 @@ Service Worker
 | `AUTOFILL_PENDING_FLOW_STORE` | `{ url: string, entryId: string, username: string }` | `{ success: boolean }` | 分割ログインフローの状態をService Workerに保存（Section 3-5参照） |
 | `AUTOFILL_PENDING_FLOW_QUERY` | `{ url: string }` | `{ pendingFlow: { entryId, username, password } \| null }` | 分割ログインフローの保存状態を問い合わせ。非破壊（TOTPステップでも再利用可能） |
 | `AUTOFILL_SAVE_CAPTURED` | `{ url: string, name: string \| null, username: string \| null, password: string }` | `{ success: boolean, entryId: string }` | 手動キャプチャしたクレデンシャルを新規エントリとしてvaultに保存（Section 1-6参照） |
-| `AUTOFILL_OPEN_POPUP` | `{}` | `{ success: boolean }` | ポップアップを開く（ロック状態のドロップダウンから使用） |
+| `AUTOFILL_OPEN_SIDEBAR` | `{}` | `{ success: boolean }` | サイドバーを開く（ロック状態のドロップダウンから使用）。ユーザー操作の文脈を保つため、Service Worker は他の処理より先に同期的に処理する |
 
-**Popup → Service Worker（`chrome.runtime.sendMessage`）：**
+**サイドバー → Service Worker（`chrome.runtime.sendMessage`）：**
 
 | タイプ | ペイロード | 説明 |
 |--------|----------|------|
@@ -137,11 +137,11 @@ Service Worker
 |--------|----------|------|
 | `AUTOFILL_VAULT_LOCKED` | `{}` | vaultがロックされたことの通知（ドロップダウンを非表示にし、キャプチャモードを終了する） |
 | `AUTOFILL_VAULT_UNLOCKED` | `{}` | vaultがアンロックされたことの通知（ロック状態のドロップダウンを閉じる） |
-| `AUTOFILL_START_CAPTURE` | `{}` | クレデンシャルキャプチャモードの開始指示（Popupからの転送） |
+| `AUTOFILL_START_CAPTURE` | `{}` | クレデンシャルキャプチャモードの開始指示（サイドバーからの転送） |
 
 ### 2-2.2 Service Worker側のVault状態管理
 
-Content Scriptはロック通知を受信すると、表示中のドロップダウンを非表示にし、キャプチャモード中であれば終了する。focusイベントリスナーは維持される — ロック中にフィールドにフォーカスすると「Vault is locked」ドロップダウンが表示され、クリックするとポップアップが開いてアンロックを促す。アンロック通知を受信すると、ロック状態のドロップダウンを閉じる。
+Content Scriptはロック通知を受信すると、表示中のドロップダウンを非表示にし、キャプチャモード中であれば終了する。focusイベントリスナーは維持される — ロック中にフィールドにフォーカスすると「Vault is locked」ドロップダウンが表示され、クリックするとサイドバーが開いてアンロックを促す。アンロック通知を受信すると、ロック状態のドロップダウンを閉じる。
 
 **設計判断:** ロック時にリスナーの解除・初期化フラグのリセットは行わない。Content Scriptは`document_idle`で一度だけ初期化されるため、完全無効化するとページリロードなしに再初期化する手段がない。リスナーを維持し、Service Worker側のアンロック状態チェックでクレデンシャルの返却を制御する方式とする。
 
@@ -353,21 +353,20 @@ Section 1-6で定義した手動クレデンシャルキャプチャの実装詳
 ### 3-7.1 キャプチャモード開始フロー
 
 ```
-Popup                    Service Worker              Content Script
+Sidebar                  Service Worker              Content Script
   │                           │                           │
   ├─ AUTOFILL_START_CAPTURE ─►│                           │
   │  (fire-and-forget)        │                           │
-  │  ポップアップは閉じる       ├─ AUTOFILL_START_CAPTURE ─►│
+  │                           ├─ AUTOFILL_START_CAPTURE ─►│
   │                           │  (chrome.tabs.sendMessage) │
   │                           │                           ├─ キャプチャモード開始
   │                           │                           │
 ```
 
-1. ユーザーがポップアップで「このページのクレデンシャルを保存」ボタンをクリック
-2. ポップアップがService Workerに`AUTOFILL_START_CAPTURE`を送信（fire-and-forget）
-3. ポップアップは閉じる（送信完了を待たない）
-4. Service WorkerがアクティブタブのContent Scriptに`AUTOFILL_START_CAPTURE`を転送（`chrome.tabs.sendMessage`）
-5. Content Scriptがキャプチャモードに入る
+1. ユーザーがサイドバーで「このページのクレデンシャルを保存」ボタンをクリック
+2. サイドバーがService Workerに`AUTOFILL_START_CAPTURE`を送信（fire-and-forget）
+3. Service WorkerがアクティブタブのContent Scriptに`AUTOFILL_START_CAPTURE`を転送（`chrome.tabs.sendMessage`）
+4. Content Scriptがキャプチャモードに入る。サイドバーは開いたままで、保存されたエントリは一覧に即座に反映される（一覧は `vaultBytes` の更新を監視している）
 
 ### 3-7.2 キャプチャモードUI
 
@@ -404,7 +403,7 @@ Popup                    Service Worker              Content Script
    - 結果をContent Scriptにレスポンスとして返却
 4. Content Scriptが保存結果を表示（成功/失敗のトースト通知）し、キャプチャモードを終了する
 
-**vaultロック中の場合:** ポップアップの「このページのクレデンシャルを保存」ボタンはvaultロック中は非表示（またはdisabled）とする。キャプチャモード中にvaultがロックされた場合は、キャプチャモードを終了し「vaultがロックされました」のトースト通知を表示する。
+**vaultロック中の場合:** サイドバーの「このページのクレデンシャルを保存」ボタンはvaultロック中は非表示（またはdisabled）とする。キャプチャモード中にvaultがロックされた場合は、キャプチャモードを終了し「vaultがロックされました」のトースト通知を表示する。
 
 ## 3-8. カスタムフィールドのセレクタベースオートフィル
 
