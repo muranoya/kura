@@ -28,19 +28,9 @@ export default function RecoveryKey() {
     setCompleting(true)
     try {
       await removeFromStorage(STORAGE_KEYS.ONBOARDING_DRAFT)
-
-      const isUnlocked = await new Promise<boolean>((resolve) => {
-        chrome.runtime.sendMessage({ type: 'IS_UNLOCKED' }, (response: { unlocked?: boolean }) => {
-          resolve(response?.unlocked ?? false)
-        })
-      })
-
-      if (isUnlocked) {
-        await new Promise((resolve) => setTimeout(resolve, 100))
-        navigate('/entries')
-      } else {
-        alert(t('onboarding.recoveryKey.vaultNotReady'))
-      }
+      // リカバリーキーを書き写している間にオートロックされていることがある。
+      // 遷移すると App がロック状態を確認し直し、ロック中ならロック画面を表示する
+      navigate('/entries')
     } catch (err) {
       console.error('[RecoveryKey] Error:', err)
       alert(`${t('onboarding.recoveryKey.errorPrefix')}: ${String(err)}`)

@@ -267,10 +267,7 @@ describe('RecoveryKey', () => {
     expect(screen.getByText('test-recovery-key-xyz789')).toBeInTheDocument()
   })
 
-  it('should navigate to entries on complete when unlocked', async () => {
-    mockChromeMessages({
-      IS_UNLOCKED: () => ({ unlocked: true }),
-    })
+  it('should navigate to entries on complete', async () => {
     const user = userEvent.setup()
     renderOnboarding({
       pathname: '/onb/recovery',
@@ -286,6 +283,25 @@ describe('RecoveryKey', () => {
       ['onboardingDraft'],
       expect.any(Function),
     )
+  })
+
+  // リカバリーキーを書き写している間にオートロックされても先へ進める
+  // （遷移後にAppがロック状態を確認し、ロック画面を表示する）
+  it('should navigate to entries on complete even when autolocked', async () => {
+    mockChromeMessages({
+      IS_UNLOCKED: () => ({ unlocked: false }),
+    })
+    const user = userEvent.setup()
+    renderOnboarding({
+      pathname: '/onb/recovery',
+      state: { recoveryKey: 'test-key', fromOnboarding: true },
+    })
+
+    await user.click(screen.getByRole('button', { name: '完了' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Entries Page')).toBeInTheDocument()
+    })
   })
 })
 

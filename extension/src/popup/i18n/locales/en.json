@@ -122,7 +122,6 @@
       "copyKey": "Copy recovery key",
       "completing": "Verifying...",
       "completeButton": "Done",
-      "vaultNotReady": "Vault is not ready. Please try again.",
       "errorPrefix": "Error"
     },
     "unlockExisting": {
