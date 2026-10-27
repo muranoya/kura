@@ -64,6 +64,10 @@ fn restore_s3_config(password: &str) -> Result<(), String> {
 
 fn unlock(app: &AppWindow) {
     let auth = app.global::<Auth>();
+    if auth.get_loading() {
+        // 処理中の Enter 連打で二重に呼ぶと、vault-core 側でセッションが破棄されてしまう
+        return;
+    }
     let password = Zeroizing::new(auth.get_password().to_string());
     if password.is_empty() {
         auth.set_error("パスワードを入力してください".into());
@@ -101,6 +105,10 @@ fn unlock(app: &AppWindow) {
 
 fn recover(app: &AppWindow) {
     let auth = app.global::<Auth>();
+    if auth.get_loading() {
+        // 処理中の Enter 連打で二重に呼ぶと、vault-core 側でセッションが破棄されてしまう
+        return;
+    }
     let recovery_key = Zeroizing::new(auth.get_recovery_key().to_string());
     let new_password = auth.get_new_password();
     let confirm = auth.get_confirm_password();

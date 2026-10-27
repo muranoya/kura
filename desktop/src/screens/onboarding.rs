@@ -190,6 +190,10 @@ fn persist_pending_config(password: &str) -> Result<(), String> {
 
 fn create_vault(app: &AppWindow) {
     let ob = app.global::<Onboarding>();
+    if ob.get_loading() {
+        // 処理中の Enter 連打で二重に呼ぶと、vault の作成やアンロックが二重に走る
+        return;
+    }
     let password = Zeroizing::new(ob.get_password().to_string());
     let confirm = ob.get_confirm_password();
     if password.is_empty() || confirm.is_empty() {
@@ -244,6 +248,10 @@ fn recovery_complete(app: &AppWindow) {
 
 fn unlock_existing(app: &AppWindow) {
     let ob = app.global::<Onboarding>();
+    if ob.get_loading() {
+        // 処理中の Enter 連打で二重に呼ぶと、vault の作成やアンロックが二重に走る
+        return;
+    }
     let password = Zeroizing::new(ob.get_password().to_string());
     if password.is_empty() {
         ob.set_error("パスワードを入力してください".into());
