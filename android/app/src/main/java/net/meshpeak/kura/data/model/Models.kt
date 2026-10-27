@@ -75,9 +75,12 @@ data class CustomField(
     val secret: Boolean = false,
     @SerialName("autofill_selector") val autofillSelector: CustomFieldSelector? = null
 ) {
-    /** 型で固定されているものを含め、秘匿フィールドかどうか */
+    /**
+     * 秘匿フィールドかどうか。vault-core が返す secret（保存先）に従う。
+     * password / totp / passkey は保存時に常に true へ正規化されている
+     */
     val isSecretField: Boolean
-        get() = if (fieldType in SECRET_TOGGLEABLE_FIELD_TYPES) secret else true
+        get() = secret
 
     companion object {
         /** ユーザーが「秘匿」を切り替えられるカスタムフィールドの型 */

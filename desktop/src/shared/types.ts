@@ -42,10 +42,11 @@ export const SECRET_TOGGLEABLE_FIELD_TYPES: readonly CustomFieldType[] = [
   'phone',
 ]
 
-// カスタムフィールドが秘匿フィールドかどうか（型で固定されているものを含む）
+// カスタムフィールドが秘匿フィールドかどうか。vault-core が返す secret（保存先）に従う。
+// password / totp / passkey は保存時に常に true へ正規化されている。
+// secret を持たない場合だけ、型から判断する
 export function isSecretCustomField(field: Pick<CustomField, 'fieldType' | 'secret'>): boolean {
-  if (SECRET_TOGGLEABLE_FIELD_TYPES.includes(field.fieldType)) return field.secret === true
-  return true
+  return field.secret ?? !SECRET_TOGGLEABLE_FIELD_TYPES.includes(field.fieldType)
 }
 
 // Sort types
