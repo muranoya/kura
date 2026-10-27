@@ -20,7 +20,7 @@ async-trait = "0.1"
 zeroize = "1"
 dirs = "6"
 arboard = { version = "3", features = ["wayland-data-control"] }
-rfd = { version = "0.15", default-features = false, features = ["xdg-portal", "tokio"] }
+rfd = { version = "0.15", default-features = false, features = ["gtk3"] }
 open = { version = "5", features = ["shellexecute-on-windows"] }
 pulldown-cmark = { version = "0.13", default-features = false }
 qrcode = { version = "0.14", default-features = false }
