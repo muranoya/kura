@@ -101,36 +101,81 @@ impl VaultMeta {
     /// リモートの meta をスロットごとにマージする。`remote_digest` はリモートの
     /// （復号できた＝DEK を持つ端末が書いた）index にあるダイジェストで、これと一致する
     /// スロットだけを採用の候補にする。候補のうち `(updated_at, 暗号文)` が大きい方を採用する
-    /// （時刻が同じなら暗号文の比較で決め、どの端末でも同じ結果にする）
-    pub(crate) fn merge_slots(&mut self, remote: &VaultMeta, remote_digest: &MetaDigest) {
+    /// （時刻が同じなら暗号文の比較で決め、どの端末でも同じ結果にする）。
+    /// ローカルのスロットが `untrusted`（改ざんの疑いがある）なら、時刻によらず候補を採用し、
+    /// 採用したスロットは `untrusted` から外す
+    pub(crate) fn merge_slots(
+        &mut self,
+        remote: &VaultMeta,
+        remote_digest: &MetaDigest,
+        untrusted: &mut UntrustedSlots,
+    ) {
         if remote_digest.master == remote.master_slot_digest()
-            && compare_slot(
-                (remote.master_updated_at, &remote.encrypted_dek_master),
-                (self.master_updated_at, &self.encrypted_dek_master),
-            ) == Ordering::Greater
+            && (untrusted.master.is_some()
+                || compare_slot(
+                    (remote.master_updated_at, &remote.encrypted_dek_master),
+                    (self.master_updated_at, &self.encrypted_dek_master),
+                ) == Ordering::Greater)
         {
             self.recovery_argon2_params = Some(self.recovery_argon2_params().clone());
             self.encrypted_dek_master = remote.encrypted_dek_master.clone();
             self.argon2_params = remote.argon2_params.clone();
             self.master_updated_at = remote.master_updated_at;
+            untrusted.master = None;
         }
         if remote_digest.recovery == remote.recovery_slot_digest()
-            && compare_slot(
-                (remote.recovery_updated_at, &remote.encrypted_dek_recovery),
-                (self.recovery_updated_at, &self.encrypted_dek_recovery),
-            ) == Ordering::Greater
+            && (untrusted.recovery.is_some()
+                || compare_slot(
+                    (remote.recovery_updated_at, &remote.encrypted_dek_recovery),
+                    (self.recovery_updated_at, &self.encrypted_dek_recovery),
+                ) == Ordering::Greater)
         {
             self.encrypted_dek_recovery = remote.encrypted_dek_recovery.clone();
             self.recovery_argon2_params = Some(remote.recovery_argon2_params().clone());
             self.recovery_updated_at = remote.recovery_updated_at;
+            untrusted.recovery = None;
         }
     }
 
-    /// 暗号化された index に入れるダイジェスト
-    pub(crate) fn digest(&self) -> MetaDigest {
+    /// 暗号化された index に入れるダイジェスト。`untrusted` のスロットは、読み込んだ index に
+    /// あった元のダイジェストを入れ直す（改ざんされた疑いのある値に署名しないため）
+    pub(crate) fn digest(&self, untrusted: &UntrustedSlots) -> MetaDigest {
         MetaDigest {
-            master: self.master_slot_digest(),
-            recovery: self.recovery_slot_digest(),
+            master: untrusted
+                .master
+                .clone()
+                .unwrap_or_else(|| self.master_slot_digest()),
+            recovery: untrusted
+                .recovery
+                .clone()
+                .unwrap_or_else(|| self.recovery_slot_digest()),
+        }
+    }
+}
+
+/// 読み込んだ index のダイジェストと一致しなかった meta のスロット。
+///
+/// 平文の meta はストレージに書き込める攻撃者が改ざんできる。新しい端末でダウンロードした
+/// vault のように、マージを経ずに meta をそのまま使う場合でも、改ざんされたスロットに
+/// 署名して他の端末へ広げないよう、元のダイジェスト（`Some` の値）を保持して書き込み時に使う。
+/// スロットを書き換えるか、検証済みのリモートのスロットを採用した時点で外す
+#[derive(Debug, Clone, Default)]
+pub(crate) struct UntrustedSlots {
+    pub master: Option<String>,
+    pub recovery: Option<String>,
+}
+
+impl UntrustedSlots {
+    /// `meta` の各スロットを、同じファイルの index にあったダイジェストと照合する。
+    /// ダイジェストを持たない index（v1 からの移行直後など）は、照合できないので信頼する
+    pub(crate) fn detect(meta: &VaultMeta, digest: Option<&MetaDigest>) -> Self {
+        let Some(digest) = digest else {
+            return Self::default();
+        };
+        Self {
+            master: (digest.master != meta.master_slot_digest()).then(|| digest.master.clone()),
+            recovery: (digest.recovery != meta.recovery_slot_digest())
+                .then(|| digest.recovery.clone()),
         }
     }
 }

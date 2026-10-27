@@ -11,7 +11,7 @@ pub(crate) mod webauthn;
 use std::collections::HashMap;
 
 use crate::crypto::{Dek, SubKeys};
-use crate::models::VaultMeta;
+use crate::models::{UntrustedSlots, VaultMeta};
 use crate::store::{ExtraFields, StoredVault, VaultIndex};
 
 /// Locked vault - encrypted data in memory, DEK not available
@@ -26,6 +26,8 @@ pub struct LockedVault {
 /// （`docs/vault-format-v2.md` 6章）
 pub struct UnlockedVault {
     pub(crate) meta: VaultMeta,
+    /// meta のうち、読み込んだ index のダイジェストと一致しなかったスロット
+    pub(crate) untrusted_meta: UntrustedSlots,
     pub(crate) dek: Dek,
     /// DEK から導出した index 用・secret 用のサブ鍵
     pub(crate) keys: SubKeys,

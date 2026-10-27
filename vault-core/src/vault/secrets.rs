@@ -6,7 +6,7 @@ use zeroize::Zeroizing;
 
 use crate::crypto::{Dek, SubKeys};
 use crate::error::{Result, VaultError};
-use crate::models::VaultMeta;
+use crate::models::{UntrustedSlots, VaultMeta};
 use crate::store::{
     EntrySecret, ExtraFields, StoredVault, VaultFile, VaultIndex, SCHEMA_VERSION_V2,
 };
@@ -59,6 +59,7 @@ impl UnlockedVault {
         let keys = SubKeys::derive(&dek);
         Self {
             meta,
+            untrusted_meta: UntrustedSlots::default(),
             dek,
             keys,
             index: VaultIndex::new(),
@@ -72,8 +73,11 @@ impl UnlockedVault {
     pub(crate) fn from_vault_file(file: VaultFile, dek: Dek, etag: Option<String>) -> Result<Self> {
         let keys = SubKeys::derive(&dek);
         let index = open_index(&keys, &file)?;
+        // マージを経ずに meta を使うので、ここで index のダイジェストと照合しておく
+        let untrusted_meta = UntrustedSlots::detect(&file.meta, index.meta_digest.as_ref());
         Ok(Self {
             meta: file.meta,
+            untrusted_meta,
             dek,
             keys,
             index,
@@ -178,7 +182,9 @@ impl UnlockedVault {
     pub(crate) fn to_vault_file(&self) -> Result<VaultFile> {
         let index = self.keys.seal_index(
             &self.meta.vault_uuid,
-            &self.index.to_bytes_with_meta_digest(&self.meta.digest())?,
+            &self
+                .index
+                .to_bytes_with_meta_digest(&self.meta.digest(&self.untrusted_meta))?,
         )?;
         let secrets = self
             .secrets

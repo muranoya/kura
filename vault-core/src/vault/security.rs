@@ -35,8 +35,7 @@ impl UnlockedVault {
         // Update vault_meta
         let engine = base64::engine::general_purpose::STANDARD;
         let params = self.meta.argon2_params.clone();
-        self.meta
-            .set_master_slot(engine.encode(&encrypted_dek_master), params);
+        self.set_master_slot(engine.encode(&encrypted_dek_master), params);
 
         Ok(())
     }
@@ -116,10 +115,8 @@ impl UnlockedVault {
         self.keys = SubKeys::derive(&new_dek);
         self.dek = new_dek;
         let master_params = self.meta.argon2_params.clone();
-        self.meta
-            .set_master_slot(engine.encode(&encrypted_dek_master), master_params);
-        self.meta
-            .set_recovery_slot(engine.encode(&encrypted_dek_recovery), recovery_params);
+        self.set_master_slot(engine.encode(&encrypted_dek_master), master_params);
+        self.set_recovery_slot(engine.encode(&encrypted_dek_recovery), recovery_params);
 
         // 全 secret を新しいサブ鍵で再暗号化する（secret_rev も再生成する）。
         // index は次の書き込み時に新しいサブ鍵で暗号化される
@@ -160,10 +157,8 @@ impl UnlockedVault {
         let encrypted_dek_recovery = self.dek.wrap(&kek_recovery)?;
 
         // Update vault_meta
-        self.meta
-            .set_master_slot(engine.encode(&encrypted_dek_master), new_params.clone());
-        self.meta
-            .set_recovery_slot(engine.encode(&encrypted_dek_recovery), new_params);
+        self.set_master_slot(engine.encode(&encrypted_dek_master), new_params.clone());
+        self.set_recovery_slot(engine.encode(&encrypted_dek_recovery), new_params);
 
         Ok(new_recovery_key)
     }
@@ -193,10 +188,23 @@ impl UnlockedVault {
         let encrypted_dek_recovery = self.dek.wrap(&kek_recovery)?;
 
         // Update vault_meta
-        self.meta
-            .set_recovery_slot(engine.encode(&encrypted_dek_recovery), recovery_params);
+        self.set_recovery_slot(engine.encode(&encrypted_dek_recovery), recovery_params);
 
         Ok(new_recovery_key)
+    }
+}
+
+impl UnlockedVault {
+    /// master スロットを置き換える。新しく書いた値なので、改ざんの疑いも解消する
+    fn set_master_slot(&mut self, encrypted_dek: String, params: Argon2Params) {
+        self.meta.set_master_slot(encrypted_dek, params);
+        self.untrusted_meta.master = None;
+    }
+
+    /// recovery スロットを置き換える。新しく書いた値なので、改ざんの疑いも解消する
+    fn set_recovery_slot(&mut self, encrypted_dek: String, params: Argon2Params) {
+        self.meta.set_recovery_slot(encrypted_dek, params);
+        self.untrusted_meta.recovery = None;
     }
 }
 
@@ -305,6 +313,35 @@ mod tests {
             .unwrap();
 
         assert!(lock_vault(a).unlock(&mp(PASSWORD)).is_ok());
+    }
+
+    #[test]
+    fn test_new_device_does_not_spread_tampered_meta() {
+        // ストレージ上で recovery スロットだけを改ざんされた vault を、新しい端末がダウンロードして
+        // そのまま push しても、改ざんされたスロットは他の端末に採用されない。
+        // 新しい端末自身も、次の同期で正しいスロットに戻る
+        let password = mp(PASSWORD);
+        let (locked, recovery_key) = LockedVault::create_new(&password).unwrap();
+        let mut a = locked.unlock(&password).unwrap();
+        let mut file = a.to_vault_file().unwrap();
+        file.meta.encrypted_dek_recovery = "AAAA".into();
+        file.meta.recovery_updated_at = 4_102_444_800;
+        let mut new_device = LockedVault {
+            vault_file: crate::store::StoredVault::V2(file),
+            etag: None,
+        }
+        .unlock(&password)
+        .unwrap();
+
+        a.merge_remote(&v2(&new_device)).unwrap();
+        new_device.merge_remote(&v2(&a)).unwrap();
+
+        let recovery = || recovery_key_input(recovery_key.to_display_string());
+        for vault in [a, new_device] {
+            assert!(lock_vault(vault)
+                .unlock_with_recovery_key(&recovery())
+                .is_ok());
+        }
     }
 
     #[test]

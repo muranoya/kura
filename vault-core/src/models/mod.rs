@@ -15,4 +15,5 @@ pub use typed_value::{
     BankData, CreditCardData, LoginData, PasswordData, SecureNoteData, SoftwareLicenseData,
     SshKeyData, TypedValue,
 };
+pub(crate) use vault_meta::UntrustedSlots;
 pub use vault_meta::{MetaDigest, VaultMeta};

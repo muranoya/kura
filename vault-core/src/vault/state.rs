@@ -57,7 +57,8 @@ impl UnlockedVault {
         if let (StoredVault::V2(remote_file), Some(remote_digest)) =
             (remote, &remote_index.meta_digest)
         {
-            self.meta.merge_slots(&remote_file.meta, remote_digest);
+            self.meta
+                .merge_slots(&remote_file.meta, remote_digest, &mut self.untrusted_meta);
         }
 
         let merge_result = crate::sync::auto_merge(&self.index, &remote_index)?;
