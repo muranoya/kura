@@ -425,6 +425,8 @@ async function autoSync() {
   try {
     // 復号済みS3設定がない場合はローカル保存のみ
     if (!decryptedS3Config) {
+      // ロック・ログアウト後に呼ばれた場合は書き戻さない
+      if (!unlocked) return
       const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
       await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
       return
@@ -828,7 +830,6 @@ async function handleMessage(
           const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, null)
-          await autoSync()
           unlocked = true
           updateExtensionIcon(true)
           await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.newPassword)
@@ -1321,6 +1322,8 @@ async function handleMessage(
           }
 
           await syncWithS3(decryptedS3Config)
+          // S3通信の await 中にロック・ログアウトされた場合は書き戻さない（autoSync と同様）
+          if (!unlocked) throw new VaultLockedDuringSyncError()
 
           // 同期後、vault bytes と ETag を更新
           const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
