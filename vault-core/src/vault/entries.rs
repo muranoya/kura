@@ -935,6 +935,32 @@ mod tests {
     }
 
     #[test]
+    fn test_purged_entry_is_not_listed_even_with_trash() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "trashed", "Trashed", 1000);
+        insert_entry(&mut vault, "purged", "Purged", 1001);
+        vault.delete_entry("trashed").unwrap();
+        vault.purge_entry("purged").unwrap();
+
+        let filter = EntryFilter::new().with_trash(true);
+        let ids: Vec<String> = vault
+            .list_entries(&filter)
+            .unwrap()
+            .into_iter()
+            .map(|e| e.id)
+            .collect();
+        assert_eq!(ids, vec!["trashed".to_string()]);
+        let summary_ids: Vec<String> = vault
+            .list_entry_summaries(&filter)
+            .into_iter()
+            .map(|e| e.id)
+            .collect();
+        assert_eq!(summary_ids, vec!["trashed".to_string()]);
+        // tombstone 自体は同期のために index に残っている
+        assert!(vault.index.entries.contains_key("purged"));
+    }
+
+    #[test]
     fn test_purge_nonexistent_entry() {
         let mut vault = make_vault();
         assert!(vault.purge_entry("nonexistent").is_err());

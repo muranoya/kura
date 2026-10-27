@@ -183,6 +183,10 @@ impl EntryFilter {
     }
 
     pub fn matches(&self, entry: &crate::store::VaultEntry) -> bool {
+        // 完全削除済み（tombstone）は同期のために残しているだけなので、ゴミ箱を含めても一覧に出さない
+        if entry.purged_at.is_some() {
+            return false;
+        }
         if !self.include_trash && entry.deleted_at.is_some() {
             return false;
         }
