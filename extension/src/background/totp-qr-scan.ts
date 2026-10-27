@@ -2,6 +2,7 @@
 
 import { DEFAULT_VAULT_ID } from '../shared/constants'
 import { broadcastToExtensionPages } from '../shared/messages'
+import { queryActiveBrowserTab } from '../shared/tabs'
 
 const LOG_PREFIX = '[kura:totp-qr:sw]'
 
@@ -65,35 +66,36 @@ export function handleTotpQrMessage(
         sendResponse({ success: false, error: 'entryId and fieldId required' })
         break
       }
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const tab = tabs[0]
-        if (!tab?.id) {
-          sendResponse({ success: false, error: 'No active tab' })
-          return
-        }
-        const prevContext = scanContext
-        scanContext = {
-          entryId,
-          fieldId,
-          tabId: tab.id,
-          windowId: tab.windowId,
-        }
-        // Tear down an overlay left on a previous tab — the scan context now
-        // belongs to the new tab, so the old tab's overlay would otherwise
-        // stay on screen and fail with 'Scan tab mismatch' on interaction.
-        if (prevContext && prevContext.tabId !== tab.id) {
+      queryActiveBrowserTab()
+        .then((tab) => {
+          if (!tab?.id) {
+            sendResponse({ success: false, error: 'No active tab' })
+            return
+          }
+          const prevContext = scanContext
+          scanContext = {
+            entryId,
+            fieldId,
+            tabId: tab.id,
+            windowId: tab.windowId,
+          }
+          // Tear down an overlay left on a previous tab — the scan context now
+          // belongs to the new tab, so the old tab's overlay would otherwise
+          // stay on screen and fail with 'Scan tab mismatch' on interaction.
+          if (prevContext && prevContext.tabId !== tab.id) {
+            chrome.tabs
+              .sendMessage(prevContext.tabId, { type: 'TOTP_QR_END' }, { frameId: 0 })
+              .catch(() => {}) // Tab may already be closed
+          }
           chrome.tabs
-            .sendMessage(prevContext.tabId, { type: 'TOTP_QR_END' }, { frameId: 0 })
-            .catch(() => {}) // Tab may already be closed
-        }
-        chrome.tabs
-          .sendMessage(tab.id, { type: 'TOTP_QR_START' }, { frameId: 0 })
-          .then(() => sendResponse({ success: true }))
-          .catch((e) => {
-            scanContext = null
-            sendResponse({ success: false, error: String(e) })
-          })
-      })
+            .sendMessage(tab.id, { type: 'TOTP_QR_START' }, { frameId: 0 })
+            .then(() => sendResponse({ success: true }))
+            .catch((e) => {
+              scanContext = null
+              sendResponse({ success: false, error: String(e) })
+            })
+        })
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
       return true
     }
 

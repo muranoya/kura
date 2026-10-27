@@ -7,6 +7,7 @@
 
 import { DEFAULT_VAULT_ID } from '../shared/constants'
 import { broadcastToExtensionPages } from '../shared/messages'
+import { queryActiveBrowserTab } from '../shared/tabs'
 
 const LOG_PREFIX = '[kura:picker:sw]'
 
@@ -78,21 +79,22 @@ export function handlePickerMessage(
         sendResponse({ success: false, error: 'entryId and fieldId required' })
         break
       }
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const tab = tabs[0]
-        if (!tab?.id) {
-          sendResponse({ success: false, error: 'No active tab' })
-          return
-        }
-        pickerContext = { entryId, fieldId, tabId: tab.id }
-        chrome.tabs
-          .sendMessage(tab.id, { type: 'PICKER_START', fieldId }, { frameId: 0 })
-          .then(() => sendResponse({ success: true }))
-          .catch((e) => {
-            pickerContext = null
-            sendResponse({ success: false, error: String(e) })
-          })
-      })
+      queryActiveBrowserTab()
+        .then((tab) => {
+          if (!tab?.id) {
+            sendResponse({ success: false, error: 'No active tab' })
+            return
+          }
+          pickerContext = { entryId, fieldId, tabId: tab.id }
+          chrome.tabs
+            .sendMessage(tab.id, { type: 'PICKER_START', fieldId }, { frameId: 0 })
+            .then(() => sendResponse({ success: true }))
+            .catch((e) => {
+              pickerContext = null
+              sendResponse({ success: false, error: String(e) })
+            })
+        })
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
       return true
     }
 

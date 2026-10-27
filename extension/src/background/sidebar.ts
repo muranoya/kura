@@ -50,19 +50,31 @@ export function openSidebar(sender: chrome.runtime.MessageSender): Promise<void>
   }
 
   const sidebarAction = getFirefoxSidebarAction()
-  const openWindow = () =>
-    chrome.windows
-      .create({
-        url: chrome.runtime.getURL(SIDEBAR_PAGE),
-        type: 'popup',
-        width: 400,
-        height: 640,
-        focused: true,
-      })
-      .then(() => undefined)
   if (!sidebarAction) return openWindow()
   return sidebarAction.open().catch((e) => {
     console.warn(LOG_PREFIX, 'sidebarAction.open failed, falling back to window:', e)
     return openWindow()
+  })
+}
+
+/**
+ * サイドバーを開けない場合のフォールバックとして、同じ画面を小さなウィンドウで開く。
+ * 既に開いていればそのウィンドウを前面に出す（クリックのたびにウィンドウが増えないように）。
+ */
+async function openWindow(): Promise<void> {
+  const url = chrome.runtime.getURL(SIDEBAR_PAGE)
+  // SW の再起動でメモリ上の情報は失われるため、開いているウィンドウから探す
+  const windows = await chrome.windows.getAll({ populate: true, windowTypes: ['popup'] })
+  const existing = windows.find((w) => w.tabs?.some((t) => t.url?.startsWith(url)))
+  if (existing?.id != null) {
+    await chrome.windows.update(existing.id, { focused: true })
+    return
+  }
+  await chrome.windows.create({
+    url,
+    type: 'popup',
+    width: 400,
+    height: 640,
+    focused: true,
   })
 }

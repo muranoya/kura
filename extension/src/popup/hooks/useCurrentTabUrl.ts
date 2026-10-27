@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { queryActiveBrowserTab } from '../../shared/tabs'
 
 export interface UseCurrentTabUrlResult {
   url: string | null
@@ -25,11 +26,10 @@ export function useCurrentTabUrl(): UseCurrentTabUrlResult {
 
     const refresh = () => {
       const seq = ++requestSeq
-      chrome.tabs
-        .query({ active: true, currentWindow: true })
-        .then((tabs) => {
+      queryActiveBrowserTab()
+        .then((tab) => {
           if (cancelled || seq !== requestSeq) return
-          const tabUrl = tabs[0]?.url
+          const tabUrl = tab?.url
           setUrl(isMatchableUrl(tabUrl) ? tabUrl : null)
         })
         .catch(() => {

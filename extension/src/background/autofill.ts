@@ -3,6 +3,7 @@
 import { DEFAULT_VAULT_ID } from '../shared/constants'
 import { extractETldPlus1 } from '../shared/etld'
 import { broadcastToExtensionPages } from '../shared/messages'
+import { queryActiveBrowserTab } from '../shared/tabs'
 import type {
   AutofillCredentialCandidate,
   AutofillCustomFieldFillEntry,
@@ -495,19 +496,20 @@ export async function handleAutofillMessage(
 
     case 'AUTOFILL_START_CAPTURE': {
       // Forward to active tab's content script
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const activeTab = tabs[0]
-        if (activeTab?.id) {
-          chrome.tabs
-            .sendMessage(activeTab.id, { type: 'AUTOFILL_START_CAPTURE' })
-            .then(() => sendResponse({ success: true }))
-            .catch((e) => {
-              sendResponse({ success: false, error: String(e) })
-            })
-        } else {
-          sendResponse({ success: false, error: 'No active tab' })
-        }
-      })
+      queryActiveBrowserTab()
+        .then((activeTab) => {
+          if (activeTab?.id) {
+            chrome.tabs
+              .sendMessage(activeTab.id, { type: 'AUTOFILL_START_CAPTURE' })
+              .then(() => sendResponse({ success: true }))
+              .catch((e) => {
+                sendResponse({ success: false, error: String(e) })
+              })
+          } else {
+            sendResponse({ success: false, error: 'No active tab' })
+          }
+        })
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
       return true // Keep message channel open for async response
     }
 
