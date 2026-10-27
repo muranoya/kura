@@ -5,6 +5,7 @@ use vault_core::api::{parse_s3_config, SyncApiResult};
 use crate::ctx::shared;
 use crate::paths;
 use crate::s3::S3Storage;
+use crate::store;
 
 pub fn vault_file_exists() -> bool {
     paths::vault_file().exists()
@@ -19,11 +20,7 @@ pub fn read_vault_file() -> Result<Option<Vec<u8>>, String> {
 }
 
 pub fn write_vault_file(bytes: &[u8]) -> Result<(), String> {
-    let path = paths::vault_file();
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    std::fs::write(&path, bytes).map_err(|e| e.to_string())
+    store::write_atomic(&paths::vault_file(), bytes)
 }
 
 pub fn delete_vault_file() -> Result<(), String> {

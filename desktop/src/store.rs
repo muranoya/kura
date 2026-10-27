@@ -1,5 +1,6 @@
 //! 設定ストア。旧 tauri-plugin-store と同じ JSON オブジェクト形式で settings.json を読み書きする。
 
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 
@@ -49,15 +50,39 @@ impl Default for SortConfig {
 pub struct Store {
     path: PathBuf,
     data: Mutex<Map<String, Value>>,
+    load_error: Mutex<Option<String>>,
 }
 
 impl Store {
+    /// settings.json を読み込む。読めなかったファイルは上書きで失わないよう別名に退避し、
+    /// 空の設定で始める（エラーは `take_load_error` で取り出して利用者に知らせる）
     pub fn open(path: PathBuf) -> Self {
-        let data = load(&path).unwrap_or_default();
+        let (data, load_error) = match load(&path) {
+            Ok(data) => (data, None),
+            Err(e) => {
+                let backup = path.with_extension("json.broken");
+                let message = match std::fs::rename(&path, &backup) {
+                    Ok(()) => format!(
+                        "設定ファイルを読み込めなかったため {} に退避しました。S3 同期などの設定はやり直しが必要です: {e}",
+                        backup.display()
+                    ),
+                    Err(_) => format!("設定ファイルを読み込めませんでした: {e}"),
+                };
+                (Map::new(), Some(message))
+            }
+        };
         Self {
             path,
             data: Mutex::new(data),
+            load_error: Mutex::new(load_error),
         }
+    }
+
+    pub fn take_load_error(&self) -> Option<String> {
+        self.load_error
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take()
     }
 
     pub fn get<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
@@ -70,14 +95,22 @@ impl Store {
     pub fn set<T: Serialize>(&self, key: &str, value: &T) -> Result<(), String> {
         let value = serde_json::to_value(value).map_err(|e| e.to_string())?;
         let mut data = self.data.lock().unwrap_or_else(PoisonError::into_inner);
-        data.insert(key.to_string(), value);
-        save(&self.path, &data)
+        // 検索の入力ごとにフィルタ設定が書き戻されるので、変わっていなければファイルに触らない
+        if data.get(key) == Some(&value) {
+            return Ok(());
+        }
+        let mut updated = data.clone();
+        updated.insert(key.to_string(), value);
+        save(&self.path, &updated)?;
+        *data = updated;
+        Ok(())
     }
 
     pub fn clear(&self) -> Result<(), String> {
         let mut data = self.data.lock().unwrap_or_else(PoisonError::into_inner);
+        save(&self.path, &Map::new())?;
         data.clear();
-        save(&self.path, &data)
+        Ok(())
     }
 
     pub fn app_settings(&self) -> AppSettings {
@@ -98,17 +131,38 @@ impl Store {
     }
 }
 
-fn load(path: &Path) -> Option<Map<String, Value>> {
-    let text = std::fs::read_to_string(path).ok()?;
-    serde_json::from_str(&text).ok()
+/// ファイルがまだない場合だけ空の設定とみなし、読み込みやパースの失敗はエラーにする
+fn load(path: &Path) -> Result<Map<String, Value>, String> {
+    let text = match std::fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Map::new()),
+        Err(e) => return Err(e.to_string()),
+    };
+    serde_json::from_str(&text).map_err(|e| e.to_string())
 }
 
 fn save(path: &Path, data: &Map<String, Value>) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
     let text = serde_json::to_string_pretty(data).map_err(|e| e.to_string())?;
-    std::fs::write(path, text).map_err(|e| e.to_string())
+    write_atomic(path, text.as_bytes())
+}
+
+/// 一時ファイルに書いてから置き換える。書き込み途中で落ちても元のファイルは壊れない
+pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    let parent = path.parent().ok_or("Invalid file path")?;
+    std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let mut tmp_name = path.file_name().ok_or("Invalid file path")?.to_os_string();
+    tmp_name.push(".tmp");
+    let tmp = parent.join(tmp_name);
+    let result = (|| {
+        let mut file = std::fs::File::create(&tmp)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        std::fs::rename(&tmp, path)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    result.map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
@@ -188,6 +242,33 @@ mod tests {
         assert_eq!(raw["language"], "ja");
         assert_eq!(raw["autolockMinutes"], 1);
         assert_eq!(raw["clipboardClearSeconds"], 120);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn broken_file_is_moved_aside_instead_of_overwritten() {
+        let (_, dir) = temp_store("broken");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings.json");
+        std::fs::write(&path, r#"{"s3Config":"ab"#).unwrap();
+        let store = Store::open(path.clone());
+        assert!(store.take_load_error().is_some());
+        assert_eq!(store.get::<String>(keys::S3_CONFIG), None);
+        assert_eq!(
+            std::fs::read_to_string(dir.join("settings.json.broken")).unwrap(),
+            r#"{"s3Config":"ab"#
+        );
+
+        store.set(keys::LAST_SYNC_TIME, &1_i64).unwrap();
+        assert!(!dir.join("settings.json.tmp").exists());
+        assert_eq!(Store::open(path).get::<i64>(keys::LAST_SYNC_TIME), Some(1));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn missing_file_is_not_an_error() {
+        let (store, dir) = temp_store("missing");
+        assert_eq!(store.take_load_error(), None);
         let _ = std::fs::remove_dir_all(dir);
     }
 
