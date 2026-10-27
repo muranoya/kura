@@ -125,17 +125,41 @@ fn close_dialog(app: &AppWindow) {
     settings.set_dialog("".into());
 }
 
-fn show_recovery_key(app: &AppWindow, recovery_key: String) {
+fn show_recovery_key_with_warning(
+    app: &AppWindow,
+    (recovery_key, warning): (String, Option<String>),
+) {
     let settings = app.global::<Settings>();
     clear_dialog_fields(app);
     settings.set_new_recovery_key(recovery_key.into());
     settings.set_dialog("recovery-key".into());
+    show_push_warning(app, warning);
 }
 
-/// 再暗号化後の vault を保存し、S3 設定があれば上書きアップロードする
-fn save_and_push() -> Result<(), String> {
+/// 再暗号化の前に同期して、リモートの変更を取り込み ETag を最新にしておく。
+/// 再暗号化後の上書きアップロードはマージできないので、ここで 412 になる余地を減らす
+fn sync_before_reencrypt() -> Result<(), String> {
+    shared().rt.block_on(ctx::sync_if_configured()).map(|_| ())
+}
+
+/// 再暗号化後の vault を保存し、S3 設定があれば上書きアップロードする。
+/// 再暗号化はローカル保存の時点で確定しているので、アップロードの失敗は Err にせず警告文で返す
+/// （Err にすると、新しいリカバリーキーを表示できないまま古いキーだけが無効になる）
+fn save_and_push() -> Result<Option<String>, String> {
     ctx::save_local()?;
+    Ok(push_warning())
+}
+
+fn push_warning() -> Option<String> {
     push_if_configured()
+        .err()
+        .map(|e| format!("変更はこの端末に保存しましたが、S3 への反映に失敗しました: {e}"))
+}
+
+fn show_push_warning(app: &AppWindow, warning: Option<String>) {
+    if let Some(warning) = warning {
+        ctx::push_error(app, warning, Some("reencrypt-push"));
+    }
 }
 
 fn push_if_configured() -> Result<(), String> {
@@ -185,6 +209,8 @@ fn change_password(app: &AppWindow) {
     settings.set_dialog_loading(true);
     ctx::run_blocking(
         move || {
+            // オフラインでもパスワード変更はできる（後の同期で meta のスロットごとにマージされる）
+            let _ = sync_before_reencrypt();
             // S3 設定は DEK 由来の鍵で暗号化しているので、パスワード変更では暗号化し直さなくてよい
             shared()
                 .vault
@@ -196,7 +222,10 @@ fn change_password(app: &AppWindow) {
                 &app,
                 result,
                 "パスワード変更に失敗しました",
-                |app, ()| close_dialog(app),
+                |app, warning| {
+                    close_dialog(app);
+                    show_push_warning(app, warning);
+                },
             )
         },
     );
@@ -213,6 +242,10 @@ fn rotate_dek(app: &AppWindow) {
     settings.set_dialog_loading(true);
     ctx::run_blocking(
         move || {
+            // S3 上の vault が古い DEK のまま残ると以降の同期でマージできなくなるので、
+            // 同期できない状態では DEK を更新しない
+            sync_before_reencrypt()
+                .map_err(|e| format!("S3 と同期できないため、DEK を更新しませんでした: {e}"))?;
             let recovery_key = shared().vault.api_rotate_dek(password.to_string())?;
             // 新しい DEK の vault を先に保存する。S3 設定の保存より前に終了しても、
             // vault は新しいリカバリーキーで開ける状態になる（S3 設定は Lock 画面で復号に失敗するだけ）
@@ -223,11 +256,17 @@ fn rotate_dek(app: &AppWindow) {
                     .vault
                     .api_encrypt_config(password.to_string(), config.to_string())?;
                 shared().store.set(keys::S3_CONFIG, &encrypted)?;
-                push_if_configured()?;
             }
-            Ok(recovery_key)
+            Ok((recovery_key, push_warning()))
         },
-        |app, result| finish_dialog_task(&app, result, "DEK更新に失敗しました", show_recovery_key),
+        |app, result| {
+            finish_dialog_task(
+                &app,
+                result,
+                "DEK更新に失敗しました",
+                show_recovery_key_with_warning,
+            )
+        },
     );
 }
 
@@ -242,18 +281,19 @@ fn regenerate_recovery(app: &AppWindow) {
     settings.set_dialog_loading(true);
     ctx::run_blocking(
         move || {
+            let _ = sync_before_reencrypt();
             let recovery_key = shared()
                 .vault
                 .api_regenerate_recovery_key(password.to_string())?;
-            save_and_push()?;
-            Ok(recovery_key)
+            let warning = save_and_push()?;
+            Ok((recovery_key, warning))
         },
         |app, result| {
             finish_dialog_task(
                 &app,
                 result,
                 "リカバリーキー再生成に失敗しました",
-                show_recovery_key,
+                show_recovery_key_with_warning,
             )
         },
     );
