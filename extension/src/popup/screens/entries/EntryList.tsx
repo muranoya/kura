@@ -128,19 +128,26 @@ export default function EntryList() {
     }
   }
 
-  const initialSelectedId = (location.state as { selectedId?: string } | null)?.selectedId ?? null
+  // 作成・編集画面から渡された選択。直後に location.state をクリアするため、マウント時の値で固定する
+  // （クリアに追従すると、下の復元処理が保存済みの古い選択で上書きしてしまう）
+  const [initialSelectedId] = useState<string | null>(
+    () => (location.state as { selectedId?: string } | null)?.selectedId ?? null,
+  )
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId)
   // 狭いサイドバー（1カラム）で詳細を表示中か。前回の選択の復元では一覧のまま開き、
   // ユーザーが選択したとき・編集画面から戻ったときだけ詳細を表示する
   const [showDetail, setShowDetail] = useState(initialSelectedId !== null)
 
   useEffect(() => {
-    if (!initialSelectedId) {
-      getFromStorage<string>(STORAGE_KEYS.SELECTED_ENTRY_ID).then((saved) => {
-        if (saved) setSelectedId(saved)
-      })
+    if (initialSelectedId) {
+      saveToStorage(STORAGE_KEYS.SELECTED_ENTRY_ID, initialSelectedId)
+      return
     }
-  }, [initialSelectedId]) // eslint-disable-line react-hooks/exhaustive-deps
+    getFromStorage<string>(STORAGE_KEYS.SELECTED_ENTRY_ID).then((saved) => {
+      // 読み込みを待つ間にユーザーが選択していれば、そちらを優先する
+      if (saved) setSelectedId((prev) => prev ?? saved)
+    })
+  }, [initialSelectedId])
 
   const clearSelection = useCallback(() => {
     setSelectedId(null)
