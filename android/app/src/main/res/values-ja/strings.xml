@@ -157,6 +157,7 @@
     <string name="lock_passcode_required">パスコードを入力してください</string>
     <string name="lock_unlock_failed">アンロックに失敗しました</string>
     <string name="lock_passcode_unlock_failed">パスコードでのアンロックに失敗しました</string>
+    <string name="lock_quick_unlock_password_changed">別の端末でマスターパスワードが変更されたため、クイックアンロックを無効にしました。マスターパスワードでロックを解除し、設定から再度有効にしてください</string>
 
     <!-- Recovery screen -->
     <string name="recovery_title">リカバリーキーでアンロック</string>

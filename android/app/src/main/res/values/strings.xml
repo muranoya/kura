@@ -157,6 +157,7 @@
     <string name="lock_passcode_required">Please enter your passcode</string>
     <string name="lock_unlock_failed">Failed to unlock</string>
     <string name="lock_passcode_unlock_failed">Failed to unlock with passcode</string>
+    <string name="lock_quick_unlock_password_changed">Your master password was changed on another device, so quick unlock has been turned off. Unlock with your master password and set it up again in settings.</string>
 
     <!-- Recovery screen -->
     <string name="recovery_title">Unlock with Recovery Key</string>
