@@ -21,6 +21,7 @@ const TAG_LEN: usize = 16;
 
 const INFO_INDEX: &str = "kura/v2/index";
 const INFO_SECRET: &str = "kura/v2/secret";
+const INFO_CONFIG: &str = "kura/v2/config";
 
 /// 32 バイトの用途別サブ鍵。drop 時にゼロ化される。
 /// `Dek` と同様、鍵素材の複製を防ぐため Clone は実装しない。
@@ -98,6 +99,35 @@ impl SubKeys {
     }
 }
 
+/// 端末ローカルに保存する設定（S3 設定など）を暗号化する鍵。
+/// DEK から導出するため、マスターパスワードの変更や Argon2 パラメータの更新で変わらない
+/// （別の端末でそれらが変更されても、新しいパスワードでアンロックすれば復号できる）。
+pub struct ConfigKey(SubKey);
+
+impl fmt::Debug for ConfigKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("ConfigKey([REDACTED])")
+    }
+}
+
+impl ConfigKey {
+    /// DEK から HKDF-SHA256 で導出する（`SubKeys` と同じ PRK で、info だけが異なる）
+    pub fn derive(dek: &super::Dek) -> Self {
+        let prk = hkdf_extract(dek.as_bytes());
+        Self(hkdf_expand(&prk, INFO_CONFIG))
+    }
+
+    /// 設定を暗号化する
+    pub fn seal(&self, vault_uuid: &str, plaintext: &[u8]) -> Result<String> {
+        seal(&self.0, &config_aad(vault_uuid), plaintext)
+    }
+
+    /// 設定を復号する
+    pub fn open(&self, vault_uuid: &str, sealed_b64: &str) -> Result<Zeroizing<Vec<u8>>> {
+        open(&self.0, &config_aad(vault_uuid), sealed_b64)
+    }
+}
+
 // HKDF-SHA256（RFC 5869）と HMAC-SHA256（RFC 2104）を SHA-256 の呼び出しだけで組み立てる。
 // hkdf クレートは PRK と Expand の出力ブロックを、hmac クレートは鍵と ipad / opad の
 // XOR（鍵そのものを復元できる）を、それぞれゼロ化せずにスタックへ残すため使わない。
@@ -154,6 +184,13 @@ fn push_field(aad: &mut Vec<u8>, value: &str) {
 fn index_aad(vault_uuid: &str) -> Vec<u8> {
     let mut aad = Vec::new();
     push_field(&mut aad, INFO_INDEX);
+    push_field(&mut aad, vault_uuid);
+    aad
+}
+
+fn config_aad(vault_uuid: &str) -> Vec<u8> {
+    let mut aad = Vec::new();
+    push_field(&mut aad, INFO_CONFIG);
     push_field(&mut aad, vault_uuid);
     aad
 }
@@ -344,6 +381,19 @@ mod tests {
 
     fn unhex<const N: usize>(s: &str) -> [u8; N] {
         std::array::from_fn(|i| u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).unwrap())
+    }
+
+    #[test]
+    fn test_config_roundtrip_and_separated_from_index_key() {
+        let dek = Dek::generate();
+        let config_key = ConfigKey::derive(&dek);
+        let sealed = config_key.seal(UUID, b"{}").unwrap();
+        assert_eq!(config_key.open(UUID, &sealed).unwrap().as_slice(), b"{}");
+        // 同じ DEK から導出し直しても開ける
+        assert!(ConfigKey::derive(&dek).open(UUID, &sealed).is_ok());
+        // index 鍵とは分離されている
+        let keys = SubKeys::derive(&dek);
+        assert!(open(&keys.index_key, &config_aad(UUID), &sealed).is_err());
     }
 
     #[test]

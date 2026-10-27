@@ -6,7 +6,7 @@ pub mod recovery;
 pub mod transfer;
 pub mod v1;
 
-pub use aead::SubKeys;
+pub use aead::{ConfigKey, SubKeys};
 pub use dek::Dek;
 pub use kdf::Kek;
 pub use recovery::RecoveryKey;

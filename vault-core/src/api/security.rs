@@ -6,7 +6,7 @@ use super::VaultManager;
 
 impl VaultManager {
     /// S3設定などの任意データをマスターパスワードで暗号化
-    /// Locked/Unlocked両状態で動作（Argon2Paramsのみ必要）
+    /// Locked/Unlocked両状態で動作（パスワードで DEK をアンラップし、DEK 由来の鍵で暗号化する）
     pub fn api_encrypt_config(
         &self,
         password: String,
@@ -16,21 +16,18 @@ impl VaultManager {
         let plaintext = PlaintextConfig::from_string(plaintext);
         let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
 
-        let argon2_params = match session.as_ref() {
-            Some(SessionState::Locked(locked)) => &locked.meta().argon2_params,
-            Some(SessionState::Unlocked(unlocked)) => &unlocked.meta.argon2_params,
+        let meta = match session.as_ref() {
+            Some(SessionState::Locked(locked)) => locked.meta(),
+            Some(SessionState::Unlocked(unlocked)) => &unlocked.meta,
             None => return Err("Vault not loaded".to_string()),
         };
 
-        let kek = crypto::kdf::derive_kek_from_master_password(&password, argon2_params)
-            .map_err(|e| format!("Failed to derive KEK: {}", e))?;
-
-        crypto::config::encrypt_with_kek(plaintext.as_bytes(), &kek)
+        crypto::config::encrypt_config(meta, &password, plaintext.as_bytes())
             .map_err(|e| format!("Failed to encrypt config: {}", e))
     }
 
     /// マスターパスワードで暗号化されたデータを復号
-    /// Locked/Unlocked両状態で動作
+    /// Locked/Unlocked両状態で動作。旧形式にも対応する（`api_config_needs_upgrade` を参照）
     pub fn api_decrypt_config(
         &self,
         password: String,
@@ -39,16 +36,13 @@ impl VaultManager {
         let password = MasterPassword::from_string(password);
         let session = self.session.lock().unwrap_or_else(|p| p.into_inner());
 
-        let argon2_params = match session.as_ref() {
-            Some(SessionState::Locked(locked)) => &locked.meta().argon2_params,
-            Some(SessionState::Unlocked(unlocked)) => &unlocked.meta.argon2_params,
+        let meta = match session.as_ref() {
+            Some(SessionState::Locked(locked)) => locked.meta(),
+            Some(SessionState::Unlocked(unlocked)) => &unlocked.meta,
             None => return Err("Vault not loaded".to_string()),
         };
 
-        let kek = crypto::kdf::derive_kek_from_master_password(&password, argon2_params)
-            .map_err(|e| format!("Failed to derive KEK: {}", e))?;
-
-        let decrypted_bytes = crypto::config::decrypt_with_kek(&encrypted_b64, &kek)
+        let decrypted_bytes = crypto::config::decrypt_config(meta, &password, &encrypted_b64)
             .map_err(|e| format!("Failed to decrypt config: {}", e))?;
 
         String::from_utf8(decrypted_bytes.to_vec())
@@ -151,4 +145,11 @@ impl VaultManager {
             Ok(recovery_key.to_display_string())
         })
     }
+}
+
+/// 暗号化された設定が旧形式（マスターパスワード由来の鍵で直接暗号化したもの）かどうか（VaultManager不要）。
+/// true なら、復号後に `api_encrypt_config` で暗号化し直して保存すること
+/// （旧形式は別の端末でのマスターパスワード変更後に復号できなくなるため）
+pub fn api_config_needs_upgrade(encrypted_b64: String) -> bool {
+    crypto::config::is_legacy_config(&encrypted_b64)
 }

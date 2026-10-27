@@ -103,6 +103,7 @@ interface WasmApi {
   api_regenerate_recovery_key(vaultId: string, password: string): string
   api_encrypt_config(vaultId: string, password: string, plaintext: string): string
   api_decrypt_config(vaultId: string, password: string, encryptedB64: string): string
+  api_config_needs_upgrade(encryptedB64: string): boolean
   api_encrypt_transfer_config(password: string, configJson: string): string
   api_decrypt_transfer_config(password: string, transferString: string): string
   api_export_bitwarden_json(vaultId: string): string
@@ -502,6 +503,25 @@ async function enterLockedState() {
   clearPickerContext()
 }
 
+// ========== S3設定 ==========
+
+// 暗号化して保存したS3設定を復号してメモリに保持する（vault のロード後に呼ぶこと）。
+// 旧形式（パスワード由来の鍵で直接暗号化したもの）なら、現行形式で暗号化し直して保存する
+async function loadS3Config(password: string): Promise<void> {
+  const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
+  if (!encryptedConfig) return
+  try {
+    const configJson = vault.api_decrypt_config(DEFAULT_VAULT_ID, password, encryptedConfig)
+    decryptedS3Config = JSON.parse(configJson)
+    if (vault.api_config_needs_upgrade(encryptedConfig)) {
+      const encrypted = vault.api_encrypt_config(DEFAULT_VAULT_ID, password, configJson)
+      await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
+    }
+  } catch (e) {
+    console.error('[SW] Failed to decrypt S3 config:', e)
+  }
+}
+
 // ========== セッション復元 ==========
 
 let restoreSessionPromise: Promise<boolean> | null = null
@@ -536,15 +556,7 @@ async function restoreSession(): Promise<boolean> {
     vault.api_unlock(DEFAULT_VAULT_ID, password)
 
     // S3設定の復号
-    const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
-    if (encryptedConfig) {
-      try {
-        const configJson = vault.api_decrypt_config(DEFAULT_VAULT_ID, password, encryptedConfig)
-        decryptedS3Config = JSON.parse(configJson)
-      } catch (e) {
-        console.error('[SW] Failed to decrypt S3 config during session restore:', e)
-      }
-    }
+    await loadS3Config(password)
 
     unlocked = true
     updateExtensionIcon(true)
@@ -661,19 +673,7 @@ async function handleMessage(
           vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
           vault.api_unlock(DEFAULT_VAULT_ID, message.password)
           // 暗号化されたS3設定を復号してメモリに保持
-          const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
-          if (encryptedConfig) {
-            try {
-              const configJson = vault.api_decrypt_config(
-                DEFAULT_VAULT_ID,
-                message.password,
-                encryptedConfig,
-              )
-              decryptedS3Config = JSON.parse(configJson)
-            } catch (e) {
-              console.error('[SW] Failed to decrypt S3 config:', e)
-            }
-          }
+          await loadS3Config(message.password)
           unlocked = true
           updateExtensionIcon(true)
           await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.password)
@@ -720,19 +720,7 @@ async function handleMessage(
             decryptedS3Config = message.s3Config
           } else {
             // 通常のアンロック: 暗号化S3設定を復号
-            const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
-            if (encryptedConfig) {
-              try {
-                const cJson = vault.api_decrypt_config(
-                  DEFAULT_VAULT_ID,
-                  message.password,
-                  encryptedConfig,
-                )
-                decryptedS3Config = JSON.parse(cJson)
-              } catch (e) {
-                console.error('[SW] Failed to decrypt S3 config:', e)
-              }
-            }
+            await loadS3Config(message.password)
           }
           unlocked = true
           updateExtensionIcon(true)
@@ -1199,16 +1187,7 @@ async function handleMessage(
             message.oldPassword,
             message.newPassword,
           )
-          // S3設定を新しいパスワードで再暗号化
-          if (decryptedS3Config) {
-            const configJson = JSON.stringify(decryptedS3Config)
-            const encrypted = vault.api_encrypt_config(
-              DEFAULT_VAULT_ID,
-              message.newPassword,
-              configJson,
-            )
-            await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
-          }
+          // S3設定は DEK 由来の鍵で暗号化しているので、パスワード変更では暗号化し直さなくてよい
           await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.newPassword)
           await autoSync()
           sendResponse({ success: true })
@@ -1225,6 +1204,15 @@ async function handleMessage(
         }
         try {
           const recoveryKey = vault.api_rotate_dek(DEFAULT_VAULT_ID, message.password)
+          // S3設定は DEK 由来の鍵で暗号化しているので、新しい DEK で暗号化し直す
+          if (decryptedS3Config) {
+            const encrypted = vault.api_encrypt_config(
+              DEFAULT_VAULT_ID,
+              message.password,
+              JSON.stringify(decryptedS3Config),
+            )
+            await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
+          }
           await autoSync()
           sendResponse({ success: true, recoveryKey })
         } catch (err) {

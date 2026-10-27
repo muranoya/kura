@@ -10,7 +10,7 @@ import { Label } from '../../components/ui/label'
 import { PasswordInput } from '../../components/ui/password-input'
 import { Separator } from '../../components/ui/separator'
 import { STORAGE_KEYS } from '../../shared/constants'
-import { clearStorage, getFromStorage } from '../../shared/storage'
+import { clearStorage, getFromStorage, saveToStorage } from '../../shared/storage'
 
 interface LockScreenProps {
   onUnlocked?: () => void
@@ -38,6 +38,11 @@ export default function LockScreen({ onUnlocked }: LockScreenProps) {
       if (encryptedConfig) {
         const configJson = await commands.decryptConfig(password, encryptedConfig)
         await commands.setS3ConfigSession(configJson)
+        // 旧形式（パスワード由来の鍵で直接暗号化したもの）なら現行形式で暗号化し直す
+        if (await commands.configNeedsUpgrade(encryptedConfig)) {
+          const encrypted = await commands.encryptConfig(password, configJson)
+          await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
+        }
       }
       commands.syncVaultIfConfigured().catch(() => {}) // バックグラウンド
       onUnlocked?.()

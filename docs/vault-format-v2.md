@@ -200,6 +200,7 @@ secret_key = HKDF-SHA256(ikm = DEK, salt = なし, info = "kura/v2/secret", L = 
 - サブ鍵は DEK と同様にゼロ化対象とし、ロック時に破棄する
 - 導出の途中で生じる鍵由来の中間値（PRK、HMAC の鍵と ipad / opad の XOR、内側のハッシュ値）もゼロ化する。`hkdf` / `hmac` クレートはこれらをゼロ化せずにスタックへ残すため使わず、HKDF と HMAC を `sha2` の SHA-256（`zeroize` フィーチャで内部状態をゼロ化）の上に組み立てる。正しさは RFC 4231 / RFC 5869 のテストベクタと、`hkdf` クレートとの出力の一致で確認している。コンパイラが作る一時的な複製までは防げないため、ゼロ化はベストエフォートである
 - 将来別の用途の鍵が必要になった場合は、`kura/v2/<用途>` の info 文字列を追加する
+  - `kura/v2/config`: 端末ローカルに保存する S3 設定の暗号化に使う（vault.json には保存しない。`docs/architecture.md` の「S3設定の暗号化」を参照）
 
 ### 5-2. AEAD
 

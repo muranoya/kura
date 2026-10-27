@@ -11,6 +11,7 @@ mod webauthn;
 #[cfg(any(feature = "desktop", feature = "android"))]
 mod import;
 
+pub use security::api_config_needs_upgrade;
 pub use sync::parse_s3_config;
 pub use transfer::*;
 pub use utils::*;

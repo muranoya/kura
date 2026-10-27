@@ -203,6 +203,11 @@ export async function decryptConfig(password: string, encryptedB64: string): Pro
   return invoke<string>('decrypt_config', { vaultId, password, encryptedB64 })
 }
 
+// 暗号化された設定が旧形式で、復号後に encryptConfig で暗号化し直す必要があるか
+export async function configNeedsUpgrade(encryptedB64: string): Promise<boolean> {
+  return invoke<boolean>('config_needs_upgrade', { encryptedB64 })
+}
+
 export async function encryptTransferConfig(password: string, configJson: string): Promise<string> {
   return invoke<string>('encrypt_transfer_config', { password, configJson })
 }
