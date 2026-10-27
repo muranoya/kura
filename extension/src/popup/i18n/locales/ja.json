@@ -122,7 +122,6 @@
       "copyKey": "リカバリーキーをコピー",
       "completing": "確認中...",
       "completeButton": "完了",
-      "vaultNotReady": "Vaultの準備ができていません。もう一度お試しください。",
       "errorPrefix": "エラー"
     },
     "unlockExisting": {

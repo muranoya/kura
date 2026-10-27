@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   Check,
   Copy,
   Crosshair,
@@ -13,7 +14,7 @@ import {
   X,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -127,19 +128,36 @@ export default function EntryList() {
     }
   }
 
-  const initialSelectedId = (location.state as { selectedId?: string } | null)?.selectedId ?? null
+  // 作成・編集画面から渡された選択。直後に location.state をクリアするため、マウント時の値で固定する
+  // （クリアに追従すると、下の復元処理が保存済みの古い選択で上書きしてしまう）
+  const [initialSelectedId] = useState<string | null>(
+    () => (location.state as { selectedId?: string } | null)?.selectedId ?? null,
+  )
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId)
+  // 狭いサイドバー（1カラム）で詳細を表示中か。前回の選択の復元では一覧のまま開き、
+  // ユーザーが選択したとき・編集画面から戻ったときだけ詳細を表示する
+  const [showDetail, setShowDetail] = useState(initialSelectedId !== null)
 
   useEffect(() => {
-    if (!initialSelectedId) {
-      getFromStorage<string>(STORAGE_KEYS.SELECTED_ENTRY_ID).then((saved) => {
-        if (saved) setSelectedId(saved)
-      })
+    if (initialSelectedId) {
+      saveToStorage(STORAGE_KEYS.SELECTED_ENTRY_ID, initialSelectedId)
+      return
     }
-  }, [initialSelectedId]) // eslint-disable-line react-hooks/exhaustive-deps
+    getFromStorage<string>(STORAGE_KEYS.SELECTED_ENTRY_ID).then((saved) => {
+      // 読み込みを待つ間にユーザーが選択していれば、そちらを優先する
+      if (saved) setSelectedId((prev) => prev ?? saved)
+    })
+  }, [initialSelectedId])
+
+  const clearSelection = useCallback(() => {
+    setSelectedId(null)
+    setShowDetail(false)
+    removeFromStorage(STORAGE_KEYS.SELECTED_ENTRY_ID)
+  }, [])
 
   const handleSelectEntry = (id: string | null) => {
     setSelectedId(id)
+    setShowDetail(id !== null)
     if (id) {
       saveToStorage(STORAGE_KEYS.SELECTED_ENTRY_ID, id)
     } else {
@@ -191,36 +209,58 @@ export default function EntryList() {
     loadEntries()
   }, [loadEntries])
 
+  // 古い問い合わせの結果が、後から選択したエントリの詳細を上書きしないようにする
+  const detailRequestSeqRef = useRef(0)
+
+  const loadDetail = useCallback(
+    async (id: string, showLoading: boolean) => {
+      const seq = ++detailRequestSeqRef.current
+      if (showLoading) setSelectedLoading(true)
+      try {
+        const entry = await commands.getEntry(id)
+        if (seq !== detailRequestSeqRef.current) return
+        if (entry.deletedAt) {
+          // 他のウィンドウや同期でゴミ箱へ移された
+          clearSelection()
+          return
+        }
+        setSelectedEntry(entry)
+      } catch (err) {
+        if (seq !== detailRequestSeqRef.current) return
+        console.error('Failed to load entry:', err)
+        // 完全に削除された等。別のエントリの内容が残らないよう選択を解除する
+        clearSelection()
+      } finally {
+        if (seq === detailRequestSeqRef.current) setSelectedLoading(false)
+      }
+    },
+    [clearSelection],
+  )
+
   useEffect(() => {
+    // マスク解除の状態はフィールド種別のキーで持つため、別のエントリへ持ち越さない
+    // （サイドバーは開いたままなので、一度の表示で以降のエントリまで平文になってしまう）
+    setUnmaskedFields(new Set())
+    if (!selectedId) {
+      detailRequestSeqRef.current++
+      setSelectedEntry(null)
+      return
+    }
+    loadDetail(selectedId, true)
+  }, [selectedId, loadDetail])
+
+  useEffect(() => {
+    // サイドバーは開いたままになるため、同期だけでなくSW側での保存（キャプチャ・
+    // 他ウィンドウでの編集等）でも一覧と詳細を更新する
     const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
-      if (changes[STORAGE_KEYS.LAST_SYNC_TIME]) {
+      if (changes[STORAGE_KEYS.LAST_SYNC_TIME] || changes[STORAGE_KEYS.VAULT_BYTES]) {
         loadEntries()
+        if (selectedId) loadDetail(selectedId, false)
       }
     }
     chrome.storage.onChanged.addListener(listener)
     return () => chrome.storage.onChanged.removeListener(listener)
-  }, [loadEntries])
-
-  useEffect(() => {
-    if (!selectedId) {
-      setSelectedEntry(null)
-      return
-    }
-
-    const loadDetail = async () => {
-      setSelectedLoading(true)
-      try {
-        const entry = await commands.getEntry(selectedId)
-        setSelectedEntry(entry)
-      } catch (err) {
-        console.error('Failed to load entry:', err)
-      } finally {
-        setSelectedLoading(false)
-      }
-    }
-
-    loadDetail()
-  }, [selectedId])
+  }, [loadEntries, loadDetail, selectedId])
 
   const filteredEntries = useMemo(() => {
     return entries.filter((e) => !selectedType || e.entryType === selectedType)
@@ -323,7 +363,6 @@ export default function EntryList() {
           size="sm"
           onClick={() => {
             sendMessage({ type: 'AUTOFILL_START_CAPTURE' }).catch(() => {})
-            window.close()
           }}
           className="gap-1 text-sm flex-shrink-0"
           title={t('entries.captureCredentials')}
@@ -336,16 +375,21 @@ export default function EntryList() {
           size="sm"
           onClick={() => navigate('/entries/create')}
           className="gap-1 text-sm flex-shrink-0"
+          title={t('entries.newAddButton')}
         >
           <Plus size={14} />
-          {t('entries.newAddButton')}
+          <span className="hidden twopane:inline">{t('entries.newAddButton')}</span>
         </Button>
 
         <SyncActions onSyncComplete={loadEntries} />
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="w-60 border-r border-border bg-sidebar flex flex-col">
+        <div
+          className={`w-full twopane:w-60 twopane:border-r border-border bg-sidebar flex-col ${
+            showDetail ? 'hidden twopane:flex' : 'flex'
+          }`}
+        >
           {error && (
             <div className="mx-2 mt-2 p-2 rounded-md bg-danger/10 border border-danger/20">
               <p className="text-sm text-danger">{error}</p>
@@ -385,7 +429,9 @@ export default function EntryList() {
           />
         </div>
 
-        <div className="flex-1 bg-bg-surface overflow-y-auto">
+        <div
+          className={`flex-1 bg-bg-surface overflow-y-auto ${showDetail ? '' : 'hidden twopane:block'}`}
+        >
           {selectedId && selectedEntry ? (
             <EntryDetailPane
               entry={selectedEntry}
@@ -396,6 +442,7 @@ export default function EntryList() {
               onEdit={() => navigate(`/entries/${selectedId}/edit`)}
               onDelete={() => handleDelete(selectedId)}
               onFavorite={() => handleFavorite(selectedId, selectedEntry.isFavorite)}
+              onBack={() => setShowDetail(false)}
             />
           ) : (
             <div className="h-full flex items-center justify-center">
@@ -417,6 +464,8 @@ interface EntryDetailPaneProps {
   onEdit: () => void
   onDelete: () => void
   onFavorite: () => void
+  /** 1カラム表示時に一覧へ戻る */
+  onBack: () => void
 }
 
 function PaneFieldDisplay({
@@ -563,6 +612,7 @@ function EntryDetailPane({
   onEdit,
   onDelete,
   onFavorite,
+  onBack,
 }: EntryDetailPaneProps) {
   const { t } = useTranslation()
 
@@ -579,6 +629,14 @@ function EntryDetailPane({
   return (
     <div className="p-3">
       <div className="flex items-start justify-between gap-2 mb-1">
+        <button
+          type="button"
+          onClick={onBack}
+          className="twopane:hidden p-1 -ml-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors shrink-0"
+          title={t('common.back')}
+        >
+          <ArrowLeft size={14} />
+        </button>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-bold text-text-primary truncate">{entry.name}</h2>
           <Badge variant="muted" className="text-[11px] mt-0.5">

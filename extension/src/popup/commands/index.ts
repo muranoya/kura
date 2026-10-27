@@ -36,6 +36,11 @@ export async function lock(): Promise<void> {
   if (!res.success) throw new Error(field<'error', string>(res, 'error'))
 }
 
+export async function logout(): Promise<void> {
+  const res = await sendMessage({ type: 'LOGOUT' })
+  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
+}
+
 // Entries
 export async function listEntries(filter?: EntryFilter): Promise<EntryRow[]> {
   const res = await sendMessage({ type: 'LIST_ENTRIES', filter: filter ?? {} })
@@ -208,18 +213,6 @@ export async function startTotpQrScan(entryId: string, fieldId: string): Promise
 export async function startPicker(entryId: string, fieldId: string): Promise<void> {
   const res = await sendMessage({ type: 'PICKER_START', entryId, fieldId })
   if (!res.success) throw new Error(field<'error', string>(res, 'error'))
-}
-
-/**
- * popup再起動時に、直前のピッカー操作で適用された結果（あれば）を取り出す。
- * 呼ぶたびに一度だけ消費される。
- */
-export async function queryPickerResult(): Promise<{ entryId: string; fieldId: string } | null> {
-  const res = await sendMessage({ type: 'PICKER_QUERY_RESULT' })
-  if (!res.success) return null
-  return (
-    field<'pickerResult', { entryId: string; fieldId: string } | null>(res, 'pickerResult') ?? null
-  )
 }
 
 // Export

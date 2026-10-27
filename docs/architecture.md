@@ -44,6 +44,19 @@ Android向けJNIの活用先の一つであるAutofillService（システム標�
 
 ---
 
+### ブラウザ拡張のUI（サイドバー）
+
+拡張機能のメインUIはツールバーアイコンから開閉するサイドバーとして提供する。Chrome は `side_panel`（`chrome.sidePanel`）、Firefox は `sidebar_action`（`browser.sidebarAction`）を使い、差異は `extension/src/background/sidebar.ts` で吸収する。Passkey の儀式ウィンドウ（`webauthn.html`）だけは、ページからの要求に応じて開く独立したウィンドウのままとする。
+
+サイドバーはページを操作しても閉じず、開いたままになる。そのため次のように設計している。
+
+- **オートロック**: 「拡張機能UIでの最後の操作」から設定時間が経つとロックする。サイドバーはクリック・キー入力・スクロールがあると `USER_ACTIVITY` を Service Worker に送り（15秒間隔に間引く）、Service Worker はそのたびに `autolock` アラームを張り直す。サイドバーを開いていても、操作しなければロックされる
+- **状態変化の反映**: Service Worker 側で起きた変化は `chrome.runtime.sendMessage` で拡張機能ページにブロードキャストする（`ExtensionPageBroadcast`）。オートロックや儀式ウィンドウでのアンロックは `VAULT_LOCK_STATE_CHANGED` として送り、サイドバーはロック画面と一覧を切り替える。ピッカー・TOTP QR スキャン・既存エントリへの Passkey 登録の結果は `ENTRY_UPDATED_IN_BACKGROUND` として送り、開いている編集画面に反映する（SW が書き換えた属性だけを差し替え、編集中の他の内容は保持する）
+- **現在のタブへの追従**: 「このサイト」のエントリは、タブの切り替えや遷移（`tabs.onActivated` / `tabs.onUpdated`）に応じて再計算する
+- **幅への対応**: サイドバーの幅は可変なので、35rem 以上では一覧と詳細を左右に並べ、それより狭ければ一覧と詳細を切り替える1カラム表示にする
+
+Content Script のロック中ドロップダウンからは `AUTOFILL_OPEN_SIDEBAR` でサイドバーを開く。Firefox の `sidebarAction.open()` はメッセージ経由ではユーザー操作として扱われず失敗するため、その場合は同じ画面を小さなウィンドウで開く（既に開いていればそのウィンドウを前面に出す）。このウィンドウからも操作対象のタブを正しく選べるよう、「現在のタブ」は `currentWindow` ではなく最後にフォーカスされた通常ウィンドウのアクティブタブとして解決する（`shared/tabs.ts`）。Firefox の `windows.getLastFocused` は `windowTypes` を無視してこのウィンドウ自身を返すため、その場合は通常ウィンドウのアクティブタブのうち最後に表示された（`lastAccessed` が最大の）ものを使う。
+
 ## Data Design
 
 ### vault.json の構造
@@ -344,12 +357,13 @@ TOTP は `CustomField`（`field_type: "totp"`）として保持する。値は B
 #### ブラウザ拡張のフロー
 
 1. エントリ編集フォームの TOTP 値入力横の QR アイコンから起動する
-2. 現在のフォーム内容を先に保存し、ポップアップを閉じる
+2. 現在のフォーム内容を先に保存する（サイドバーは開いたまま）
 3. アクティブタブにオーバーレイ（キャプチャモードと同様の右上ツールバー）を表示
 4. ユーザーが [スキャン] を押すと `captureVisibleTab` でビューポートを取得し、content script 上で `@zxing/library` によりデコードする（複数 QR は検出位置をマスクして繰り返し検出）
+   - `captureVisibleTab` には `<all_urls>` ホスト権限が必要なため manifest で宣言している。Chrome はサイドパネルを開くツールバークリックでは `activeTab` を付与せず、サイドバーを開いたままタブを移動した場合も `activeTab` は効かないため
 5. 検出結果を一覧表示し、ユーザーが意図した候補を確認して保存する
-6. Service Worker で TOTP 検証後、対象カスタムフィールドを直接更新する
+6. Service Worker で TOTP 検証後、対象カスタムフィールドを直接更新し、`ENTRY_UPDATED_IN_BACKGROUND` で開いている編集画面に反映する
 
-手入力（Base32 / otpauth URI の貼り付け）は従来どおり利用できる。ポップアップ内の画像ファイル選択は、ファイルダイアログ表示でポップアップが閉じるため提供しない。新規作成中はエントリ ID が無いため QR スキャンは使えず、先に保存してから編集画面で行う。
+手入力（Base32 / otpauth URI の貼り付け）は従来どおり利用できる。画像ファイルからの読み取りは提供していない（ポップアップ UI だった頃はファイルダイアログの表示でポップアップが閉じたため。サイドバーでは閉じないので、今後追加できる）。新規作成中はエントリ ID が無いため QR スキャンは使えず、先に保存してから編集画面で行う。
 
 Android ではアイコンタップ後に「カメラでスキャン」「画像を選択」の選択ダイアログを表示し、選んだ手段で読み取る。

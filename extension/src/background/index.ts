@@ -4,6 +4,7 @@
 import { DEFAULT_VAULT_ID, STORAGE_KEYS } from '../shared/constants'
 import { ConflictError, VaultS3Client } from '../shared/s3-client'
 import {
+  clearStorage,
   getFromSessionStorage,
   getFromStorage,
   removeFromSessionStorage,
@@ -21,6 +22,7 @@ import {
   onVaultUnlocked,
 } from './autofill'
 import { clearPickerContext, handlePickerMessage, initPicker } from './picker'
+import { initSidebar, openSidebar } from './sidebar'
 import { clearTotpQrScanContext, handleTotpQrMessage, initTotpQrScan } from './totp-qr-scan'
 import { initWasmManual } from './wasm-init'
 import { handleWebauthnMessage, initWebauthn, resumeLockedWebauthnRituals } from './webauthn'
@@ -92,6 +94,11 @@ interface WasmApi {
   api_parse_totp_period(value: string): number
   api_verify_password(vaultId: string, password: string): void
   api_change_master_password(vaultId: string, oldPassword: string, newPassword: string): void
+  api_reset_master_password_with_recovery_key(
+    vaultId: string,
+    recoveryKey: string,
+    newPassword: string,
+  ): void
   api_rotate_dek(vaultId: string, password: string): string
   api_regenerate_recovery_key(vaultId: string, password: string): string
   api_encrypt_config(vaultId: string, password: string, plaintext: string): string
@@ -121,9 +128,8 @@ interface WasmApi {
 
 let vault: WasmApi = null as unknown as WasmApi
 
-let wasmInitialized = false
+let wasmInitPromise: Promise<void> | null = null
 let unlocked = false
-let popupConnected = false
 let decryptedS3Config: S3Config | null = null
 
 function updateExtensionIcon(isUnlocked: boolean) {
@@ -138,21 +144,44 @@ function updateExtensionIcon(isUnlocked: boolean) {
 }
 
 // WASM 初期化関数（手動 fetch + instantiate で top-level await を回避）
-async function initWasm() {
-  if (wasmInitialized) return
-  try {
-    vault = (await initWasmManual()) as unknown as WasmApi
-    wasmInitialized = true
-  } catch (error) {
-    console.error('[SW] WASM initialization error:', error)
-    throw error
+// 並行して呼ばれても1回だけ初期化する（2つ目のインスタンスで vault が差し替わり、
+// アンロック済みのセッションが失われるのを防ぐ）
+function initWasm(): Promise<void> {
+  if (!wasmInitPromise) {
+    wasmInitPromise = initWasmManual()
+      .then((api) => {
+        vault = api as unknown as WasmApi
+      })
+      .catch((error) => {
+        wasmInitPromise = null
+        console.error('[SW] WASM initialization error:', error)
+        throw error
+      })
   }
+  return wasmInitPromise
 }
 
 // ========== メッセージハンドラーのセットアップ ==========
 
 function setupMessageHandlers() {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // サイドバーの表示はユーザー操作の文脈内で同期的に呼ぶ必要があるため、
+    // await を含む handleMessage より前に処理する
+    if (message?.type === 'AUTOFILL_OPEN_SIDEBAR') {
+      openSidebar(sender)
+        .then(() => sendResponse({ success: true }))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
+      return true
+    }
+
+    // サイドバーから頻繁に届くため、Vaultの復元を伴う handleMessage を通さずに処理する
+    if (message?.type === 'USER_ACTIVITY') {
+      handleUserActivity()
+        .then(() => sendResponse({ success: true }))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
+      return true
+    }
+
     // async 処理を fire-and-forget で実行し、Promise で sendResponse を呼ぶ
     handleMessage(message, sender, sendResponse).catch((err) => {
       console.error('[SW] Unhandled error in message handler:', message.type, err)
@@ -168,22 +197,27 @@ function setupMessageHandlers() {
 
 // メッセージハンドラーを最初に登録（スクリプト読み込み時）
 setupMessageHandlers()
+initSidebar()
 
-// ポップアップの接続/切断を検知してオートロックを管理
-chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== 'popup') return
-  popupConnected = true
-  chrome.alarms.clear('autolock')
+// オートロックは「拡張機能UIでの最後の操作」からの経過時間で判定する。
+// サイドバーは開いたままになるため、接続の有無ではなく操作（USER_ACTIVITY）で
+// タイマーを延長する。
+async function resetAutolockAlarm() {
+  const settings = await loadSettings()
+  if (settings.autolockMinutes > 0) {
+    chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
+  } else {
+    chrome.alarms.clear('autolock')
+  }
+}
 
-  port.onDisconnect.addListener(async () => {
-    popupConnected = false
-    if (!unlocked) return
-    const settings = await loadSettings()
-    if (settings.autolockMinutes > 0) {
-      chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
-    }
-  })
-})
+async function handleUserActivity() {
+  // SW再起動直後はメモリ上 unlocked=false でもセッションは残っている（アラームも残る）。
+  // セッションの有無だけで判定し、Vaultの復元（Argon2）は行わない
+  if (unlocked || (await getFromSessionStorage<string>(STORAGE_KEYS.SESSION_PASSWORD))) {
+    await resetAutolockAlarm()
+  }
+}
 
 // Service Worker 起動時に初期化
 self.addEventListener('install', (event: Event) => {
@@ -391,12 +425,17 @@ async function autoSync() {
   try {
     // 復号済みS3設定がない場合はローカル保存のみ
     if (!decryptedS3Config) {
+      // ロック・ログアウト後に呼ばれた場合は書き戻さない
+      if (!unlocked) return
       const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
       await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
       return
     }
 
     await syncWithS3(decryptedS3Config)
+    // S3通信の await 中にロック・ログアウトされた場合は書き戻さない
+    // （ログアウト後のストレージにVaultが復活するのを防ぐ）
+    if (!unlocked) throw new VaultLockedDuringSyncError()
 
     // 同期後に vault bytes / ETag / lastSyncTime を更新
     const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
@@ -444,9 +483,42 @@ async function loadSettings(): Promise<AppSettings> {
   )
 }
 
+/**
+ * ロック状態へ遷移する（復号済みデータの破棄・アラーム停止・各画面への通知）。
+ * WASM 側の api_lock は呼び出し側で済ませておくこと。
+ */
+async function enterLockedState() {
+  unlocked = false
+  updateExtensionIcon(false)
+  decryptedS3Config = null
+  await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
+  chrome.alarms.clear('autolock')
+  chrome.alarms.clear('autosync')
+  // オートフィル: 全タブに通知してContent Scriptを無効化
+  onVaultLocked()
+  clearTotpQrScanContext()
+  clearPickerContext()
+}
+
 // ========== セッション復元 ==========
 
-async function tryRestoreSession(): Promise<boolean> {
+let restoreSessionPromise: Promise<boolean> | null = null
+
+/**
+ * セッションが残っていればアンロック状態まで復元する。
+ * 並行して呼ばれても復元（Argon2）は1回だけ行う。
+ */
+function tryRestoreSession(): Promise<boolean> {
+  if (unlocked) return Promise.resolve(true)
+  if (!restoreSessionPromise) {
+    restoreSessionPromise = restoreSession().finally(() => {
+      restoreSessionPromise = null
+    })
+  }
+  return restoreSessionPromise
+}
+
+async function restoreSession(): Promise<boolean> {
   const password = await getFromSessionStorage<string>(STORAGE_KEYS.SESSION_PASSWORD)
   if (!password) return false
 
@@ -455,6 +527,8 @@ async function tryRestoreSession(): Promise<boolean> {
     const vaultBytes = await getFromStorage<number[]>(STORAGE_KEYS.VAULT_BYTES)
     const etag = await getFromStorage<string>(STORAGE_KEYS.VAULT_ETAG)
     if (!vaultBytes) return false
+    // await 中に UNLOCK 等でアンロックされていれば、ロード済みのセッションを壊さない
+    if (unlocked || vault.api_is_unlocked(DEFAULT_VAULT_ID)) return unlocked
 
     vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
     vault.api_unlock(DEFAULT_VAULT_ID, password)
@@ -480,6 +554,39 @@ async function tryRestoreSession(): Promise<boolean> {
   }
 }
 
+let ensureVaultLoadedPromise: Promise<void> | null = null
+
+/**
+ * Service Worker 再起動時の vault 自動復元。
+ * セッションが残っていればアンロック状態まで復元、なければロック状態でvaultをロードする。
+ * 並行するメッセージで重複して実行しないよう、実行中の処理を共有する。
+ */
+function ensureVaultLoaded(): Promise<void> {
+  if (unlocked) return Promise.resolve()
+  if (!ensureVaultLoadedPromise) {
+    ensureVaultLoadedPromise = loadVaultForMessage().finally(() => {
+      ensureVaultLoadedPromise = null
+    })
+  }
+  return ensureVaultLoadedPromise
+}
+
+async function loadVaultForMessage() {
+  const restored = await tryRestoreSession()
+  if (restored) return
+  const vaultBytes = await getFromStorage<number[]>(STORAGE_KEYS.VAULT_BYTES)
+  if (!vaultBytes) return
+  try {
+    const etag = await getFromStorage<string>(STORAGE_KEYS.VAULT_ETAG)
+    // await 中に UNLOCK 等でアンロックされていれば、ロック状態で上書きしない
+    // （チェック直後に同期的にロードするため、間に割り込まれることはない）
+    if (unlocked || vault.api_is_unlocked(DEFAULT_VAULT_ID)) return
+    vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
+  } catch (e) {
+    console.error('[SW] Failed to auto-load vault:', e)
+  }
+}
+
 // ========== メッセージハンドリング ==========
 
 async function handleMessage(
@@ -491,23 +598,7 @@ async function handleMessage(
 ) {
   try {
     await initWasm()
-
-    // Service Worker 再起動時の vault 自動復元
-    // セッションが残っていればアンロック状態まで復元、なければロック状態でvaultをロードする
-    if (!unlocked) {
-      const restored = await tryRestoreSession()
-      if (!restored) {
-        const vaultBytes = await getFromStorage<number[]>(STORAGE_KEYS.VAULT_BYTES)
-        if (vaultBytes) {
-          try {
-            const etag = await getFromStorage<string>(STORAGE_KEYS.VAULT_ETAG)
-            vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
-          } catch (e) {
-            console.error('[SW] Failed to auto-load vault:', e)
-          }
-        }
-      }
-    }
+    await ensureVaultLoaded()
 
     // Delegate developer mode messages
     if (typeof message.type === 'string' && message.type.startsWith('DEV_MODE_')) {
@@ -545,6 +636,18 @@ async function handleMessage(
           sendResponse({ success: false, error: 'Password required' })
           break
         }
+        if (unlocked && vault.api_is_unlocked(DEFAULT_VAULT_ID)) {
+          // 別のウィンドウで既にアンロック済み（ロック画面が残っていた）。Vaultを
+          // ロードし直すとアンロック済みのセッションを壊すため、パスワードの検証だけ行う。
+          // CREATE_VAULT直後はunlockedがtrueでもWASMセッションはLockedなので通常経路へ進む
+          try {
+            vault.api_verify_password(DEFAULT_VAULT_ID, message.password)
+            sendResponse({ success: true })
+          } catch (err) {
+            sendResponse({ success: false, error: String(err) })
+          }
+          break
+        }
         try {
           const vaultBytes = await getFromStorage<number[]>(STORAGE_KEYS.VAULT_BYTES)
           const etag = await getFromStorage<string>(STORAGE_KEYS.VAULT_ETAG)
@@ -572,13 +675,7 @@ async function handleMessage(
           unlocked = true
           updateExtensionIcon(true)
           await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.password)
-          // ポップアップが閉じている場合のみオートロック alarm を設定
-          if (!popupConnected) {
-            const settings = await loadSettings()
-            if (settings.autolockMinutes > 0) {
-              chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
-            }
-          }
+          await resetAutolockAlarm()
           // 定期同期アラームを設定
           chrome.alarms.create('autosync', { periodInMinutes: 1 })
           // WebAuthnリチュアルがアンロック待ちの場合、確認/選択画面へ進める
@@ -638,13 +735,7 @@ async function handleMessage(
           unlocked = true
           updateExtensionIcon(true)
           await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.password)
-          // ポップアップが閉じている場合のみオートロック alarm を設定
-          if (!popupConnected) {
-            const settings = await loadSettings()
-            if (settings.autolockMinutes > 0) {
-              chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
-            }
-          }
+          await resetAutolockAlarm()
           // 定期同期アラームを設定
           chrome.alarms.create('autosync', { periodInMinutes: 1 })
           await resumeLockedWebauthnRituals()
@@ -663,16 +754,27 @@ async function handleMessage(
         try {
           const vaultBytes = vault.api_lock(DEFAULT_VAULT_ID)
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
-          unlocked = false
-          updateExtensionIcon(false)
-          decryptedS3Config = null
-          await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
-          chrome.alarms.clear('autolock')
-          chrome.alarms.clear('autosync')
-          // オートフィル: 全タブに通知してContent Scriptを無効化
-          onVaultLocked()
-          clearTotpQrScanContext()
-          clearPickerContext()
+          await enterLockedState()
+          sendResponse({ success: true })
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      case 'LOGOUT': {
+        // サイドバーは閉じないため、UI側でストレージを消すだけではSWのアンロック状態
+        // （復号済みVault・S3設定・同期アラーム）が残る。ロックしてから全データを消去する。
+        try {
+          if (unlocked) {
+            try {
+              vault.api_lock(DEFAULT_VAULT_ID)
+            } catch (e) {
+              console.error('[SW] LOGOUT: api_lock failed:', e)
+            }
+            await enterLockedState()
+          }
+          await clearStorage()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -704,12 +806,7 @@ async function handleMessage(
           }
           unlocked = true
           await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.masterPassword)
-          if (!popupConnected) {
-            const settings = await loadSettings()
-            if (settings.autolockMinutes > 0) {
-              chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
-            }
-          }
+          await resetAutolockAlarm()
           sendResponse({ success: true, recoveryKey })
         } catch (err) {
           console.error('[SW] CREATE_VAULT: Error:', err)
@@ -725,7 +822,7 @@ async function handleMessage(
         }
         try {
           vault.api_unlock_with_recovery_key(DEFAULT_VAULT_ID, message.recoveryKey)
-          vault.api_change_master_password(
+          vault.api_reset_master_password_with_recovery_key(
             DEFAULT_VAULT_ID,
             message.recoveryKey,
             message.newPassword,
@@ -733,18 +830,20 @@ async function handleMessage(
           const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
           await saveToStorage(STORAGE_KEYS.VAULT_ETAG, null)
-          await autoSync()
           unlocked = true
           updateExtensionIcon(true)
           await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.newPassword)
-          if (!popupConnected) {
-            const settings = await loadSettings()
-            if (settings.autolockMinutes > 0) {
-              chrome.alarms.create('autolock', { delayInMinutes: settings.autolockMinutes })
-            }
-          }
+          await resetAutolockAlarm()
+          chrome.alarms.create('autosync', { periodInMinutes: 1 })
+          // 通常のアンロックと同様に、待機中のPasskeyリチュアル・他の画面・各タブへ通知する
+          await resumeLockedWebauthnRituals()
           sendResponse({ success: true })
+          onVaultUnlocked()
         } catch (err) {
+          // SW側はロック状態のままなので、WASMセッションだけアンロック済みで残さない
+          if (!unlocked && vault.api_is_unlocked(DEFAULT_VAULT_ID)) {
+            vault.api_lock(DEFAULT_VAULT_ID)
+          }
           sendResponse({ success: false, error: String(err) })
         }
         break
@@ -886,6 +985,13 @@ async function handleMessage(
           break
         }
         try {
+          // 完全削除はゴミ箱内のエントリに限る。古いゴミ箱画面から、別の画面で
+          // 復元済みのエントリを消してしまわないようにする
+          const target = JSON.parse(vault.api_get_entry(DEFAULT_VAULT_ID, message.id))
+          if (target?.deleted_at == null) {
+            sendResponse({ success: false, error: 'Entry is not in trash' })
+            break
+          }
           vault.api_purge_entry(DEFAULT_VAULT_ID, message.id)
           await saveLocally()
           autoSync().catch((e) => console.error('[SW] Sync failed:', e))
@@ -944,7 +1050,10 @@ async function handleMessage(
             null,
             null,
           )
-          const rawEntries = JSON.parse(result)
+          // include_trash は「ゴミ箱のエントリも含める」なので、ゴミ箱内のものだけに絞る
+          const rawEntries = (JSON.parse(result) as Record<string, unknown>[]).filter(
+            (e) => e.deleted_at != null,
+          )
           const entries = normalizeEntries(rawEntries)
           sendResponse({ success: true, entries })
         } catch (err) {
@@ -1213,6 +1322,8 @@ async function handleMessage(
           }
 
           await syncWithS3(decryptedS3Config)
+          // S3通信の await 中にロック・ログアウトされた場合は書き戻さない（autoSync と同様）
+          if (!unlocked) throw new VaultLockedDuringSyncError()
 
           // 同期後、vault bytes と ETag を更新
           const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
@@ -1253,7 +1364,7 @@ async function handleMessage(
         try {
           await saveToStorage(STORAGE_KEYS.APP_SETTINGS, message.settings)
           if (unlocked) {
-            if (message.settings.autolockMinutes > 0 && !popupConnected) {
+            if (message.settings.autolockMinutes > 0) {
               chrome.alarms.create('autolock', { delayInMinutes: message.settings.autolockMinutes })
             } else {
               chrome.alarms.clear('autolock')
@@ -1367,14 +1478,7 @@ async function handleAutolockAlarm() {
   try {
     const vaultBytes = vault.api_lock(DEFAULT_VAULT_ID)
     await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
-    unlocked = false
-    updateExtensionIcon(false)
-    decryptedS3Config = null
-    await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
-    chrome.alarms.clear('autosync')
-    onVaultLocked()
-    clearTotpQrScanContext()
-    clearPickerContext()
+    await enterLockedState()
   } catch (err) {
     console.error('[SW] Autolock failed:', err)
   }

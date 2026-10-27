@@ -39,21 +39,11 @@ export default function LockScreen() {
 
   const handleLogoutConfirm = useCallback(async () => {
     try {
-      await new Promise<void>((resolve, reject) => {
-        if (typeof chrome !== 'undefined' && chrome.storage) {
-          chrome.storage.local.clear(() => {
-            if (chrome.runtime.lastError) {
-              reject(chrome.runtime.lastError)
-            } else {
-              resolve()
-            }
-          })
-        } else {
-          resolve()
-        }
-      })
+      // 別ウィンドウでアンロック済みの場合もあるため、SW側でロックしてから消去する
+      await commands.logout()
 
-      window.close()
+      // サイドバーは閉じないため、再読み込みしてオンボーディング画面へ戻す
+      window.location.reload()
     } catch (err) {
       setError(t('errors.logoutFailed', { error: String(err) }))
       setShowLogoutDialog(false)

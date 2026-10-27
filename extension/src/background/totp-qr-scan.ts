@@ -1,6 +1,8 @@
 // TOTP QR scan via page screenshot — Service Worker handlers
 
 import { DEFAULT_VAULT_ID } from '../shared/constants'
+import { broadcastToExtensionPages } from '../shared/messages'
+import { queryActiveBrowserTab } from '../shared/tabs'
 
 const LOG_PREFIX = '[kura:totp-qr:sw]'
 
@@ -64,35 +66,36 @@ export function handleTotpQrMessage(
         sendResponse({ success: false, error: 'entryId and fieldId required' })
         break
       }
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const tab = tabs[0]
-        if (!tab?.id) {
-          sendResponse({ success: false, error: 'No active tab' })
-          return
-        }
-        const prevContext = scanContext
-        scanContext = {
-          entryId,
-          fieldId,
-          tabId: tab.id,
-          windowId: tab.windowId,
-        }
-        // Tear down an overlay left on a previous tab — the scan context now
-        // belongs to the new tab, so the old tab's overlay would otherwise
-        // stay on screen and fail with 'Scan tab mismatch' on interaction.
-        if (prevContext && prevContext.tabId !== tab.id) {
+      queryActiveBrowserTab()
+        .then((tab) => {
+          if (!tab?.id) {
+            sendResponse({ success: false, error: 'No active tab' })
+            return
+          }
+          const prevContext = scanContext
+          scanContext = {
+            entryId,
+            fieldId,
+            tabId: tab.id,
+            windowId: tab.windowId,
+          }
+          // Tear down an overlay left on a previous tab — the scan context now
+          // belongs to the new tab, so the old tab's overlay would otherwise
+          // stay on screen and fail with 'Scan tab mismatch' on interaction.
+          if (prevContext && prevContext.tabId !== tab.id) {
+            chrome.tabs
+              .sendMessage(prevContext.tabId, { type: 'TOTP_QR_END' }, { frameId: 0 })
+              .catch(() => {}) // Tab may already be closed
+          }
           chrome.tabs
-            .sendMessage(prevContext.tabId, { type: 'TOTP_QR_END' }, { frameId: 0 })
-            .catch(() => {}) // Tab may already be closed
-        }
-        chrome.tabs
-          .sendMessage(tab.id, { type: 'TOTP_QR_START' }, { frameId: 0 })
-          .then(() => sendResponse({ success: true }))
-          .catch((e) => {
-            scanContext = null
-            sendResponse({ success: false, error: String(e) })
-          })
-      })
+            .sendMessage(tab.id, { type: 'TOTP_QR_START' }, { frameId: 0 })
+            .then(() => sendResponse({ success: true }))
+            .catch((e) => {
+              scanContext = null
+              sendResponse({ success: false, error: String(e) })
+            })
+        })
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
       return true
     }
 
@@ -179,6 +182,9 @@ export function handleTotpQrMessage(
             name: String(f.name ?? ''),
             field_type: String(f.field_type ?? 'text'),
             value: String(f.value ?? ''),
+            // api_update_entry は custom_fields を丸ごと置き換えるため、落とすと全フィールドの
+            // セレクタが消える
+            autofill_selector: f.autofill_selector ?? undefined,
           }))
 
           const idx = customFields.findIndex((f) => f.id === fieldId)
@@ -194,6 +200,7 @@ export function handleTotpQrMessage(
                 name: 'TOTP',
                 field_type: 'totp',
                 value,
+                autofill_selector: undefined,
               },
             ]
           }
@@ -212,6 +219,12 @@ export function handleTotpQrMessage(
 
           scanContext = null
           sendResponse({ success: true })
+          broadcastToExtensionPages({
+            type: 'ENTRY_UPDATED_IN_BACKGROUND',
+            entryId,
+            fieldId,
+            change: 'totp',
+          })
         } catch (e) {
           console.error(LOG_PREFIX, 'TOTP_QR_APPLY failed:', e)
           sendResponse({ success: false, error: String(e) })

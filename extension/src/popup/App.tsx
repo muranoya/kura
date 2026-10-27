@@ -1,10 +1,11 @@
 import { Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import * as commands from './commands'
+import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import type { ExtensionPageBroadcast } from '../shared/messages'
 import { BottomNav } from './components/BottomNav'
 import ErrorBar from './components/layout/ErrorBar'
 import { ErrorProvider } from './contexts/ErrorContext'
+import { useUserActivity } from './hooks/useUserActivity'
 import Lock from './screens/auth/Lock'
 import Recovery from './screens/auth/Recovery'
 import EntryCreate from './screens/entries/EntryCreate'
@@ -34,13 +35,22 @@ function shouldShowBottomNav(pathname: string, appState: AppState): boolean {
 
 function AppContent() {
   const location = useLocation()
-  const navigate = useNavigate()
   const [appState, setAppState] = useState<AppState>('loading')
 
-  // ポップアップの接続を維持し、オートロックタイマーを管理
+  useUserActivity()
+
+  // サイドバーは開いたままになるため、オートロックや他画面（Passkeyの儀式ウィンドウ等）で
+  // 起きたロック状態の変化を受けて画面を切り替える
   useEffect(() => {
-    const port = chrome.runtime.connect({ name: 'popup' })
-    return () => port.disconnect()
+    const listener = (message: ExtensionPageBroadcast) => {
+      if (message?.type !== 'VAULT_LOCK_STATE_CHANGED') return
+      setAppState((prev) => {
+        if (message.unlocked) return prev === 'locked' ? 'unlocked' : prev
+        return prev === 'unlocked' ? 'locked' : prev
+      })
+    }
+    chrome.runtime.onMessage.addListener(listener)
+    return () => chrome.runtime.onMessage.removeListener(listener)
   }, [])
 
   useEffect(() => {
@@ -98,28 +108,6 @@ function AppContent() {
     checkVaultState()
   }, [location.state])
 
-  // ピッカーの選択結果を反映するためにpopupが再起動された場合、保留中の結果が
-  // あれば該当エントリの編集画面へ遷移する（TOTP QRスキャンと異なり、ピッカーは
-  // Service Worker側で直接永続化済みなので、ここでは画面遷移のみでよい）。
-  // 詳細: docs/extension-custom-field-autofill.md 4-2節, 4-3節
-  useEffect(() => {
-    if (appState !== 'unlocked') return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const result = await commands.queryPickerResult()
-        if (!cancelled && result?.entryId) {
-          navigate(`/entries/${result.entryId}/edit`, { replace: true })
-        }
-      } catch {
-        // ベストエフォート: 失敗してもpopupの通常起動を妨げない
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [appState, navigate])
-
   if (appState === 'loading') {
     return (
       <div className="flex items-center justify-center h-full bg-bg-base">
@@ -137,7 +125,7 @@ function AppContent() {
   const showBottomNav = shouldShowBottomNav(location.pathname, appState)
 
   return (
-    <div className="relative w-full flex flex-col" style={{ height: '504px' }}>
+    <div className="relative w-full h-full flex flex-col">
       <ErrorBar />
       <div className="flex-1 overflow-hidden relative">
         <Routes>

@@ -77,7 +77,6 @@ globalThis.chrome = {
       removeListener: vi.fn(noop),
     },
     getURL: vi.fn((path: string) => `chrome-extension://test-id/${path}`),
-    connect: vi.fn(() => ({ disconnect: vi.fn(noop) })),
     lastError: undefined,
   },
   tabs: {
@@ -88,9 +87,6 @@ globalThis.chrome = {
     onRemoved: {
       addListener: vi.fn(noop),
     },
-  },
-  action: {
-    openPopup: vi.fn(() => Promise.resolve()),
   },
   storage: {
     local: chromeStorageLocal,

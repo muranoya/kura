@@ -85,7 +85,7 @@ pub struct CustomField {
 
 「4属性のうち最低1つは値を持つべき」という制約をどこで強制するかについて、以下の方針とする：
 
-- **vault-core層では強制しない。** バリデーションはUI層（popup / desktop / Android各フォーム）の入力チェックで行う。
+- **vault-core層では強制しない。** バリデーションはUI層（拡張機能 / desktop / Android各フォーム）の入力チェックで行う。
 - 理由: `CustomFieldType`（`Text`/`Password`等）と異なり、これは新規追加のoptional構造体であり、全属性がNoneの状態（意味的には「常にマッチしない」無効な状態）を許容してもデータ破損には繋がらない。また、既存の `api_update_entry` は `field_type` の再検証すら行っていない（後述2-5節）という非対称性が既にコードベースに存在しており、今回新たに厳格なバリデーション層を追加すると、この既存の緩さと整合が取りにくくなる。
 - ただし、「4項目すべてNoneのCustomFieldSelectorオブジェクトが渡された場合は `None` 自体に正規化する」程度の軽いサニタイズは、`api_create_entry`/`api_update_entry` のJSON→構造体変換直後に入れることを検討する。
 
@@ -225,7 +225,7 @@ export function matchSelector(
 
 # Part 4: ピッカーUI設計（ブラウザ拡張）
 
-## 4-1. popup側カスタムフィールド編集UIの変更
+## 4-1. 拡張機能側カスタムフィールド編集UIの変更
 
 `extension/src/popup/components/entries/EntryForm.tsx` のカスタムフィールド一覧描画部分に、以下を追加する:
 
@@ -237,7 +237,7 @@ export function matchSelector(
 
 ピッカーと手動編集は排他ではなく併存する: ピッカーで取得した結果を後から手動編集で微調整する、あるいはピッカーが使えない状況では最初から手動入力する、といった使い分けができる。
 
-CLAUDE.mdに定める通り、拡張機能のポップアップではRadix UIのPortal系コンポーネントが動作しないため、このUIも自前実装（`extension/src/popup/components/ui/` 配下の既存パターン）に従う。ただし `@radix-ui/react-label`（`ui/label.tsx`）はPortalを使わないラッパーであるため、Desktop版と同様に4入力のラベル表示に利用してよい。
+CLAUDE.mdに定める通り、拡張機能のUIではRadix UIのPortal系コンポーネントを使わない方針のため、このUIも自前実装（`extension/src/popup/components/ui/` 配下の既存パターン）に従う。ただし `@radix-ui/react-label`（`ui/label.tsx`）はPortalを使わないラッパーであるため、Desktop版と同様に4入力のラベル表示に利用してよい。
 
 ## 4-1-2. アイテム詳細画面（読み取り専用ペイン）での表示
 
@@ -248,8 +248,8 @@ CLAUDE.mdに定める通り、拡張機能のポップアップではRadix UIの
 ## 4-2. ピッカー起動〜結果反映のメッセージフロー
 
 ```
-1. popup: 「ページ上の要素を選択」ボタン押下
-   → Service Worker に PICKER_START { entryId?, fieldId } を送信
+1. サイドバー: 「ページ上の要素を選択」ボタン押下
+   → 編集中の内容を保存してから、Service Worker に PICKER_START { entryId, fieldId } を送信
 
 2. Service Worker: アクティブタブへ chrome.tabs.sendMessage(tabId, { type: 'PICKER_START', fieldId })
 
@@ -258,14 +258,18 @@ CLAUDE.mdに定める通り、拡張機能のポップアップではRadix UIの
    - tag / name属性 / id属性 / type属性 を読み取る
    → Service Worker に PICKER_RESULT { fieldId, selector } を送信
 
-4. Service Worker: 受け取った結果を一時的に保持する
-   → chrome.action.openPopup() でpopupを再起動
+4. Service Worker: 受け取った結果を api_update_entry で該当カスタムフィールドへ直接書き込む
+   → ENTRY_UPDATED_IN_BACKGROUND { entryId, fieldId, change: 'autofillSelector' } を
+     拡張機能ページへブロードキャスト
 
-5. popup: 再起動時にPICKER_QUERY_RESULTで保留結果の有無を確認し、
-   あれば該当フィールドのautofillSelectorにマージする
+5. サイドバー: 編集画面を開いていれば該当エントリを再取得し、
+   対象フィールドの autofillSelector だけを最新値に差し替える
+   （ピッカー実行中に編集したフィールド名・値など、他の編集中の内容は保持する）
 ```
 
 ## 4-3. popupのライフサイクル問題と対処方針
+
+> 拡張機能のUIはポップアップからサイドバーに移行した。サイドバーはページをクリックしても閉じないため、以下の「popupが閉じてフォーム状態が失われる」問題自体は解消している。ただし、結果をService Worker側で直接永続化する方式（ケースA）と、新規作成中は使えない制約（ケースB 案1）はそのまま維持している。サイドバーへの反映方法は4-2節を参照。
 
 **本設計の中で最もリスクが高い技術的検討事項である。**
 
@@ -301,10 +305,11 @@ Chrome拡張のaction popupは、ユーザーがpopup外（対象ページ）を
 | { type: 'PICKER_START'; fieldId: string; entryId?: string }
 | { type: 'PICKER_CANCEL' }
 | { type: 'PICKER_RESULT'; fieldId: string; selector: CustomFieldSelector }
-| { type: 'PICKER_QUERY_RESULT'; fieldId: string }
 ```
 
-既存の `AUTOFILL_START_CAPTURE` / `TOTP_QR_START` 系メッセージの設計（popup→SWは `chrome.runtime.sendMessage`、SW→content scriptへの中継は `chrome.tabs.sendMessage`）に倣う。`extension/src/content/messaging.ts` と popup側のコマンド層双方に対応するラッパー関数を追加する。
+結果の反映には、TOTP QRスキャンと共通のブロードキャスト `ENTRY_UPDATED_IN_BACKGROUND`（`ExtensionPageBroadcast`）を使う。ポップアップ時代にあった `PICKER_QUERY_RESULT`（popupの再起動後に保留結果を取り出すもの）は廃止した。
+
+既存の `AUTOFILL_START_CAPTURE` / `TOTP_QR_START` 系メッセージの設計（サイドバー→SWは `chrome.runtime.sendMessage`、SW→content scriptへの中継は `chrome.tabs.sendMessage`）に倣う。`extension/src/content/messaging.ts` と サイドバー側のコマンド層双方に対応するラッパー関数を追加する。
 
 # Part 5: Desktop / Android側のUI変更方針
 

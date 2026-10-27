@@ -5,6 +5,7 @@
 
 import { DEFAULT_VAULT_ID, STORAGE_KEYS } from '../shared/constants'
 import { isValidRpId } from '../shared/etld'
+import { broadcastToExtensionPages } from '../shared/messages'
 import { getFromStorage } from '../shared/storage'
 import type {
   WebauthnRitualContext,
@@ -494,6 +495,14 @@ async function handleCreateRequest(
 
     if (saveLocallyFn) await saveLocallyFn()
     if (autoSyncFn) autoSyncFn().catch((e) => console.error(LOG_PREFIX, 'sync failed', e))
+    // 既存エントリへ追加した場合、そのエントリの編集画面が開いていると古いフィールド一覧の
+    // まま保存され、追加したPasskeyが消えてしまうため、編集画面へ反映させる
+    broadcastToExtensionPages({
+      type: 'ENTRY_UPDATED_IN_BACKGROUND',
+      entryId: result.entry_id,
+      fieldId: result.custom_field_id,
+      change: 'passkey',
+    })
 
     const clientDataJSON = buildClientDataJson('webauthn.create', req.challenge, req.origin)
 

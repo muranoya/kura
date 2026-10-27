@@ -17,6 +17,10 @@ export type Message =
   | { type: 'UNLOCK_EXISTING'; password: string }
   | { type: 'RECOVER'; recoveryKey: string; newPassword: string }
   | { type: 'LOCK' }
+  // ロックしたうえで拡張機能の全データを消去する
+  | { type: 'LOGOUT' }
+  // 拡張機能UIでのユーザー操作の通知（オートロックタイマーの延長）
+  | { type: 'USER_ACTIVITY' }
   | { type: 'CREATE_VAULT'; masterPassword: string; s3Config: Record<string, string> }
 
   // Entries
@@ -122,13 +126,11 @@ export type Message =
   | { type: 'TOTP_QR_CANCEL' }
 
   // カスタムフィールドのオートフィルセレクタ ピッカー
-  // popup → Service Worker: 既存エントリの編集画面からのみ起動可能（entryId必須）
+  // サイドバー → Service Worker: 既存エントリの編集画面からのみ起動可能（entryId必須）
   | { type: 'PICKER_START'; entryId: string; fieldId: string }
   | { type: 'PICKER_CANCEL' }
   // Content Script → Service Worker: ページ上で要素が確定されたときの結果報告
   | { type: 'PICKER_RESULT'; fieldId: string; selector: CustomFieldSelector }
-  // popup → Service Worker: popup再起動後、保留中の適用結果があるか問い合わせる
-  | { type: 'PICKER_QUERY_RESULT' }
 
 export type MessageResponse =
   // Common
@@ -207,10 +209,31 @@ export type MessageResponse =
       dataUrl?: string
     })
 
-  // Picker responses
-  | ({ success: true } & {
-      pickerResult?: { entryId: string; fieldId: string } | null
-    })
+// Service Worker → 拡張機能ページ（サイドバー）へのブロードキャスト。
+// サイドバーは開いたままになるため、SW側で起きた状態変化をその場で反映する必要がある。
+export type ExtensionPageBroadcast =
+  | { type: 'VAULT_LOCK_STATE_CHANGED'; unlocked: boolean }
+  // ピッカー / TOTP QRスキャン / Passkey登録の結果をSW側でエントリへ書き込んだ。
+  // change はSWが書き換えた属性で、受信側はその属性だけを反映する
+  | {
+      type: 'ENTRY_UPDATED_IN_BACKGROUND'
+      entryId: string
+      fieldId: string
+      change: BackgroundFieldChange
+    }
+
+/**
+ * SW側でカスタムフィールドのどの属性を書き換えたか。
+ * - autofillSelector: ピッカーでセレクタを設定した
+ * - totp: TOTP QRスキャンで種類と値を設定した（フィールドが無ければ追加した）
+ * - passkey: Passkeyの登録で既存エントリにpasskeyフィールドを追加した
+ */
+export type BackgroundFieldChange = 'autofillSelector' | 'totp' | 'passkey'
+
+export function broadcastToExtensionPages(message: ExtensionPageBroadcast) {
+  // 受信側（サイドバー）が開いていない場合は reject されるので無視する
+  chrome.runtime.sendMessage(message).catch(() => {})
+}
 
 export function sendMessage<T extends Message>(
   message: T,

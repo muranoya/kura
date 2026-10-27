@@ -45,7 +45,7 @@ export default function WebauthnRitualApp() {
 
   useEffect(fetchContext, [fetchContext])
 
-  // 'locked' context待機中、このウィンドウ以外の経路（メインpopup等）でアンロックされた
+  // 'locked' context待機中、このウィンドウ以外の経路（サイドバー等）でアンロックされた
   // 場合にも、確認/選択画面へ進めるようcontextを取り直す。
   useEffect(() => {
     if (!requestId) return

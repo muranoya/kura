@@ -218,13 +218,13 @@ Webページ側のget()呼び出しがresolveされる
 `create()`（登録ボタンの明示的クリックが前提）・`get()`（サインインボタンのクリックが前提）のいずれも、ロック中は単純にpassthroughせず、儀式ウィンドウ内でアンロックを挟んでから続行する（当初案からの変更。旧設計では`get()`はロック中は無条件passthroughだったが、`create()`向けに実装したアンロック挟み込みと挙動を揃えるため、`get()`にも同じ仕組みを適用した）。
 
 1. `excludeCredentials`チェック・`matchingEntries`計算（create）/`api_webauthn_find_credentials`（get）は復号が必要なため実行できない。そこでService Workerは`{kind:'locked'}` contextで儀式ウィンドウを先に開く（同一ウィンドウを使い回す。タイムアウトは入力時間確保のため180秒に延長）。
-2. 儀式ウィンドウは`UnlockRitual`画面を表示し、`UNLOCK`メッセージ（メインpopupの「アンロック」画面と共通のメッセージ型）を送ってvaultをアンロックさせる。
+2. 儀式ウィンドウは`UnlockRitual`画面を表示し、`UNLOCK`メッセージ（サイドバーの「アンロック」画面と共通のメッセージ型）を送ってvaultをアンロックさせる。
 3. アンロック成功時、Service Worker側（`resumeLockedWebauthnRituals`）が本来の処理をこの時点で初めて実行し、儀式windowのcontextを差し替える。タイムアウトも通常の85秒にリセットする。儀式ウィンドウは`WEBAUTHN_RITUAL_CONTEXT_UPDATED`通知（または自分自身のアンロック成功レスポンス）を契機にcontextを再取得し、次の画面へ自動遷移する。差し替え先のcontextは次のいずれか:
    - create: 既存`credential_id`と一致 → `{kind:'error', reason:'already_registered'}`（ローカライズ済みメッセージを表示し、閉じるとInvalidStateErrorでreject）
    - create: 一致なし → `{kind:'create', rpId, rpName, matchingEntries}`（通常の紐付け先選択画面へ）
    - get: 候補0件 → `{kind:'error', reason:'no_credentials'}`（ローカライズ済みメッセージを表示し、閉じるとstatus:'passthrough'でブラウザネイティブ処理へ）
    - get: 候補1件以上 → `{kind:'get', rpId, candidates}`（通常の候補選択画面へ）
-4. 以降は通常のcreate確認/候補選択フローと同じ。ユーザーがどの経路（この儀式ウィンドウ内、またはメインpopup）でアンロックしても、儀式は継続される。
+4. 以降は通常のcreate確認/候補選択フローと同じ。ユーザーがどの経路（この儀式ウィンドウ内、またはサイドバー）でアンロックしても、儀式は継続される。
 
 **get()のサイドチャネル防止方針の変更点**: アンロック済み状態での従来の設計は「候補0件なら儀式ウィンドウを一切開かない」ことでサイト側に何も観測させなかったが、ロック中はそもそも候補数を復号なしに知りえないため、この最適化は成立しない。ロック中は候補の有無に関わらず`{kind:'locked'}`でポップアップウィンドウを開き、アンロック後に候補0件と判明した場合のみ、ウィンドウ内にその旨を表示してから`passthrough`する。これにより「vaultが現在ロックされているかどうか」はウィンドウの有無から推測されうるが、「このサイト用のPasskeyを持っているかどうか」はロック中は最後まで秘匿される（アンロックしない限り誰にも分からない）。
 
