@@ -14,7 +14,7 @@ import {
   X,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -142,6 +142,12 @@ export default function EntryList() {
     }
   }, [initialSelectedId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const clearSelection = useCallback(() => {
+    setSelectedId(null)
+    setShowDetail(false)
+    removeFromStorage(STORAGE_KEYS.SELECTED_ENTRY_ID)
+  }, [])
+
   const handleSelectEntry = (id: string | null) => {
     setSelectedId(id)
     setShowDetail(id !== null)
@@ -196,41 +202,58 @@ export default function EntryList() {
     loadEntries()
   }, [loadEntries])
 
-  useEffect(() => {
-    // サイドバーは開いたままになるため、同期だけでなくSW側での保存（キャプチャ・
-    // 他ウィンドウでの編集等）でも一覧を更新する
-    const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
-      if (changes[STORAGE_KEYS.LAST_SYNC_TIME] || changes[STORAGE_KEYS.VAULT_BYTES]) {
-        loadEntries()
+  // 古い問い合わせの結果が、後から選択したエントリの詳細を上書きしないようにする
+  const detailRequestSeqRef = useRef(0)
+
+  const loadDetail = useCallback(
+    async (id: string, showLoading: boolean) => {
+      const seq = ++detailRequestSeqRef.current
+      if (showLoading) setSelectedLoading(true)
+      try {
+        const entry = await commands.getEntry(id)
+        if (seq !== detailRequestSeqRef.current) return
+        if (entry.deletedAt) {
+          // 他のウィンドウや同期でゴミ箱へ移された
+          clearSelection()
+          return
+        }
+        setSelectedEntry(entry)
+      } catch (err) {
+        if (seq !== detailRequestSeqRef.current) return
+        console.error('Failed to load entry:', err)
+        // 完全に削除された等。別のエントリの内容が残らないよう選択を解除する
+        clearSelection()
+      } finally {
+        if (seq === detailRequestSeqRef.current) setSelectedLoading(false)
       }
-    }
-    chrome.storage.onChanged.addListener(listener)
-    return () => chrome.storage.onChanged.removeListener(listener)
-  }, [loadEntries])
+    },
+    [clearSelection],
+  )
 
   useEffect(() => {
     // マスク解除の状態はフィールド種別のキーで持つため、別のエントリへ持ち越さない
     // （サイドバーは開いたままなので、一度の表示で以降のエントリまで平文になってしまう）
     setUnmaskedFields(new Set())
     if (!selectedId) {
+      detailRequestSeqRef.current++
       setSelectedEntry(null)
       return
     }
+    loadDetail(selectedId, true)
+  }, [selectedId, loadDetail])
 
-    const loadDetail = async () => {
-      setSelectedLoading(true)
-      try {
-        const entry = await commands.getEntry(selectedId)
-        setSelectedEntry(entry)
-      } catch (err) {
-        console.error('Failed to load entry:', err)
-      } finally {
-        setSelectedLoading(false)
+  useEffect(() => {
+    // サイドバーは開いたままになるため、同期だけでなくSW側での保存（キャプチャ・
+    // 他ウィンドウでの編集等）でも一覧と詳細を更新する
+    const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+      if (changes[STORAGE_KEYS.LAST_SYNC_TIME] || changes[STORAGE_KEYS.VAULT_BYTES]) {
+        loadEntries()
+        if (selectedId) loadDetail(selectedId, false)
       }
     }
-
-    loadDetail()
-  }, [selectedId])
+    chrome.storage.onChanged.addListener(listener)
+    return () => chrome.storage.onChanged.removeListener(listener)
+  }, [loadEntries, loadDetail, selectedId])
 
   const filteredEntries = useMemo(() => {
     return entries.filter((e) => !selectedType || e.entryType === selectedType)
