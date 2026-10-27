@@ -9,6 +9,7 @@ import {
   getFromStorage,
   removeFromSessionStorage,
   removeFromStorage,
+  saveItemsToStorage,
   saveToSessionStorage,
   saveToStorage,
 } from '../shared/storage'
@@ -391,6 +392,29 @@ async function syncWithS3(s3Config: S3Config): Promise<void> {
     }
   } finally {
     client.destroy()
+  }
+}
+
+/**
+ * DEK のローテーション後に、マージせずにローカルの vault で上書きアップロードする。
+ * 旧 DEK のリモートは新しい DEK では復号できず、マージできないため。
+ * If-Match で、最後に同期した版から変わっていない場合だけ上書きする
+ */
+async function pushAfterDekRotation(s3Config: S3Config): Promise<void> {
+  if (syncing) throw new Error('Sync in progress')
+  syncing = true
+  const client = new VaultS3Client(s3Config)
+  try {
+    const bytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
+    const etag = vault.api_get_vault_etag(DEFAULT_VAULT_ID)
+    const newEtag = await client.upload(bytes, etag)
+    vault.api_update_etag(DEFAULT_VAULT_ID, newEtag)
+    await saveToStorage(STORAGE_KEYS.VAULT_ETAG, newEtag)
+    await saveToStorage(STORAGE_KEYS.LAST_SYNC_TIME, Math.floor(Date.now() / 1000))
+    await clearSyncErrorIfPresent()
+  } finally {
+    client.destroy()
+    syncing = false
   }
 }
 
@@ -1204,16 +1228,33 @@ async function handleMessage(
         }
         try {
           const recoveryKey = vault.api_rotate_dek(DEFAULT_VAULT_ID, message.password)
-          // S3設定は DEK 由来の鍵で暗号化しているので、新しい DEK で暗号化し直す
+          // S3設定は DEK 由来の鍵で暗号化しているので、新しい DEK で暗号化し直す。
+          // vault 本体と DEK が食い違うと次のアンロックで S3 設定を復号できなくなるため、
+          // 同期の成否を待たずに両方を一緒に保存する
+          const items: Record<string, unknown> = {
+            [STORAGE_KEYS.VAULT_BYTES]: Array.from(vault.api_get_vault_bytes(DEFAULT_VAULT_ID)),
+          }
           if (decryptedS3Config) {
-            const encrypted = vault.api_encrypt_config(
+            items[STORAGE_KEYS.S3_CONFIG] = vault.api_encrypt_config(
               DEFAULT_VAULT_ID,
               message.password,
               JSON.stringify(decryptedS3Config),
             )
-            await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
           }
-          await autoSync()
+          await saveItemsToStorage(items)
+          if (decryptedS3Config) {
+            try {
+              await pushAfterDekRotation(decryptedS3Config)
+            } catch (err) {
+              // ローテーション自体は完了しているので、新しいリカバリーキーは必ず返す
+              console.error('[SW] push after DEK rotation failed:', err)
+              await saveToStorage(STORAGE_KEYS.LAST_ERROR, {
+                key: 'auto-sync',
+                message: `同期に失敗しました: ${err}`,
+                timestamp: Date.now(),
+              })
+            }
+          }
           sendResponse({ success: true, recoveryKey })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })

@@ -16,6 +16,15 @@ export async function saveToStorage(key: string, value: unknown): Promise<void> 
   })
 }
 
+/** 複数のキーを 1 回の set で保存する（一方だけが書かれた状態を残さないため） */
+export async function saveItemsToStorage(items: Record<string, unknown>): Promise<void> {
+  return new Promise((resolve) => {
+    chrome.storage.local.set(items, () => {
+      resolve()
+    })
+  })
+}
+
 export async function removeFromStorage(key: string): Promise<void> {
   return new Promise((resolve) => {
     chrome.storage.local.remove([key], () => {
