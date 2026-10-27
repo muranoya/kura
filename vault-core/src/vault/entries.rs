@@ -9,6 +9,11 @@ use crate::store::{EntrySecret, VaultEntry};
 use super::secrets::new_secret_rev;
 use super::UnlockedVault;
 
+/// エントリ数の上限。クライアントはこれより多い件数を想定した UI・ストレージ設計に
+/// なっていない（拡張機能は vault を chrome.storage.local に保存し、その容量制限を受ける）。
+/// 同期で取り込んだ分はこの上限を超えても受け入れ、新規作成だけを止める
+pub(crate) const MAX_ENTRIES: usize = 2000;
+
 impl UnlockedVault {
     /// フィルタに一致するエントリを、秘匿値も含めて復号して返す（エクスポート・重複検出用）。
     /// 一致したエントリの数だけ secret を復号するため、一覧表示には
@@ -99,6 +104,7 @@ impl UnlockedVault {
     }
 
     /// Create entry
+    /// エントリ数（ゴミ箱を含み、完全削除済みは除く）が `MAX_ENTRIES` に達していれば作らない
     pub fn create_entry(
         &mut self,
         name: String,
@@ -106,6 +112,16 @@ impl UnlockedVault {
         data: EntryData,
         label_ids: Vec<String>,
     ) -> Result<Entry> {
+        let count = self
+            .index
+            .entries
+            .values()
+            .filter(|e| e.purged_at.is_none())
+            .count();
+        if count >= MAX_ENTRIES {
+            return Err(VaultError::EntryLimitReached(MAX_ENTRIES));
+        }
+
         let id = uuid::Uuid::new_v4().to_string();
         let now = crate::get_timestamp();
 
@@ -447,6 +463,26 @@ mod tests {
         assert!(!entry.is_favorite);
         assert!(entry.deleted_at.is_none());
         assert!(vault.index.entries.contains_key(&entry.id));
+    }
+
+    #[test]
+    fn test_create_entry_stops_at_limit() {
+        // ゴミ箱のエントリも数え、完全削除済み（tombstone）は数えない
+        let mut vault = make_vault();
+        for i in 0..MAX_ENTRIES {
+            insert_entry(&mut vault, &format!("e{i}"), "Entry", 1000);
+        }
+        vault.delete_entry("e0").unwrap();
+        let result = vault.create_entry("Over".into(), "login".into(), make_login_data(), vec![]);
+        assert!(matches!(
+            result,
+            Err(VaultError::EntryLimitReached(MAX_ENTRIES))
+        ));
+
+        vault.purge_entry("e0").unwrap();
+        assert!(vault
+            .create_entry("Ok".into(), "login".into(), make_login_data(), vec![])
+            .is_ok());
     }
 
     /// typed_value として JSON オブジェクト以外を持つ（振り分けに失敗する）データ
