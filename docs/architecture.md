@@ -55,7 +55,7 @@ Android向けJNIの活用先の一つであるAutofillService（システム標�
 - **現在のタブへの追従**: 「このサイト」のエントリは、タブの切り替えや遷移（`tabs.onActivated` / `tabs.onUpdated`）に応じて再計算する
 - **幅への対応**: サイドバーの幅は可変なので、35rem 以上では一覧と詳細を左右に並べ、それより狭ければ一覧と詳細を切り替える1カラム表示にする
 
-Content Script のロック中ドロップダウンからは `AUTOFILL_OPEN_SIDEBAR` でサイドバーを開く。Firefox の `sidebarAction.open()` はメッセージ経由ではユーザー操作として扱われず失敗するため、その場合は同じ画面を小さなウィンドウで開く（既に開いていればそのウィンドウを前面に出す）。このウィンドウからも操作対象のタブを正しく選べるよう、「現在のタブ」は `currentWindow` ではなく最後にフォーカスされた通常ウィンドウのアクティブタブとして解決する（`shared/tabs.ts`）。
+Content Script のロック中ドロップダウンからは `AUTOFILL_OPEN_SIDEBAR` でサイドバーを開く。Firefox の `sidebarAction.open()` はメッセージ経由ではユーザー操作として扱われず失敗するため、その場合は同じ画面を小さなウィンドウで開く（既に開いていればそのウィンドウを前面に出す）。このウィンドウからも操作対象のタブを正しく選べるよう、「現在のタブ」は `currentWindow` ではなく最後にフォーカスされた通常ウィンドウのアクティブタブとして解決する（`shared/tabs.ts`）。Firefox の `windows.getLastFocused` は `windowTypes` を無視してこのウィンドウ自身を返すため、その場合は通常ウィンドウのアクティブタブのうち最後に表示された（`lastAccessed` が最大の）ものを使う。
 
 ## Data Design
 
