@@ -1,5 +1,5 @@
-import termsJa from '../assets/legal/terms_ja.md?raw'
+import terms from '../assets/legal/terms.md?raw'
 
 export function useTerms(): string {
-  return termsJa
+  return terms
 }

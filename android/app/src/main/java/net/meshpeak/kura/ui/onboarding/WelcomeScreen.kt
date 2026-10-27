@@ -24,7 +24,7 @@ fun WelcomeScreen(onStart: () -> Unit) {
     var showTermsDialog by remember { mutableStateOf(false) }
 
     val termsText = remember {
-        runCatching { context.assets.open("legal/terms_ja.md").bufferedReader().readText() }
+        runCatching { context.assets.open("legal/terms.md").bufferedReader().readText() }
             .getOrDefault("")
     }
 

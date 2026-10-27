@@ -154,7 +154,7 @@ dependencies {
     testImplementation("androidx.test:core:1.+")
 }
 
-tasks.register<Copy>("copyLegalAssets") {
+tasks.register<Sync>("copyLegalAssets") {
     from("${rootProject.projectDir}/../assets/legal")
     into("${projectDir}/src/main/assets/legal")
 }
