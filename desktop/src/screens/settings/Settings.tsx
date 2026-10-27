@@ -26,11 +26,10 @@ import {
   SelectValue,
 } from '../../components/ui/select'
 import { usePushError } from '../../contexts/ErrorContext'
-import { setLanguage } from '../../i18n'
 import { copySensitive } from '../../lib/clipboard'
 import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../../shared/constants'
 import { clearStorage, getFromStorage, saveToStorage } from '../../shared/storage'
-import type { AppSettings, LanguageSetting } from '../../shared/types'
+import type { AppSettings } from '../../shared/types'
 import Import1puxDialog from './Import1puxDialog'
 
 export default function Settings() {
@@ -41,8 +40,7 @@ export default function Settings() {
   const [storageConfig, setStorageConfig] = useState<Record<string, string> | null>(null)
   const [storageLoading, setStorageLoading] = useState(true)
 
-  // Language / Auto-lock / Clipboard settings
-  const [language, setLanguageState] = useState<LanguageSetting>(DEFAULT_SETTINGS.language)
+  // Auto-lock / Clipboard settings
   const [autolockMinutes, setAutolockMinutes] = useState<number>(DEFAULT_SETTINGS.autolockMinutes)
   const [clipboardClearSeconds, setClipboardClearSeconds] = useState<number>(
     DEFAULT_SETTINGS.clipboardClearSeconds,
@@ -88,7 +86,6 @@ export default function Settings() {
       try {
         const settings = await getFromStorage<AppSettings>(STORAGE_KEYS.APP_SETTINGS)
         if (settings) {
-          setLanguageState(settings.language ?? DEFAULT_SETTINGS.language)
           setAutolockMinutes(settings.autolockMinutes ?? DEFAULT_SETTINGS.autolockMinutes)
           setClipboardClearSeconds(
             settings.clipboardClearSeconds ?? DEFAULT_SETTINGS.clipboardClearSeconds,
@@ -114,13 +111,6 @@ export default function Settings() {
     } catch (err) {
       pushError(t('settings.errors.saveSettings', { error: String(err) }))
     }
-  }
-
-  const handleLanguageChange = async (value: string) => {
-    const lang = value as LanguageSetting
-    setLanguageState(lang)
-    await setLanguage(lang)
-    await saveSettings({ language: lang })
   }
 
   const handleAutolockChange = (value: string) => {
@@ -404,24 +394,6 @@ export default function Settings() {
             <CardTitle className="text-sm font-medium">{t('settings.general.title')}</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-text-primary">{t('settings.general.language')}</p>
-                <p className="text-xs text-text-muted">
-                  {t('settings.general.languageDescription')}
-                </p>
-              </div>
-              <Select value={language} onValueChange={handleLanguageChange}>
-                <SelectTrigger className="w-28">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="system">{t('settings.general.languageSystem')}</SelectItem>
-                  <SelectItem value="ja">{t('settings.general.languageJa')}</SelectItem>
-                  <SelectItem value="en">{t('settings.general.languageEn')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-text-primary">{t('settings.general.autolock')}</p>
