@@ -180,6 +180,9 @@ export function handleTotpQrMessage(
             name: String(f.name ?? ''),
             field_type: String(f.field_type ?? 'text'),
             value: String(f.value ?? ''),
+            // api_update_entry は custom_fields を丸ごと置き換えるため、落とすと全フィールドの
+            // セレクタが消える
+            autofill_selector: f.autofill_selector ?? undefined,
           }))
 
           const idx = customFields.findIndex((f) => f.id === fieldId)
@@ -195,6 +198,7 @@ export function handleTotpQrMessage(
                 name: 'TOTP',
                 field_type: 'totp',
                 value,
+                autofill_selector: undefined,
               },
             ]
           }
