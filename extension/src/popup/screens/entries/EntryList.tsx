@@ -209,6 +209,9 @@ export default function EntryList() {
   }, [loadEntries])
 
   useEffect(() => {
+    // マスク解除の状態はフィールド種別のキーで持つため、別のエントリへ持ち越さない
+    // （サイドバーは開いたままなので、一度の表示で以降のエントリまで平文になってしまう）
+    setUnmaskedFields(new Set())
     if (!selectedId) {
       setSelectedEntry(null)
       return
