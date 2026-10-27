@@ -176,9 +176,10 @@ impl UnlockedVault {
 
     /// vault.json（v2）を作る。index は毎回再暗号化し、secret は暗号文のまま使い回す
     pub(crate) fn to_vault_file(&self) -> Result<VaultFile> {
-        let index = self
-            .keys
-            .seal_index(&self.meta.vault_uuid, &self.index.to_bytes()?)?;
+        let index = self.keys.seal_index(
+            &self.meta.vault_uuid,
+            &self.index.to_bytes_with_meta_digest(&self.meta.digest())?,
+        )?;
         let secrets = self
             .secrets
             .iter()

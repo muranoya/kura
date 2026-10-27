@@ -15,4 +15,4 @@ pub use typed_value::{
     BankData, CreditCardData, LoginData, PasswordData, SecureNoteData, SoftwareLicenseData,
     SshKeyData, TypedValue,
 };
-pub use vault_meta::VaultMeta;
+pub use vault_meta::{MetaDigest, VaultMeta};

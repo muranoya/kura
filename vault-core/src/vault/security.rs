@@ -34,8 +34,9 @@ impl UnlockedVault {
 
         // Update vault_meta
         let engine = base64::engine::general_purpose::STANDARD;
-        self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
-        self.meta.updated_at = crate::get_timestamp();
+        let params = self.meta.argon2_params.clone();
+        self.meta
+            .set_master_slot(engine.encode(&encrypted_dek_master), params);
 
         Ok(())
     }
@@ -107,15 +108,18 @@ impl UnlockedVault {
 
         // Generate new recovery key
         let new_recovery_key = crate::crypto::RecoveryKey::generate();
-        let kek_recovery = new_recovery_key.derive_kek(&self.meta.argon2_params)?;
+        let recovery_params = self.meta.argon2_params.clone();
+        let kek_recovery = new_recovery_key.derive_kek(&recovery_params)?;
         let encrypted_dek_recovery = new_dek.wrap(&kek_recovery)?;
 
         // Update vault state
         self.keys = SubKeys::derive(&new_dek);
         self.dek = new_dek;
-        self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
-        self.meta.encrypted_dek_recovery = engine.encode(&encrypted_dek_recovery);
-        self.meta.updated_at = crate::get_timestamp();
+        let master_params = self.meta.argon2_params.clone();
+        self.meta
+            .set_master_slot(engine.encode(&encrypted_dek_master), master_params);
+        self.meta
+            .set_recovery_slot(engine.encode(&encrypted_dek_recovery), recovery_params);
 
         // 全 secret を新しいサブ鍵で再暗号化する（secret_rev も再生成する）。
         // index は次の書き込み時に新しいサブ鍵で暗号化される
@@ -156,10 +160,10 @@ impl UnlockedVault {
         let encrypted_dek_recovery = self.dek.wrap(&kek_recovery)?;
 
         // Update vault_meta
-        self.meta.argon2_params = new_params;
-        self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
-        self.meta.encrypted_dek_recovery = engine.encode(&encrypted_dek_recovery);
-        self.meta.updated_at = crate::get_timestamp();
+        self.meta
+            .set_master_slot(engine.encode(&encrypted_dek_master), new_params.clone());
+        self.meta
+            .set_recovery_slot(engine.encode(&encrypted_dek_recovery), new_params);
 
         Ok(new_recovery_key)
     }
@@ -184,12 +188,13 @@ impl UnlockedVault {
 
         // Generate new recovery key
         let new_recovery_key = crate::crypto::RecoveryKey::generate();
-        let kek_recovery = new_recovery_key.derive_kek(&self.meta.argon2_params)?;
+        let recovery_params = self.meta.argon2_params.clone();
+        let kek_recovery = new_recovery_key.derive_kek(&recovery_params)?;
         let encrypted_dek_recovery = self.dek.wrap(&kek_recovery)?;
 
         // Update vault_meta
-        self.meta.encrypted_dek_recovery = engine.encode(&encrypted_dek_recovery);
-        self.meta.updated_at = crate::get_timestamp();
+        self.meta
+            .set_recovery_slot(engine.encode(&encrypted_dek_recovery), recovery_params);
 
         Ok(new_recovery_key)
     }
@@ -233,7 +238,8 @@ mod tests {
     /// 同じ vault を開いている 2 台の端末を作る（meta の更新時刻は過去にしておく）
     fn two_devices() -> (UnlockedVault, UnlockedVault) {
         let mut a = create_unlocked_vault();
-        a.meta.updated_at = 0;
+        a.meta.master_updated_at = 0;
+        a.meta.recovery_updated_at = 0;
         let locked = LockedVault {
             vault_file: crate::store::StoredVault::V2(a.to_vault_file().unwrap()),
             etag: None,
@@ -275,6 +281,125 @@ mod tests {
 
         let locked = a.lock().unwrap();
         assert!(locked.unlock(&mp("new-password")).is_ok());
+    }
+
+    fn v2(vault: &UnlockedVault) -> crate::store::StoredVault {
+        crate::store::StoredVault::V2(vault.to_vault_file().unwrap())
+    }
+
+    fn lock_vault(vault: UnlockedVault) -> LockedVault {
+        vault.lock().unwrap()
+    }
+
+    #[test]
+    fn test_merge_ignores_tampered_remote_meta() {
+        // ストレージに書き込める攻撃者が、index はそのままに meta だけを壊し、
+        // 更新時刻を未来にしても採用しない
+        let (mut a, b) = two_devices();
+        let mut file = b.to_vault_file().unwrap();
+        file.meta.encrypted_dek_master = "AAAA".into();
+        file.meta.encrypted_dek_recovery = "AAAA".into();
+        file.meta.master_updated_at = 4_102_444_800;
+        file.meta.recovery_updated_at = 4_102_444_800;
+        a.merge_remote(&crate::store::StoredVault::V2(file))
+            .unwrap();
+
+        assert!(lock_vault(a).unlock(&mp(PASSWORD)).is_ok());
+    }
+
+    #[test]
+    fn test_merge_ignores_remote_meta_without_digest() {
+        // ダイジェストを持たない index（このクライアントより前の版が書いたもの）の meta は採用しない
+        let (mut a, mut b) = two_devices();
+        b.change_master_password(&mp(PASSWORD), &mp("new-password"))
+            .unwrap();
+        let mut file = b.to_vault_file().unwrap();
+        // to_bytes はダイジェストを書かない
+        file.index = b
+            .keys
+            .seal_index(&b.meta.vault_uuid, &b.index.to_bytes().unwrap())
+            .unwrap();
+        a.merge_remote(&crate::store::StoredVault::V2(file))
+            .unwrap();
+
+        assert!(lock_vault(a).unlock(&mp(PASSWORD)).is_ok());
+    }
+
+    #[test]
+    fn test_merge_keeps_concurrent_changes_to_different_slots() {
+        // 端末 A でリカバリーキーを再発行し、それを知らない端末 B でマスターパスワードを変更する。
+        // どちらの順でマージしても、両方の変更が残る
+        let (mut a, mut b) = two_devices();
+        let recovery_key = a.regenerate_recovery_key(&mp(PASSWORD)).unwrap();
+        b.change_master_password(&mp(PASSWORD), &mp("new-password"))
+            .unwrap();
+
+        let a_file = v2(&a);
+        b.merge_remote(&a_file).unwrap();
+        a.merge_remote(&v2(&b)).unwrap();
+
+        for vault in [a, b] {
+            let locked = lock_vault(vault);
+            assert!(locked.clone().unlock(&mp("new-password")).is_ok());
+            assert!(locked
+                .unlock_with_recovery_key(&recovery_key_input(recovery_key.to_display_string()))
+                .is_ok());
+        }
+    }
+
+    #[test]
+    fn test_merge_keeps_recovery_slot_params_after_concurrent_argon2_upgrade() {
+        // 端末 A で Argon2 パラメータを更新し、その後それを知らない端末 B でリカバリーキーを
+        // 再発行する。recovery スロットは B の（古いパラメータで包んだ）ものになるが、
+        // スロットごとにパラメータを持つので、どちらの鍵でも開ける
+        let (mut a, mut b) = two_devices();
+        let mut params = a.meta.argon2_params.clone();
+        params.salt = crate::codec::base32::encode(&rand::random::<[u8; 16]>());
+        a.upgrade_argon2_params(&mp(PASSWORD), params).unwrap();
+        let recovery_key = b.regenerate_recovery_key(&mp(PASSWORD)).unwrap();
+
+        b.merge_remote(&v2(&a)).unwrap();
+
+        let locked = lock_vault(b);
+        assert!(locked.clone().unlock(&mp(PASSWORD)).is_ok());
+        assert!(locked
+            .unlock_with_recovery_key(&recovery_key_input(recovery_key.to_display_string()))
+            .is_ok());
+    }
+
+    #[test]
+    fn test_merge_converges_when_slot_times_are_equal() {
+        // 移行直後など、両端末のスロットの更新時刻が同じで中身が異なる場合でも、
+        // どちらの端末も同じ方を採用して収束する
+        let (mut a, mut b) = two_devices();
+        a.change_master_password(&mp(PASSWORD), &mp("password-a"))
+            .unwrap();
+        b.change_master_password(&mp(PASSWORD), &mp("password-b"))
+            .unwrap();
+        a.meta.master_updated_at = 0;
+        b.meta.master_updated_at = 0;
+
+        let a_file = v2(&a);
+        a.merge_remote(&v2(&b)).unwrap();
+        b.merge_remote(&a_file).unwrap();
+
+        assert_eq!(a.meta.encrypted_dek_master, b.meta.encrypted_dek_master);
+    }
+
+    #[test]
+    fn test_change_after_adopting_future_slot_still_wins() {
+        // 時計が進んでいる端末の変更を取り込んだ後でも、次の変更はそれより新しくなる
+        let (mut a, mut b) = two_devices();
+        a.change_master_password(&mp(PASSWORD), &mp("password-a"))
+            .unwrap();
+        a.meta.master_updated_at = crate::get_timestamp() + 1_000_000;
+        b.merge_remote(&v2(&a)).unwrap();
+
+        b.change_master_password(&mp("password-a"), &mp("password-b"))
+            .unwrap();
+        a.merge_remote(&v2(&b)).unwrap();
+
+        assert!(lock_vault(a).unlock(&mp("password-b")).is_ok());
     }
 
     #[test]

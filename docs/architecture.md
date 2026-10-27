@@ -96,7 +96,9 @@ S3上に単一ファイルとして保存。単一ファイルにすることで
     "parallelism": 1
   },
   "created_at": 1234567890,
-  "updated_at": 1234567890  /* meta を最後に変更した時刻。同期時の LWW に使う（ない場合は 0） */
+  "recovery_argon2_params": { /* ... */ }, /* optional。recovery スロットの Argon2 パラメータ（省略時は argon2_params） */
+  "master_updated_at": 1234567890,         /* master スロットを最後に変更した時刻。同期時の LWW に使う（ない場合は 0） */
+  "recovery_updated_at": 1234567890        /* recovery スロットを最後に変更した時刻（同上） */
 }
 ```
 
@@ -136,6 +138,10 @@ S3上に単一ファイルとして保存。単一ファイルにすることで
       ],
       "secret_rev": "uuid-v4"    /* secret ブロックの版。purged なら null */
     }
+  },
+  "meta_digest": {               /* 書き込み時点の meta の各スロットのダイジェスト。同期時に meta を検証する */
+    "master": "...",
+    "recovery": "..."
   }
 }
 ```

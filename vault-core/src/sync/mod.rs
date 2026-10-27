@@ -308,6 +308,7 @@ mod tests {
         VaultIndex {
             entries: entries.into_iter().collect(),
             labels: labels.into_iter().collect(),
+            meta_digest: None,
             extra: Default::default(),
         }
     }

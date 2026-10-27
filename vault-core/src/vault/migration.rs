@@ -47,6 +47,7 @@ pub(crate) fn migrate_v1_contents(
     let mut index = VaultIndex {
         labels: contents.labels,
         entries: HashMap::with_capacity(contents.entries.len()),
+        meta_digest: None,
         extra: ExtraFields::new(),
     };
     let mut secrets = HashMap::with_capacity(contents.entries.len());

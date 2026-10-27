@@ -99,6 +99,10 @@ pub struct VaultIndex {
     pub labels: HashMap<String, LabelValue>,
     #[serde(default)]
     pub entries: HashMap<String, VaultEntry>,
+    /// 読み込んだ index にあった meta のダイジェスト（同期時にリモートの meta を検証するのに使う）。
+    /// 書き込み時は、その時点の meta から計算した値を `to_bytes_with_meta_digest` で入れる
+    #[serde(default, skip_serializing)]
+    pub meta_digest: Option<crate::models::MetaDigest>,
     #[serde(flatten)]
     pub extra: ExtraFields,
 }
@@ -112,6 +116,24 @@ impl VaultIndex {
     /// JSONバイト列に変換する（index も個人情報を含むため`Zeroizing`バッファへ直接書く）
     pub fn to_bytes(&self) -> Result<Zeroizing<Vec<u8>>> {
         crate::secret::to_json_zeroizing(self).map_err(VaultError::JsonError)
+    }
+
+    /// meta のダイジェストを加えて JSON バイト列に変換する（暗号化して vault.json に書く用）
+    pub fn to_bytes_with_meta_digest(
+        &self,
+        meta_digest: &crate::models::MetaDigest,
+    ) -> Result<Zeroizing<Vec<u8>>> {
+        #[derive(Serialize)]
+        struct WithMetaDigest<'a> {
+            #[serde(flatten)]
+            index: &'a VaultIndex,
+            meta_digest: &'a crate::models::MetaDigest,
+        }
+        crate::secret::to_json_zeroizing(&WithMetaDigest {
+            index: self,
+            meta_digest,
+        })
+        .map_err(VaultError::JsonError)
     }
 
     /// Create from JSON bytes

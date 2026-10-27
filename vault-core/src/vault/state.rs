@@ -47,15 +47,17 @@ impl UnlockedVault {
     ///    採用した index 行の `secret_rev` と secret の AAD の一致は復号時に必ず検証されるため、
     ///    取り違えが起きても復号失敗（破損エントリ）として検出できる
     /// 4. GC で削除されたエントリの secret も削除する
-    /// 5. meta は `updated_at` による LWW で、新しい方を丸ごと採用する。
-    ///    リモートの index を復号できた（同じ DEK を使っている）ので、どちらの meta も同じ DEK を包んでいる
+    /// 5. meta は master / recovery のスロットごとに `*_updated_at` による LWW でマージする。
+    ///    平文の meta は改ざんできるため、リモートの index（DEK を持つ端末だけが書ける）にある
+    ///    ダイジェストと一致するスロットだけを採用する。v1 のリモートはダイジェストを持たないので、
+    ///    ローカルの meta を残す
     pub(crate) fn merge_remote(&mut self, remote: &StoredVault) -> Result<()> {
         let (remote_index, mut remote_secrets) = self.open_remote(remote)?;
 
-        // 同時刻の場合はローカルを残す（エントリの LWW と同じ）
-        let remote_meta = remote.meta();
-        if remote_meta.updated_at > self.meta.updated_at {
-            self.meta = remote_meta.clone();
+        if let (StoredVault::V2(remote_file), Some(remote_digest)) =
+            (remote, &remote_index.meta_digest)
+        {
+            self.meta.merge_slots(&remote_file.meta, remote_digest);
         }
 
         let merge_result = crate::sync::auto_merge(&self.index, &remote_index)?;
@@ -144,7 +146,9 @@ mod tests {
             encrypted_dek_recovery: String::new(),
             argon2_params: Argon2Params::default(),
             created_at: 0,
-            updated_at: 0,
+            recovery_argon2_params: None,
+            master_updated_at: 0,
+            recovery_updated_at: 0,
         }
     }
 

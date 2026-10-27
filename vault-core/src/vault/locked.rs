@@ -83,7 +83,7 @@ impl LockedVault {
     ) -> Result<UnlockedVault> {
         let kek = crate::crypto::RecoveryKey::derive_kek_from_input(
             recovery_key,
-            &self.meta().argon2_params,
+            self.meta().recovery_argon2_params(),
         )?;
         let encrypted_dek = self.meta().encrypted_dek_recovery.clone();
         self.unlock_with_kek(&kek, &encrypted_dek, "encrypted_dek_recovery")

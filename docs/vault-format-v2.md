@@ -58,7 +58,9 @@ v1 で一括暗号化を採用したのはエントリの検索機能のため�
 ```
 
 - `meta` は v1 と同一（`encrypted_dek_master` / `encrypted_dek_recovery` / `argon2_params` 等）。DEK のラップ方式（AES-256-GCM）も変更しない
-  - ただし、同期時のマージに使う `updated_at`（meta を最後に変更した時刻）を追加する。持たない vault は 0 として扱う
+  - ただし、同期時にスロットごとにマージする（7章）ため、次のフィールドを追加する
+    - `master_updated_at` / `recovery_updated_at`: master スロット（`encrypted_dek_master` / `argon2_params`）・recovery スロット（`encrypted_dek_recovery` / `recovery_argon2_params`）を最後に変更した時刻。持たない vault は 0 として扱う。更新時は `max(現在時刻, 前回の値 + 1)` とし、取り込んだ変更より後の変更が必ず新しくなるようにする
+    - `recovery_argon2_params`: recovery スロットの Argon2 パラメータ。省略時は `argon2_params` と同じ。Argon2 パラメータの更新とリカバリーキーの再発行が別々の端末で同時に起きても、各スロットの暗号文とパラメータの組が崩れないようにするため
 - `secrets` のキーは entry_id。purged（完全削除）エントリは secret を持たない
 
 ### 3-2. index の平文（VaultIndex）
@@ -106,6 +108,8 @@ v1 で一括暗号化を採用したのはエントリの検索機能のため�
 
 - `labels` の構造は v1 と同一
 - `secret_rev` は secret ブロックの版を表すランダム値（5章で詳述）
+- トップレベルに `meta_digest`（`{ "master": "<base64>", "recovery": "<base64>" }`）を置く。書き込み時点の meta の各スロットの SHA-256 で、同期時にリモートの平文の meta が DEK を持つ端末によって書かれたものかを確認するのに使う（7章）
+  - `SHA-256(enc("kura/v2/meta/<master|recovery>") || enc(vault_uuid) || enc(暗号文) || enc(salt) || u32_be(iterations) || u32_be(memory) || u32_be(parallelism) || i64_be(updated_at))`。`enc` は 5-3 と同じ長さプレフィックス付きの符号化
 
 ### 3-3. secret の平文（EntrySecret）
 
@@ -278,8 +282,11 @@ UnlockedVault (v2)
    - 勝った側でブロックが欠けていて、負けた側の index 行が同じ `secret_rev` のブロックを持っていれば、そちらを使う（index だけが変わった場合など。同じ版の暗号文なので内容は同じ）
    - 採用した index 行の `secret_rev` が、その secret の AAD と一致することは復号時に必ず検証される。このため、マージ処理のバグで取り違えが起きても、復号失敗として検出できる
 4. GC で削除されるエントリ（purge から 180 日経過）は、index 行と secret の両方を削除する
-5. `meta` は `updated_at` による LWW で、新しい方を丸ごと採用する（同時刻ならローカルを残す）。マスターパスワードの変更・リカバリーキーの再発行・Argon2 パラメータの更新・DEK のローテーションで `updated_at` を更新する
-   - リモートの index を復号できた時点で両者は同じ DEK を使っているので、どちらの meta を採用しても vault は開ける
+5. `meta` は master / recovery のスロットごとに LWW でマージする
+   - リモートの index にある `meta_digest` と一致するスロットだけを採用の候補にする。平文の meta はストレージに書き込める攻撃者が改ざんできるが、index は DEK を持つ端末しか書けないため。`meta_digest` を持たない index（v1 のリモートを含む）の meta は採用せず、ローカルを残す
+   - 候補のうち `(*_updated_at, 暗号文)` が大きい方を採用する。時刻が同じなら暗号文の比較で決め、どの端末でも同じ結果にする
+   - スロットごとに分けるのは、別々の端末でのマスターパスワード変更とリカバリーキー再発行のように、異なるスロットへの同時の変更をどちらも残すため
+   - マスターパスワードの変更は master、リカバリーキーの再発行は recovery、Argon2 パラメータの更新と DEK のローテーションは両方のスロットを更新する
    - `VaultFile` / `VaultIndex` のトップレベルの未知フィールドは、リモートの値で丸ごと置き換える。このクライアントは未知フィールドを書き換えないので、ローカルの値は過去に読んだリモートの古い複製にすぎないため（ローカル優先にすると、新しいクライアントによる変更・削除を巻き戻してしまう）
 6. index を再暗号化して push する（If-Match。412 の場合は既存のリトライ処理で再ダウンロードからやり直す）
 
