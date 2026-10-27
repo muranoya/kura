@@ -73,6 +73,16 @@ fn setup_util(app: &AppWindow) {
     });
     let weak = app.as_weak();
     util.on_open_url(move |url| {
+        if !is_openable_url(&url) {
+            if let Some(app) = weak.upgrade() {
+                ctx::push_error(
+                    &app,
+                    "この URL は開けません（http / https / mailto / tel のみ対応）",
+                    Some("open-url"),
+                );
+            }
+            return;
+        }
         if let Err(e) = open::that_detached(url.as_str()) {
             if let Some(app) = weak.upgrade() {
                 ctx::push_error(
@@ -88,6 +98,19 @@ fn setup_util(app: &AppWindow) {
 
     let errors = app.global::<Errors>();
     errors.on_dismiss(ctx::handler(app, ctx::dismiss_latest_error));
+}
+
+/// vault 内の任意の文字列が渡されるので、ブラウザ等で開いて安全なスキームだけを許可する。
+/// ファイルパスや `ms-msdt:` などのスキームを OS に渡すと、任意のプログラムを起動できてしまう
+fn is_openable_url(url: &str) -> bool {
+    let Some((scheme, rest)) = url.trim().split_once(':') else {
+        return false;
+    };
+    match scheme.to_ascii_lowercase().as_str() {
+        "http" | "https" => rest.starts_with("//") && rest.len() > 2,
+        "mailto" | "tel" => !rest.is_empty(),
+        _ => false,
+    }
 }
 
 fn setup_nav(app: &AppWindow) {
@@ -442,4 +465,25 @@ fn on_focus_changed(app: &AppWindow, focused: bool) {
             },
         );
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_openable_url;
+
+    #[test]
+    fn test_is_openable_url() {
+        assert!(is_openable_url("https://example.com/login"));
+        assert!(is_openable_url("HTTP://example.com"));
+        assert!(is_openable_url("mailto:user@example.com"));
+        assert!(is_openable_url("tel:0123456789"));
+
+        assert!(!is_openable_url("example.com"));
+        assert!(!is_openable_url("https:"));
+        assert!(!is_openable_url("file:///tmp/x.command"));
+        assert!(!is_openable_url("C:\\Tools\\x.exe"));
+        assert!(!is_openable_url("\\\\host\\share\\x.exe"));
+        assert!(!is_openable_url("ms-msdt:/id PCWDiagnostic"));
+        assert!(!is_openable_url("javascript:alert(1)"));
+    }
 }
