@@ -629,6 +629,17 @@ async function handleMessage(
           sendResponse({ success: false, error: 'Password required' })
           break
         }
+        if (unlocked) {
+          // 別のウィンドウで既にアンロック済み（ロック画面が残っていた）。Vaultを
+          // ロードし直すとアンロック済みのセッションを壊すため、パスワードの検証だけ行う
+          try {
+            vault.api_verify_password(DEFAULT_VAULT_ID, message.password)
+            sendResponse({ success: true })
+          } catch (err) {
+            sendResponse({ success: false, error: String(err) })
+          }
+          break
+        }
         try {
           const vaultBytes = await getFromStorage<number[]>(STORAGE_KEYS.VAULT_BYTES)
           const etag = await getFromStorage<string>(STORAGE_KEYS.VAULT_ETAG)
@@ -816,7 +827,11 @@ async function handleMessage(
           updateExtensionIcon(true)
           await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.newPassword)
           await resetAutolockAlarm()
+          chrome.alarms.create('autosync', { periodInMinutes: 1 })
+          // 通常のアンロックと同様に、待機中のPasskeyリチュアル・他の画面・各タブへ通知する
+          await resumeLockedWebauthnRituals()
           sendResponse({ success: true })
+          onVaultUnlocked()
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }
