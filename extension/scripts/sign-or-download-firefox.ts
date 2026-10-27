@@ -85,7 +85,8 @@ async function uploadSourceBundle(versionId: number): Promise<void> {
 }
 
 function submitToAmo(): void {
-  console.log(`Submitting version ${version} to AMO as listed...`)
+  // ストアには公開せず、署名済み xpi を受け取って GitHub Release で配布する
+  console.log(`Submitting version ${version} to AMO as unlisted...`)
   const result = spawnSync(
     'pnpm',
     [
@@ -94,9 +95,7 @@ function submitToAmo(): void {
       '--source-dir',
       'dist',
       '--channel',
-      'listed',
-      '--amo-metadata',
-      'amo-metadata.json',
+      'unlisted',
       '--api-key',
       apiKey as string,
       '--api-secret',
