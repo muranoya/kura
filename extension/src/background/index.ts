@@ -1049,7 +1049,10 @@ async function handleMessage(
             null,
             null,
           )
-          const rawEntries = JSON.parse(result)
+          // include_trash は「ゴミ箱のエントリも含める」なので、ゴミ箱内のものだけに絞る
+          const rawEntries = (JSON.parse(result) as Record<string, unknown>[]).filter(
+            (e) => e.deleted_at != null,
+          )
           const entries = normalizeEntries(rawEntries)
           sendResponse({ success: true, entries })
         } catch (err) {
