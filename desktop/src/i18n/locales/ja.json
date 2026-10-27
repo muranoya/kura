@@ -201,6 +201,7 @@
       "logout": "ログアウト",
       "errorRequired": "パスワードを入力してください",
       "errorUnlock": "ロック解除失敗: {{error}}",
+      "errorConfig": "S3 設定を復号できなかったため、同期を停止しています。同期するには、ログアウトして設定し直してください: {{error}}",
       "errorLogout": "ログアウト失敗: {{error}}",
       "logoutDialog": {
         "title": "ログアウト",

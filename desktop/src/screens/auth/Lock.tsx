@@ -9,6 +9,7 @@ import { Card, CardContent } from '../../components/ui/card'
 import { Label } from '../../components/ui/label'
 import { PasswordInput } from '../../components/ui/password-input'
 import { Separator } from '../../components/ui/separator'
+import { usePushError } from '../../contexts/ErrorContext'
 import { STORAGE_KEYS } from '../../shared/constants'
 import { clearStorage, getFromStorage, saveToStorage } from '../../shared/storage'
 
@@ -19,6 +20,7 @@ interface LockScreenProps {
 export default function LockScreen({ onUnlocked }: LockScreenProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const pushError = usePushError()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -33,7 +35,15 @@ export default function LockScreen({ onUnlocked }: LockScreenProps) {
     setLoading(true)
     try {
       await commands.unlock(password)
-      // 暗号化されたS3設定を復号してRustプロセスメモリに保持
+    } catch (err) {
+      setError(t('auth.lock.errorUnlock', { error: String(err) }))
+      setLoading(false)
+      return
+    }
+    // 暗号化されたS3設定を復号してRustプロセスメモリに保持。
+    // 復号できなくても vault はアンロック済みなので、同期なしで続ける
+    // （DEK のローテーション中に終了し、S3設定と vault の DEK が食い違った場合など）
+    try {
       const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
       if (encryptedConfig) {
         const configJson = await commands.decryptConfig(password, encryptedConfig)
@@ -45,12 +55,11 @@ export default function LockScreen({ onUnlocked }: LockScreenProps) {
         }
       }
       commands.syncVaultIfConfigured().catch(() => {}) // バックグラウンド
-      onUnlocked?.()
     } catch (err) {
-      setError(t('auth.lock.errorUnlock', { error: String(err) }))
-      setLoading(false)
+      pushError(t('auth.lock.errorConfig', { error: String(err) }))
     }
-  }, [password, onUnlocked, t])
+    onUnlocked?.()
+  }, [password, onUnlocked, pushError, t])
 
   const handleLogout = useCallback(() => {
     setShowLogoutDialog(true)
