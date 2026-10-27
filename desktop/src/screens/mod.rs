@@ -278,6 +278,7 @@ pub fn enter_unlocked(app: &AppWindow) {
         );
     });
     navigate(app, Page::Entries);
+    arm_autolock_if_unfocused(app);
 }
 
 fn periodic_sync(_app: &AppWindow) {
@@ -435,13 +436,37 @@ fn setup_autolock(app: &AppWindow) {
 
     let weak = app.as_weak();
     app.window().on_winit_window_event(move |_window, event| {
-        if let winit::event::WindowEvent::Focused(focused) = event {
-            if let Some(app) = weak.upgrade() {
-                on_focus_changed(&app, *focused);
+        let Some(app) = weak.upgrade() else {
+            return EventResult::Propagate;
+        };
+        match event {
+            winit::event::WindowEvent::Focused(focused) => on_focus_changed(&app, *focused),
+            // フォーカスを持ったまま隠れた場合（最小化・画面のスリープなど）もフォーカスを失ったのと同じに扱う
+            winit::event::WindowEvent::Occluded(true) => on_focus_changed(&app, false),
+            // 再び見えるようになったときは、フォーカスが戻っている場合だけタイマーを止める
+            winit::event::WindowEvent::Occluded(false) if window_has_focus(&app) => {
+                on_focus_changed(&app, true)
             }
+            _ => {}
         }
         EventResult::Propagate
     });
+}
+
+/// アンロック処理中にフォーカスが外れた場合はイベントを取りこぼしているので、
+/// アンロック直後に現在の状態から自動ロックを仕掛け直す
+fn arm_autolock_if_unfocused(app: &AppWindow) {
+    if !window_has_focus(app) {
+        on_focus_changed(app, false);
+    }
+}
+
+fn window_has_focus(app: &AppWindow) -> bool {
+    use slint::winit_030::WinitWindowAccessor;
+
+    app.window()
+        .with_winit_window(|w| w.has_focus())
+        .unwrap_or(true)
 }
 
 fn on_focus_changed(app: &AppWindow, focused: bool) {
