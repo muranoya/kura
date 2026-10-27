@@ -1,6 +1,7 @@
 //! schema_version 2 の暗号処理（`docs/vault-format-v2.md` 5章）。
 //!
-//! - DEK から HKDF-SHA256 で index 用・secret 用のサブ鍵を導出する（ドメイン分離）
+//! - DEK から HKDF-SHA256 で index 用・secret 用のサブ鍵を導出する（ドメイン分離）。
+//!   鍵由来の中間値をゼロ化するため、HKDF・HMAC は SHA-256 の上に自前で組み立てる
 //! - AEAD は XChaCha20-Poly1305。nonce は 24 バイトのランダム値
 //! - AAD で暗号文を「どの vault の、どのエントリの、どの版か」に束縛する
 //!
@@ -11,8 +12,7 @@ use chacha20poly1305::{
     aead::{Aead, KeyInit, Payload},
     XChaCha20Poly1305, XNonce,
 };
-use hkdf::Hkdf;
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 use std::fmt;
 use zeroize::{Zeroize, Zeroizing};
 
@@ -48,10 +48,10 @@ impl SubKeys {
     /// DEK から HKDF-SHA256 でサブ鍵を導出する。
     /// DEK は一様ランダムなので salt は使わない。
     pub fn derive(dek: &super::Dek) -> Self {
-        let hk = Hkdf::<Sha256>::new(None, dek.as_bytes());
+        let prk = hkdf_extract(dek.as_bytes());
         Self {
-            index_key: expand(&hk, INFO_INDEX),
-            secret_key: expand(&hk, INFO_SECRET),
+            index_key: hkdf_expand(&prk, INFO_INDEX),
+            secret_key: hkdf_expand(&prk, INFO_SECRET),
         }
     }
 
@@ -98,12 +98,50 @@ impl SubKeys {
     }
 }
 
-fn expand(hk: &Hkdf<Sha256>, info: &str) -> SubKey {
-    // 一時バッファを経由せず SubKey に直接書き込み、鍵素材の複製をスタックに残さない
+// HKDF-SHA256（RFC 5869）と HMAC-SHA256（RFC 2104）を SHA-256 の呼び出しだけで組み立てる。
+// hkdf クレートは PRK と Expand の出力ブロックを、hmac クレートは鍵と ipad / opad の
+// XOR（鍵そのものを復元できる）を、それぞれゼロ化せずにスタックへ残すため使わない。
+// ここでは鍵由来の中間値をすべて `Zeroizing` か出力先のバッファに置き、SHA-256 の内部状態は
+// drop 時にゼロ化される（sha2 の `zeroize` フィーチャ）。コンパイラが作る一時的な複製までは
+// 防げないため、ゼロ化はベストエフォートである。
+
+const SHA256_BLOCK_LEN: usize = 64;
+const IPAD: u8 = 0x36;
+const OPAD: u8 = 0x5c;
+
+/// HMAC-SHA256(key, message[0] || message[1] || ...) を `out` に書き込む（key は 32 バイト固定）
+fn hmac_sha256(key: &[u8; 32], message: &[&[u8]], out: &mut [u8; 32]) {
+    // key はブロック長（64）以下なので、0 で埋めてそのまま使う
+    let mut pad = Zeroizing::new([0u8; SHA256_BLOCK_LEN]);
+    pad[..key.len()].copy_from_slice(key);
+
+    pad.iter_mut().for_each(|b| *b ^= IPAD);
+    let mut inner = Sha256::new();
+    inner.update(pad.as_slice());
+    for part in message {
+        inner.update(part);
+    }
+    let mut inner_hash = Zeroizing::new([0u8; 32]);
+    inner.finalize_into((&mut *inner_hash).into());
+
+    pad.iter_mut().for_each(|b| *b ^= IPAD ^ OPAD);
+    let mut outer = Sha256::new();
+    outer.update(pad.as_slice());
+    outer.update(inner_hash.as_slice());
+    outer.finalize_into(out.into());
+}
+
+/// HKDF-Extract（salt なし = HashLen 個の 0）。PRK を返す
+fn hkdf_extract(ikm: &[u8; 32]) -> Zeroizing<[u8; 32]> {
+    let mut prk = Zeroizing::new([0u8; 32]);
+    hmac_sha256(&[0u8; 32], &[ikm], &mut prk);
+    prk
+}
+
+/// HKDF-Expand（L = 32）。L が HashLen と等しいので T(1) = HMAC(PRK, info || 0x01) だけで済む
+fn hkdf_expand(prk: &[u8; 32], info: &str) -> SubKey {
     let mut key = SubKey([0u8; 32]);
-    // L = 32 は HKDF-SHA256 の上限（255 * 32）を大きく下回るため失敗しない
-    hk.expand(info.as_bytes(), &mut key.0)
-        .expect("32 bytes is a valid HKDF-SHA256 output length");
+    hmac_sha256(prk, &[info.as_bytes(), &[0x01]], &mut key.0);
     key
 }
 
@@ -225,6 +263,87 @@ mod tests {
         let sealed = SubKeys::derive(&dek).seal_index(UUID, b"x").unwrap();
         let opened = SubKeys::derive(&dek).open_index(UUID, &sealed).unwrap();
         assert_eq!(opened.as_slice(), b"x");
+    }
+
+    #[test]
+    fn test_hmac_matches_rfc4231_test_case_2() {
+        // RFC 4231 4.3 の鍵 "Jefe" を 32 バイトに 0 埋めしたもの（HMAC の定義上、結果は同じ）
+        let mut key = [0u8; 32];
+        key[..4].copy_from_slice(b"Jefe");
+        let mut out = [0u8; 32];
+        hmac_sha256(&key, &[b"what do ya want ", b"for nothing?"], &mut out);
+        assert_eq!(
+            hex(&out),
+            "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
+        );
+    }
+
+    #[test]
+    fn test_hmac_matches_hmac_crate() {
+        use hmac::Mac;
+        let key: [u8; 32] = rand::random();
+        let message: [u8; 100] = std::array::from_fn(|i| i as u8);
+        let mut out = [0u8; 32];
+        hmac_sha256(&key, &[&message[..30], &message[30..]], &mut out);
+        let mut mac = <hmac::Hmac<sha2_010::Sha256> as Mac>::new_from_slice(&key).unwrap();
+        mac.update(&message);
+        assert_eq!(out.as_slice(), mac.finalize().into_bytes().as_slice());
+    }
+
+    #[test]
+    fn test_hkdf_expand_matches_rfc5869_test_case_1() {
+        // RFC 5869 A.1 の Expand（PRK は付録の値）。info が UTF-8 でないため HMAC で直接計算する。
+        // L = 42 のうち先頭 32 バイトが T(1) に等しい
+        let prk: [u8; 32] =
+            unhex("077709362c2e32df0ddc3f0dc47bba6390b6c73bb50f9c3122ec844ad7c2b3e5");
+        let info: Vec<u8> = (0xf0..=0xf9).collect();
+        let mut t1 = [0u8; 32];
+        hmac_sha256(&prk, &[&info, &[0x01]], &mut t1);
+        assert_eq!(
+            hex(&t1),
+            "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf"
+        );
+    }
+
+    #[test]
+    fn test_hkdf_extract_matches_rfc5869_test_case_3() {
+        // RFC 5869 A.3（salt・info なし）。IKM は 22 バイトなので HMAC で直接確認する
+        let ikm = [0x0bu8; 22];
+        let mut prk = [0u8; 32];
+        hmac_sha256(&[0u8; 32], &[&ikm], &mut prk);
+        assert_eq!(
+            hex(&prk),
+            "19ef24a32c717b167f33a91d6f648bdf96596776afdb6377ac434c1c293ccb04"
+        );
+        let okm = hkdf_expand(&prk, "");
+        assert_eq!(
+            hex(&okm.0),
+            "8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d"
+        );
+    }
+
+    #[test]
+    fn test_sub_keys_match_hkdf_crate() {
+        // 以前の実装（hkdf クレート）と同じサブ鍵が導出されること
+        let dek = Dek::generate();
+        let keys = SubKeys::derive(&dek);
+        let hk = hkdf::Hkdf::<sha2_010::Sha256>::new(None, dek.as_bytes());
+        for (info, key) in [
+            (INFO_INDEX, &keys.index_key),
+            (INFO_SECRET, &keys.secret_key),
+        ] {
+            let mut expected = [0u8; 32];
+            hk.expand(info.as_bytes(), &mut expected).unwrap();
+            assert_eq!(key.0, expected, "{info}");
+        }
+    }
+
+    fn hex(bytes: &[u8]) -> String {
+        bytes.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    fn unhex<const N: usize>(s: &str) -> [u8; N] {
+        std::array::from_fn(|i| u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).unwrap())
     }
 
     #[test]

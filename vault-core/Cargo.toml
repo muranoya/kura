@@ -11,7 +11,6 @@ homepage = "https://github.com/muranoya/kura"
 [dependencies]
 aes-gcm = "0.10"
 chacha20poly1305 = "0.10"
-hkdf = "0.12"
 argon2 = "0.5"
 rand = "0.8"
 zeroize = { version = "1", features = ["derive"] }
@@ -24,7 +23,8 @@ base32 = "0.5"
 base64 = "0.22"
 log = "0.4"
 async-trait = "0.1"
-sha2 = "0.10"
+# zeroize: SHA-256 の内部状態とバッファを drop 時にゼロ化する（サブ鍵導出で使う）
+sha2 = { version = "0.11", features = ["zeroize"] }
 hmac = "0.12"
 totp-rs = "5"
 getrandom = { version = "0.2", features = ["js"] }  # WASM-compatible random
@@ -39,6 +39,9 @@ android = []
 wasm = []
 
 [dev-dependencies]
+# サブ鍵導出（HMAC で組み立てた HKDF）が hkdf クレートと同じ出力になることの確認用
+hkdf = "0.12"
+sha2_010 = { package = "sha2", version = "0.10" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
 [lib]
