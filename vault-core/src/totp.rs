@@ -14,6 +14,9 @@ use crate::error::{Result, VaultError};
 /// # Errors
 /// Base32 デコード失敗またはTOTP生成エラーの場合は `VaultError::InvalidInput` を返す
 pub fn generate_totp(secret: &str, digits: u32, period: u64) -> Result<String> {
+    // totp-rs はこれらを検証せず、period=0 ではゼロ除算、digits>=10 では桁あふれで panic する
+    validate_params(digits, period)?;
+
     // スペースを除去して大文字に統一
     let secret_normalized = secret.replace(" ", "").to_uppercase();
 
@@ -81,7 +84,22 @@ pub fn parse_otpauth_uri(uri: &str) -> Result<(String, u32, u64)> {
     let secret = secret.ok_or(VaultError::InvalidInput(
         "Missing secret parameter in otpauth URI".into(),
     ))?;
+    validate_params(digits, period)?;
     Ok((secret, digits, period))
+}
+
+fn validate_params(digits: u32, period: u64) -> Result<()> {
+    if period == 0 {
+        return Err(VaultError::InvalidInput(
+            "TOTP period must be greater than 0".into(),
+        ));
+    }
+    if !(1..=9).contains(&digits) {
+        return Err(VaultError::InvalidInput(
+            "TOTP digits must be between 1 and 9".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// カスタムフィールドの値から TOTP コードを生成する
@@ -235,6 +253,34 @@ mod tests {
     fn test_parse_otpauth_uri_missing_secret() {
         let uri = "otpauth://totp/MyApp?digits=6&period=30";
         assert!(parse_otpauth_uri(uri).is_err());
+    }
+
+    #[test]
+    fn test_parse_otpauth_uri_rejects_zero_period() {
+        let uri = format!("otpauth://totp/Test?secret={}&period=0", test_secret());
+        assert!(parse_otpauth_uri(&uri).is_err());
+        assert!(generate_totp_from_value(&uri).is_err());
+        // 周期だけを取り出す経路はデフォルトに倒す（表示側で 0 除算しないように）
+        assert_eq!(parse_totp_period(&uri), 30);
+    }
+
+    #[test]
+    fn test_parse_otpauth_uri_rejects_out_of_range_digits() {
+        for digits in [0, 10] {
+            let uri = format!(
+                "otpauth://totp/Test?secret={}&digits={}",
+                test_secret(),
+                digits
+            );
+            assert!(parse_otpauth_uri(&uri).is_err());
+            assert!(generate_totp_from_value(&uri).is_err());
+        }
+    }
+
+    #[test]
+    fn test_generate_totp_rejects_invalid_params() {
+        assert!(generate_totp(&test_secret(), 6, 0).is_err());
+        assert!(generate_totp(&test_secret(), 10, 30).is_err());
     }
 
     #[test]
