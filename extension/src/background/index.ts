@@ -629,9 +629,10 @@ async function handleMessage(
           sendResponse({ success: false, error: 'Password required' })
           break
         }
-        if (unlocked) {
+        if (unlocked && vault.api_is_unlocked(DEFAULT_VAULT_ID)) {
           // 別のウィンドウで既にアンロック済み（ロック画面が残っていた）。Vaultを
-          // ロードし直すとアンロック済みのセッションを壊すため、パスワードの検証だけ行う
+          // ロードし直すとアンロック済みのセッションを壊すため、パスワードの検証だけ行う。
+          // CREATE_VAULT直後はunlockedがtrueでもWASMセッションはLockedなので通常経路へ進む
           try {
             vault.api_verify_password(DEFAULT_VAULT_ID, message.password)
             sendResponse({ success: true })
