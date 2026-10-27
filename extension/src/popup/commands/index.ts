@@ -36,6 +36,11 @@ export async function lock(): Promise<void> {
   if (!res.success) throw new Error(field<'error', string>(res, 'error'))
 }
 
+export async function logout(): Promise<void> {
+  const res = await sendMessage({ type: 'LOGOUT' })
+  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
+}
+
 // Entries
 export async function listEntries(filter?: EntryFilter): Promise<EntryRow[]> {
   const res = await sendMessage({ type: 'LIST_ENTRIES', filter: filter ?? {} })

@@ -17,6 +17,8 @@ export type Message =
   | { type: 'UNLOCK_EXISTING'; password: string }
   | { type: 'RECOVER'; recoveryKey: string; newPassword: string }
   | { type: 'LOCK' }
+  // ロックしたうえで拡張機能の全データを消去する
+  | { type: 'LOGOUT' }
   // 拡張機能UIでのユーザー操作の通知（オートロックタイマーの延長）
   | { type: 'USER_ACTIVITY' }
   | { type: 'CREATE_VAULT'; masterPassword: string; s3Config: Record<string, string> }

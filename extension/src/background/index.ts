@@ -4,6 +4,7 @@
 import { DEFAULT_VAULT_ID, STORAGE_KEYS } from '../shared/constants'
 import { ConflictError, VaultS3Client } from '../shared/s3-client'
 import {
+  clearStorage,
   getFromSessionStorage,
   getFromStorage,
   removeFromSessionStorage,
@@ -403,6 +404,9 @@ async function autoSync() {
     }
 
     await syncWithS3(decryptedS3Config)
+    // S3通信の await 中にロック・ログアウトされた場合は書き戻さない
+    // （ログアウト後のストレージにVaultが復活するのを防ぐ）
+    if (!unlocked) throw new VaultLockedDuringSyncError()
 
     // 同期後に vault bytes / ETag / lastSyncTime を更新
     const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
@@ -448,6 +452,23 @@ async function loadSettings(): Promise<AppSettings> {
       theme: 'light',
     }
   )
+}
+
+/**
+ * ロック状態へ遷移する（復号済みデータの破棄・アラーム停止・各画面への通知）。
+ * WASM 側の api_lock は呼び出し側で済ませておくこと。
+ */
+async function enterLockedState() {
+  unlocked = false
+  updateExtensionIcon(false)
+  decryptedS3Config = null
+  await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
+  chrome.alarms.clear('autolock')
+  chrome.alarms.clear('autosync')
+  // オートフィル: 全タブに通知してContent Scriptを無効化
+  onVaultLocked()
+  clearTotpQrScanContext()
+  clearPickerContext()
 }
 
 // ========== セッション復元 ==========
@@ -657,16 +678,27 @@ async function handleMessage(
         try {
           const vaultBytes = vault.api_lock(DEFAULT_VAULT_ID)
           await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
-          unlocked = false
-          updateExtensionIcon(false)
-          decryptedS3Config = null
-          await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
-          chrome.alarms.clear('autolock')
-          chrome.alarms.clear('autosync')
-          // オートフィル: 全タブに通知してContent Scriptを無効化
-          onVaultLocked()
-          clearTotpQrScanContext()
-          clearPickerContext()
+          await enterLockedState()
+          sendResponse({ success: true })
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) })
+        }
+        break
+      }
+
+      case 'LOGOUT': {
+        // サイドバーは閉じないため、UI側でストレージを消すだけではSWのアンロック状態
+        // （復号済みVault・S3設定・同期アラーム）が残る。ロックしてから全データを消去する。
+        try {
+          if (unlocked) {
+            try {
+              vault.api_lock(DEFAULT_VAULT_ID)
+            } catch (e) {
+              console.error('[SW] LOGOUT: api_lock failed:', e)
+            }
+            await enterLockedState()
+          }
+          await clearStorage()
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -1357,14 +1389,7 @@ async function handleAutolockAlarm() {
   try {
     const vaultBytes = vault.api_lock(DEFAULT_VAULT_ID)
     await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
-    unlocked = false
-    updateExtensionIcon(false)
-    decryptedS3Config = null
-    await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
-    chrome.alarms.clear('autosync')
-    onVaultLocked()
-    clearTotpQrScanContext()
-    clearPickerContext()
+    await enterLockedState()
   } catch (err) {
     console.error('[SW] Autolock failed:', err)
   }

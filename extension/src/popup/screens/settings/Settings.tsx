@@ -253,19 +253,8 @@ export default function Settings() {
 
   const handleLogoutConfirmed = async () => {
     try {
-      await new Promise<void>((resolve, reject) => {
-        if (typeof chrome !== 'undefined' && chrome.storage) {
-          chrome.storage.local.clear(() => {
-            if (chrome.runtime.lastError) {
-              reject(chrome.runtime.lastError)
-            } else {
-              resolve()
-            }
-          })
-        } else {
-          resolve()
-        }
-      })
+      // SW側のアンロック状態も破棄する必要があるため、ストレージの消去はSWに任せる
+      await commands.logout()
       // サイドバーは閉じないため、再読み込みしてオンボーディング画面へ戻す
       window.location.reload()
     } catch (err) {
