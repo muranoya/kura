@@ -34,6 +34,13 @@ fn main() -> Result<(), slint::PlatformError> {
     };
     screens::setup(&app, tray);
 
+    // 表示中のトレイアイコンはイベントループを生かし続けるので、ウィンドウを閉じたら明示的に終了する。
+    // そうしないとアンロックされたまま裏で動き続け、ウィンドウも二度と開けなくなる
+    app.window().on_close_requested(|| {
+        let _ = slint::quit_event_loop();
+        slint::CloseRequestResponse::HideWindow
+    });
+
     app.run()?;
 
     // 終了時もメモリ上の vault をロックしてから抜ける
