@@ -17,18 +17,21 @@ export default function Trash() {
   const [confirmPurgeOpen, setConfirmPurgeOpen] = useState(false)
   const [selectedPurgeId, setSelectedPurgeId] = useState<string | null>(null)
 
-  const loadTrash = useCallback(async (showLoading = true) => {
-    if (showLoading) setLoading(true)
-    setError(null)
-    try {
-      const result = await commands.listTrash()
-      setEntries(result)
-    } catch (err) {
-      setError(String(err) || t('entries.trash.loadFailed'))
-    } finally {
-      setLoading(false)
-    }
-  }, [t])
+  const loadTrash = useCallback(
+    async (showLoading = true) => {
+      if (showLoading) setLoading(true)
+      setError(null)
+      try {
+        const result = await commands.listTrash()
+        setEntries(result)
+      } catch (err) {
+        setError(String(err) || t('entries.trash.loadFailed'))
+      } finally {
+        setLoading(false)
+      }
+    },
+    [t],
+  )
 
   useEffect(() => {
     loadTrash()
