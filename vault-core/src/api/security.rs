@@ -1,5 +1,5 @@
 use crate::crypto;
-use crate::secret::{MasterPassword, PlaintextConfig};
+use crate::secret::{MasterPassword, PlaintextConfig, RecoveryKeyInput};
 use crate::sync::engine::SessionState;
 
 use super::VaultManager;
@@ -88,6 +88,21 @@ impl VaultManager {
             unlocked
                 .change_master_password(&old_password, &new_password)
                 .map_err(|e| format!("Failed to change master password: {}", e))
+        })
+    }
+
+    /// リカバリーキーでマスターパスワードを再設定（マスターパスワードを忘れた場合）
+    pub fn api_reset_master_password_with_recovery_key(
+        &self,
+        recovery_key: String,
+        new_password: String,
+    ) -> Result<(), String> {
+        let recovery_key = RecoveryKeyInput::from_string(recovery_key);
+        let new_password = MasterPassword::from_string(new_password);
+        self.with_unlocked_mut(|unlocked| {
+            unlocked
+                .reset_master_password_with_recovery_key(&recovery_key, &new_password)
+                .map_err(|e| format!("Failed to reset master password: {}", e))
         })
     }
 

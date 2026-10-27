@@ -312,6 +312,18 @@ pub fn api_change_master_password(
 }
 
 #[wasm_bindgen]
+pub fn api_reset_master_password_with_recovery_key(
+    vault_id: String,
+    recovery_key: String,
+    new_password: String,
+) -> Result<(), JsValue> {
+    with_manager(&vault_id, |m| {
+        m.api_reset_master_password_with_recovery_key(recovery_key, new_password)
+    })
+    .map_err(to_js_err)
+}
+
+#[wasm_bindgen]
 pub fn api_upgrade_argon2_params(
     vault_id: String,
     password: String,

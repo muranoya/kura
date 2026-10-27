@@ -1,7 +1,7 @@
 use crate::crypto::Dek;
 use crate::error::{Result, VaultError};
 use crate::models::Argon2Params;
-use crate::secret::MasterPassword;
+use crate::secret::{MasterPassword, RecoveryKeyInput};
 
 use super::UnlockedVault;
 
@@ -34,6 +34,38 @@ impl UnlockedVault {
 
         // Update vault_meta
         let engine = base64::engine::general_purpose::STANDARD;
+        self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
+
+        Ok(())
+    }
+
+    /// Reset master password using the recovery key (forgotten master password flow)
+    pub fn reset_master_password_with_recovery_key(
+        &mut self,
+        recovery_key: &RecoveryKeyInput,
+        new_password: &MasterPassword,
+    ) -> Result<()> {
+        use base64::Engine;
+
+        // Verify recovery key
+        let recovery_kek = crate::crypto::RecoveryKey::derive_kek_from_input(
+            recovery_key,
+            &self.meta.argon2_params,
+        )?;
+        let engine = base64::engine::general_purpose::STANDARD;
+        let encrypted_dek_bytes = engine
+            .decode(&self.meta.encrypted_dek_recovery)
+            .map_err(|_| VaultError::DecryptionError("Invalid base64".to_string()))?;
+        let _recovery_dek = Dek::unwrap(&encrypted_dek_bytes, &recovery_kek)?;
+
+        // Derive new KEK from new password
+        let new_kek = crate::crypto::kdf::derive_kek_from_master_password(
+            new_password,
+            &self.meta.argon2_params,
+        )?;
+        let encrypted_dek_master = self.dek.wrap(&new_kek)?;
+
+        // Update vault_meta
         self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
 
         Ok(())
@@ -146,7 +178,6 @@ impl UnlockedVault {
 mod tests {
     use super::*;
     use crate::secret::EntrySecretJson;
-    use crate::secret::RecoveryKeyInput;
     use crate::store::VaultEntry;
     use crate::vault::LockedVault;
 
@@ -330,5 +361,47 @@ mod tests {
         let _unlocked2 = locked2
             .unlock_with_recovery_key(&recovery_key_input(recovery_key.to_display_string()))
             .unwrap();
+    }
+
+    #[test]
+    fn test_reset_master_password_with_recovery_key_success() {
+        let (locked, recovery_key) = LockedVault::create_new(&mp(PASSWORD)).unwrap();
+        let recovery_str = recovery_key.to_display_string();
+        let mut vault = locked
+            .unlock_with_recovery_key(&recovery_key_input(recovery_str.clone()))
+            .unwrap();
+        let new_password = "new-master-password";
+
+        vault
+            .reset_master_password_with_recovery_key(
+                &recovery_key_input(recovery_str.clone()),
+                &mp(new_password),
+            )
+            .unwrap();
+
+        // New password works, old password no longer works, recovery key still works
+        let locked = vault.lock().unwrap();
+        assert!(locked.clone().unlock(&mp(PASSWORD)).is_err());
+        assert!(locked
+            .clone()
+            .unlock_with_recovery_key(&recovery_key_input(recovery_str))
+            .is_ok());
+        let _unlocked = locked.unlock(&mp(new_password)).unwrap();
+    }
+
+    #[test]
+    fn test_reset_master_password_with_wrong_recovery_key() {
+        let mut vault = create_unlocked_vault();
+        let (_, other_recovery) = LockedVault::create_new(&mp("other-password")).unwrap();
+
+        let result = vault.reset_master_password_with_recovery_key(
+            &recovery_key_input(other_recovery.to_display_string()),
+            &mp("new-password"),
+        );
+        assert!(result.is_err());
+
+        // Original password still works
+        let locked = vault.lock().unwrap();
+        let _unlocked = locked.unlock(&mp(PASSWORD)).unwrap();
     }
 }

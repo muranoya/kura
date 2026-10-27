@@ -94,6 +94,11 @@ interface WasmApi {
   api_parse_totp_period(value: string): number
   api_verify_password(vaultId: string, password: string): void
   api_change_master_password(vaultId: string, oldPassword: string, newPassword: string): void
+  api_reset_master_password_with_recovery_key(
+    vaultId: string,
+    recoveryKey: string,
+    newPassword: string,
+  ): void
   api_rotate_dek(vaultId: string, password: string): string
   api_regenerate_recovery_key(vaultId: string, password: string): string
   api_encrypt_config(vaultId: string, password: string, plaintext: string): string
@@ -815,7 +820,7 @@ async function handleMessage(
         }
         try {
           vault.api_unlock_with_recovery_key(DEFAULT_VAULT_ID, message.recoveryKey)
-          vault.api_change_master_password(
+          vault.api_reset_master_password_with_recovery_key(
             DEFAULT_VAULT_ID,
             message.recoveryKey,
             message.newPassword,
@@ -834,6 +839,10 @@ async function handleMessage(
           sendResponse({ success: true })
           onVaultUnlocked()
         } catch (err) {
+          // SW側はロック状態のままなので、WASMセッションだけアンロック済みで残さない
+          if (!unlocked && vault.api_is_unlocked(DEFAULT_VAULT_ID)) {
+            vault.api_lock(DEFAULT_VAULT_ID)
+          }
           sendResponse({ success: false, error: String(err) })
         }
         break
