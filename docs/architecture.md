@@ -360,6 +360,7 @@ TOTP は `CustomField`（`field_type: "totp"`）として保持する。値は B
 2. 現在のフォーム内容を先に保存する（サイドバーは開いたまま）
 3. アクティブタブにオーバーレイ（キャプチャモードと同様の右上ツールバー）を表示
 4. ユーザーが [スキャン] を押すと `captureVisibleTab` でビューポートを取得し、content script 上で `@zxing/library` によりデコードする（複数 QR は検出位置をマスクして繰り返し検出）
+   - `captureVisibleTab` には `<all_urls>` ホスト権限が必要なため manifest で宣言している。Chrome はサイドパネルを開くツールバークリックでは `activeTab` を付与せず、サイドバーを開いたままタブを移動した場合も `activeTab` は効かないため
 5. 検出結果を一覧表示し、ユーザーが意図した候補を確認して保存する
 6. Service Worker で TOTP 検証後、対象カスタムフィールドを直接更新し、`ENTRY_UPDATED_IN_BACKGROUND` で開いている編集画面に反映する
 

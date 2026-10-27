@@ -7,6 +7,8 @@
 
   "permissions": ["storage", "alarms", "clipboardWrite", "clipboardRead", "tabs", "activeTab"],
 
+  "host_permissions": ["<all_urls>"],
+
   "action": {
     "default_title": "__MSG_appName__",
     "default_icon": {
