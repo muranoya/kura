@@ -17,8 +17,8 @@ export default function Trash() {
   const [confirmPurgeOpen, setConfirmPurgeOpen] = useState(false)
   const [selectedPurgeId, setSelectedPurgeId] = useState<string | null>(null)
 
-  const loadTrash = useCallback(async () => {
-    setLoading(true)
+  const loadTrash = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     setError(null)
     try {
       const result = await commands.listTrash()
@@ -35,9 +35,11 @@ export default function Trash() {
   }, [loadTrash])
 
   useEffect(() => {
+    // サイドバーは開いたままになるため、同期だけでなくSW側での保存（他ウィンドウでの
+    // 復元・削除等）でも更新する。ローカルのみのVaultでは LAST_SYNC_TIME は書かれない
     const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
-      if (changes[STORAGE_KEYS.LAST_SYNC_TIME]) {
-        loadTrash()
+      if (changes[STORAGE_KEYS.LAST_SYNC_TIME] || changes[STORAGE_KEYS.VAULT_BYTES]) {
+        loadTrash(false)
       }
     }
     chrome.storage.onChanged.addListener(listener)

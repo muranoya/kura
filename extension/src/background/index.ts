@@ -974,6 +974,13 @@ async function handleMessage(
           break
         }
         try {
+          // 完全削除はゴミ箱内のエントリに限る。古いゴミ箱画面から、別の画面で
+          // 復元済みのエントリを消してしまわないようにする
+          const target = JSON.parse(vault.api_get_entry(DEFAULT_VAULT_ID, message.id))
+          if (target?.deleted_at == null) {
+            sendResponse({ success: false, error: 'Entry is not in trash' })
+            break
+          }
           vault.api_purge_entry(DEFAULT_VAULT_ID, message.id)
           await saveLocally()
           autoSync().catch((e) => console.error('[SW] Sync failed:', e))
