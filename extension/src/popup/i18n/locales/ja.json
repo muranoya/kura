@@ -26,11 +26,6 @@
     "preview": "プレビュー",
     "passwordPlaceholder": "マスターパスワード"
   },
-  "language": {
-    "label": "言語",
-    "ja": "日本語",
-    "en": "English"
-  },
   "navigation": {
     "entries": "エントリ",
     "passwordGenerator": "生成",
@@ -412,7 +407,6 @@
       "about": "このアプリについて"
     },
     "general": {
-      "language": "言語",
       "autoLock": "自動ロック",
       "clipboardClear": "クリップボード自動クリア",
       "passkeyEnabled": "パスキー対応（ベータ）",

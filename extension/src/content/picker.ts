@@ -5,9 +5,7 @@
 // ＝即選択）。
 // 詳細: docs/extension-custom-field-autofill.md 4-4節
 
-import enLocale from '../popup/i18n/locales/en.json'
 import jaLocale from '../popup/i18n/locales/ja.json'
-import { STORAGE_KEYS } from '../shared/constants'
 import type { CustomFieldSelector } from '../shared/types'
 import { cancelPicker, sendPickerResult } from './messaging'
 import overlayCss from './picker.css?inline'
@@ -22,35 +20,7 @@ let toastEl: HTMLElement | null = null
 let currentHoverTarget: HTMLInputElement | null = null
 let activeFieldId: string | null = null
 
-type OverlayStrings = typeof enLocale.content.picker
-
-const STRINGS: Record<'en' | 'ja', OverlayStrings> = {
-  en: enLocale.content.picker,
-  ja: jaLocale.content.picker,
-}
-
-let t: OverlayStrings = STRINGS.en
-
-function detectLangFromNavigator(): 'en' | 'ja' {
-  const raw = (navigator.language || '').toLowerCase()
-  return raw.split('-')[0] === 'ja' ? 'ja' : 'en'
-}
-
-async function resolveOverlayStrings(): Promise<OverlayStrings> {
-  let lang: 'en' | 'ja' = detectLangFromNavigator()
-  try {
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-      const result = await chrome.storage.local.get([STORAGE_KEYS.APP_SETTINGS])
-      const settings = result?.[STORAGE_KEYS.APP_SETTINGS] as { language?: string } | undefined
-      if (settings?.language === 'ja' || settings?.language === 'en') {
-        lang = settings.language
-      }
-    }
-  } catch {
-    // fall back to navigator
-  }
-  return STRINGS[lang]
-}
+const t = jaLocale.content.picker
 
 // ========== Shadow DOM host ==========
 
@@ -234,8 +204,6 @@ export async function startPickerMode(fieldId: string) {
   isActive = true
   activeFieldId = fieldId
   currentHoverTarget = null
-
-  t = await resolveOverlayStrings()
 
   ensureShadowHost()
   renderBanner()
