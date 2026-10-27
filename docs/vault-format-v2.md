@@ -347,7 +347,7 @@ UnlockedVault (v2)
 - **typed_value**: `secret_field_keys` に含まれるフィールドを秘匿値として表示する（マスク表示）。ただし `secure_note.content` は notes と同じく長文のノートなので、マスクせず（Markdown として）表示する
 - **秘匿カスタムフィールド**: 「秘匿フィールド」セクションの text / email / url / phone 型はマスク表示する（password 型と同様）。秘匿にした url 型はオートフィル候補の判定に使わないため、リンクとしても扱わない
 
-対象クライアント: Android / デスクトップ（Tauri）/ ブラウザ拡張
+対象クライアント: Android / デスクトップ（Slint）/ ブラウザ拡張
 
 ---
 
@@ -409,4 +409,4 @@ v1 のデータを開いた場合は「古い形式のため、v2 対応の旧�
 | 同期（7章） | `vault-core/src/sync/mod.rs`、`vault-core/src/vault/state.rs`、`vault-core/src/sync/engine.rs` |
 | v1 → v2 の移行（11章） | `vault-core/src/vault/migration.rs`、`vault-core/src/store/v1.rs`、`vault-core/src/crypto/v1.rs` |
 | API（9-1） | `vault-core/src/api/entries.rs`（`EntryDetail.secret_field_keys`、`custom_fields[].secret`） |
-| UI（10章） | デスクトップ `desktop/src/components/entries/`、拡張機能 `extension/src/popup/`、Android `android/app/src/main/java/net/meshpeak/kura/ui/` |
+| UI（10章） | デスクトップ `desktop/src/screens/entries.rs`・`desktop/ui/screens/`、拡張機能 `extension/src/popup/`、Android `android/app/src/main/java/net/meshpeak/kura/ui/` |

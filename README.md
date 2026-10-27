@@ -19,8 +19,8 @@
 
 | プラットフォーム | 技術 | 状態 |
 |----------------|------|------|
-| Windows / Linux | Tauri (Rust + React) | 利用可能 |
-| macOS (Apple Silicon) | Tauri (Rust + React) | 利用可能（[インストール手順](#macos-インストール手順)参照） |
+| Windows / Linux | Rust + Slint | 利用可能 |
+| macOS (Apple Silicon) | Rust + Slint | 利用可能（[インストール手順](#macos-インストール手順)参照） |
 | Android | Kotlin + Jetpack Compose | 利用可能 |
 | Chrome 拡張機能 | React + WASM | 利用可能 |
 | Firefox 拡張機能 | React + WASM | 利用可能 |
@@ -63,7 +63,7 @@ vaultデータをXChaCha20-Poly1305で暗号化（一覧用のindexと、エン�
 ```
 
 共有Rustコア（`vault-core`）は以下にコンパイルされます。
-- **ネイティブバイナリ** -- Tauriデスクトップバックエンド用
+- **ネイティブバイナリ** -- デスクトップアプリ（Rust + Slint）に直接リンク
 - **JNIライブラリ** -- Java Native Interfaceを介したAndroid用
 - **WebAssembly** -- ブラウザ拡張機能用
 

@@ -25,7 +25,7 @@
 
 vault-core（Rust）はクライアント全体で共有するコアライブラリ。ネットワーク通信は環境依存なため、vault-coreには含めない（WASM/Android/デスクトップで実装要件が異なるため）。
 
-FFI構成：JNI → Android / ネイティブFFI → デスクトップ / WASM → ブラウザ拡張
+FFI構成：JNI → Android / Rust クレートとして直接リンク → デスクトップ（Slint） / WASM → ブラウザ拡張
 
 詳細は `docs/architecture.md` を参照。
 
@@ -60,7 +60,7 @@ FFI構成：JNI → Android / ネイティブFFI → デスクトップ / WASM �
 ブラウザ拡張機能（`extension/`）では、Radix UIのPortalを使用するコンポーネント（`Select`, `DropdownMenu`等）を使わない。UIがポップアップだった頃、isolatedなDOMコンテキストでPortalが正しくレンダリングされなかったため（現在のUIはサイドバー。サイドバーで動作するかは未検証）。
 
 - **拡張機能**: `extension/src/popup/components/ui/type-filter-dropdown.tsx` などの自前ドロップダウンを使用
-- **デスクトップ**: `desktop/` ではRadix UIをそのまま使用可
+- **デスクトップ**: `desktop/` は Slint 製（React / Radix UI は使っていない）
 
 ### ドキュメントと実装の関係
 
