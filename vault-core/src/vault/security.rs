@@ -1,4 +1,4 @@
-use crate::crypto::Dek;
+use crate::crypto::{Dek, SubKeys};
 use crate::error::{Result, VaultError};
 use crate::models::Argon2Params;
 use crate::secret::{MasterPassword, RecoveryKeyInput};
@@ -34,7 +34,8 @@ impl UnlockedVault {
 
         // Update vault_meta
         let engine = base64::engine::general_purpose::STANDARD;
-        self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
+        let params = self.meta.argon2_params.clone();
+        self.set_master_slot(engine.encode(&encrypted_dek_master), params);
 
         Ok(())
     }
@@ -90,19 +91,38 @@ impl UnlockedVault {
             .map_err(|_| VaultError::DecryptionError("Invalid base64".to_string()))?;
         let _verified_dek = Dek::unwrap(&encrypted_dek_bytes, &kek_master)?;
 
+        // 旧 DEK のうちに全 secret を復号しておく。1 件でも復号できなければ、
+        // vault の状態を変えずにエラーを返す（新しい DEK に切り替えると、その secret は
+        // 二度と復号できなくなるため）
+        let mut plaintexts = Vec::new();
+        for (id, entry) in &self.index.entries {
+            if entry.secret_rev.is_some() {
+                plaintexts.push((id.clone(), self.read_secret(id)?.to_bytes()?));
+            }
+        }
+
         // Generate new DEK
         let new_dek = Dek::generate();
         let encrypted_dek_master = new_dek.wrap(&kek_master)?;
 
         // Generate new recovery key
         let new_recovery_key = crate::crypto::RecoveryKey::generate();
-        let kek_recovery = new_recovery_key.derive_kek(&self.meta.argon2_params)?;
+        let recovery_params = self.meta.argon2_params.clone();
+        let kek_recovery = new_recovery_key.derive_kek(&recovery_params)?;
         let encrypted_dek_recovery = new_dek.wrap(&kek_recovery)?;
 
         // Update vault state
+        self.keys = SubKeys::derive(&new_dek);
         self.dek = new_dek;
-        self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
-        self.meta.encrypted_dek_recovery = engine.encode(&encrypted_dek_recovery);
+        let master_params = self.meta.argon2_params.clone();
+        self.set_master_slot(engine.encode(&encrypted_dek_master), master_params);
+        self.set_recovery_slot(engine.encode(&encrypted_dek_recovery), recovery_params);
+
+        // 全 secret を新しいサブ鍵で再暗号化する（secret_rev も再生成する）。
+        // index は次の書き込み時に新しいサブ鍵で暗号化される
+        for (id, plaintext) in plaintexts {
+            self.seal_secret_with_new_rev(&id, &plaintext)?;
+        }
 
         Ok(new_recovery_key)
     }
@@ -137,9 +157,8 @@ impl UnlockedVault {
         let encrypted_dek_recovery = self.dek.wrap(&kek_recovery)?;
 
         // Update vault_meta
-        self.meta.argon2_params = new_params;
-        self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
-        self.meta.encrypted_dek_recovery = engine.encode(&encrypted_dek_recovery);
+        self.set_master_slot(engine.encode(&encrypted_dek_master), new_params.clone());
+        self.set_recovery_slot(engine.encode(&encrypted_dek_recovery), new_params);
 
         Ok(new_recovery_key)
     }
@@ -164,21 +183,34 @@ impl UnlockedVault {
 
         // Generate new recovery key
         let new_recovery_key = crate::crypto::RecoveryKey::generate();
-        let kek_recovery = new_recovery_key.derive_kek(&self.meta.argon2_params)?;
+        let recovery_params = self.meta.argon2_params.clone();
+        let kek_recovery = new_recovery_key.derive_kek(&recovery_params)?;
         let encrypted_dek_recovery = self.dek.wrap(&kek_recovery)?;
 
         // Update vault_meta
-        self.meta.encrypted_dek_recovery = engine.encode(&encrypted_dek_recovery);
+        self.set_recovery_slot(engine.encode(&encrypted_dek_recovery), recovery_params);
 
         Ok(new_recovery_key)
+    }
+}
+
+impl UnlockedVault {
+    /// master スロットを置き換える。新しく書いた値なので、改ざんの疑いも解消する
+    fn set_master_slot(&mut self, encrypted_dek: String, params: Argon2Params) {
+        self.meta.set_master_slot(encrypted_dek, params);
+        self.untrusted_meta.master = None;
+    }
+
+    /// recovery スロットを置き換える。新しく書いた値なので、改ざんの疑いも解消する
+    fn set_recovery_slot(&mut self, encrypted_dek: String, params: Argon2Params) {
+        self.meta.set_recovery_slot(encrypted_dek, params);
+        self.untrusted_meta.recovery = None;
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::secret::EntrySecretJson;
-    use crate::store::VaultEntry;
     use crate::vault::LockedVault;
 
     const PASSWORD: &str = "test-master-password";
@@ -211,6 +243,202 @@ mod tests {
         let _unlocked = locked.unlock(&mp(new_password)).unwrap();
     }
 
+    /// 同じ vault を開いている 2 台の端末を作る（meta の更新時刻は過去にしておく）
+    fn two_devices() -> (UnlockedVault, UnlockedVault) {
+        let mut a = create_unlocked_vault();
+        a.meta.master_updated_at = 0;
+        a.meta.recovery_updated_at = 0;
+        let locked = LockedVault {
+            vault_file: crate::store::StoredVault::V2(a.to_vault_file().unwrap()),
+            etag: None,
+        };
+        let b = locked.unlock(&mp(PASSWORD)).unwrap();
+        (a, b)
+    }
+
+    #[test]
+    fn test_merge_keeps_password_change_from_other_device() {
+        let (mut a, mut b) = two_devices();
+        a.change_master_password(&mp(PASSWORD), &mp("new-password"))
+            .unwrap();
+
+        // 端末 B は古い meta のまま編集し、A の変更をマージしてから push する
+        b.create_entry(
+            "note".into(),
+            "secure_note".into(),
+            crate::models::EntryData::new_secure_note("s".into(), None),
+            vec![],
+        )
+        .unwrap();
+        b.merge_remote(&crate::store::StoredVault::V2(a.to_vault_file().unwrap()))
+            .unwrap();
+
+        let locked = b.lock().unwrap();
+        assert!(locked.clone().unlock(&mp(PASSWORD)).is_err());
+        assert!(locked.unlock(&mp("new-password")).is_ok());
+    }
+
+    #[test]
+    fn test_merge_keeps_local_password_change_not_yet_pushed() {
+        let (mut a, b) = two_devices();
+        // 端末 A で変更し、push する前に（古い meta のままの）リモートをマージする
+        a.change_master_password(&mp(PASSWORD), &mp("new-password"))
+            .unwrap();
+        a.merge_remote(&crate::store::StoredVault::V2(b.to_vault_file().unwrap()))
+            .unwrap();
+
+        let locked = a.lock().unwrap();
+        assert!(locked.unlock(&mp("new-password")).is_ok());
+    }
+
+    fn v2(vault: &UnlockedVault) -> crate::store::StoredVault {
+        crate::store::StoredVault::V2(vault.to_vault_file().unwrap())
+    }
+
+    fn lock_vault(vault: UnlockedVault) -> LockedVault {
+        vault.lock().unwrap()
+    }
+
+    #[test]
+    fn test_merge_ignores_tampered_remote_meta() {
+        // ストレージに書き込める攻撃者が、index はそのままに meta だけを壊し、
+        // 更新時刻を未来にしても採用しない
+        let (mut a, b) = two_devices();
+        let mut file = b.to_vault_file().unwrap();
+        file.meta.encrypted_dek_master = "AAAA".into();
+        file.meta.encrypted_dek_recovery = "AAAA".into();
+        file.meta.master_updated_at = 4_102_444_800;
+        file.meta.recovery_updated_at = 4_102_444_800;
+        a.merge_remote(&crate::store::StoredVault::V2(file))
+            .unwrap();
+
+        assert!(lock_vault(a).unlock(&mp(PASSWORD)).is_ok());
+    }
+
+    #[test]
+    fn test_new_device_does_not_spread_tampered_meta() {
+        // ストレージ上で recovery スロットだけを改ざんされた vault を、新しい端末がダウンロードして
+        // そのまま push しても、改ざんされたスロットは他の端末に採用されない。
+        // 新しい端末自身も、次の同期で正しいスロットに戻る
+        let password = mp(PASSWORD);
+        let (locked, recovery_key) = LockedVault::create_new(&password).unwrap();
+        let mut a = locked.unlock(&password).unwrap();
+        let mut file = a.to_vault_file().unwrap();
+        file.meta.encrypted_dek_recovery = "AAAA".into();
+        file.meta.recovery_updated_at = 4_102_444_800;
+        let mut new_device = LockedVault {
+            vault_file: crate::store::StoredVault::V2(file),
+            etag: None,
+        }
+        .unlock(&password)
+        .unwrap();
+
+        a.merge_remote(&v2(&new_device)).unwrap();
+        new_device.merge_remote(&v2(&a)).unwrap();
+
+        let recovery = || recovery_key_input(recovery_key.to_display_string());
+        for vault in [a, new_device] {
+            assert!(lock_vault(vault)
+                .unlock_with_recovery_key(&recovery())
+                .is_ok());
+        }
+    }
+
+    #[test]
+    fn test_merge_ignores_remote_meta_without_digest() {
+        // ダイジェストを持たない index（このクライアントより前の版が書いたもの）の meta は採用しない
+        let (mut a, mut b) = two_devices();
+        b.change_master_password(&mp(PASSWORD), &mp("new-password"))
+            .unwrap();
+        let mut file = b.to_vault_file().unwrap();
+        // to_bytes はダイジェストを書かない
+        file.index = b
+            .keys
+            .seal_index(&b.meta.vault_uuid, &b.index.to_bytes().unwrap())
+            .unwrap();
+        a.merge_remote(&crate::store::StoredVault::V2(file))
+            .unwrap();
+
+        assert!(lock_vault(a).unlock(&mp(PASSWORD)).is_ok());
+    }
+
+    #[test]
+    fn test_merge_keeps_concurrent_changes_to_different_slots() {
+        // 端末 A でリカバリーキーを再発行し、それを知らない端末 B でマスターパスワードを変更する。
+        // どちらの順でマージしても、両方の変更が残る
+        let (mut a, mut b) = two_devices();
+        let recovery_key = a.regenerate_recovery_key(&mp(PASSWORD)).unwrap();
+        b.change_master_password(&mp(PASSWORD), &mp("new-password"))
+            .unwrap();
+
+        let a_file = v2(&a);
+        b.merge_remote(&a_file).unwrap();
+        a.merge_remote(&v2(&b)).unwrap();
+
+        for vault in [a, b] {
+            let locked = lock_vault(vault);
+            assert!(locked.clone().unlock(&mp("new-password")).is_ok());
+            assert!(locked
+                .unlock_with_recovery_key(&recovery_key_input(recovery_key.to_display_string()))
+                .is_ok());
+        }
+    }
+
+    #[test]
+    fn test_merge_keeps_recovery_slot_params_after_concurrent_argon2_upgrade() {
+        // 端末 A で Argon2 パラメータを更新し、その後それを知らない端末 B でリカバリーキーを
+        // 再発行する。recovery スロットは B の（古いパラメータで包んだ）ものになるが、
+        // スロットごとにパラメータを持つので、どちらの鍵でも開ける
+        let (mut a, mut b) = two_devices();
+        let mut params = a.meta.argon2_params.clone();
+        params.salt = crate::codec::base32::encode(&rand::random::<[u8; 16]>());
+        a.upgrade_argon2_params(&mp(PASSWORD), params).unwrap();
+        let recovery_key = b.regenerate_recovery_key(&mp(PASSWORD)).unwrap();
+
+        b.merge_remote(&v2(&a)).unwrap();
+
+        let locked = lock_vault(b);
+        assert!(locked.clone().unlock(&mp(PASSWORD)).is_ok());
+        assert!(locked
+            .unlock_with_recovery_key(&recovery_key_input(recovery_key.to_display_string()))
+            .is_ok());
+    }
+
+    #[test]
+    fn test_merge_converges_when_slot_times_are_equal() {
+        // 移行直後など、両端末のスロットの更新時刻が同じで中身が異なる場合でも、
+        // どちらの端末も同じ方を採用して収束する
+        let (mut a, mut b) = two_devices();
+        a.change_master_password(&mp(PASSWORD), &mp("password-a"))
+            .unwrap();
+        b.change_master_password(&mp(PASSWORD), &mp("password-b"))
+            .unwrap();
+        a.meta.master_updated_at = 0;
+        b.meta.master_updated_at = 0;
+
+        let a_file = v2(&a);
+        a.merge_remote(&v2(&b)).unwrap();
+        b.merge_remote(&a_file).unwrap();
+
+        assert_eq!(a.meta.encrypted_dek_master, b.meta.encrypted_dek_master);
+    }
+
+    #[test]
+    fn test_change_after_adopting_future_slot_still_wins() {
+        // 時計が進んでいる端末の変更を取り込んだ後でも、次の変更はそれより新しくなる
+        let (mut a, mut b) = two_devices();
+        a.change_master_password(&mp(PASSWORD), &mp("password-a"))
+            .unwrap();
+        a.meta.master_updated_at = crate::get_timestamp() + 1_000_000;
+        b.merge_remote(&v2(&a)).unwrap();
+
+        b.change_master_password(&mp("password-a"), &mp("password-b"))
+            .unwrap();
+        a.merge_remote(&v2(&b)).unwrap();
+
+        assert!(lock_vault(a).unlock(&mp("password-b")).is_ok());
+    }
+
     #[test]
     fn test_change_master_password_wrong_old_password() {
         let mut vault = create_unlocked_vault();
@@ -238,29 +466,32 @@ mod tests {
         let mut vault = create_unlocked_vault();
 
         // Add an entry to verify data survives rotation
-        vault.contents.entries.insert(
-            uuid::Uuid::new_v4().to_string(),
-            VaultEntry {
-                entry_type: "secure_note".to_string(),
-                name: "test-note".to_string(),
-                created_at: 1000,
-                updated_at: 1000,
-                deleted_at: None,
-                purged_at: None,
-                is_favorite: false,
-                label_ids: vec![],
-                typed_value: EntrySecretJson::from_string(r#"{"content":"secret"}"#.to_string()),
-                notes: None,
-                custom_fields: None,
-            },
-        );
+        let entry = vault
+            .create_entry(
+                "test-note".to_string(),
+                "secure_note".to_string(),
+                crate::models::EntryData::new_secure_note("secret".to_string(), None),
+                vec![],
+            )
+            .unwrap();
+        let rev_before = vault.index.entries[&entry.id].secret_rev.clone();
+        let sealed_before = vault.secrets[&entry.id].clone();
 
         let recovery_key = vault.rotate_dek(&mp(PASSWORD)).unwrap();
+
+        // secret は新しい鍵で再暗号化され、secret_rev も再生成される
+        assert_ne!(vault.index.entries[&entry.id].secret_rev, rev_before);
+        assert_ne!(vault.secrets[&entry.id], sealed_before);
 
         // Should still unlock with master password after lock
         let locked = vault.lock().unwrap();
         let unlocked = locked.unlock(&mp(PASSWORD)).unwrap();
-        assert_eq!(unlocked.contents.entries.len(), 1);
+        assert_eq!(unlocked.index.entries.len(), 1);
+        let restored = unlocked.get_entry(&entry.id).unwrap().unwrap();
+        match restored.data.typed_value {
+            crate::models::TypedValue::SecureNote(d) => assert_eq!(d.content.as_str(), "secret"),
+            _ => panic!("Expected SecureNote"),
+        }
 
         // New recovery key should work
         let locked2 = unlocked.lock().unwrap();
@@ -355,7 +586,7 @@ mod tests {
 
         let locked = vault.lock().unwrap();
         let unlocked = locked.unlock(&mp(new_password)).unwrap();
-        assert!(unlocked.contents.entries.is_empty());
+        assert!(unlocked.index.entries.is_empty());
 
         let locked2 = unlocked.lock().unwrap();
         let _unlocked2 = locked2

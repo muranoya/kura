@@ -85,11 +85,13 @@ export async function getEntry(id: string): Promise<Entry> {
   )
   return {
     ...entry,
+    secretFieldKeys: entry.secretFieldKeys ?? [],
     customFields: (entry.customFields ?? []).map((f: Record<string, unknown>) => ({
       id: f.id as string,
       name: f.name as string,
       fieldType: f.field_type as CustomFieldType,
       value: f.value as string,
+      secret: f.secret === true,
       autofillSelector:
         (f.autofill_selector as CustomFieldSelector | null | undefined) ?? undefined,
     })),
@@ -199,6 +201,11 @@ export async function encryptConfig(password: string, plaintext: string): Promis
 
 export async function decryptConfig(password: string, encryptedB64: string): Promise<string> {
   return invoke<string>('decrypt_config', { vaultId, password, encryptedB64 })
+}
+
+// 暗号化された設定が旧形式で、復号後に encryptConfig で暗号化し直す必要があるか
+export async function configNeedsUpgrade(encryptedB64: string): Promise<boolean> {
+  return invoke<boolean>('config_needs_upgrade', { encryptedB64 })
 }
 
 export async function encryptTransferConfig(password: string, configJson: string): Promise<string> {

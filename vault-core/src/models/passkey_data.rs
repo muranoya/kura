@@ -1,4 +1,5 @@
 use crate::error::{Result, VaultError};
+use crate::secret::SecretString;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -21,10 +22,62 @@ pub struct PasskeyFieldData {
     pub credential_id: String,
     /// P-256 private key, base64-encoded. Opaque at this layer; interpreted by
     /// whichever code performs the actual WebAuthn signing.
-    pub private_key: String,
+    pub private_key: SecretString,
 }
 
 impl PasskeyFieldData {
+    /// 秘密鍵を含むため、ゼロ化されるバッファに直接シリアライズする
+    pub fn to_json_string(&self) -> Result<SecretString> {
+        crate::secret::to_json_secret_string(self).map_err(VaultError::JsonError)
+    }
+
+    pub fn from_json_string(json_str: &str) -> Result<Self> {
+        serde_json::from_str(json_str).map_err(VaultError::JsonError)
+    }
+
+    /// index に置く公開部と、secret に置く `private_key` に分ける
+    pub fn into_parts(self) -> (PasskeyPublicData, SecretString) {
+        (
+            PasskeyPublicData {
+                rp_id: self.rp_id,
+                rp_name: self.rp_name,
+                user_handle: self.user_handle,
+                user_name: self.user_name,
+                user_display_name: self.user_display_name,
+                credential_id: self.credential_id,
+            },
+            self.private_key,
+        )
+    }
+
+    pub fn from_parts(public: PasskeyPublicData, private_key: SecretString) -> Self {
+        PasskeyFieldData {
+            rp_id: public.rp_id,
+            rp_name: public.rp_name,
+            user_handle: public.user_handle,
+            user_name: public.user_name,
+            user_display_name: public.user_display_name,
+            credential_id: public.credential_id,
+            private_key,
+        }
+    }
+}
+
+/// Passkey カスタムフィールドの非秘匿部分（`private_key` 以外）。
+/// index の `custom_fields[].value` に JSON 文字列として置き、RP ごとの候補列挙
+/// （`find_passkey_credentials`）で秘密鍵を復号せずに済むようにする。
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PasskeyPublicData {
+    pub rp_id: String,
+    #[serde(default)]
+    pub rp_name: Option<String>,
+    pub user_handle: String,
+    pub user_name: String,
+    pub user_display_name: String,
+    pub credential_id: String,
+}
+
+impl PasskeyPublicData {
     pub fn to_json_string(&self) -> Result<String> {
         serde_json::to_string(self).map_err(VaultError::JsonError)
     }
@@ -60,7 +113,7 @@ mod tests {
             user_name: "user@example.com".to_string(),
             user_display_name: "Example User".to_string(),
             credential_id: "Y3JlZGVudGlhbC1pZA".to_string(),
-            private_key: "c3VwZXItc2VjcmV0LWtleQ".to_string(),
+            private_key: SecretString::from_string("c3VwZXItc2VjcmV0LWtleQ".to_string()),
         }
     }
 
@@ -68,7 +121,7 @@ mod tests {
     fn test_roundtrip() {
         let data = sample();
         let json = data.to_json_string().unwrap();
-        let parsed = PasskeyFieldData::from_json_string(&json).unwrap();
+        let parsed = PasskeyFieldData::from_json_string(json.as_str()).unwrap();
 
         assert_eq!(parsed.rp_id, data.rp_id);
         assert_eq!(parsed.rp_name, data.rp_name);
@@ -76,7 +129,7 @@ mod tests {
         assert_eq!(parsed.user_name, data.user_name);
         assert_eq!(parsed.user_display_name, data.user_display_name);
         assert_eq!(parsed.credential_id, data.credential_id);
-        assert_eq!(parsed.private_key, data.private_key);
+        assert_eq!(parsed.private_key.as_str(), data.private_key.as_str());
     }
 
     #[test]
@@ -101,11 +154,28 @@ mod tests {
     }
 
     #[test]
+    fn test_parts_roundtrip() {
+        let data = sample();
+        let (public, private_key) = data.clone().into_parts();
+        let public_json = public.to_json_string().unwrap();
+        assert!(!public_json.contains(data.private_key.as_str()));
+        assert!(!public_json.contains("private_key"));
+
+        let restored = PasskeyFieldData::from_parts(
+            PasskeyPublicData::from_json_string(&public_json).unwrap(),
+            private_key,
+        );
+        assert_eq!(restored.credential_id, data.credential_id);
+        assert_eq!(restored.private_key.as_str(), data.private_key.as_str());
+        assert_eq!(restored.rp_name, data.rp_name);
+    }
+
+    #[test]
     fn test_debug_output_redacts_private_key() {
         let data = sample();
         let debug_str = format!("{:?}", data);
 
-        assert!(!debug_str.contains(&data.private_key));
+        assert!(!debug_str.contains(data.private_key.as_str()));
         assert!(debug_str.contains("[REDACTED]"));
         assert!(debug_str.contains("example.com"));
     }

@@ -1,5 +1,4 @@
-use crate::models::TypedValue;
-use crate::store::VaultEntry;
+use crate::models::{Entry, TypedValue};
 
 use super::onepux::types::ParsedItem;
 use super::{DuplicateCandidate, DuplicateConfidence};
@@ -8,14 +7,15 @@ use super::{DuplicateCandidate, DuplicateConfidence};
 pub fn detect_duplicates(
     item: &ParsedItem,
     target_entry_type: &str,
-    existing_entries: &[(&str, &VaultEntry)],
+    existing_entries: &[Entry],
 ) -> Vec<DuplicateCandidate> {
     let mut candidates = Vec::new();
 
     let item_name_normalized = normalize_name(&item.title);
     let item_url_domain = item.url.as_deref().and_then(extract_domain);
 
-    for &(id, entry) in existing_entries {
+    for entry in existing_entries {
+        let id = entry.id.as_str();
         // Skip deleted/purged entries
         if entry.deleted_at.is_some() {
             continue;
@@ -89,18 +89,12 @@ pub fn detect_duplicates(
     candidates
 }
 
-fn check_high_confidence(
-    item: &ParsedItem,
-    target_type: &str,
-    entry: &VaultEntry,
-) -> Option<String> {
+fn check_high_confidence(item: &ParsedItem, target_type: &str, entry: &Entry) -> Option<String> {
     if entry.entry_type != target_type {
         return None;
     }
 
-    let typed_value = TypedValue::parse(target_type, entry.typed_value.as_ref()).ok()?;
-
-    match &typed_value {
+    match &entry.data.typed_value {
         TypedValue::Login(d) => {
             let entry_url = d.url.as_ref().map(|u| u.as_str());
             let entry_username = d.username.as_str();
@@ -225,9 +219,8 @@ pub fn extract_domain(url: &str) -> Option<String> {
     }
 }
 
-fn get_entry_url_domain(entry: &VaultEntry) -> Option<String> {
-    let typed_value = TypedValue::parse(&entry.entry_type, entry.typed_value.as_ref()).ok()?;
-    match typed_value {
+fn get_entry_url_domain(entry: &Entry) -> Option<String> {
+    match &entry.data.typed_value {
         TypedValue::Login(d) => d.url.as_ref().and_then(|u| extract_domain(u.as_str())),
         _ => None,
     }

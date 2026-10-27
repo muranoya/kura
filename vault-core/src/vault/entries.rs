@@ -1,96 +1,110 @@
-use crate::error::{Result, VaultError};
-use crate::models::{
-    Entry, EntryData, EntryFilter, EntrySummary, SortField, SortOrder, TypedValue,
-};
-use crate::secret::EntrySecretJson;
-use crate::store::VaultEntry;
+use zeroize::Zeroizing;
 
+use crate::error::{Result, VaultError};
+use crate::models::{Entry, EntryData, EntryFilter, EntrySummary, SortField, SortOrder};
+use crate::secret::PublicString;
+use crate::store::layout::{combine_entry_data, split_custom_fields, split_typed_value};
+use crate::store::{EntrySecret, VaultEntry};
+
+use super::secrets::new_secret_rev;
 use super::UnlockedVault;
 
+/// エントリ数の上限。クライアントはこれより多い件数を想定した UI・ストレージ設計に
+/// なっていない（拡張機能は vault を chrome.storage.local に保存し、その容量制限を受ける）。
+/// 同期で取り込んだ分はこの上限を超えても受け入れ、新規作成だけを止める
+pub(crate) const MAX_ENTRIES: usize = 2000;
+
 impl UnlockedVault {
-    /// List entries sorted by created_at descending (newest first)
+    /// フィルタに一致するエントリを、秘匿値も含めて復号して返す（エクスポート・重複検出用）。
+    /// 一致したエントリの数だけ secret を復号するため、一覧表示には
+    /// `list_entry_summaries` を使うこと。破損エントリが含まれる場合はエラーを返す。
     pub fn list_entries(&self, filter: &EntryFilter) -> Result<Vec<Entry>> {
         let mut result = Vec::new();
-        for (id, vault_entry) in &self.contents.entries {
+        for (id, vault_entry) in &self.index.entries {
             if filter.matches(vault_entry) {
-                result.push(vault_entry_to_entry(id.clone(), vault_entry)?);
+                result.push(self.decrypt_entry(id, vault_entry)?);
             }
         }
-        result.sort_by(|a, b| {
-            let cmp = match filter.sort_field {
-                SortField::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-                SortField::CreatedAt => a.created_at.cmp(&b.created_at),
-                SortField::UpdatedAt => a.updated_at.cmp(&b.updated_at),
-            };
-            match filter.sort_order {
-                SortOrder::Asc => cmp,
-                SortOrder::Desc => cmp.reverse(),
-            }
+        sort_by_filter(&mut result, filter, |e| {
+            (&e.name, e.created_at, e.updated_at)
         });
         Ok(result)
     }
 
-    /// エントリのサマリ一覧をcreated_at降順で返す（一覧表示・オートフィル候補抽出用）。
-    /// `list_entries`と異なり、password/cvv/pin/notes/custom_fields等の秘匿値は
-    /// 一切パース・cloneしない。typed_valueからはsubtitle/URL抽出に必要な
-    /// 非秘匿フィールドのみを読む。
+    /// エントリのサマリ一覧をフィルタのソート順で返す（一覧表示・オートフィル候補抽出用）。
+    /// index だけから作るため、secret ブロックは一切復号しない。
     pub fn list_entry_summaries(&self, filter: &EntryFilter) -> Vec<EntrySummary> {
-        let mut result = Vec::new();
-        for (id, vault_entry) in &self.contents.entries {
-            if filter.matches(vault_entry) {
-                result.push(vault_entry_to_summary(id.clone(), vault_entry));
-            }
-        }
-        result.sort_by(|a, b| {
-            let cmp = match filter.sort_field {
-                SortField::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-                SortField::CreatedAt => a.created_at.cmp(&b.created_at),
-                SortField::UpdatedAt => a.updated_at.cmp(&b.updated_at),
-            };
-            match filter.sort_order {
-                SortOrder::Asc => cmp,
-                SortOrder::Desc => cmp.reverse(),
-            }
+        let mut result: Vec<EntrySummary> = self
+            .index
+            .entries
+            .iter()
+            .filter(|(_, e)| filter.matches(e))
+            .map(|(id, e)| vault_entry_to_summary(id.clone(), e))
+            .collect();
+        sort_by_filter(&mut result, filter, |e| {
+            (&e.name, e.created_at, e.updated_at)
         });
         result
     }
 
-    /// Get single entry (decrypted)
+    /// Get single entry (decrypted). 対象エントリの secret だけを復号する
     pub fn get_entry(&self, id: &str) -> Result<Option<Entry>> {
-        match self.contents.entries.get(id) {
-            Some(e) => Ok(Some(vault_entry_to_entry(id.to_string(), e)?)),
+        match self.index.entries.get(id) {
+            Some(e) => Ok(Some(self.decrypt_entry(id, e)?)),
             None => Ok(None),
         }
     }
 
     /// 指定エントリのTOTPカスタムフィールドからTOTPコードを生成する。
-    /// `vault_entry_to_entry`（password等を含む全フィールド変換）を経由せず、
-    /// custom_fieldsのtotpフィールドのみを直接参照するため、他の秘匿フィールドは
-    /// 一切パース・cloneされない。
+    /// 対象エントリの secret だけを復号する。
     /// エントリが存在しない、またはtotpカスタムフィールドを持たない場合は`Ok(None)`。
     pub fn get_totp_code(&self, id: &str) -> Result<Option<String>> {
-        let Some(vault_entry) = self.contents.entries.get(id) else {
+        let Some(vault_entry) = self.index.entries.get(id) else {
             return Ok(None);
         };
-        match find_totp_value(vault_entry) {
-            Some(value) => crate::totp::generate_totp_from_value(value).map(Some),
+        let Some(field) = vault_entry
+            .custom_fields
+            .iter()
+            .find(|f| f.field_type == "totp")
+        else {
+            return Ok(None);
+        };
+        let value = if field.secret {
+            let secret = self.read_secret(id)?;
+            secret
+                .custom_fields
+                .get(&field.id)
+                .map(|v| Zeroizing::new(v.as_str().to_string()))
+        } else {
+            field
+                .value
+                .as_ref()
+                .map(|v| Zeroizing::new(v.as_str().to_string()))
+        };
+        match value {
+            Some(value) => crate::totp::generate_totp_from_value(&value).map(Some),
             None => Ok(None),
         }
     }
 
     /// 複数エントリのTOTP周期をまとめて取得する（オートフィル候補一覧のN+1回避用）。
+    /// 周期は index にある totp フィールドの公開部から読み、secret は復号しない。
     /// 存在しないID・totpカスタムフィールドを持たないエントリは結果から除外する。
     pub fn list_totp_periods(&self, ids: &[String]) -> Vec<(String, u64)> {
         ids.iter()
             .filter_map(|id| {
-                let vault_entry = self.contents.entries.get(id)?;
-                let value = find_totp_value(vault_entry)?;
-                Some((id.clone(), crate::totp::parse_totp_period(value)))
+                let vault_entry = self.index.entries.get(id)?;
+                let field = vault_entry
+                    .custom_fields
+                    .iter()
+                    .find(|f| f.field_type == "totp")?;
+                Some((id.clone(), totp_period_from_index(field)))
             })
             .collect()
     }
 
     /// Create entry
+    /// エントリ数（ゴミ箱を含み、完全削除済みは除く）が `MAX_ENTRIES` に達していれば作らない
     pub fn create_entry(
         &mut self,
         name: String,
@@ -98,58 +112,103 @@ impl UnlockedVault {
         data: EntryData,
         label_ids: Vec<String>,
     ) -> Result<Entry> {
+        let count = self
+            .index
+            .entries
+            .values()
+            .filter(|e| e.purged_at.is_none())
+            .count();
+        if count >= MAX_ENTRIES {
+            return Err(VaultError::EntryLimitReached(MAX_ENTRIES));
+        }
+
         let id = uuid::Uuid::new_v4().to_string();
         let now = crate::get_timestamp();
 
-        let vault_entry = VaultEntry {
-            entry_type: entry_type.clone(),
-            name: name.clone(),
-            created_at: now,
-            updated_at: now,
-            deleted_at: None,
-            purged_at: None,
-            is_favorite: false,
-            label_ids: label_ids.clone(),
-            typed_value: EntrySecretJson::from_string(data.typed_value.to_json_string()),
-            notes: data.notes.clone(),
-            custom_fields: data.custom_fields.clone(),
-        };
+        let mut vault_entry = VaultEntry::new(entry_type, name, now);
+        vault_entry.label_ids = label_ids;
+        self.store_entry(&id, vault_entry, &data)?;
 
-        self.contents
-            .entries
-            .insert(id.clone(), vault_entry.clone());
-
-        Ok(Entry {
-            id,
-            name,
-            entry_type: entry_type.clone(),
-            is_favorite: false,
-            created_at: now,
-            updated_at: now,
-            deleted_at: None,
-            data,
-            labels: label_ids,
-        })
+        self.get_entry(&id)?
+            .ok_or_else(|| VaultError::EntryNotFound(id.clone()))
     }
 
     /// Update entry (only active entries can be updated)
+    /// secret は平文が変わった場合だけ再暗号化する（`docs/vault-format-v2.md` 5-4）
     pub fn update_entry(&mut self, id: &str, name: String, data: EntryData) -> Result<()> {
         let entry = self
-            .contents
+            .index
             .entries
-            .get_mut(id)
+            .get(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
 
         if entry.deleted_at.is_some() || entry.purged_at.is_some() {
             return Err(VaultError::EntryNotFound(id.to_string()));
         }
 
-        entry.name = name;
-        entry.typed_value = EntrySecretJson::from_string(data.typed_value.to_json_string());
-        entry.notes = data.notes.clone();
-        entry.custom_fields = data.custom_fields.clone();
+        let mut entry = entry.clone();
+        entry.name = PublicString::new(name);
         entry.updated_at = crate::get_timestamp();
+        self.store_entry(id, entry, &data)
+    }
 
+    /// `EntryData` を index（非秘匿値）と secret（秘匿値）に振り分け、`entry` を `id` の行として書き込む。
+    /// 既存のエントリでは、未知のエントリタイプ・フィールドタイプの配置と、
+    /// 未知のフィールド（`extra`）を引き継ぐ。
+    ///
+    /// 振り分けと暗号化をすべて済ませてから index と secret を書き換えるため、
+    /// 途中で失敗しても vault の状態は変わらない。
+    pub(crate) fn store_entry(
+        &mut self,
+        id: &str,
+        mut entry: VaultEntry,
+        data: &EntryData,
+    ) -> Result<()> {
+        // 既存の secret が破損していても、新しい内容で上書きできるようにする
+        let previous_secret = if self.index.entries.contains_key(id) {
+            self.read_secret(id).ok()
+        } else {
+            None
+        };
+
+        let typed_value_json = Zeroizing::new(data.typed_value.to_json_string());
+        let (public_fields, secret_fields) = split_typed_value(
+            &entry.entry_type,
+            &typed_value_json,
+            Some(&entry.public_fields),
+        )?;
+        let (custom_fields, secret_custom_fields) = split_custom_fields(
+            data.custom_fields.as_deref().unwrap_or_default(),
+            &entry.custom_fields,
+        );
+        entry.public_fields = public_fields;
+        entry.custom_fields = custom_fields;
+
+        let previous_plaintext = previous_secret.as_ref().map(|s| s.to_bytes()).transpose()?;
+        let secret = EntrySecret {
+            fields: secret_fields,
+            notes: data.notes.clone(),
+            custom_fields: secret_custom_fields,
+            extra: previous_secret.map(|s| s.extra).unwrap_or_default(),
+        };
+
+        // 平文が変わっていなければ、暗号文と `secret_rev` を維持する（5-4）
+        let plaintext = secret.to_bytes()?;
+        let unchanged = entry.secret_rev.is_some()
+            && previous_plaintext.is_some_and(|previous| *previous == *plaintext);
+        let sealed = if unchanged {
+            None
+        } else {
+            let secret_rev = new_secret_rev();
+            let sealed = self.seal_secret(id, &secret_rev, &plaintext)?;
+            entry.secret_rev = Some(secret_rev);
+            Some(sealed)
+        };
+
+        self.index.entries.insert(id.to_string(), entry);
+        if let Some(sealed) = sealed {
+            self.secrets.insert(id.to_string(), sealed);
+        }
         Ok(())
     }
 
@@ -157,7 +216,7 @@ impl UnlockedVault {
     /// Idempotent: calling on an already soft-deleted entry is a no-op.
     pub fn delete_entry(&mut self, id: &str) -> Result<()> {
         let entry = self
-            .contents
+            .index
             .entries
             .get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
@@ -182,7 +241,7 @@ impl UnlockedVault {
     /// Restore entry from trash (only soft-deleted entries can be restored)
     pub fn restore_entry(&mut self, id: &str) -> Result<()> {
         let entry = self
-            .contents
+            .index
             .entries
             .get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
@@ -199,11 +258,11 @@ impl UnlockedVault {
     }
 
     /// Permanently delete entry (converts to tombstone)
-    /// Clears sensitive data and marks as purged for sync-safe deletion.
+    /// index 上の値を空にし、secret ブロックを削除する（`secret_rev = null`）。
     /// Idempotent: calling on an already-purged entry is a no-op.
     pub fn purge_entry(&mut self, id: &str) -> Result<()> {
         let entry = self
-            .contents
+            .index
             .entries
             .get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
@@ -220,22 +279,25 @@ impl UnlockedVault {
             entry.deleted_at = Some(now);
         }
 
-        // Convert to tombstone: clear sensitive data and mark as purged
+        // Convert to tombstone: clear values and mark as purged
         entry.purged_at = Some(now);
         entry.updated_at = now;
-        entry.name = String::new();
-        entry.typed_value = EntrySecretJson::from_string("{}".to_string());
-        entry.notes = None;
-        entry.custom_fields = None;
+        entry.name = PublicString::default();
+        entry.public_fields.clear();
+        entry.custom_fields.clear();
         entry.label_ids.clear();
+        entry.is_favorite = false;
+        entry.extra.clear();
+        entry.secret_rev = None;
+        self.secrets.remove(id);
 
         Ok(())
     }
 
-    /// Set entry favorite (only active entries)
+    /// Set entry favorite (only active entries). secret は再暗号化しない
     pub fn set_favorite(&mut self, id: &str, is_favorite: bool) -> Result<()> {
         let entry = self
-            .contents
+            .index
             .entries
             .get_mut(id)
             .ok_or_else(|| VaultError::EntryNotFound(id.to_string()))?;
@@ -248,6 +310,111 @@ impl UnlockedVault {
         entry.updated_at = crate::get_timestamp();
         Ok(())
     }
+
+    /// index 行と、そのエントリの secret を合成して `Entry` を作る
+    fn decrypt_entry(&self, id: &str, e: &VaultEntry) -> Result<Entry> {
+        let secret = self.read_secret(id)?;
+        let data = combine_entry_data(e, &secret).map_err(|err| {
+            VaultError::InvalidInput(format!("Invalid typed_value for entry {}: {:?}", id, err))
+        })?;
+        Ok(Entry {
+            id: id.to_string(),
+            name: e.name.to_string(),
+            entry_type: e.entry_type.clone(),
+            is_favorite: e.is_favorite,
+            created_at: e.created_at,
+            updated_at: e.updated_at,
+            deleted_at: e.deleted_at,
+            data,
+            labels: e.label_ids.clone(),
+            secret_field_keys: secret.fields.keys().cloned().collect(),
+        })
+    }
+}
+
+fn sort_by_filter<T>(
+    items: &mut [T],
+    filter: &EntryFilter,
+    key: impl Fn(&T) -> (&String, i64, i64),
+) {
+    items.sort_by(|a, b| {
+        let (a_name, a_created, a_updated) = key(a);
+        let (b_name, b_created, b_updated) = key(b);
+        let cmp = match filter.sort_field {
+            SortField::Name => a_name.to_lowercase().cmp(&b_name.to_lowercase()),
+            SortField::CreatedAt => a_created.cmp(&b_created),
+            SortField::UpdatedAt => a_updated.cmp(&b_updated),
+        };
+        match filter.sort_order {
+            SortOrder::Asc => cmp,
+            SortOrder::Desc => cmp.reverse(),
+        }
+    });
+}
+
+/// totp フィールドの公開部（`{"period": 30}`）から周期を読む。
+/// 公開部がない・読めない場合は、非秘匿の値ならそこから、そうでなければ既定値（30 秒）を返す。
+fn totp_period_from_index(field: &crate::store::IndexCustomField) -> u64 {
+    #[derive(serde::Deserialize)]
+    struct TotpPublic {
+        period: u64,
+    }
+    let value = field.value.as_deref().unwrap_or_default();
+    if field.secret {
+        serde_json::from_str::<TotpPublic>(value)
+            .map(|p| p.period)
+            .unwrap_or_else(|_| crate::totp::parse_totp_period(""))
+    } else {
+        crate::totp::parse_totp_period(value)
+    }
+}
+
+/// index 上の非秘匿の値を文字列として取り出す（空文字列は None）
+fn public_text(e: &VaultEntry, key: &str) -> Option<String> {
+    e.public_fields
+        .get(key)
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+}
+
+/// VaultEntry（index 行）から一覧表示用の軽量サマリを作る。secret は復号しない。
+pub(crate) fn vault_entry_to_summary(id: String, e: &VaultEntry) -> EntrySummary {
+    // エントリタイプごとの非秘匿な代表フィールド
+    let subtitle = match e.entry_type.as_str() {
+        "login" | "password" => public_text(e, "username"),
+        "bank" => public_text(e, "bank_name"),
+        "credit_card" => public_text(e, "cardholder"),
+        _ => None,
+    };
+    let login_url = if e.entry_type == "login" {
+        public_text(e, "url")
+    } else {
+        None
+    };
+
+    // 非秘匿のURL型カスタムフィールドをオートフィル候補抽出用に収集
+    let additional_urls: Vec<String> = e
+        .custom_fields
+        .iter()
+        .filter(|f| f.field_type == "url" && !f.secret)
+        .filter_map(|f| f.value.as_deref())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect();
+
+    EntrySummary {
+        id,
+        name: e.name.to_string(),
+        entry_type: e.entry_type.clone(),
+        is_favorite: e.is_favorite,
+        created_at: e.created_at,
+        updated_at: e.updated_at,
+        deleted_at: e.deleted_at,
+        subtitle,
+        login_url,
+        additional_urls,
+    }
 }
 
 #[cfg(test)]
@@ -257,7 +424,6 @@ mod tests {
     use crate::crypto::Dek;
     use crate::models::{Argon2Params, CustomField, SortField, SortOrder, VaultMeta};
     use crate::secret::SecretString;
-    use crate::store::VaultContents;
 
     fn make_vault() -> UnlockedVault {
         let dek = Dek::generate();
@@ -265,12 +431,7 @@ mod tests {
         let password = crate::secret::MasterPassword::from_string("test".to_string());
         let kek = crate::crypto::kdf::derive_kek_from_master_password(&password, &params).unwrap();
         let meta = VaultMeta::new(dek.wrap(&kek).unwrap(), dek.wrap(&kek).unwrap(), params);
-        UnlockedVault {
-            meta,
-            contents: VaultContents::new(),
-            dek,
-            etag: None,
-        }
+        UnlockedVault::new_empty(meta, dek)
     }
 
     fn make_login_data() -> EntryData {
@@ -284,22 +445,9 @@ mod tests {
 
     fn insert_entry(vault: &mut UnlockedVault, id: &str, name: &str, created_at: i64) {
         let data = make_login_data();
-        vault.contents.entries.insert(
-            id.to_string(),
-            VaultEntry {
-                entry_type: "login".to_string(),
-                name: name.to_string(),
-                created_at,
-                updated_at: created_at,
-                deleted_at: None,
-                purged_at: None,
-                is_favorite: false,
-                label_ids: vec![],
-                typed_value: EntrySecretJson::from_string(data.typed_value.to_json_string()),
-                notes: None,
-                custom_fields: None,
-            },
-        );
+        let mut entry = VaultEntry::new("login", name, created_at);
+        entry.updated_at = created_at;
+        vault.store_entry(id, entry, &data).unwrap();
     }
 
     #[test]
@@ -314,7 +462,76 @@ mod tests {
         assert_eq!(entry.entry_type, "login");
         assert!(!entry.is_favorite);
         assert!(entry.deleted_at.is_none());
-        assert!(vault.contents.entries.contains_key(&entry.id));
+        assert!(vault.index.entries.contains_key(&entry.id));
+    }
+
+    #[test]
+    fn test_create_entry_stops_at_limit() {
+        // ゴミ箱のエントリも数え、完全削除済み（tombstone）は数えない
+        let mut vault = make_vault();
+        for i in 0..MAX_ENTRIES {
+            insert_entry(&mut vault, &format!("e{i}"), "Entry", 1000);
+        }
+        vault.delete_entry("e0").unwrap();
+        let result = vault.create_entry("Over".into(), "login".into(), make_login_data(), vec![]);
+        assert!(matches!(
+            result,
+            Err(VaultError::EntryLimitReached(MAX_ENTRIES))
+        ));
+
+        vault.purge_entry("e0").unwrap();
+        assert!(vault
+            .create_entry("Ok".into(), "login".into(), make_login_data(), vec![])
+            .is_ok());
+    }
+
+    /// typed_value として JSON オブジェクト以外を持つ（振り分けに失敗する）データ
+    fn invalid_data() -> EntryData {
+        EntryData {
+            entry_type: "future_type".to_string(),
+            typed_value: crate::models::TypedValue::parse("future_type", "[1]").unwrap(),
+            notes: None,
+            custom_fields: None,
+        }
+    }
+
+    #[test]
+    fn test_create_entry_failure_leaves_no_entry() {
+        let mut vault = make_vault();
+        let result =
+            vault.create_entry("Ghost".into(), "future_type".into(), invalid_data(), vec![]);
+        assert!(result.is_err());
+        assert!(vault.index.entries.is_empty());
+        assert!(vault.secrets.is_empty());
+    }
+
+    #[test]
+    fn test_update_entry_failure_keeps_entry_unchanged() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "Before", 1000);
+        let before_rev = vault.index.entries["e1"].secret_rev.clone();
+
+        assert!(vault
+            .update_entry("e1", "After".into(), invalid_data())
+            .is_err());
+
+        let entry = &vault.index.entries["e1"];
+        assert_eq!(entry.name, "Before");
+        assert_eq!(entry.updated_at, 1000);
+        assert_eq!(entry.secret_rev, before_rev);
+        assert!(vault.get_entry("e1").is_ok());
+    }
+
+    #[test]
+    fn test_active_entry_without_secret_rev_is_corrupted() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "Entry1", 1000);
+        vault.index.entries.get_mut("e1").unwrap().secret_rev = None;
+
+        assert!(matches!(
+            vault.get_entry("e1"),
+            Err(VaultError::CorruptedEntry(_))
+        ));
     }
 
     #[test]
@@ -338,22 +555,9 @@ mod tests {
         updated_at: i64,
     ) {
         let data = make_login_data();
-        vault.contents.entries.insert(
-            id.to_string(),
-            VaultEntry {
-                entry_type: "login".to_string(),
-                name: name.to_string(),
-                created_at,
-                updated_at,
-                deleted_at: None,
-                purged_at: None,
-                is_favorite: false,
-                label_ids: vec![],
-                typed_value: EntrySecretJson::from_string(data.typed_value.to_json_string()),
-                notes: None,
-                custom_fields: None,
-            },
-        );
+        let mut entry = VaultEntry::new("login", name, created_at);
+        entry.updated_at = updated_at;
+        vault.store_entry(id, entry, &data).unwrap();
     }
 
     #[test]
@@ -467,7 +671,7 @@ mod tests {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "Active", 1000);
         insert_entry(&mut vault, "e2", "Deleted", 2000);
-        vault.contents.entries.get_mut("e2").unwrap().deleted_at = Some(2000);
+        vault.index.entries.get_mut("e2").unwrap().deleted_at = Some(2000);
 
         let filter = EntryFilter::new();
         let entries = vault.list_entries(&filter).unwrap();
@@ -531,6 +735,7 @@ mod tests {
                 name: "Recovery URL".to_string(),
                 field_type: "url".to_string(),
                 value: SecretString::from_string("https://recovery.example.com".to_string()),
+                secret: false,
                 autofill_selector: None,
             },
             CustomField {
@@ -538,6 +743,7 @@ mod tests {
                 name: "API Endpoint".to_string(),
                 field_type: "url".to_string(),
                 value: SecretString::from_string("https://api.example.com".to_string()),
+                secret: false,
                 autofill_selector: None,
             },
             CustomField {
@@ -545,6 +751,7 @@ mod tests {
                 name: "Note".to_string(),
                 field_type: "text".to_string(),
                 value: SecretString::from_string("not a url".to_string()),
+                secret: false,
                 autofill_selector: None,
             },
         ]);
@@ -580,6 +787,7 @@ mod tests {
             name: "Security Q".to_string(),
             field_type: "text".to_string(),
             value: SecretString::from_string("answer".to_string()),
+            secret: false,
             autofill_selector: None,
         }]);
         vault
@@ -622,7 +830,7 @@ mod tests {
         insert_entry(&mut vault, "old", "Old", 1000);
         insert_entry(&mut vault, "mid", "Mid", 2000);
         insert_entry(&mut vault, "new", "New", 3000);
-        vault.contents.entries.get_mut("mid").unwrap().deleted_at = Some(2000);
+        vault.index.entries.get_mut("mid").unwrap().deleted_at = Some(2000);
 
         let filter = EntryFilter::new();
         let summaries = vault.list_entry_summaries(&filter);
@@ -669,13 +877,13 @@ mod tests {
         insert_entry(&mut vault, "e1", "Test", 1000);
 
         vault.delete_entry("e1").unwrap();
-        let first_deleted_at = vault.contents.entries["e1"].deleted_at;
-        let first_updated_at = vault.contents.entries["e1"].updated_at;
+        let first_deleted_at = vault.index.entries["e1"].deleted_at;
+        let first_updated_at = vault.index.entries["e1"].updated_at;
 
         // Second delete should be a no-op
         vault.delete_entry("e1").unwrap();
-        assert_eq!(vault.contents.entries["e1"].deleted_at, first_deleted_at);
-        assert_eq!(vault.contents.entries["e1"].updated_at, first_updated_at);
+        assert_eq!(vault.index.entries["e1"].deleted_at, first_deleted_at);
+        assert_eq!(vault.index.entries["e1"].updated_at, first_updated_at);
     }
 
     #[test]
@@ -694,11 +902,11 @@ mod tests {
         insert_entry(&mut vault, "e1", "Test", 1000);
 
         vault.delete_entry("e1").unwrap();
-        let ve = &vault.contents.entries["e1"];
+        let ve = &vault.index.entries["e1"];
         assert!(ve.deleted_at.is_some());
 
         vault.restore_entry("e1").unwrap();
-        let ve = &vault.contents.entries["e1"];
+        let ve = &vault.index.entries["e1"];
         assert!(ve.deleted_at.is_none());
     }
 
@@ -706,17 +914,24 @@ mod tests {
     fn test_purge_entry() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "Secret", 1000);
+        vault.set_favorite("e1", true).unwrap();
+        vault.index.entries.get_mut("e1").unwrap().extra.insert(
+            "icon".to_string(),
+            serde_json::json!("https://example.com/icon.png"),
+        );
 
         vault.purge_entry("e1").unwrap();
 
-        let ve = &vault.contents.entries["e1"];
+        let ve = &vault.index.entries["e1"];
         assert!(ve.deleted_at.is_some());
         assert!(ve.purged_at.is_some());
         assert!(ve.name.is_empty());
-        assert_eq!(ve.typed_value.as_str(), "{}");
-        assert!(ve.notes.is_none());
-        assert!(ve.custom_fields.is_none());
+        assert!(ve.public_fields.is_empty());
+        assert!(ve.secret_rev.is_none());
+        assert!(ve.custom_fields.is_empty());
         assert!(ve.label_ids.is_empty());
+        assert!(!ve.is_favorite);
+        assert!(ve.extra.is_empty());
     }
 
     #[test]
@@ -738,14 +953,14 @@ mod tests {
             .create_entry("TestWithNotes".into(), "login".to_string(), data, vec![])
             .unwrap();
 
-        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entries: Vec<_> = vault.index.entries.keys().cloned().collect();
         let entry_id = entries[0].clone();
 
         vault.purge_entry(&entry_id).unwrap();
 
-        let ve = &vault.contents.entries[&entry_id];
-        assert!(ve.notes.is_none());
-        assert_eq!(ve.typed_value.as_str(), "{}");
+        let ve = &vault.index.entries[&entry_id];
+        assert!(ve.public_fields.is_empty());
+        assert!(ve.secret_rev.is_none());
     }
 
     #[test]
@@ -762,6 +977,7 @@ mod tests {
             name: "Custom".to_string(),
             field_type: "text".to_string(),
             value: SecretString::from_string("value".to_string()),
+            secret: false,
             autofill_selector: None,
         }]);
 
@@ -769,14 +985,15 @@ mod tests {
             .create_entry("TestWithFields".into(), "login".to_string(), data, vec![])
             .unwrap();
 
-        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entries: Vec<_> = vault.index.entries.keys().cloned().collect();
         let entry_id = entries[0].clone();
 
         vault.purge_entry(&entry_id).unwrap();
 
-        let ve = &vault.contents.entries[&entry_id];
-        assert!(ve.custom_fields.is_none());
-        assert_eq!(ve.typed_value.as_str(), "{}");
+        let ve = &vault.index.entries[&entry_id];
+        assert!(ve.custom_fields.is_empty());
+        assert!(ve.public_fields.is_empty());
+        assert!(ve.secret_rev.is_none());
     }
 
     #[test]
@@ -793,6 +1010,7 @@ mod tests {
             name: "TOTP".to_string(),
             field_type: "totp".to_string(),
             value: SecretString::from_string("JBSWY3DPEHPK3PXP".to_string()),
+            secret: false,
             autofill_selector: None,
         }]);
         let created = vault
@@ -834,18 +1052,18 @@ mod tests {
             .create_entry("BankAccount".into(), "bank".to_string(), data, vec![])
             .unwrap();
 
-        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entries: Vec<_> = vault.index.entries.keys().cloned().collect();
         let entry_id = entries[0].clone();
 
         vault.purge_entry(&entry_id).unwrap();
 
-        let ve = &vault.contents.entries[&entry_id];
+        let ve = &vault.index.entries[&entry_id];
         assert!(ve.deleted_at.is_some());
         assert!(ve.purged_at.is_some());
         assert!(ve.name.is_empty());
-        assert_eq!(ve.typed_value.as_str(), "{}");
-        assert!(ve.notes.is_none());
-        assert!(ve.custom_fields.is_none());
+        assert!(ve.public_fields.is_empty());
+        assert!(ve.secret_rev.is_none());
+        assert!(ve.custom_fields.is_empty());
         assert!(ve.label_ids.is_empty());
     }
 
@@ -860,13 +1078,14 @@ mod tests {
             .create_entry("SSHKey".into(), "ssh_key".to_string(), data, vec![])
             .unwrap();
 
-        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entries: Vec<_> = vault.index.entries.keys().cloned().collect();
         let entry_id = entries[0].clone();
 
         vault.purge_entry(&entry_id).unwrap();
 
-        let ve = &vault.contents.entries[&entry_id];
-        assert_eq!(ve.typed_value.as_str(), "{}");
+        let ve = &vault.index.entries[&entry_id];
+        assert!(ve.public_fields.is_empty());
+        assert!(ve.secret_rev.is_none());
     }
 
     #[test]
@@ -877,13 +1096,14 @@ mod tests {
             .create_entry("SecureNote".into(), "secure_note".to_string(), data, vec![])
             .unwrap();
 
-        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entries: Vec<_> = vault.index.entries.keys().cloned().collect();
         let entry_id = entries[0].clone();
 
         vault.purge_entry(&entry_id).unwrap();
 
-        let ve = &vault.contents.entries[&entry_id];
-        assert_eq!(ve.typed_value.as_str(), "{}");
+        let ve = &vault.index.entries[&entry_id];
+        assert!(ve.public_fields.is_empty());
+        assert!(ve.secret_rev.is_none());
     }
 
     #[test]
@@ -901,13 +1121,14 @@ mod tests {
             .create_entry("CreditCard".into(), "credit_card".to_string(), data, vec![])
             .unwrap();
 
-        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entries: Vec<_> = vault.index.entries.keys().cloned().collect();
         let entry_id = entries[0].clone();
 
         vault.purge_entry(&entry_id).unwrap();
 
-        let ve = &vault.contents.entries[&entry_id];
-        assert_eq!(ve.typed_value.as_str(), "{}");
+        let ve = &vault.index.entries[&entry_id];
+        assert!(ve.public_fields.is_empty());
+        assert!(ve.secret_rev.is_none());
     }
 
     #[test]
@@ -922,13 +1143,14 @@ mod tests {
             .create_entry("Password".into(), "password".to_string(), data, vec![])
             .unwrap();
 
-        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entries: Vec<_> = vault.index.entries.keys().cloned().collect();
         let entry_id = entries[0].clone();
 
         vault.purge_entry(&entry_id).unwrap();
 
-        let ve = &vault.contents.entries[&entry_id];
-        assert_eq!(ve.typed_value.as_str(), "{}");
+        let ve = &vault.index.entries[&entry_id];
+        assert!(ve.public_fields.is_empty());
+        assert!(ve.secret_rev.is_none());
     }
 
     #[test]
@@ -947,13 +1169,14 @@ mod tests {
             )
             .unwrap();
 
-        let entries: Vec<_> = vault.contents.entries.keys().cloned().collect();
+        let entries: Vec<_> = vault.index.entries.keys().cloned().collect();
         let entry_id = entries[0].clone();
 
         vault.purge_entry(&entry_id).unwrap();
 
-        let ve = &vault.contents.entries[&entry_id];
-        assert_eq!(ve.typed_value.as_str(), "{}");
+        let ve = &vault.index.entries[&entry_id];
+        assert!(ve.public_fields.is_empty());
+        assert!(ve.secret_rev.is_none());
     }
 
     #[test]
@@ -962,10 +1185,10 @@ mod tests {
         insert_entry(&mut vault, "e1", "Test", 1000);
 
         vault.set_favorite("e1", true).unwrap();
-        assert!(vault.contents.entries["e1"].is_favorite);
+        assert!(vault.index.entries["e1"].is_favorite);
 
         vault.set_favorite("e1", false).unwrap();
-        assert!(!vault.contents.entries["e1"].is_favorite);
+        assert!(!vault.index.entries["e1"].is_favorite);
     }
 
     #[test]
@@ -980,22 +1203,9 @@ mod tests {
         insert_entry(&mut vault, "e1", "Login", 1000);
 
         let note_data = EntryData::new_secure_note("content".into(), None);
-        vault.contents.entries.insert(
-            "e2".to_string(),
-            VaultEntry {
-                entry_type: "secure_note".to_string(),
-                name: "Note".to_string(),
-                created_at: 2000,
-                updated_at: 2000,
-                deleted_at: None,
-                purged_at: None,
-                is_favorite: false,
-                label_ids: vec![],
-                typed_value: EntrySecretJson::from_string(note_data.typed_value.to_json_string()),
-                notes: None,
-                custom_fields: None,
-            },
-        );
+        vault
+            .create_entry("Note".into(), "secure_note".to_string(), note_data, vec![])
+            .unwrap();
 
         let filter = EntryFilter::new().with_type("login");
         let entries = vault.list_entries(&filter).unwrap();
@@ -1008,7 +1218,7 @@ mod tests {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "Normal", 1000);
         insert_entry(&mut vault, "e2", "Fav", 2000);
-        vault.contents.entries.get_mut("e2").unwrap().is_favorite = true;
+        vault.index.entries.get_mut("e2").unwrap().is_favorite = true;
 
         let filter = EntryFilter::new().favorites_only();
         let entries = vault.list_entries(&filter).unwrap();
@@ -1021,7 +1231,7 @@ mod tests {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "NoLabel", 1000);
         insert_entry(&mut vault, "e2", "WithLabel", 2000);
-        vault.contents.entries.get_mut("e2").unwrap().label_ids = vec!["label1".into()];
+        vault.index.entries.get_mut("e2").unwrap().label_ids = vec!["label1".into()];
 
         let filter = EntryFilter::new().with_label("label1".into());
         let entries = vault.list_entries(&filter).unwrap();
@@ -1040,6 +1250,262 @@ mod tests {
         let entries = vault.list_entries(&filter).unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].name, "GitHub Login");
+    }
+
+    // ===== v2: index / secret の分離 =====
+
+    fn secret_rev(vault: &UnlockedVault, id: &str) -> Option<String> {
+        vault.index.entries[id].secret_rev.clone()
+    }
+
+    #[test]
+    fn test_index_only_updates_keep_secret_rev() {
+        let mut vault = make_vault();
+        let entry = vault
+            .create_entry(
+                "Name".into(),
+                "login".to_string(),
+                make_login_data(),
+                vec![],
+            )
+            .unwrap();
+        let rev = secret_rev(&vault, &entry.id);
+        let sealed = vault.secrets[&entry.id].clone();
+        assert!(rev.is_some());
+
+        let label = vault.create_label("L".into()).unwrap();
+        vault.set_favorite(&entry.id, true).unwrap();
+        vault.set_entry_labels(&entry.id, vec![label.id]).unwrap();
+        // 名前と public_fields だけの変更でも secret は再暗号化しない
+        let data = EntryData::new_login(
+            Some("https://changed.example".into()),
+            "changed-user".into(),
+            "pass".into(),
+            None,
+        );
+        vault
+            .update_entry(&entry.id, "Renamed".into(), data)
+            .unwrap();
+
+        assert_eq!(secret_rev(&vault, &entry.id), rev);
+        assert_eq!(vault.secrets[&entry.id], sealed);
+        let summary = &vault.list_entry_summaries(&EntryFilter::new())[0];
+        assert_eq!(summary.name, "Renamed");
+        assert_eq!(summary.subtitle.as_deref(), Some("changed-user"));
+    }
+
+    #[test]
+    fn test_secret_change_regenerates_secret_rev() {
+        let mut vault = make_vault();
+        let entry = vault
+            .create_entry(
+                "Name".into(),
+                "login".to_string(),
+                make_login_data(),
+                vec![],
+            )
+            .unwrap();
+        let rev = secret_rev(&vault, &entry.id);
+
+        let data = EntryData::new_login(
+            Some("https://example.com".into()),
+            "user".into(),
+            "new-password".into(),
+            None,
+        );
+        vault.update_entry(&entry.id, "Name".into(), data).unwrap();
+        assert_ne!(secret_rev(&vault, &entry.id), rev);
+
+        // notes の変更も secret の変更
+        let rev = secret_rev(&vault, &entry.id);
+        let data = EntryData::new_login(
+            Some("https://example.com".into()),
+            "user".into(),
+            "new-password".into(),
+            Some(SecretString::from_string("memo".to_string())),
+        );
+        vault.update_entry(&entry.id, "Name".into(), data).unwrap();
+        assert_ne!(secret_rev(&vault, &entry.id), rev);
+    }
+
+    #[test]
+    fn test_secret_field_keys_and_index_contents() {
+        let mut vault = make_vault();
+        let entry = vault
+            .create_entry(
+                "Card".into(),
+                "credit_card".to_string(),
+                EntryData::new_credit_card(
+                    "Holder".into(),
+                    "4111".into(),
+                    "12/30".into(),
+                    "123".into(),
+                    "0000".into(),
+                    None,
+                ),
+                vec![],
+            )
+            .unwrap();
+        assert_eq!(
+            entry.secret_field_keys,
+            vec!["cvv".to_string(), "number".to_string(), "pin".to_string()]
+        );
+        let ve = &vault.index.entries[&entry.id];
+        assert_eq!(
+            ve.public_fields.keys().collect::<Vec<_>>(),
+            vec!["cardholder", "expiry"]
+        );
+    }
+
+    #[test]
+    fn test_every_entry_has_secret_block_even_without_secrets() {
+        // 秘匿値を持たないエントリでも secret ブロックを作る（3-3）
+        let mut vault = make_vault();
+        let entry = vault
+            .create_entry(
+                "Note".into(),
+                "password".to_string(),
+                EntryData::new_password("user".into(), String::new(), None),
+                vec![],
+            )
+            .unwrap();
+        assert!(vault.secrets.contains_key(&entry.id));
+    }
+
+    #[test]
+    fn test_corrupted_secret_is_reported_per_entry() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "ok", "Ok", 1000);
+        insert_entry(&mut vault, "broken", "Broken", 2000);
+        insert_entry(&mut vault, "missing", "Missing", 3000);
+
+        // 他のエントリの secret を持ち込む（入れ替え攻撃）と、AAD の不一致で復号に失敗する
+        let other = vault.secrets["ok"].clone();
+        vault.secrets.insert("broken".to_string(), other);
+        vault.secrets.remove("missing");
+
+        assert!(vault.get_entry("ok").unwrap().is_some());
+        assert!(matches!(
+            vault.get_entry("broken"),
+            Err(VaultError::CorruptedEntry(id)) if id == "broken"
+        ));
+        assert!(matches!(
+            vault.get_entry("missing"),
+            Err(VaultError::CorruptedEntry(_))
+        ));
+        // 一覧は index だけで処理するので影響を受けない
+        assert_eq!(vault.list_entry_summaries(&EntryFilter::new()).len(), 3);
+
+        // 破損した暗号文は勝手に消さずに書き戻す
+        let file = vault.to_vault_file().unwrap();
+        assert!(file.secrets.contains_key("broken"));
+    }
+
+    #[test]
+    fn test_orphan_secret_is_dropped_on_write() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "E", 1000);
+        vault
+            .secrets
+            .insert("orphan".to_string(), vault.secrets["e1"].clone());
+        let file = vault.to_vault_file().unwrap();
+        assert!(!file.secrets.contains_key("orphan"));
+        assert!(file.secrets.contains_key("e1"));
+    }
+
+    #[test]
+    fn test_purge_removes_secret_block() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "E", 1000);
+        assert!(vault.secrets.contains_key("e1"));
+        vault.purge_entry("e1").unwrap();
+        assert!(!vault.secrets.contains_key("e1"));
+        assert!(vault.to_vault_file().unwrap().secrets.is_empty());
+        // purged エントリの get_entry は空の値で返る（secret を持たないため）
+        let entry = vault.get_entry("e1").unwrap().unwrap();
+        assert!(entry.name.is_empty());
+    }
+
+    #[test]
+    fn test_list_totp_periods_does_not_decrypt_secrets() {
+        let mut vault = make_vault();
+        let mut data = make_login_data();
+        data.custom_fields = Some(vec![CustomField {
+            id: "f1".to_string(),
+            name: "TOTP".to_string(),
+            field_type: "totp".to_string(),
+            value: SecretString::from_string(
+                "otpauth://totp/x?secret=JBSWY3DPEHPK3PXP&period=60".to_string(),
+            ),
+            secret: false,
+            autofill_selector: None,
+        }]);
+        let entry = vault
+            .create_entry("T".into(), "login".to_string(), data, vec![])
+            .unwrap();
+
+        // secret が無くても周期は index から取れる
+        let sealed = vault.secrets.remove(&entry.id).unwrap();
+        assert_eq!(
+            vault.list_totp_periods(std::slice::from_ref(&entry.id)),
+            vec![(entry.id.clone(), 60)]
+        );
+        // コード生成は secret が必要
+        assert!(vault.get_totp_code(&entry.id).is_err());
+        vault.secrets.insert(entry.id.clone(), sealed);
+        assert_eq!(vault.get_totp_code(&entry.id).unwrap().unwrap().len(), 6);
+    }
+
+    #[test]
+    fn test_secret_custom_url_not_used_for_autofill() {
+        let mut vault = make_vault();
+        let mut data = make_login_data();
+        data.custom_fields = Some(vec![CustomField {
+            id: "cf1".to_string(),
+            name: "Hidden URL".to_string(),
+            field_type: "url".to_string(),
+            value: SecretString::from_string("https://hidden.example".to_string()),
+            secret: true,
+            autofill_selector: None,
+        }]);
+        vault
+            .create_entry("Login".into(), "login".to_string(), data, vec![])
+            .unwrap();
+        let summaries = vault.list_entry_summaries(&EntryFilter::new());
+        assert!(summaries[0].additional_urls.is_empty());
+    }
+
+    #[test]
+    fn test_custom_field_secret_flag_roundtrip() {
+        let mut vault = make_vault();
+        let mut data = make_login_data();
+        data.custom_fields = Some(vec![
+            CustomField {
+                id: "a".to_string(),
+                name: "PIN".to_string(),
+                field_type: "text".to_string(),
+                value: SecretString::from_string("1234".to_string()),
+                secret: true,
+                autofill_selector: None,
+            },
+            CustomField {
+                id: "b".to_string(),
+                name: "API".to_string(),
+                field_type: "password".to_string(),
+                value: SecretString::from_string("key".to_string()),
+                // password 型は常に秘匿値として扱われる
+                secret: false,
+                autofill_selector: None,
+            },
+        ]);
+        let entry = vault
+            .create_entry("Login".into(), "login".to_string(), data, vec![])
+            .unwrap();
+        let fields = entry.data.custom_fields.unwrap();
+        assert!(fields[0].secret);
+        assert_eq!(fields[0].value.as_str(), "1234");
+        assert!(fields[1].secret);
+        assert_eq!(fields[1].value.as_str(), "key");
     }
 
     // ===== State transition guard tests =====
@@ -1082,11 +1548,11 @@ mod tests {
         insert_entry(&mut vault, "e1", "Test", 1000);
         vault.purge_entry("e1").unwrap();
 
-        let first_purged_at = vault.contents.entries["e1"].purged_at;
+        let first_purged_at = vault.index.entries["e1"].purged_at;
 
         // Second purge should be a no-op
         vault.purge_entry("e1").unwrap();
-        assert_eq!(vault.contents.entries["e1"].purged_at, first_purged_at);
+        assert_eq!(vault.index.entries["e1"].purged_at, first_purged_at);
     }
 
     #[test]
@@ -1108,85 +1574,4 @@ mod tests {
         let result = vault.set_favorite("e1", true);
         assert!(result.is_err());
     }
-}
-
-/// VaultEntryのcustom_fieldsからfield_type=="totp"の値を取り出す。
-/// custom_fields全体をcloneせず参照のみ返す。
-fn find_totp_value(e: &VaultEntry) -> Option<&str> {
-    e.custom_fields
-        .as_ref()?
-        .iter()
-        .find(|f| f.field_type == "totp")
-        .map(|f| f.value.as_str())
-}
-
-/// VaultEntryから一覧表示用の軽量サマリを作る。
-/// typed_valueは`TypedValuePreviewFields`（非秘匿フィールドのみ）へdeserializeするため、
-/// password/cvv/pin等は`SecretString`としてすら構築されない。
-pub(crate) fn vault_entry_to_summary(id: String, e: &VaultEntry) -> EntrySummary {
-    let preview = serde_json::from_str::<crate::models::entry::TypedValuePreviewFields>(
-        e.typed_value.as_str(),
-    )
-    .ok();
-
-    let subtitle = preview.as_ref().and_then(|p| p.subtitle(&e.entry_type));
-    let login_url = if e.entry_type == "login" {
-        preview.and_then(|p| p.login_url())
-    } else {
-        None
-    };
-
-    // カスタムフィールドのURL（field_type == "url"）をオートフィル候補抽出用に収集
-    let additional_urls: Vec<String> = e
-        .custom_fields
-        .as_ref()
-        .map(|fs| {
-            fs.iter()
-                .filter(|f| f.field_type == "url")
-                .map(|f| f.value.as_str().to_string())
-                .filter(|s| !s.is_empty())
-                .collect()
-        })
-        .unwrap_or_default();
-
-    EntrySummary {
-        id,
-        name: e.name.clone(),
-        entry_type: e.entry_type.clone(),
-        is_favorite: e.is_favorite,
-        created_at: e.created_at,
-        updated_at: e.updated_at,
-        deleted_at: e.deleted_at,
-        subtitle,
-        login_url,
-        additional_urls,
-    }
-}
-
-/// Helper function to convert VaultEntry to Entry
-pub(crate) fn vault_entry_to_entry(id: String, e: &VaultEntry) -> Result<Entry> {
-    // Convert typed_value back to EntryData
-    // EntrySecretJson contains raw JSON string that needs to be parsed
-    let typed_value = TypedValue::parse(&e.entry_type, e.typed_value.as_str()).map_err(|err| {
-        VaultError::InvalidInput(format!("Invalid typed_value for entry {}: {:?}", id, err))
-    })?;
-
-    let data = EntryData {
-        entry_type: e.entry_type.clone(),
-        typed_value,
-        notes: e.notes.clone(),
-        custom_fields: e.custom_fields.clone(),
-    };
-
-    Ok(Entry {
-        id,
-        name: e.name.clone(),
-        entry_type: e.entry_type.clone(),
-        is_favorite: e.is_favorite,
-        created_at: e.created_at,
-        updated_at: e.updated_at,
-        deleted_at: e.deleted_at,
-        data,
-        labels: e.label_ids.clone(),
-    })
 }

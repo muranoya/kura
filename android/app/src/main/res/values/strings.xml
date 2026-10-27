@@ -157,6 +157,7 @@
     <string name="lock_passcode_required">Please enter your passcode</string>
     <string name="lock_unlock_failed">Failed to unlock</string>
     <string name="lock_passcode_unlock_failed">Failed to unlock with passcode</string>
+    <string name="lock_quick_unlock_password_changed">Your master password was changed on another device, so quick unlock has been turned off. Unlock with your master password and set it up again in settings.</string>
 
     <!-- Recovery screen -->
     <string name="recovery_title">Unlock with Recovery Key</string>
@@ -229,6 +230,8 @@
     <string name="section_software_license">License Information</string>
     <string name="section_default">Basic Information</string>
     <string name="section_notes">Notes</string>
+    <string name="section_custom_fields">Fields</string>
+    <string name="section_secret_custom_fields">Secret fields</string>
     <string name="section_labels">Labels</string>
 
     <!-- Fields -->
@@ -281,6 +284,8 @@
 
     <!-- Custom field autofill selector (docs/extension-custom-field-autofill.md) -->
     <string name="cd_autofill_target">Set autofill target</string>
+    <string name="cd_secret_field_on">Make this a secret field (excluded from search, decrypted only when shown)</string>
+    <string name="cd_secret_field_off">Make this a regular field</string>
     <string name="autofill_target_tag">Tag name</string>
     <string name="autofill_target_tag_placeholder">input</string>
     <string name="autofill_target_name">name attribute</string>

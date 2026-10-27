@@ -87,7 +87,9 @@
     "secure_note": "ノート",
     "password": "パスワード情報",
     "software_license": "ライセンス情報",
-    "notes": "メモ"
+    "notes": "メモ",
+    "customFields": "フィールド",
+    "secretCustomFields": "秘匿フィールド"
   },
   "customFieldTypes": {
     "text": "テキスト",
@@ -199,6 +201,7 @@
       "logout": "ログアウト",
       "errorRequired": "パスワードを入力してください",
       "errorUnlock": "ロック解除失敗: {{error}}",
+      "errorConfig": "S3 設定を復号できなかったため、同期を停止しています。同期するには、ログアウトして設定し直してください: {{error}}",
       "errorLogout": "ログアウト失敗: {{error}}",
       "logoutDialog": {
         "title": "ログアウト",
@@ -312,7 +315,9 @@
       "autofillTargetName": "name属性",
       "autofillTargetId": "id属性",
       "autofillTargetType": "type属性",
-      "clearSelector": "クリア"
+      "clearSelector": "クリア",
+      "secretFieldOn": "秘匿フィールドにする（検索対象外になり、表示するときだけ復号されます）",
+      "secretFieldOff": "秘匿フィールドを解除する"
     },
     "typeSelectDialog": {
       "title": "アイテム種別を選択",

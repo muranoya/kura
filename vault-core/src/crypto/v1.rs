@@ -1,14 +1,18 @@
+//! schema_version 1 の vault 全体の暗号化（AES-256-GCM）。
+//!
+//! v1 → v2 の移行（`docs/vault-format-v2.md` 11章）のためだけに残している。
+//! すべての端末の移行が済んだら削除する。
 use crate::error::{Result, VaultError};
-use crate::store::VaultContents;
+use crate::store::v1::VaultContentsV1;
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
 use zeroize::Zeroizing;
 
-/// Encrypt entire VaultContents with DEK
+/// Encrypt entire v1 VaultContents with DEK（v1 のフィクスチャを作るテスト用）
 /// Returns: base64-encoded [12-byte IV | ciphertext | 16-byte GCM tag]
-pub fn encrypt_vault(contents: &VaultContents, dek: &super::Dek) -> Result<String> {
+pub fn encrypt_vault(contents: &VaultContentsV1, dek: &super::Dek) -> Result<String> {
     use base64::Engine;
 
     let json_bytes: Zeroizing<Vec<u8>> = contents.to_bytes()?;
@@ -33,7 +37,7 @@ pub fn encrypt_vault(contents: &VaultContents, dek: &super::Dek) -> Result<Strin
 
 /// Decrypt vault from base64-encoded encrypted data
 /// Input: base64-encoded [12-byte IV | ciphertext | 16-byte GCM tag]
-pub fn decrypt_vault(encrypted_b64: &str, dek: &super::Dek) -> Result<VaultContents> {
+pub fn decrypt_vault(encrypted_b64: &str, dek: &super::Dek) -> Result<VaultContentsV1> {
     use base64::Engine;
 
     let engine = base64::engine::general_purpose::STANDARD;
@@ -60,7 +64,7 @@ pub fn decrypt_vault(encrypted_b64: &str, dek: &super::Dek) -> Result<VaultConte
             .map_err(|_| VaultError::DecryptionError("Decryption failed".to_string()))?,
     );
 
-    VaultContents::from_bytes(&plaintext)
+    VaultContentsV1::from_bytes(&plaintext)
 }
 
 #[cfg(test)]
@@ -70,7 +74,7 @@ mod tests {
     #[test]
     fn test_encrypt_decrypt_vault() {
         let dek = super::super::Dek::generate();
-        let contents = VaultContents::new();
+        let contents = VaultContentsV1::default();
 
         // The test would verify encrypt/decrypt of vault contents
         // For now, just ensure the functions are callable
@@ -85,7 +89,7 @@ mod tests {
     fn test_wrong_key_fails() {
         let dek1 = super::super::Dek::generate();
         let dek2 = super::super::Dek::generate();
-        let contents = VaultContents::new();
+        let contents = VaultContentsV1::default();
 
         let encrypted = encrypt_vault(&contents, &dek1).unwrap();
         assert!(decrypt_vault(&encrypted, &dek2).is_err());

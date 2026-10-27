@@ -63,15 +63,24 @@ Content Script のロック中ドロップダウンからは `AUTOFILL_OPEN_SIDE
 
 S3上に単一ファイルとして保存。単一ファイルにすることでConditional Write（If-Match）によるデータレース対策が有効に機能する。
 
+ファイルの中は、全ラベル・全エントリの非秘匿値をまとめた **index** ブロックと、エントリごとの秘匿値を持つ **secret** ブロックに分かれている（schema_version 2）。詳細な設計（フィールドの振り分け・AAD・移行）は `docs/vault-format-v2.md` を参照。
+
 #### トップレベル（VaultFile）
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "meta": { /* VaultMeta（平文） */ },
-  "encrypted_vault": "..." /* base64 */
+  "index": "...",               /* base64(nonce[24] | ciphertext | tag[16]) */
+  "secrets": {
+    "entry-uuid-1": "..."       /* base64(nonce[24] | ciphertext | tag[16]) */
+  }
 }
 ```
+
+- `secrets` のキーは entry_id。purged（完全削除）エントリは secret を持たない
+- 秘匿値を持たないエントリでも secret ブロックは必ず作る（空オブジェクトを暗号化する）
+- schema_version 1（`encrypted_vault` に全体を AES-256-GCM で暗号化した旧形式）は読み込み時のみ受け付け、アンロック時に v2 へ変換する
 
 #### VaultMeta（平文保存）
 
@@ -86,11 +95,14 @@ S3上に単一ファイルとして保存。単一ファイルにすることで
     "memory": 67108864, /* >= 64 MiB (64 * 1024 * 1024) */
     "parallelism": 1
   },
-  "created_at": 1234567890
+  "created_at": 1234567890,
+  "recovery_argon2_params": { /* ... */ }, /* optional。recovery スロットの Argon2 パラメータ（省略時は argon2_params） */
+  "master_updated_at": 1234567890,         /* master スロットを最後に変更した時刻。同期時の LWW に使う（ない場合は 0） */
+  "recovery_updated_at": 1234567890        /* recovery スロットを最後に変更した時刻（同上） */
 }
 ```
 
-#### VaultContents（暗号化後）
+#### VaultIndex（index ブロックの平文）
 
 ```json
 {
@@ -111,18 +123,36 @@ S3上に単一ファイルとして保存。単一ファイルにすることで
       "purged_at": null,         /* optional, complete-delete tombstone */
       "is_favorite": false,
       "label_ids": ["label-uuid-1"],
-      "typed_value": "{...}",    /* JSON string */
-      "notes": null,
-      "custom_fields": [
+      "public_fields": {         /* typed_value の非秘匿フィールド */
+        "url": "https://mail.google.com",
+        "username": "user@example.com"
+      },
+      "custom_fields": [         /* 全カスタムフィールドのメタデータ（順序を保持） */
         {
           "id": "custom-field-id",
           "name": "Security Question",
           "field_type": "text",  /* String型：未知タイプ対応 */
-          "value": "..."
+          "secret": false,       /* true なら値は secret 側にある */
+          "value": "..."         /* 非秘匿の値（secret == true なら公開部のみ） */
         }
-      ]
+      ],
+      "secret_rev": "uuid-v4"    /* secret ブロックの版。purged なら null */
     }
+  },
+  "meta_digest": {               /* 書き込み時点の meta の各スロットのダイジェスト。同期時に meta を検証する */
+    "master": "...",
+    "recovery": "..."
   }
+}
+```
+
+#### EntrySecret（secret ブロックの平文、エントリごと）
+
+```json
+{
+  "fields": { "password": "..." },          /* typed_value の秘匿フィールド */
+  "notes": "...",                           /* optional */
+  "custom_fields": { "custom-field-id": "..." } /* field_id → 秘匿値 */
 }
 ```
 
@@ -140,6 +170,7 @@ S3上に単一ファイルとして保存。単一ファイルにすることで
 - ラベルの`deleted_at`も同様にオプションフィールド
 - ラベルは削除=即tombstoneとなる（ゴミ箱なし）
 - UUIDをキーとするマップ構造により、IDがユニークなprimary keyであることが明示的になる
+- エントリ数は 2,000 件（active と soft-deleted の合計。purged は数えない）を上限とし、超える場合は新規作成をエラーにする。UI やローカル保存（拡張機能の `chrome.storage.local` の容量制限など）がこれより多い件数を想定していないため。同期で取り込んだエントリは上限を超えても受け入れる
 
 ---
 
@@ -153,10 +184,11 @@ S3上に単一ファイルとして保存。単一ファイルにすることで
 KEK（Key Encryption Key）
     ↓ AES-256-GCM でラップ
 DEK（Data Encryption Key）を暗号化 → VaultMeta.encrypted_dek_master に保存
-    ↓ DEK で暗号化
-VaultContents（labels + entries）を AES-256-GCM で暗号化
-    ↓ base64 エンコード
-VaultFile.encrypted_vault に保存
+    ↓ HKDF-SHA256 でサブ鍵を導出（info = "kura/v2/index" / "kura/v2/secret"）
+index_key / secret_key
+    ↓ XChaCha20-Poly1305 で暗号化（AAD で文脈に束縛）
+VaultFile.index（全ラベル・全エントリの非秘匿値）
+VaultFile.secrets[entry_id]（エントリごとの秘匿値）
 ```
 
 ### 暗号化パラメータ
@@ -166,17 +198,24 @@ VaultFile.encrypted_vault に保存
   - パラメータは平文の`VaultMeta.argon2_params`に保存
   - 攻撃者はパラメータを知っていても、マスターパスワード（ユーザーのみが知る）なしにはKEKを導出できない
 
-- **データ暗号化**: AES-256-GCM
+- **DEK のラップ**: AES-256-GCM
   - Format: `[12-byte IV | ciphertext | 16-byte GCM tag]`
-  - IVは毎回ランダム生成（同じ鍵でも異なる平文ごとに異なるIV）
-  - GCM tag により改ざん検知
+
+- **データ暗号化**: XChaCha20-Poly1305
+  - Format: `base64(nonce[24] | ciphertext | tag[16])`
+  - nonce は毎回 24 バイトのランダム値（192 bit のため衝突は事実上起きない）
+  - AAD: index は `vault_uuid`、secret は `vault_uuid` / `entry_id` / `secret_rev` に束縛する。
+    secret の入れ替え・エントリ単位のロールバック・2 台同時編集時の取り違えを復号失敗として検出する
+  - 実装: `vault-core/src/crypto/aead.rs`
 
 ### メモリ安全性
 
-- `zeroize`クレートで使用済みの秘密鍵（KEK、DEK）をメモリから削除
-- ロック時にDEKをゼロ埋め解放
-- アンロック中の各アイテムの秘匿フィールド（password/notes等）も`SecretString`（`Zeroizing<String>`ラッパー）で保持し、ロック時にドロップ連鎖でゼロ化される
-- Vault全体は単一のAES-256-GCMブロックとして暗号化されており（エントリ単位暗号化ではない）、アンロック時に全アイテムを一括復号してメモリ常駐させる設計。エントリ単位暗号化への移行は、スキーマ変更・sync アルゴリズムへの影響が大きいため不採用と判断した（2026-07-09）
+- `zeroize`クレートで使用済みの秘密鍵（KEK、DEK、サブ鍵）をメモリから削除
+- ロック時にDEKとサブ鍵をゼロ埋め解放
+- アンロック中に平文で常駐するのは index（非秘匿値）だけ。秘匿値（password・notes 等）は secret ブロックの暗号文のまま保持し、`get_entry` / TOTP コード生成 / Passkey 署名など**必要になったときに、対象エントリの分だけ**復号する。復号結果は `SecretString`（`Zeroizing<String>`ラッパー）で保持し、使い終わった時点でドロップ連鎖でゼロ化される
+- index 由来の文字列（エントリ名・username・URL 等）も個人情報なので `PublicString` / `PublicJson`（`SecretString` とは別の型）で保持し、ロック時にゼロ化する
+- 一覧表示・検索・オートフィル候補判定・TOTP 周期の取得・Passkey 候補の列挙は index だけで処理し、同期（マージ）でも secret は復号しない
+- 2026-07-09 時点では「Vault 全体を単一の AES-256-GCM ブロックとして暗号化し、エントリ単位暗号化はスキーマ変更・sync アルゴリズムへの影響が大きいため不採用」と判断していたが、未使用エントリの秘匿値までメモリに常駐するリスクを減らすため見直し、schema_version 2 でエントリ単位暗号化（index / secret の二層構造）に移行した（`docs/vault-format-v2.md`）
 
 ---
 
@@ -208,34 +247,42 @@ DEKを2種類のKEKで暗号化して保存することで、どちらか一方�
 
 ## S3設定の暗号化
 
-S3のアクセスキー・シークレットキー等のS3設定は、マスターパスワードで暗号化してローカルストレージに保存。
+S3のアクセスキー・シークレットキー等のS3設定は、DEK から導出した鍵で暗号化してローカルストレージに保存。
 
 ### 暗号化フロー
 
 ```
 マスターパスワード + VaultMeta.argon2_params
-    ↓ Argon2 で鍵導出（vault のDEK暗号化と同じKEK）
-KEK（再利用）
-    ↓ AES-256-GCM で暗号化
-S3 設定 JSON
-    ↓ base64 エンコード
+    ↓ Argon2 で鍵導出
+KEK_master
+    ↓ encrypted_dek_master をアンラップ
+DEK
+    ↓ HKDF-SHA256（info = "kura/v2/config"）
+config_key
+    ↓ XChaCha20-Poly1305（AAD = enc("kura/v2/config") || enc(vault_uuid)）
+"v2." + base64(nonce | ciphertext | tag)
+    ↓
 ローカルストレージに保存
 ```
+
+- DEK はマスターパスワード変更・Argon2 パラメータ更新で変わらない。別の端末でそれらが変更され、同期で新しい meta を取り込んでも、新しいパスワードでアンロックすれば S3 設定もそのまま復号できる
+- 旧形式（`v2.` の接頭辞なし。KEK_master で直接 AES-256-GCM 暗号化したもの）も復号できる。アンロック時に旧形式なら現行形式で暗号化し直して保存する（`api_config_needs_upgrade`）
 
 ### ライフサイクル
 
 | タイミング | 動作 |
 |-----------|------|
 | 初回セットアップ | S3設定はメモリに一時保持 → マスターパスワード設定後に暗号化して永続保存 |
-| アンロック時 | KEK導出 → S3設定を復号 → メモリに保持 |
+| アンロック時 | DEK をアンラップ → S3設定を復号 → メモリに保持（旧形式なら暗号化し直す） |
 | ロック時 | メモリ上のS3設定をクリア |
-| マスターパスワード変更時 | 新しいKEKでS3設定を再暗号化 |
+| マスターパスワード変更時 | 何もしない（DEK が変わらないため） |
+| DEK ローテーション時 | 新しい DEK でS3設定を暗号化し直す |
 
 ### 制約
 
 - ロック中はS3認証情報にアクセスできないため、**同期はアンロック後のみ可能**
-- リカバリーキーでの復旧時は旧マスターパスワードのKEKが不明なため、**S3設定の再入力が必要**
-- vault-core の`api_encrypt_config` / `api_decrypt_config` API で暗号化・復号（Locked/Unlocked両状態で動作）
+- リカバリーキーでのアンロック時はマスターパスワードが分からないため、その場では**S3設定を復号できない**
+- vault-core の`api_encrypt_config` / `api_decrypt_config` API で暗号化・復号（Locked/Unlocked両状態で動作。どちらもマスターパスワードで DEK をアンラップする）
 
 ---
 
@@ -271,9 +318,9 @@ S3 設定 JSON
 
 ```
 1. リモートの最新をダウンロード
-2. encrypted_vault を復号
-3. `auto_merge(local, remote)` でマージ済みコンテンツを取得
-4. マージ済みコンテンツを暗号化
+2. index だけを復号（secret は復号しない。リモートが schema_version 1 なら一括復号して v2 に変換）
+3. `auto_merge(local, remote)` で index をマージし、各エントリの secret は勝った側の暗号文を採用
+4. マージ済みの index を暗号化（secret は暗号文のまま使い回す）
 5. Conditional Write で再アップロード
 6. 412 が再度返った場合は 1 からリトライ（上限回数あり）
 ```
@@ -308,7 +355,7 @@ S3 設定 JSON
 
 #### 永続化層の原則
 
-- `entry_type` と `custom_field.field_type` は永続化層（`VaultEntry`, `CustomField`）では **`String` として保存**
+- `entry_type` と `custom_field.field_type` は永続化層（`VaultEntry`, `IndexCustomField`）では **`String` として保存**
 - 厳密なenumはデシリアライズに使用しない
 - `EntryType` / `CustomFieldType` enumはバリデーション専用（エントリの作成・編集時のみ使用）
 - 古いクライアントでも未知のタイプを含むvaultを正常にデシリアライズできる
@@ -332,6 +379,8 @@ S3 設定 JSON
 - 未知タイプのエントリも既知タイプと同一のLWWロジックで処理
 - 古いクライアントが`typed_value`を変更できないため、マージでデータ破壊のリスクなし
 - 未知タイプのエントリは同期時に必ず保持（削除や無視なし）
+- 未知タイプでも、どの値が秘匿値かは書き込んだクライアントがデータ（`public_fields` / `secret` 属性）に記録しているため、表示・検索・マージは配置に従うだけでよい。secret ブロックはマージ時に暗号文のまま引き継ぐ
+- 新しいクライアントが追加した未知のフィールドは、`VaultFile` / index の各エントリ・カスタムフィールド / `EntrySecret` で保持してそのまま書き戻す
 
 #### schema_version との関係
 

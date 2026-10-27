@@ -365,6 +365,12 @@ pub fn api_decrypt_config(
     with_manager(&vault_id, |m| m.api_decrypt_config(password, encrypted_b64)).map_err(to_js_err)
 }
 
+/// 暗号化された設定が旧形式で、暗号化し直す必要があるか（VaultManager不要）
+#[wasm_bindgen]
+pub fn api_config_needs_upgrade(encrypted_b64: String) -> bool {
+    vault_core::api::api_config_needs_upgrade(encrypted_b64)
+}
+
 /// S3設定を転送用に暗号化（VaultManager不要）
 #[wasm_bindgen]
 pub fn api_encrypt_transfer_config(

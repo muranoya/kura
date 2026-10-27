@@ -29,7 +29,7 @@ pub use models::{
 };
 pub use password_gen::{generate_password, PasswordOptions};
 pub use storage::StorageBackend;
-pub use store::{LabelValue, VaultContents, VaultEntry, VaultFile};
+pub use store::{EntrySecret, LabelValue, StoredVault, VaultEntry, VaultFile, VaultIndex};
 pub use sync::SyncResult;
 pub use totp::{generate_totp, generate_totp_default};
 pub use vault::{LockedVault, UnlockedVault};

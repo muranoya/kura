@@ -91,7 +91,16 @@ fun LockScreen(
                                 isLoading = true
                                 try {
                                     val masterPassword = biometricHelper.decryptPassword(authenticatedCipher)
-                                    appViewModel.repository.unlock(masterPassword)
+                                    try {
+                                        appViewModel.repository.unlock(masterPassword)
+                                    } catch (e: Exception) {
+                                        // 保存済みのパスワードで開けない: 別の端末でのマスターパスワード変更を
+                                        // 同期で取り込んだ。古いパスワードを使い続けないよう無効にする
+                                        biometricHelper.clearAll()
+                                        appViewModel.preferences.setBiometricEnabled(false)
+                                        error = context.getString(R.string.lock_quick_unlock_password_changed)
+                                        return@launch
+                                    }
                                     onUnlocked()
                                 } catch (e: Exception) {
                                     error = context.getString(R.string.lock_unlock_failed)
@@ -188,7 +197,18 @@ fun LockScreen(
                         } else {
                             password
                         }
-                        appViewModel.repository.unlock(masterPassword)
+                        try {
+                            appViewModel.repository.unlock(masterPassword)
+                        } catch (e: Exception) {
+                            if (!usePasscode) throw e
+                            // パスコードは正しいが、保存済みのパスワードで開けない: 別の端末での
+                            // マスターパスワード変更を同期で取り込んだ。古いパスワードを使い続けないよう無効にする
+                            appViewModel.passcodeHelper.clearAll()
+                            appViewModel.preferences.setPasscodeEnabled(false)
+                            password = ""
+                            error = context.getString(R.string.lock_quick_unlock_password_changed)
+                            return@launch
+                        }
                         onUnlocked()
                     } catch (e: Exception) {
                         error = context.getString(if (usePasscode) R.string.lock_passcode_unlock_failed else R.string.lock_unlock_failed)

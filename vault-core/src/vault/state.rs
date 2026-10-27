@@ -1,14 +1,16 @@
+use std::collections::HashMap;
+
 use crate::error::Result;
 use crate::storage::StorageBackend;
-use crate::store::VaultFile;
+use crate::store::{StoredVault, VaultFile};
+use crate::sync::MergeSide;
 
-use super::{LockedVault, UnlockedVault, CURRENT_SCHEMA_VERSION};
+use super::{LockedVault, UnlockedVault};
 
 impl UnlockedVault {
     /// Push changes to storage
     pub async fn push(&self, storage: &dyn StorageBackend) -> Result<String> {
-        let vault_file = self.to_vault_file()?;
-        let file_bytes = vault_file.to_bytes()?;
+        let file_bytes = self.to_vault_bytes()?;
         storage.upload(&file_bytes, self.etag.as_deref()).await
     }
 
@@ -25,30 +27,82 @@ impl UnlockedVault {
             }
         };
 
-        // Open remote vault file
-        let remote_vault_file = VaultFile::from_bytes(&remote_bytes)?;
-        let remote_contents = crate::crypto::encryption::decrypt_vault(
-            &remote_vault_file.encrypted_vault,
-            &self.dek,
-        )?;
-
-        // Auto-merge local and remote using LWW + Tombstone strategy
-        let merge_result = crate::sync::auto_merge(&self.contents, &remote_contents)?;
-
-        // Apply merged state to current vault
-        self.contents.entries = merge_result.merged_entries;
-        self.contents.labels = merge_result.merged_labels;
-        self.etag = Some(remote_etag.clone());
-
-        // Apply garbage collection to remove old tombstones
-        let now = crate::get_timestamp();
-        crate::sync::apply_gc_to_contents(&mut self.contents, now);
+        let remote = StoredVault::from_bytes(&remote_bytes)?;
+        self.merge_remote(&remote)?;
+        self.etag = Some(remote_etag);
 
         // Push merged state back to remote
         let new_etag = self.push(storage).await?;
         self.etag = Some(new_etag.clone());
 
         Ok(crate::sync::SyncResult::success(Some(new_etag)))
+    }
+
+    /// リモートの vault をローカルにマージし、GC を適用する（`docs/vault-format-v2.md` 7章）。
+    ///
+    /// 1. リモートの index だけを復号する（secret は復号しない）
+    /// 2. index 同士をエントリ単位・ラベル単位に既存アルゴリズムでマージする
+    /// 3. 各エントリについて、勝った側の secret ブロックを暗号文のまま採用する
+    ///    （勝った側で欠けていれば、負けた側の同じ `secret_rev` のブロックを使う）。
+    ///    採用した index 行の `secret_rev` と secret の AAD の一致は復号時に必ず検証されるため、
+    ///    取り違えが起きても復号失敗（破損エントリ）として検出できる
+    /// 4. GC で削除されたエントリの secret も削除する
+    /// 5. meta は master / recovery のスロットごとに `*_updated_at` による LWW でマージする。
+    ///    平文の meta は改ざんできるため、リモートの index（DEK を持つ端末だけが書ける）にある
+    ///    ダイジェストと一致するスロットだけを採用する。v1 のリモートはダイジェストを持たないので、
+    ///    ローカルの meta を残す
+    pub(crate) fn merge_remote(&mut self, remote: &StoredVault) -> Result<()> {
+        let (remote_index, mut remote_secrets) = self.open_remote(remote)?;
+
+        if let (StoredVault::V2(remote_file), Some(remote_digest)) =
+            (remote, &remote_index.meta_digest)
+        {
+            self.meta
+                .merge_slots(&remote_file.meta, remote_digest, &mut self.untrusted_meta);
+        }
+
+        let merge_result = crate::sync::auto_merge(&self.index, &remote_index)?;
+
+        let mut merged_secrets = HashMap::with_capacity(merge_result.entry_sources.len());
+        for (id, side) in &merge_result.entry_sources {
+            let local = (self.secrets.remove(id), self.index.entries.get(id));
+            let remote = (remote_secrets.remove(id), remote_index.entries.get(id));
+            let ((winner, _), (loser, loser_row)) = match side {
+                MergeSide::Local => (local, remote),
+                MergeSide::Remote => (remote, local),
+            };
+            // 勝った側でブロックが欠けていても、負けた側が同じ secret_rev のブロックを持っていれば
+            // それを使う（同じ版の暗号文なので、取り違えても AAD の検証で検出される）
+            let winner_rev = merge_result
+                .merged_entries
+                .get(id)
+                .and_then(|e| e.secret_rev.as_deref());
+            let loser_rev = loser_row.and_then(|e| e.secret_rev.as_deref());
+            let sealed = winner
+                .or_else(|| loser.filter(|_| winner_rev.is_some() && winner_rev == loser_rev));
+            if let Some(sealed) = sealed {
+                merged_secrets.insert(id.clone(), sealed);
+            }
+        }
+
+        self.index.entries = merge_result.merged_entries;
+        self.index.labels = merge_result.merged_labels;
+        // 未知のトップレベルフィールドは、このクライアントが書き換えることはないので、
+        // ローカルの値は過去に読んだリモートの古い複製にすぎない。リモートの値で丸ごと置き換える
+        // （新しいクライアントによる変更・削除を巻き戻さないため）。
+        // v1 のリモートは未知フィールドを持たないので、ローカルの値を残す
+        if let StoredVault::V2(remote_file) = remote {
+            self.index.extra = remote_index.extra;
+            self.file_extra = remote_file.extra.clone();
+        }
+        self.secrets = merged_secrets;
+
+        // Apply garbage collection to remove old tombstones
+        let now = crate::get_timestamp();
+        crate::sync::apply_gc_to_index(&mut self.index, now);
+        self.prune_secrets();
+
+        Ok(())
     }
 
     /// Get current ETag
@@ -61,32 +115,285 @@ impl UnlockedVault {
         self.etag = Some(etag);
     }
 
-    /// Lock vault (DEK is zeroized)
+    /// Lock vault (DEK, sub keys and index are zeroized on drop)
     pub fn lock(self) -> Result<LockedVault> {
-        let vault_file = VaultFile {
-            schema_version: CURRENT_SCHEMA_VERSION,
-            meta: self.meta,
-            encrypted_vault: crate::crypto::encryption::encrypt_vault(&self.contents, &self.dek)?,
-        };
-
+        let vault_file = self.to_vault_file()?;
         Ok(LockedVault {
-            vault_file,
-            etag: self.etag,
+            vault_file: StoredVault::V2(vault_file),
+            etag: self.etag.clone(),
         })
     }
 
     /// Get vault as JSON bytes (for storage)
     pub fn to_vault_bytes(&self) -> Result<Vec<u8>> {
-        let vault_file = self.to_vault_file()?;
+        let vault_file: VaultFile = self.to_vault_file()?;
         vault_file.to_bytes()
     }
+}
 
-    pub(crate) fn to_vault_file(&self) -> Result<VaultFile> {
-        let encrypted_vault = crate::crypto::encryption::encrypt_vault(&self.contents, &self.dek)?;
-        Ok(VaultFile {
-            schema_version: CURRENT_SCHEMA_VERSION,
-            meta: self.meta.clone(),
-            encrypted_vault,
-        })
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::crypto::Dek;
+    use crate::models::{Argon2Params, EntryData, TypedValue, VaultMeta};
+    use crate::store::VaultFile;
+
+    const DEK_BYTES: [u8; 32] = [42u8; 32];
+
+    fn meta() -> VaultMeta {
+        VaultMeta {
+            vault_uuid: "11111111-1111-4111-8111-111111111111".to_string(),
+            encrypted_dek_master: String::new(),
+            encrypted_dek_recovery: String::new(),
+            argon2_params: Argon2Params::default(),
+            created_at: 0,
+            recovery_argon2_params: None,
+            master_updated_at: 0,
+            recovery_updated_at: 0,
+        }
+    }
+
+    /// 同じ vault を開いている別の端末を作る
+    fn device(file: &VaultFile) -> UnlockedVault {
+        UnlockedVault::from_vault_file(file.clone(), Dek::from_bytes(DEK_BYTES), None).unwrap()
+    }
+
+    fn login(password: &str) -> EntryData {
+        EntryData::new_login(
+            Some("https://example.com".into()),
+            "user".into(),
+            password.into(),
+            None,
+        )
+    }
+
+    fn password_of(vault: &UnlockedVault, id: &str) -> String {
+        match vault.get_entry(id).unwrap().unwrap().data.typed_value {
+            TypedValue::Login(d) => d.password.as_str().to_string(),
+            _ => panic!("Expected Login"),
+        }
+    }
+
+    fn remote_of(vault: &UnlockedVault) -> StoredVault {
+        StoredVault::V2(vault.to_vault_file().unwrap())
+    }
+
+    #[test]
+    fn test_merge_replaces_unknown_fields_with_remote() {
+        // 未知フィールドはこのクライアントが書き換えないので、新しいクライアントによる
+        // リモートでの変更・削除をそのまま受け入れる
+        let mut base = UnlockedVault::new_empty(meta(), Dek::from_bytes(DEK_BYTES));
+        base.index
+            .extra
+            .insert("settings".into(), serde_json::json!("old"));
+        base.index
+            .extra
+            .insert("removed".into(), serde_json::json!(1));
+        base.file_extra
+            .insert("file_level".into(), serde_json::json!("old"));
+        let mut local = device(&base.to_vault_file().unwrap());
+
+        let mut remote = device(&base.to_vault_file().unwrap());
+        remote
+            .index
+            .extra
+            .insert("settings".into(), serde_json::json!("new"));
+        remote.index.extra.remove("removed");
+        remote
+            .file_extra
+            .insert("file_level".into(), serde_json::json!("new"));
+
+        local.merge_remote(&remote_of(&remote)).unwrap();
+
+        assert_eq!(local.index.extra["settings"], "new");
+        assert!(!local.index.extra.contains_key("removed"));
+        assert_eq!(local.file_extra["file_level"], "new");
+    }
+
+    #[test]
+    fn test_merge_uses_losing_side_block_with_same_secret_rev() {
+        let base = UnlockedVault::new_empty(meta(), Dek::from_bytes(DEK_BYTES));
+        let mut local = device(&base.to_vault_file().unwrap());
+        let entry = local
+            .create_entry("E".into(), "login".into(), login("pw"), vec![])
+            .unwrap();
+        local.index.entries.get_mut(&entry.id).unwrap().updated_at = 1;
+
+        // リモートでは index だけを変更（secret_rev は同じ）し、secret ブロックが欠けている
+        let mut remote = device(&local.to_vault_file().unwrap());
+        remote.set_favorite(&entry.id, true).unwrap();
+        remote.secrets.remove(&entry.id);
+
+        local.merge_remote(&remote_of(&remote)).unwrap();
+
+        assert!(local.index.entries[&entry.id].is_favorite);
+        assert_eq!(password_of(&local, &entry.id), "pw");
+    }
+
+    #[test]
+    fn test_merge_does_not_use_losing_side_block_with_other_secret_rev() {
+        let base = UnlockedVault::new_empty(meta(), Dek::from_bytes(DEK_BYTES));
+        let mut local = device(&base.to_vault_file().unwrap());
+        let entry = local
+            .create_entry("E".into(), "login".into(), login("old"), vec![])
+            .unwrap();
+        local.index.entries.get_mut(&entry.id).unwrap().updated_at = 1;
+
+        // リモートでは secret も変更した（secret_rev が違う）うえで、ブロックが欠けている
+        let mut remote = device(&local.to_vault_file().unwrap());
+        remote
+            .update_entry(&entry.id, "E".into(), login("new"))
+            .unwrap();
+        remote.secrets.remove(&entry.id);
+
+        local.merge_remote(&remote_of(&remote)).unwrap();
+
+        assert!(matches!(
+            local.get_entry(&entry.id),
+            Err(crate::error::VaultError::CorruptedEntry(_))
+        ));
+    }
+
+    #[test]
+    fn test_merge_adopts_secret_of_winning_side() {
+        let base = UnlockedVault::new_empty(meta(), Dek::from_bytes(DEK_BYTES));
+        let mut a = device(&base.to_vault_file().unwrap());
+        let shared = a
+            .create_entry("Shared".into(), "login".into(), login("v1"), vec![])
+            .unwrap();
+        let mut b = device(&a.to_vault_file().unwrap());
+
+        // 端末 B で後から編集し、端末 A で別のエントリを追加する
+        a.index.entries.get_mut(&shared.id).unwrap().updated_at = 1;
+        let a_only = a
+            .create_entry("A only".into(), "login".into(), login("a"), vec![])
+            .unwrap();
+        b.update_entry(&shared.id, "Shared".into(), login("v2"))
+            .unwrap();
+        let b_only = b
+            .create_entry("B only".into(), "login".into(), login("b"), vec![])
+            .unwrap();
+
+        a.merge_remote(&remote_of(&b)).unwrap();
+
+        assert_eq!(password_of(&a, &shared.id), "v2");
+        assert_eq!(password_of(&a, &a_only.id), "a");
+        assert_eq!(password_of(&a, &b_only.id), "b");
+        assert_eq!(a.secrets[&shared.id], b.secrets[&shared.id]);
+    }
+
+    #[test]
+    fn test_merge_does_not_need_remote_secrets_to_be_decryptable() {
+        // マージは index だけで行い、secret は復号しない。リモートで壊れている secret も
+        // そのまま引き継ぎ、そのエントリだけが破損として扱われる
+        let base = UnlockedVault::new_empty(meta(), Dek::from_bytes(DEK_BYTES));
+        let a = device(&base.to_vault_file().unwrap());
+        let mut b = device(&a.to_vault_file().unwrap());
+        let entry = b
+            .create_entry("E".into(), "login".into(), login("x"), vec![])
+            .unwrap();
+        let mut remote_file = b.to_vault_file().unwrap();
+        remote_file
+            .secrets
+            .insert(entry.id.clone(), "garbage".to_string());
+
+        let mut a = a;
+        a.merge_remote(&StoredVault::V2(remote_file)).unwrap();
+        assert!(matches!(
+            a.get_entry(&entry.id),
+            Err(crate::VaultError::CorruptedEntry(_))
+        ));
+        assert_eq!(a.secrets[&entry.id], "garbage");
+    }
+
+    #[test]
+    fn test_merge_remote_v1_is_migrated() {
+        use crate::secret::EntrySecretJson;
+        use crate::store::v1::{VaultContentsV1, VaultEntryV1, VaultFileV1};
+
+        let mut contents = VaultContentsV1::default();
+        contents.entries.insert(
+            "old".to_string(),
+            VaultEntryV1 {
+                entry_type: "login".to_string(),
+                name: "Old".to_string(),
+                created_at: 1,
+                updated_at: 1,
+                deleted_at: None,
+                purged_at: None,
+                is_favorite: false,
+                label_ids: vec![],
+                typed_value: EntrySecretJson::from_string(
+                    r#"{"url":null,"username":"u","password":"from-v1"}"#.to_string(),
+                ),
+                notes: None,
+                custom_fields: None,
+            },
+        );
+        let remote = StoredVault::V1(VaultFileV1 {
+            schema_version: 1,
+            meta: meta(),
+            encrypted_vault: crate::crypto::v1::encrypt_vault(
+                &contents,
+                &Dek::from_bytes(DEK_BYTES),
+            )
+            .unwrap(),
+        });
+
+        let mut local = UnlockedVault::new_empty(meta(), Dek::from_bytes(DEK_BYTES));
+        let local_entry = local
+            .create_entry("New".into(), "login".into(), login("local"), vec![])
+            .unwrap();
+        local.merge_remote(&remote).unwrap();
+
+        assert_eq!(password_of(&local, "old"), "from-v1");
+        assert_eq!(password_of(&local, &local_entry.id), "local");
+        assert_eq!(local.to_vault_file().unwrap().schema_version, 2);
+    }
+
+    #[test]
+    fn test_merge_rejects_different_vault() {
+        let mut local = UnlockedVault::new_empty(meta(), Dek::from_bytes(DEK_BYTES));
+        let mut other_meta = meta();
+        other_meta.vault_uuid = "22222222-2222-4222-8222-222222222222".to_string();
+        let other = UnlockedVault::new_empty(other_meta, Dek::from_bytes(DEK_BYTES));
+        assert!(matches!(
+            local.merge_remote(&remote_of(&other)),
+            Err(crate::VaultError::VaultUuidMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn test_merge_purge_on_remote_removes_local_secret() {
+        let base = UnlockedVault::new_empty(meta(), Dek::from_bytes(DEK_BYTES));
+        let mut a = device(&base.to_vault_file().unwrap());
+        let entry = a
+            .create_entry("E".into(), "login".into(), login("x"), vec![])
+            .unwrap();
+        let mut b = device(&a.to_vault_file().unwrap());
+        a.index.entries.get_mut(&entry.id).unwrap().updated_at = 1;
+        b.purge_entry(&entry.id).unwrap();
+
+        a.merge_remote(&remote_of(&b)).unwrap();
+        assert!(a.index.entries[&entry.id].purged_at.is_some());
+        assert!(!a.secrets.contains_key(&entry.id));
+    }
+
+    #[test]
+    fn test_gc_after_merge_removes_old_tombstones() {
+        let base = UnlockedVault::new_empty(meta(), Dek::from_bytes(DEK_BYTES));
+        let mut a = device(&base.to_vault_file().unwrap());
+        let entry = a
+            .create_entry("E".into(), "login".into(), login("x"), vec![])
+            .unwrap();
+        a.purge_entry(&entry.id).unwrap();
+        let tombstone = a.index.entries.get_mut(&entry.id).unwrap();
+        tombstone.purged_at = Some(0);
+        tombstone.deleted_at = Some(0);
+        tombstone.updated_at = 0;
+
+        let b = device(&base.to_vault_file().unwrap());
+        a.merge_remote(&remote_of(&b)).unwrap();
+        assert!(!a.index.entries.contains_key(&entry.id));
     }
 }

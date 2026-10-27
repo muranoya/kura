@@ -26,7 +26,26 @@ export interface CustomField {
   name: string
   fieldType: CustomFieldType
   value: string
+  // 秘匿フィールド（vault 内で secret ブロックに保存され、検索・オートフィル候補判定の
+  // 対象外になる）かどうか。password / totp / passkey は常に true。
+  // text / email / url / phone はユーザーが選べる。詳細: docs/vault-format-v2.md 4-2節
+  secret?: boolean
   autofillSelector?: CustomFieldSelector
+}
+
+// ユーザーが「秘匿」を切り替えられるカスタムフィールドの型
+export const SECRET_TOGGLEABLE_FIELD_TYPES: readonly CustomFieldType[] = [
+  'text',
+  'email',
+  'url',
+  'phone',
+]
+
+// カスタムフィールドが秘匿フィールドかどうか。vault-core が返す secret（保存先）に従う。
+// password / totp / passkey は保存時に常に true へ正規化されている。
+// secret を持たない場合だけ、型から判断する
+export function isSecretCustomField(field: Pick<CustomField, 'fieldType' | 'secret'>): boolean {
+  return field.secret ?? !SECRET_TOGGLEABLE_FIELD_TYPES.includes(field.fieldType)
 }
 
 // Sort types
@@ -57,6 +76,8 @@ export interface Entry extends EntryRow {
   typedValue: Record<string, unknown>
   labels: string[]
   customFields: CustomField[]
+  // typedValue のうち秘匿値のキー（マスク表示の対象）
+  secretFieldKeys: string[]
 }
 
 // Label

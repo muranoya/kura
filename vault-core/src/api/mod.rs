@@ -11,6 +11,7 @@ mod webauthn;
 #[cfg(any(feature = "desktop", feature = "android"))]
 mod import;
 
+pub use security::api_config_needs_upgrade;
 pub use sync::parse_s3_config;
 pub use transfer::*;
 pub use utils::*;
@@ -50,8 +51,12 @@ pub struct EntryDetail {
     pub typed_value: String,
     pub labels: Vec<String>,
     /// FFI境界越しに構造体の配列を渡せないため、JSON文字列として返す。
+    /// 各要素は `secret: bool`（秘匿フィールドかどうか）を持つ。
     #[serde(default)]
     pub custom_fields: Option<String>,
+    /// typed_value のうち秘匿値のキー。UI はこれに含まれるフィールドをマスク表示する
+    #[serde(default)]
+    pub secret_field_keys: Vec<String>,
 }
 
 /// オートフィル候補データ（パスワードを含まない）

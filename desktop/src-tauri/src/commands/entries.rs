@@ -69,6 +69,7 @@ pub async fn get_entry(vault_id: String, id: String) -> Result<serde_json::Value
             "typedValue": typed_value_obj,
             "labels": entry.labels,
             "customFields": custom_fields_obj,
+            "secretFieldKeys": entry.secret_field_keys,
         }))
     })
     .await

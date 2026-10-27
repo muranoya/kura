@@ -6,7 +6,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { copySensitive } from '../../lib/clipboard'
 import { getEntryTypeLabel } from '../../shared/constants'
-import type { Entry, Label } from '../../shared/types'
+import type { CustomField, Entry, Label } from '../../shared/types'
+import { isSecretCustomField } from '../../shared/types'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { LargeTextDialog } from '../ui/large-text-dialog'
@@ -82,7 +83,7 @@ function FieldDisplay({
         {isEmpty
           ? t('common.unset')
           : isPassword && isMasked
-            ? '•'.repeat(Math.max(8, value.length))
+            ? '•'.repeat(Math.min(32, Math.max(8, value.length)))
             : value}
       </span>
       {!isEmpty && isPassword && onToggleMask && (
@@ -259,6 +260,58 @@ export default function EntryDetailContent({
 
   const v = entry.typedValue as Record<string, string | null>
 
+  // typedValue のうち secretFieldKeys に含まれるもの（vault 内で秘匿値として保存されている
+  // フィールド）をマスク表示する。カスタムフィールドの id と衝突しないよう接頭辞を付ける
+  const secretKeys = new Set(entry.secretFieldKeys ?? [])
+  const typedField = (key: string, label: string, isUrl = false) => {
+    const isSecret = secretKeys.has(key)
+    const maskKey = `typed:${key}`
+    return (
+      <FieldDisplay
+        label={label}
+        value={v[key] as string}
+        isUrl={isUrl}
+        isPassword={isSecret}
+        isMasked={isSecret && !unmaskedFields.has(maskKey)}
+        onToggleMask={isSecret ? () => toggleFieldMask(maskKey) : undefined}
+      />
+    )
+  }
+
+  const customFields = entry.customFields ?? []
+  const publicCustomFields = customFields.filter((f) => !isSecretCustomField(f))
+  const secretCustomFields = customFields.filter((f) => isSecretCustomField(f))
+
+  const renderCustomField = (field: CustomField) => {
+    const masked = isSecretCustomField(field)
+    return (
+      <div key={field.id}>
+        {field.fieldType === 'totp' ? (
+          <TotpCustomFieldDisplay label={field.name} value={field.value} />
+        ) : field.fieldType === 'passkey' ? (
+          <PasskeyCustomFieldDisplay label={t('customFieldTypes.passkey')} value={field.value} />
+        ) : (
+          <FieldDisplay
+            label={field.name}
+            value={field.value}
+            isUrl={field.fieldType === 'url' && !masked}
+            isPassword={masked}
+            isMasked={masked && !unmaskedFields.has(field.id)}
+            onToggleMask={masked ? () => toggleFieldMask(field.id) : undefined}
+          />
+        )}
+        {field.autofillSelector && (
+          <div className="flex items-center gap-1.5 pl-3 pb-1 text-[11px] text-text-muted">
+            <Crosshair size={11} className="shrink-0" />
+            <span className="truncate font-mono">
+              {formatSelectorSummary(field.autofillSelector)}
+            </span>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-full bg-bg-surface">
       {/* ヘッダー */}
@@ -311,15 +364,9 @@ export default function EntryDetailContent({
           <>
             <SectionHeading>{t('sections.login')}</SectionHeading>
             <div className="space-y-0.5">
-              <FieldDisplay label={t('fields.username')} value={v.username as string} />
-              <FieldDisplay
-                label={t('fields.password')}
-                value={v.password as string}
-                isPassword={true}
-                isMasked={!unmaskedFields.has('password')}
-                onToggleMask={() => toggleFieldMask('password')}
-              />
-              <FieldDisplay label={t('fields.url')} value={v.url as string} isUrl={true} />
+              {typedField('username', t('fields.username'))}
+              {typedField('password', t('fields.password'))}
+              {typedField('url', t('fields.url'), true)}
             </div>
           </>
         )}
@@ -329,18 +376,12 @@ export default function EntryDetailContent({
           <>
             <SectionHeading>{t('sections.bank')}</SectionHeading>
             <div className="space-y-0.5">
-              <FieldDisplay label={t('fields.bank_name')} value={v.bank_name as string} />
-              <FieldDisplay label={t('fields.branch_code')} value={v.branch_code as string} />
-              <FieldDisplay label={t('fields.account_type')} value={v.account_type as string} />
-              <FieldDisplay label={t('fields.account_holder')} value={v.account_holder as string} />
-              <FieldDisplay label={t('fields.account_number')} value={v.account_number as string} />
-              <FieldDisplay
-                label={t('fields.pin')}
-                value={v.pin as string}
-                isPassword={true}
-                isMasked={!unmaskedFields.has('bank-pin')}
-                onToggleMask={() => toggleFieldMask('bank-pin')}
-              />
+              {typedField('bank_name', t('fields.bank_name'))}
+              {typedField('branch_code', t('fields.branch_code'))}
+              {typedField('account_type', t('fields.account_type'))}
+              {typedField('account_holder', t('fields.account_holder'))}
+              {typedField('account_number', t('fields.account_number'))}
+              {typedField('pin', t('fields.pin'))}
             </div>
           </>
         )}
@@ -349,13 +390,11 @@ export default function EntryDetailContent({
         {entry.entryType === 'ssh_key' && (
           <>
             <SectionHeading>{t('sections.ssh_key')}</SectionHeading>
-            <div className="space-y-0.5">
-              <FieldDisplay label={t('fields.private_key')} value={v.private_key as string} />
-            </div>
+            <div className="space-y-0.5">{typedField('private_key', t('fields.private_key'))}</div>
           </>
         )}
 
-        {/* セキュアノート */}
+        {/* セキュアノート（秘匿値として保存されるが、メモと同様にマスクせず表示する） */}
         {entry.entryType === 'secure_note' && (
           <>
             <SectionHeading>{t('sections.secure_note')}</SectionHeading>
@@ -378,29 +417,11 @@ export default function EntryDetailContent({
           <>
             <SectionHeading>{t('sections.credit_card')}</SectionHeading>
             <div className="space-y-0.5">
-              <FieldDisplay label={t('fields.cardholder')} value={v.cardholder as string} />
-              <FieldDisplay
-                label={t('fields.number')}
-                value={v.number as string}
-                isPassword={true}
-                isMasked={!unmaskedFields.has('cc-number')}
-                onToggleMask={() => toggleFieldMask('cc-number')}
-              />
-              <FieldDisplay label={t('fields.expiry')} value={v.expiry as string} />
-              <FieldDisplay
-                label={t('fields.cvv')}
-                value={v.cvv as string}
-                isPassword={true}
-                isMasked={!unmaskedFields.has('cvv')}
-                onToggleMask={() => toggleFieldMask('cvv')}
-              />
-              <FieldDisplay
-                label={t('fields.cc_pin')}
-                value={v.pin as string}
-                isPassword={true}
-                isMasked={!unmaskedFields.has('cc-pin')}
-                onToggleMask={() => toggleFieldMask('cc-pin')}
-              />
+              {typedField('cardholder', t('fields.cardholder'))}
+              {typedField('number', t('fields.number'))}
+              {typedField('expiry', t('fields.expiry'))}
+              {typedField('cvv', t('fields.cvv'))}
+              {typedField('pin', t('fields.cc_pin'))}
             </div>
           </>
         )}
@@ -410,14 +431,8 @@ export default function EntryDetailContent({
           <>
             <SectionHeading>{t('sections.password')}</SectionHeading>
             <div className="space-y-0.5">
-              <FieldDisplay label={t('fields.username')} value={v.username as string} />
-              <FieldDisplay
-                label={t('fields.password')}
-                value={v.password as string}
-                isPassword={true}
-                isMasked={!unmaskedFields.has('password')}
-                onToggleMask={() => toggleFieldMask('password')}
-              />
+              {typedField('username', t('fields.username'))}
+              {typedField('password', t('fields.password'))}
             </div>
           </>
         )}
@@ -426,46 +441,24 @@ export default function EntryDetailContent({
         {entry.entryType === 'software_license' && (
           <>
             <SectionHeading>{t('sections.software_license')}</SectionHeading>
-            <div className="space-y-0.5">
-              <FieldDisplay label={t('fields.license_key')} value={v.license_key as string} />
-            </div>
+            <div className="space-y-0.5">{typedField('license_key', t('fields.license_key'))}</div>
           </>
         )}
 
-        {/* カスタムフィールド */}
-        {entry.customFields && entry.customFields.length > 0 && (
-          <div className="space-y-0.5">
-            {entry.customFields.map((field) => (
-              <div key={field.id}>
-                {field.fieldType === 'totp' ? (
-                  <TotpCustomFieldDisplay label={field.name} value={field.value} />
-                ) : field.fieldType === 'passkey' ? (
-                  <PasskeyCustomFieldDisplay
-                    label={t('customFieldTypes.passkey')}
-                    value={field.value}
-                  />
-                ) : (
-                  <FieldDisplay
-                    label={field.name}
-                    value={field.value}
-                    isPassword={field.fieldType === 'password'}
-                    isMasked={field.fieldType === 'password' && !unmaskedFields.has(field.id)}
-                    onToggleMask={
-                      field.fieldType === 'password' ? () => toggleFieldMask(field.id) : undefined
-                    }
-                  />
-                )}
-                {field.autofillSelector && (
-                  <div className="flex items-center gap-1.5 pl-3 pb-1 text-[11px] text-text-muted">
-                    <Crosshair size={11} className="shrink-0" />
-                    <span className="truncate font-mono">
-                      {formatSelectorSummary(field.autofillSelector)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+        {/* カスタムフィールド（非秘匿） */}
+        {publicCustomFields.length > 0 && (
+          <>
+            <SectionHeading>{t('sections.customFields')}</SectionHeading>
+            <div className="space-y-0.5">{publicCustomFields.map(renderCustomField)}</div>
+          </>
+        )}
+
+        {/* カスタムフィールド（秘匿） */}
+        {secretCustomFields.length > 0 && (
+          <>
+            <SectionHeading>{t('sections.secretCustomFields')}</SectionHeading>
+            <div className="space-y-0.5">{secretCustomFields.map(renderCustomField)}</div>
+          </>
         )}
 
         {/* メモ */}

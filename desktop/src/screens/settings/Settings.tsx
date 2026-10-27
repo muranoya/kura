@@ -271,13 +271,8 @@ export default function Settings() {
 
     setChangePasswordLoading(true)
     try {
+      // S3設定は DEK 由来の鍵で暗号化しているので、パスワード変更では暗号化し直さなくてよい
       await commands.changeMasterPassword(oldPassword, newPassword)
-      // S3設定を新しいパスワードで再暗号化
-      const configJson = await commands.getS3ConfigSession()
-      if (configJson) {
-        const encrypted = await commands.encryptConfig(newPassword, configJson)
-        await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
-      }
       await saveVaultAndPush()
       setChangePasswordOpen(false)
       setOldPassword('')
@@ -302,7 +297,16 @@ export default function Settings() {
     setRotateDekLoading(true)
     try {
       const newRecoveryKey = await commands.rotateDek(rotateDekPassword)
-      await saveVaultAndPush()
+      // 新しい DEK の vault を先に保存する。S3設定の保存より前に終了しても、
+      // vault は新しいリカバリーキーで開ける状態になる（S3設定は Lock 画面で復号に失敗するだけ）
+      await commands.writeVaultFile(await commands.getVaultBytes())
+      // S3設定は DEK 由来の鍵で暗号化しているので、新しい DEK で暗号化し直す
+      const configJson = await commands.getS3ConfigSession()
+      if (configJson) {
+        const encrypted = await commands.encryptConfig(rotateDekPassword, configJson)
+        await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
+        await commands.pushVaultAndTrack()
+      }
       setRotateDekOpen(false)
       setRotateDekPassword('')
       setRecoveryKeyDisplayValue(newRecoveryKey)

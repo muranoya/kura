@@ -11,6 +11,14 @@ pub enum VaultError {
     #[error("Entry not found: {0}")]
     EntryNotFound(String),
 
+    /// index にはあるが、secret ブロックが欠けている・復号できないエントリ
+    #[error("Entry data is corrupted: {0}")]
+    CorruptedEntry(String),
+
+    /// エントリ数が上限（`MAX_ENTRIES`）に達している
+    #[error("Entry limit reached (max {0} entries)")]
+    EntryLimitReached(usize),
+
     #[error("Label not found: {0}")]
     LabelNotFound(String),
 

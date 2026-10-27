@@ -63,6 +63,7 @@ fn generate_test_vault_fixture() {
         name: "TOTP".to_string(),
         field_type: "totp".to_string(),
         value: vault_core::secret::SecretString::from_string("JBSWY3DPEHPK3PXP".to_string()),
+        secret: true,
         autofill_selector: None,
     }]);
     unlocked
@@ -105,6 +106,42 @@ fn generate_test_vault_fixture() {
             vec![],
         )
         .expect("Failed to create Other Site Login");
+
+    // Entry 6: 秘匿/非秘匿のカスタムフィールドを持つログイン（詳細画面のセクション分け確認用）
+    let mut secret_fields_data = EntryData::new_login(
+        Some("https://secret-fields.example.com".to_string()),
+        "secret-fields@example.com".to_string(),
+        "secret-fields-pass".to_string(),
+        Some(vault_core::secret::SecretString::from_string(
+            "メモは秘匿値として保存されるが、マスクせず表示される".to_string(),
+        )),
+    );
+    secret_fields_data.custom_fields = Some(vec![
+        CustomField {
+            id: "public-field-1".to_string(),
+            name: "Recovery email".to_string(),
+            field_type: "email".to_string(),
+            value: vault_core::secret::SecretString::from_string("alt@example.com".to_string()),
+            secret: false,
+            autofill_selector: None,
+        },
+        CustomField {
+            id: "secret-field-1".to_string(),
+            name: "PIN".to_string(),
+            field_type: "text".to_string(),
+            value: vault_core::secret::SecretString::from_string("4321".to_string()),
+            secret: true,
+            autofill_selector: None,
+        },
+    ]);
+    unlocked
+        .create_entry(
+            "Secret Fields Login".to_string(),
+            "login".to_string(),
+            secret_fields_data,
+            vec![],
+        )
+        .expect("Failed to create Secret Fields Login");
 
     // Lock and serialize
     let locked = unlocked.lock().expect("Failed to lock vault");

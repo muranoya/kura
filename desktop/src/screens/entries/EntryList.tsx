@@ -339,6 +339,8 @@ export default function EntryList({ onlyFavorites = false, labelId, labelName }:
             </div>
           ) : selectedEntry ? (
             <EntryDetailContent
+              // 別のエントリを選んだら秘匿値のマスク状態をリセットする
+              key={selectedEntry.id}
               entry={selectedEntry}
               allLabels={allLabels}
               onEdit={() => {

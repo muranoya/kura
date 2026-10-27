@@ -87,7 +87,9 @@
     "secure_note": "Note",
     "password": "Password info",
     "software_license": "License info",
-    "notes": "Notes"
+    "notes": "Notes",
+    "customFields": "Fields",
+    "secretCustomFields": "Secret fields"
   },
   "customFieldTypes": {
     "text": "Text",
@@ -199,6 +201,7 @@
       "logout": "Sign out",
       "errorRequired": "Please enter a password",
       "errorUnlock": "Failed to unlock: {{error}}",
+      "errorConfig": "Could not decrypt the S3 settings, so sync is paused. To sync again, log out and set it up again: {{error}}",
       "errorLogout": "Failed to sign out: {{error}}",
       "logoutDialog": {
         "title": "Sign out",
@@ -312,7 +315,9 @@
       "autofillTargetName": "name attribute",
       "autofillTargetId": "id attribute",
       "autofillTargetType": "type attribute",
-      "clearSelector": "Clear"
+      "clearSelector": "Clear",
+      "secretFieldOn": "Make this a secret field (excluded from search, decrypted only when shown)",
+      "secretFieldOff": "Make this a regular field"
     },
     "typeSelectDialog": {
       "title": "Select item type",

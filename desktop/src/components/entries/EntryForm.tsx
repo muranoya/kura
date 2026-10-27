@@ -4,6 +4,7 @@ import {
   Crosshair,
   Link,
   Lock,
+  LockOpen,
   Mail,
   Phone,
   Plus,
@@ -22,6 +23,7 @@ import * as commands from '../../commands'
 import { TotpQrDecodeError, decodeTotpQrFromImageFile } from '../../lib/totp-qr'
 import { cn } from '../../lib/utils'
 import { getEntryTypeLabel } from '../../shared/constants'
+import { SECRET_TOGGLEABLE_FIELD_TYPES } from '../../shared/types'
 import type { CustomField, CustomFieldSelector, CustomFieldType, Label } from '../../shared/types'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
@@ -757,7 +759,7 @@ export default function EntryForm({
                   <Input
                     id={`field-value-${field.id}`}
                     type={
-                      field.fieldType === 'password' || field.fieldType === 'totp'
+                      field.fieldType === 'password' || field.fieldType === 'totp' || field.secret
                         ? focusedPasswordFieldId === `custom-${field.id}`
                           ? 'text'
                           : 'password'
@@ -776,13 +778,21 @@ export default function EntryForm({
                       field.fieldType === 'totp' && 'pr-1',
                     )}
                     onFocus={() => {
-                      if (field.fieldType === 'password' || field.fieldType === 'totp')
+                      if (
+                        field.fieldType === 'password' ||
+                        field.fieldType === 'totp' ||
+                        field.secret
+                      )
                         setFocusedPasswordFieldId(`custom-${field.id}`)
                       if (field.fieldType === 'password' && !field.value)
                         setActiveGeneratorFieldId(`custom-${field.id}`)
                     }}
                     onBlur={() => {
-                      if (field.fieldType === 'password' || field.fieldType === 'totp')
+                      if (
+                        field.fieldType === 'password' ||
+                        field.fieldType === 'totp' ||
+                        field.secret
+                      )
                         setFocusedPasswordFieldId(null)
                     }}
                   />
@@ -819,6 +829,29 @@ export default function EntryForm({
                   aria-label={t('entries.form.scanTotpQr')}
                 >
                   <ScanQrCode size={14} />
+                </button>
+              )}
+              {SECRET_TOGGLEABLE_FIELD_TYPES.includes(field.fieldType) && (
+                <button
+                  type="button"
+                  onClick={() => updateCustomField(field.id, { secret: !field.secret })}
+                  className={cn(
+                    'p-1 shrink-0 mt-1 transition-colors',
+                    field.secret ? 'text-accent' : 'text-text-muted hover:text-accent',
+                  )}
+                  title={
+                    field.secret
+                      ? t('entries.form.secretFieldOff')
+                      : t('entries.form.secretFieldOn')
+                  }
+                  aria-label={
+                    field.secret
+                      ? t('entries.form.secretFieldOff')
+                      : t('entries.form.secretFieldOn')
+                  }
+                  aria-pressed={field.secret === true}
+                >
+                  {field.secret ? <Lock size={14} /> : <LockOpen size={14} />}
                 </button>
               )}
               <button

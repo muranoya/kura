@@ -79,6 +79,11 @@ pub async fn decrypt_config(
 }
 
 #[tauri::command]
+pub fn config_needs_upgrade(encrypted_b64: String) -> bool {
+    vault_core::api::api_config_needs_upgrade(encrypted_b64)
+}
+
+#[tauri::command]
 pub async fn encrypt_transfer_config(
     password: String,
     config_json: String,
