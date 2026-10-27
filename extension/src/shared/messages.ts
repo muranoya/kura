@@ -213,7 +213,7 @@ export type MessageResponse =
 // サイドバーは開いたままになるため、SW側で起きた状態変化をその場で反映する必要がある。
 export type ExtensionPageBroadcast =
   | { type: 'VAULT_LOCK_STATE_CHANGED'; unlocked: boolean }
-  // ピッカー / TOTP QRスキャンの結果をSW側でエントリへ書き込んだ。
+  // ピッカー / TOTP QRスキャン / Passkey登録の結果をSW側でエントリへ書き込んだ。
   // change はSWが書き換えた属性で、受信側はその属性だけを反映する
   | {
       type: 'ENTRY_UPDATED_IN_BACKGROUND'
@@ -226,8 +226,9 @@ export type ExtensionPageBroadcast =
  * SW側でカスタムフィールドのどの属性を書き換えたか。
  * - autofillSelector: ピッカーでセレクタを設定した
  * - totp: TOTP QRスキャンで種類と値を設定した（フィールドが無ければ追加した）
+ * - passkey: Passkeyの登録で既存エントリにpasskeyフィールドを追加した
  */
-export type BackgroundFieldChange = 'autofillSelector' | 'totp'
+export type BackgroundFieldChange = 'autofillSelector' | 'totp' | 'passkey'
 
 export function broadcastToExtensionPages(message: ExtensionPageBroadcast) {
   // 受信側（サイドバー）が開いていない場合は reject されるので無視する

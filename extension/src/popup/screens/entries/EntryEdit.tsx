@@ -59,7 +59,7 @@ export default function EntryEdit() {
     load()
   }, [id, t])
 
-  // ピッカー / TOTP QRスキャンの結果はSW側でエントリへ直接書き込まれるため、
+  // ピッカー / TOTP QRスキャン / Passkey登録の結果はSW側でエントリへ直接書き込まれるため、
   // SWが書き換えた属性だけを反映する（同じフィールドの名前など、編集中の内容は保持する）
   useEffect(() => {
     if (!id) return

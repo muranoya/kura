@@ -51,7 +51,7 @@ Android向けJNIの活用先の一つであるAutofillService（システム標�
 サイドバーはページを操作しても閉じず、開いたままになる。そのため次のように設計している。
 
 - **オートロック**: 「拡張機能UIでの最後の操作」から設定時間が経つとロックする。サイドバーはクリック・キー入力・スクロールがあると `USER_ACTIVITY` を Service Worker に送り（15秒間隔に間引く）、Service Worker はそのたびに `autolock` アラームを張り直す。サイドバーを開いていても、操作しなければロックされる
-- **状態変化の反映**: Service Worker 側で起きた変化は `chrome.runtime.sendMessage` で拡張機能ページにブロードキャストする（`ExtensionPageBroadcast`）。オートロックや儀式ウィンドウでのアンロックは `VAULT_LOCK_STATE_CHANGED` として送り、サイドバーはロック画面と一覧を切り替える。ピッカーや TOTP QR スキャンの結果は `ENTRY_UPDATED_IN_BACKGROUND` として送り、開いている編集画面に反映する
+- **状態変化の反映**: Service Worker 側で起きた変化は `chrome.runtime.sendMessage` で拡張機能ページにブロードキャストする（`ExtensionPageBroadcast`）。オートロックや儀式ウィンドウでのアンロックは `VAULT_LOCK_STATE_CHANGED` として送り、サイドバーはロック画面と一覧を切り替える。ピッカー・TOTP QR スキャン・既存エントリへの Passkey 登録の結果は `ENTRY_UPDATED_IN_BACKGROUND` として送り、開いている編集画面に反映する（SW が書き換えた属性だけを差し替え、編集中の他の内容は保持する）
 - **現在のタブへの追従**: 「このサイト」のエントリは、タブの切り替えや遷移（`tabs.onActivated` / `tabs.onUpdated`）に応じて再計算する
 - **幅への対応**: サイドバーの幅は可変なので、35rem 以上では一覧と詳細を左右に並べ、それより狭ければ一覧と詳細を切り替える1カラム表示にする
 
