@@ -21,75 +21,64 @@ default: help
 @_sync-version:
 	node scripts/sync-version.mjs
 
-# Desktop app - Generate icons from SVG
+# Desktop app - Generate icons from SVG（ウィンドウ・トレイ・インストーラ用の PNG）
 @_desktop-icons:
 	echo "🎨 Generating desktop icons..."
-	cd {{DESKTOP_DIR}} && pnpm install --silent
 	bash assets/icons/convert2png.sh
-	cd {{DESKTOP_DIR}} && pnpm tauri icon ../assets/icons/locked_icon.svg
 
-# Desktop app - Development (Tauri with hot reload)
+# cargo-packager がなければ入れる（インストーラ生成に使う）
+@_cargo-packager:
+	command -v cargo-packager >/dev/null || cargo install cargo-packager --locked
+
+# Desktop app - Development
 @dev-desktop: _sync-version _desktop-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🚀 Starting desktop app in development mode..."
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo ""
-	echo "📥 Installing dependencies..."
-	cd {{DESKTOP_DIR}} && pnpm install
+	echo "💡 Debug builds use the net.meshpeak.kura.debug data directory (override with KURA_DATA_DIR)"
 	echo ""
-	echo "🖥️  Starting development server with hot reload..."
-	echo "💡 Use right-click → Inspect to open DevTools"
-	echo ""
-	cd {{DESKTOP_DIR}} && pnpm tauri dev --config src-tauri/tauri.conf.dev.json
+	cargo run -p kura-desktop
 
-# Desktop app - Linux (AppImage)
-@release-desktop-linux: _sync-version _desktop-icons
+# Desktop app - Linux (AppImage + deb)
+@release-desktop-linux: _sync-version _desktop-icons _cargo-packager
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	echo "🔨 Building desktop app for Linux (AppImage)..."
+	echo "🔨 Building desktop app for Linux (AppImage + deb)..."
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo ""
-	echo "📥 Installing dependencies..."
-	cd {{DESKTOP_DIR}} && pnpm install
-	echo ""
-	echo "🖥️  Building AppImage..."
-	cd {{DESKTOP_DIR}} && pnpm tauri build --config src-tauri/tauri.conf.json
+	cargo build --release -p kura-desktop
+	cd {{DESKTOP_DIR}} && cargo packager --release --formats appimage,deb
 	echo ""
 	echo "✅ Linux build completed!"
-	echo "  - Output: target/release/bundle/appimage/"
+	echo "  - Output: target/packager/"
 
 # Desktop app - macOS (DMG, Apple Silicon / arm64 only, ad-hoc signed)
-@release-desktop-macos: _sync-version _desktop-icons
+@release-desktop-macos: _sync-version _desktop-icons _cargo-packager
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building desktop app for macOS arm64 (DMG, ad-hoc signed)..."
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo ""
-	echo "📥 Installing dependencies..."
-	cd {{DESKTOP_DIR}} && pnpm install
-	echo ""
-	echo "🖥️  Building DMG (aarch64-apple-darwin)..."
-	cd {{DESKTOP_DIR}} && APPLE_SIGNING_IDENTITY="-" pnpm tauri build --target aarch64-apple-darwin --config src-tauri/tauri.conf.json
+	cargo build --release -p kura-desktop --target aarch64-apple-darwin
+	cd {{DESKTOP_DIR}} && cargo packager --release --target aarch64-apple-darwin --formats dmg
 	echo ""
 	echo "✅ macOS build completed!"
-	echo "  - Output: target/aarch64-apple-darwin/release/bundle/dmg/"
+	echo "  - Output: target/packager/"
 
 # Desktop app - Windows (NSIS installer)
-@release-desktop-windows: _sync-version _desktop-icons
+@release-desktop-windows: _sync-version _desktop-icons _cargo-packager
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building desktop app for Windows (NSIS)..."
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo ""
-	echo "📥 Installing dependencies..."
-	cd {{DESKTOP_DIR}} && pnpm install
-	echo ""
-	echo "🖥️  Building NSIS installer..."
-	cd {{DESKTOP_DIR}} && pnpm tauri build --config src-tauri/tauri.conf.json
+	cargo build --release -p kura-desktop
+	cd {{DESKTOP_DIR}} && cargo packager --release --formats nsis
 	echo ""
 	echo "✅ Windows build completed!"
-	echo "  - Output: target/release/bundle/nsis/"
+	echo "  - Output: target/packager/"
 
 # Extension - Generate icons from SVG
 @_extension-icons:
@@ -309,10 +298,10 @@ default: help
 	cd {{ANDROID_DIR}} && ./gradlew testDebugUnitTest
 	echo "✅ Android tests passed!"
 
-# Desktop のテスト（フロントエンド）
+# Desktop のテスト
 @test-desktop: _desktop-icons
-	echo "🧪 Testing desktop (frontend)..."
-	cd {{DESKTOP_DIR}} && pnpm install && pnpm test
+	echo "🧪 Testing desktop..."
+	cargo test -p kura-desktop
 	echo "✅ desktop tests passed!"
 
 # Extension - Start manual autofill test environment (fixture + MinIO + test pages)
@@ -379,27 +368,18 @@ test-manual-autofill:
 	echo ""
 	echo "✅ vault-core checks passed!"
 
-# Desktop app - Lint & format check (TypeScript + Biome + Rust)
+# Desktop app - Lint & format check (Rust + Slint)
 @check-desktop: _desktop-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔍 Checking desktop app (lint & format)..."
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo ""
-	echo "📥 Installing dependencies..."
-	cd {{DESKTOP_DIR}} && pnpm install --silent
+	echo "🦀 Cargo clippy (desktop + Slint UI)..."
+	cargo clippy -p kura-desktop --all-targets -- -D warnings
 	echo ""
-	echo "📝 TypeScript type check..."
-	cd {{DESKTOP_DIR}} && pnpm tsc --noEmit
-	echo ""
-	echo "🔧 Biome check (lint & format)..."
-	cd {{DESKTOP_DIR}} && pnpm run check
-	echo ""
-	echo "🦀 Cargo check (src-tauri)..."
-	cargo check --manifest-path {{DESKTOP_DIR}}/src-tauri/Cargo.toml
-	echo ""
-	echo "🦀 Cargo fmt check (src-tauri)..."
-	cargo fmt --manifest-path {{DESKTOP_DIR}}/src-tauri/Cargo.toml -- --check
+	echo "🦀 Cargo fmt check (desktop)..."
+	cargo fmt -p kura-desktop -- --check
 	echo ""
 	echo "✅ Desktop checks passed!"
 
@@ -473,8 +453,7 @@ test-manual-autofill:
 	echo "  - Cargo workspace (target/)..."
 	cargo clean
 	echo "  - Desktop..."
-	cd {{DESKTOP_DIR}} && rm -rf dist/ build/ node_modules/
-	find {{DESKTOP_DIR}}/src-tauri/icons/ -maxdepth 1 \( -name '*.png' -o -name '*.ico' -o -name '*.icns' \) -delete 2>/dev/null || true
+	rm -rf {{DESKTOP_DIR}}/icons/
 	echo "  - Extension..."
 	cd {{EXTENSION_DIR}} && rm -rf dist/ build/ node_modules/ wasm/ public/ test-pages/fixtures/ kura-extension-chrome.zip kura-extension-firefox.zip
 	find {{EXTENSION_DIR}}/ -maxdepth 1 \( -name '*.xpi' -o -name 'kura-extension-source-*.zip' \) -delete 2>/dev/null || true
@@ -497,8 +476,8 @@ test-manual-autofill:
 	echo "    just run-android-device        - Build & install on USB device"
 	echo ""
 	echo "  🖥️  Desktop:"
-	echo "    just dev-desktop              - Start desktop app in dev mode (hot reload)"
-	echo "    just release-desktop-linux    - Build Linux AppImage"
+	echo "    just dev-desktop              - Start desktop app in dev mode"
+	echo "    just release-desktop-linux    - Build Linux AppImage + deb"
 	echo "    just release-desktop-macos    - Build macOS DMG"
 	echo "    just release-desktop-windows  - Build Windows NSIS installer"
 	echo ""
@@ -511,7 +490,7 @@ test-manual-autofill:
 	echo "    just test-vault-core      - Run vault-core tests"
 	echo "    just test-extension       - Run extension tests"
 	echo "    just test-android         - Run Android tests"
-	echo "    just test-desktop         - Run desktop tests (frontend)"
+	echo "    just test-desktop         - Run desktop tests"
 	echo "    just test-all             - Run all tests"
 	echo "    just test-manual-autofill      - Start autofill manual test environment"
 	echo "    just test-manual-autofill-stop - Stop autofill test environment"

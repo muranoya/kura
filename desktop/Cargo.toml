@@ -1,0 +1,46 @@
+[package]
+name = "kura-desktop"
+version = "0.4.0"
+edition = "2021"
+description = "Password manager"
+
+[[bin]]
+name = "kura"
+path = "src/main.rs"
+
+[dependencies]
+slint = { version = "1", features = ["unstable-winit-030"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "fs"] }
+vault_core = { path = "../vault-core", features = ["desktop"] }
+aws-sdk-s3 = "1"
+aws-config = "1"
+async-trait = "0.1"
+zeroize = "1"
+dirs = "6"
+arboard = { version = "3", features = ["wayland-data-control"] }
+rfd = { version = "0.15", default-features = false, features = ["xdg-portal", "tokio"] }
+open = "5"
+pulldown-cmark = { version = "0.13", default-features = false }
+qrcode = { version = "0.14", default-features = false }
+rqrr = "0.9"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+
+[build-dependencies]
+slint-build = "1"
+
+[package.metadata.packager]
+product-name = "kura"
+identifier = "net.meshpeak.kura"
+category = "Utility"
+description = "Password manager"
+out-dir = "../target/packager"
+binaries = [{ path = "kura", main = true }]
+icons = ["icons/32x32.png", "icons/128x128.png", "icons/256x256.png", "icons/512x512.png"]
+
+[package.metadata.packager.macos]
+minimum-system-version = "11.0"
+entitlements = "Entitlements.plist"
+signing-identity = "-"

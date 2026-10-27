@@ -1,0 +1,720 @@
+import { ListView, ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { AppButton, Badge, EmptyState, ErrorBanner, Icon, IconButton, MarkdownView, SectionHeading, TotpRing } from "../widgets.slint";
+import { DetailRow, EntryList, EntryRowItem, LargeText, Nav, Page, Trash, Util } from "../state.slint";
+import { EntryTypes, FilterBar, HorizontalDivider, ScreenHeader, VerticalDivider } from "layout.slint";
+
+component EntryCard inherits Rectangle {
+    in property <EntryRowItem> entry;
+    in property <bool> selected;
+    callback clicked();
+    height: 52px;
+    background: selected ? Theme.accent-subtle : touch.has-hover ? Theme.bg-elevated : transparent;
+    Rectangle {
+        x: 0;
+        width: 2px;
+        background: root.selected ? Theme.accent : transparent;
+    }
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 12px;
+        Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            background: Theme.accent-soft;
+            Icon {
+                source: EntryTypes.icon(root.entry.entry-type);
+                size: 18px;
+                color: Theme.accent;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            Text {
+                text: root.entry.name;
+                font-size: Theme.text-sm;
+                font-weight: 600;
+                color: Theme.text-primary;
+                overflow: elide;
+            }
+
+            if root.entry.subtitle != "": Text {
+                text: root.entry.subtitle;
+                font-size: Theme.text-xs;
+                color: Theme.text-muted;
+                overflow: elide;
+            }
+        }
+    }
+
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.border;
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+component SelectorLine inherits HorizontalLayout {
+    in property <string> text;
+    spacing: 6px;
+    Icon {
+        source: Icons.crosshair;
+        size: 11px;
+        color: Theme.text-muted;
+    }
+
+    Text {
+        text: root.text;
+        font-family: Theme.mono;
+        font-size: 11px;
+        color: Theme.text-muted;
+        overflow: elide;
+    }
+}
+
+// 詳細ペインの1フィールド（クリックでコピー、URL はブラウザで開く）
+component FieldRow inherits Rectangle {
+    in property <DetailRow> data;
+    callback toggle-mask();
+    private property <bool> copied;
+    private property <bool> empty: data.value == "";
+    border-radius: Theme.radius;
+    min-height: body.preferred-height;
+    background: copied ? Theme.accent-subtle : touch.has-hover && !empty ? Theme.bg-elevated : transparent;
+    opacity: empty ? 0.5 : 1;
+    Rectangle {
+        x: 0;
+        width: 2px;
+        background: root.copied ? Theme.accent : transparent;
+    }
+
+    touch := TouchArea {
+        enabled: !root.empty;
+        mouse-cursor: pointer;
+        clicked => {
+            if root.data.is-url {
+                Util.open-url(root.data.value);
+            } else {
+                Util.copy(root.data.value);
+                root.copied = true;
+            }
+        }
+    }
+
+    body := VerticalLayout {
+        padding-left: 12px;
+        padding-right: 8px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        spacing: 2px;
+        HorizontalLayout {
+            spacing: 8px;
+            HorizontalLayout {
+                width: 96px;
+                spacing: 4px;
+                Text {
+                    text: root.data.label;
+                    font-size: Theme.text-xs;
+                    color: Theme.text-secondary;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+
+                if root.copied: Icon {
+                    y: (parent.height - self.height) / 2;
+                    source: Icons.check;
+                    size: 12px;
+                    color: Theme.success;
+                }
+            }
+
+            Text {
+                horizontal-stretch: 1;
+                text: root.empty ? "未設定" : root.data.secret && root.data.masked ? root.data.masked-value : root.data.value;
+                font-family: root.empty ? "" : Theme.mono;
+                font-italic: root.empty;
+                font-size: Theme.text-sm;
+                color: root.empty ? Theme.text-secondary : Theme.text-primary;
+                vertical-alignment: center;
+                wrap: char-wrap;
+                overflow: clip;
+                max-height: root.data.secret && root.data.masked ? 20px : 100000px;
+            }
+
+            if !root.empty && root.data.secret: IconButton {
+                y: (parent.height - self.height) / 2;
+                icon: root.data.masked ? Icons.eye-off : Icons.eye;
+                icon-size: 14px;
+                clicked => {
+                    root.toggle-mask();
+                }
+            }
+            if !root.empty: IconButton {
+                y: (parent.height - self.height) / 2;
+                icon: Icons.maximize-2;
+                icon-size: 14px;
+                clicked => {
+                    LargeText.label = root.data.label;
+                    LargeText.value = root.data.value;
+                    LargeText.open = true;
+                }
+            }
+            if !root.empty && root.data.is-url: IconButton {
+                y: (parent.height - self.height) / 2;
+                icon: root.copied ? Icons.check : Icons.copy;
+                icon-size: 14px;
+                clicked => {
+                    Util.copy(root.data.value);
+                    root.copied = true;
+                }
+            }
+        }
+
+        if root.data.selector != "": SelectorLine {
+            text: root.data.selector;
+        }
+    }
+
+    Timer {
+        interval: 1.5s;
+        running: root.copied;
+        triggered => {
+            root.copied = false;
+        }
+    }
+}
+
+component TotpRow inherits Rectangle {
+    in property <DetailRow> data;
+    private property <bool> copied;
+    private property <bool> ready: data.totp-code != "";
+    border-radius: Theme.radius;
+    min-height: body.preferred-height;
+    background: copied ? Theme.accent-subtle : touch.has-hover && ready ? Theme.bg-elevated : transparent;
+    opacity: ready || data.error != "" ? 1 : 0.5;
+    touch := TouchArea {
+        enabled: root.ready;
+        mouse-cursor: pointer;
+        clicked => {
+            Util.copy(root.data.totp-code);
+            root.copied = true;
+        }
+    }
+
+    body := VerticalLayout {
+        padding-left: 12px;
+        padding-right: 8px;
+        padding-top: 6px;
+        padding-bottom: 6px;
+        HorizontalLayout {
+            spacing: 8px;
+            HorizontalLayout {
+                width: 96px;
+                spacing: 4px;
+                Text {
+                    text: root.data.label;
+                    font-size: Theme.text-xs;
+                    color: Theme.text-secondary;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+
+                if root.copied: Icon {
+                    y: (parent.height - self.height) / 2;
+                    source: Icons.check;
+                    size: 12px;
+                    color: Theme.success;
+                }
+            }
+
+            if root.data.error != "": Text {
+                horizontal-stretch: 1;
+                text: root.data.error;
+                font-size: Theme.text-xs;
+                color: Theme.danger;
+                vertical-alignment: center;
+                wrap: word-wrap;
+            }
+            if root.data.error == "" && !root.ready: Text {
+                horizontal-stretch: 1;
+                text: "読み込み中...";
+                font-size: Theme.text-xs;
+                color: Theme.text-muted;
+                vertical-alignment: center;
+            }
+            if root.ready: HorizontalLayout {
+                horizontal-stretch: 1;
+                alignment: end;
+                spacing: 6px;
+                Text {
+                    text: root.data.totp-code;
+                    font-family: Theme.mono;
+                    font-size: Theme.text-sm;
+                    letter-spacing: 3px;
+                    color: Theme.text-primary;
+                    vertical-alignment: center;
+                }
+
+                TotpRing {
+                    remaining: root.data.totp-remaining;
+                    period: root.data.totp-period;
+                }
+            }
+            if root.ready: IconButton {
+                y: (parent.height - self.height) / 2;
+                icon: Icons.maximize-2;
+                icon-size: 14px;
+                clicked => {
+                    LargeText.label = root.data.label;
+                    LargeText.value = root.data.totp-code;
+                    LargeText.open = true;
+                }
+            }
+        }
+
+        if root.data.selector != "": SelectorLine {
+            text: root.data.selector;
+        }
+    }
+
+    Timer {
+        interval: 1.5s;
+        running: root.copied;
+        triggered => {
+            root.copied = false;
+        }
+    }
+}
+
+// パスキーは秘密鍵を含むため、値そのものは表示しない
+component PasskeyRow inherits HorizontalLayout {
+    in property <DetailRow> data;
+    padding-left: 12px;
+    padding-right: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    spacing: 8px;
+    HorizontalLayout {
+        width: 96px;
+        spacing: 4px;
+        alignment: start;
+        Icon {
+            source: Icons.key-round;
+            size: 12px;
+            color: Theme.text-secondary;
+        }
+
+        Text {
+            text: root.data.label;
+            font-size: Theme.text-xs;
+            color: Theme.text-secondary;
+        }
+    }
+
+    VerticalLayout {
+        horizontal-stretch: 1;
+        spacing: 2px;
+        Text {
+            text: root.data.value;
+            font-size: Theme.text-xs;
+            color: Theme.text-primary;
+            overflow: elide;
+        }
+
+        if root.data.sub != "": Text {
+            text: root.data.sub;
+            font-size: Theme.text-xs;
+            color: Theme.text-muted;
+            overflow: elide;
+        }
+    }
+}
+
+component NoteBox inherits Rectangle {
+    background: Theme.bg-elevated;
+    border-radius: Theme.radius;
+    border-width: 1px;
+    border-color: Theme.border;
+    min-height: inner.preferred-height;
+    inner := VerticalLayout {
+        padding: 12px;
+        @children
+    }
+}
+
+component EntryDetail inherits Rectangle {
+    background: Theme.bg-surface;
+    VerticalLayout {
+        // ヘッダー
+        HorizontalLayout {
+            height: 44px;
+            padding-left: 12px;
+            padding-right: 12px;
+            spacing: 8px;
+            Badge {
+                y: (parent.height - self.height) / 2;
+                text: EntryList.detail-type;
+            }
+
+            Text {
+                horizontal-stretch: 1;
+                text: EntryList.detail-name;
+                font-size: Theme.text-sm;
+                font-weight: 600;
+                color: Theme.text-primary;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+
+            IconButton {
+                y: (parent.height - self.height) / 2;
+                icon: EntryList.detail-favorite ? Icons.star-filled : Icons.star;
+                color: EntryList.detail-favorite ? Theme.accent : Theme.text-muted;
+                hover-color: Theme.accent;
+                tooltip: EntryList.detail-favorite ? "お気に入り解除" : "お気に入り";
+                clicked => {
+                    EntryList.toggle-favorite();
+                }
+            }
+
+            AppButton {
+                y: (parent.height - self.height) / 2;
+                height: 28px;
+                text: "編集";
+                variant: "secondary";
+                size: "sm";
+                has-icon: true;
+                icon: Icons.pencil;
+                clicked => {
+                    EntryList.edit();
+                }
+            }
+
+            AppButton {
+                y: (parent.height - self.height) / 2;
+                height: 28px;
+                text: "削除";
+                variant: "destructive";
+                size: "sm";
+                has-icon: true;
+                icon: Icons.trash-2;
+                clicked => {
+                    EntryList.delete-requested(EntryList.selected-id);
+                }
+            }
+        }
+
+        HorizontalDivider { }
+
+        sv := ScrollView {
+            vertical-stretch: 1;
+            content-height: content.preferred-height;
+            content := VerticalLayout {
+                width: sv.visible-width;
+                padding: 16px;
+                spacing: 2px;
+                if EntryList.detail-labels.length > 0: HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+                    padding-bottom: 8px;
+                    for name in EntryList.detail-labels: Badge {
+                        text: name;
+                        variant: "primary";
+                    }
+                }
+                for row[i] in EntryList.detail-rows: VerticalLayout {
+                    if row.kind == "heading": SectionHeading {
+                        text: row.label;
+                    }
+                    if row.kind == "field": FieldRow {
+                        data: row;
+                        toggle-mask => {
+                            EntryList.toggle-mask(i);
+                        }
+                    }
+                    if row.kind == "totp": TotpRow {
+                        data: row;
+                    }
+                    if row.kind == "passkey": PasskeyRow {
+                        data: row;
+                    }
+                    if row.kind == "markdown": NoteBox {
+                        MarkdownView {
+                            blocks: row.md;
+                            base-size: Theme.text-xs;
+                            link-clicked(url) => {
+                                Util.open-url(url);
+                            }
+                        }
+                    }
+                    if row.kind == "unset": Text {
+                        text: "未設定";
+                        font-size: Theme.text-sm;
+                        font-italic: true;
+                        color: Theme.text-secondary;
+                    }
+                    if row.kind == "notes": NoteBox {
+                        Text {
+                            text: row.value;
+                            font-size: Theme.text-xs;
+                            color: Theme.text-primary;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+
+                // タイムスタンプ
+                VerticalLayout {
+                    padding-top: 24px;
+                    spacing: 2px;
+                    HorizontalDivider { }
+
+                    Rectangle {
+                        height: 8px;
+                    }
+
+                    if EntryList.detail-updated != "": Text {
+                        text: "更新: " + EntryList.detail-updated;
+                        font-size: Theme.text-xs;
+                        color: Theme.text-secondary;
+                    }
+                    if EntryList.detail-created != "": Text {
+                        text: "作成: " + EntryList.detail-created;
+                        font-size: Theme.text-xs;
+                        color: Theme.text-secondary;
+                    }
+                }
+            }
+        }
+    }
+}
+
+component CenterMessage {
+    in property <string> text;
+    in property <color> color: Theme.text-secondary;
+    Text {
+        text: root.text;
+        color: root.color;
+        font-size: Theme.text-sm;
+    }
+}
+
+// 全アイテム / お気に入り / ラベル別の一覧（左: リスト、右: 詳細）
+export component EntryListScreen inherits Rectangle {
+    background: Theme.bg-base;
+    private property <bool> favorites: Nav.page == Page.favorites;
+    VerticalLayout {
+        ScreenHeader {
+            title: Nav.page == Page.label-entries ? Nav.label-name : root.favorites ? "お気に入り" : "アイテム一覧";
+        }
+
+        Rectangle {
+            background: Theme.bg-surface;
+            height: filter.preferred-height + 8px;
+            filter := FilterBar {
+                x: 12px;
+                y: 0px;
+                width: parent.width - 24px;
+                type-index <=> EntryList.type-index;
+                sort-index <=> EntryList.sort-index;
+                search <=> EntryList.search;
+                changed => {
+                    EntryList.filters-changed();
+                }
+                if !root.favorites: AppButton {
+                    text: "新規作成";
+                    size: "sm";
+                    clicked => {
+                        EntryList.create();
+                    }
+                }
+            }
+        }
+
+        HorizontalDivider { }
+
+        HorizontalLayout {
+            vertical-stretch: 1;
+            VerticalLayout {
+                width: 320px;
+                if EntryList.error != "": VerticalLayout {
+                    padding: 12px;
+                    if EntryList.error != "": ErrorBanner {
+                        text: EntryList.error;
+                    }
+                }
+                if EntryList.loading: EmptyState {
+                    emoji: "⏳";
+                    title: "読み込み中...";
+                    description: "エントリを読み込んでいます";
+                }
+                if !EntryList.loading && EntryList.entries.length == 0: EmptyState {
+                    emoji: "🔑";
+                    title: root.favorites ? "お気に入りがありません" : "アイテムがありません";
+                    description: root.favorites ? "お気に入りに登録したアイテムがここに表示されます" : "新規作成ボタンからアイテムを追加してください";
+                    if !root.favorites: HorizontalLayout {
+                        alignment: center;
+                        padding-top: 16px;
+                        AppButton {
+                            text: "最初のアイテムを作成";
+                            clicked => {
+                                EntryList.create();
+                            }
+                        }
+                    }
+                }
+                if !EntryList.loading && EntryList.entries.length > 0: ListView {
+                    vertical-stretch: 1;
+                    for entry in EntryList.entries: EntryCard {
+                        entry: entry;
+                        selected: EntryList.selected-id == entry.id;
+                        clicked => {
+                            EntryList.select(entry.id);
+                        }
+                    }
+                }
+                if EntryList.loading || EntryList.entries.length == 0: Rectangle {
+                    vertical-stretch: 1;
+                }
+            }
+
+            VerticalDivider { }
+
+            Rectangle {
+                horizontal-stretch: 1;
+                if EntryList.detail-loading: CenterMessage {
+                    text: "読み込み中...";
+                }
+                if !EntryList.detail-loading && EntryList.has-detail: EntryDetail { }
+                if !EntryList.detail-loading && !EntryList.has-detail: CenterMessage {
+                    text: "アイテムを選択してください";
+                }
+            }
+        }
+    }
+}
+
+component TrashCard inherits Rectangle {
+    in property <EntryRowItem> entry;
+    height: 60px;
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 12px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 4px;
+            Text {
+                text: root.entry.name;
+                font-size: Theme.text-sm;
+                font-weight: 600;
+                color: Theme.text-primary;
+                overflow: elide;
+            }
+
+            Text {
+                text: "削除日時: " + root.entry.deleted-at;
+                font-size: Theme.text-xs;
+                color: Theme.text-muted;
+            }
+        }
+
+        AppButton {
+            y: (parent.height - self.height) / 2;
+            text: "復元";
+            variant: "secondary";
+            size: "sm";
+            has-icon: true;
+            icon: Icons.rotate-cw;
+            clicked => {
+                Trash.restore(root.entry.id);
+            }
+        }
+
+        AppButton {
+            y: (parent.height - self.height) / 2;
+            text: "削除";
+            variant: "destructive";
+            size: "sm";
+            has-icon: true;
+            icon: Icons.trash-2;
+            clicked => {
+                Trash.purge-requested(root.entry.id);
+            }
+        }
+    }
+
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.border;
+    }
+}
+
+export component TrashScreen inherits Rectangle {
+    background: Theme.bg-base;
+    VerticalLayout {
+        ScreenHeader {
+            title: "ゴミ箱";
+        }
+
+        Rectangle {
+            background: Theme.bg-surface;
+            height: filter.preferred-height + 8px;
+            filter := FilterBar {
+                x: 12px;
+                y: 0px;
+                width: parent.width - 24px;
+                type-index <=> Trash.type-index;
+                sort-index <=> Trash.sort-index;
+                search <=> Trash.search;
+                changed => {
+                    Trash.filters-changed();
+                }
+            }
+        }
+
+        HorizontalDivider { }
+
+        if Trash.error != "": VerticalLayout {
+            padding: 12px;
+            if Trash.error != "": ErrorBanner {
+                text: Trash.error;
+            }
+        }
+        if Trash.loading: EmptyState {
+            emoji: "⏳";
+            title: "読み込み中...";
+            description: "エントリを読み込んでいます";
+        }
+        if !Trash.loading && Trash.entries.length == 0: EmptyState {
+            emoji: "🔑";
+            title: "ゴミ箱が空です";
+            description: "削除済みエントリはありません";
+        }
+        if !Trash.loading && Trash.entries.length > 0: ListView {
+            vertical-stretch: 1;
+            for entry in Trash.entries: TrashCard {
+                entry: entry;
+            }
+        }
+        if Trash.loading || Trash.entries.length == 0: Rectangle {
+            vertical-stretch: 1;
+        }
+    }
+}

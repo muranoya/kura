@@ -1,0 +1,676 @@
+// 画面横断で使う共通ウィジェット（旧 components/ui/* 相当）
+import { LineEdit, ScrollView, Spinner } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Icons } from "icons.slint";
+
+export struct MdBlock {
+    // h1 / h2 / h3 / p / li / code / quote / hr / row
+    kind: string,
+    text: styled-text,
+    plain: string,
+    // 箇条書きのマーカー（"•" や "1."）とネストの深さ
+    marker: string,
+    depth: int,
+    // 表の行（kind == "row"）
+    cells: [string],
+    header: bool,
+}
+
+export component Icon {
+    in property <image> source;
+    in property <length> size: 16px;
+    in property <color> color: Theme.text-primary;
+    width: size;
+    height: size;
+    Image {
+        width: 100%;
+        height: 100%;
+        source: root.source;
+        colorize: root.color;
+        image-fit: contain;
+    }
+}
+
+export component AppButton inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    in property <bool> has-icon: false;
+    // primary / secondary / destructive / ghost
+    in property <string> variant: "primary";
+    // sm / md / lg
+    in property <string> size: "md";
+    in property <bool> enabled: true;
+    in property <bool> loading: false;
+    callback clicked();
+
+    private property <bool> active: enabled && !loading;
+    private property <color> fg: variant == "primary" || variant == "destructive" ? #ffffff : Theme.text-primary;
+
+    min-width: layout.min-width;
+    height: size == "sm" ? 32px : size == "lg" ? 44px : 38px;
+    border-radius: Theme.radius;
+    border-width: variant == "secondary" ? 1px : 0px;
+    border-color: Theme.border;
+    opacity: active ? 1 : 0.5;
+    background: variant == "primary" ? (touch.has-hover && active ? Theme.accent-hover : Theme.accent)
+        : variant == "destructive" ? (touch.has-hover && active ? #dc2626 : Theme.danger)
+        : variant == "secondary" ? (touch.has-hover && active ? Theme.bg-elevated : Theme.bg-surface)
+        : (touch.has-hover && active ? Theme.bg-elevated : transparent);
+
+    touch := TouchArea {
+        enabled: root.active;
+        mouse-cursor: root.active ? pointer : default;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    layout := HorizontalLayout {
+        padding-left: root.size == "sm" ? 10px : 16px;
+        padding-right: self.padding-left;
+        spacing: 6px;
+        alignment: center;
+        if root.loading: Spinner {
+            indeterminate: true;
+            width: 14px;
+            height: 14px;
+            y: (parent.height - self.height) / 2;
+        }
+        if root.has-icon && !root.loading: Icon {
+            source: root.icon;
+            color: root.fg;
+            size: root.size == "sm" ? 14px : 16px;
+            y: (parent.height - self.height) / 2;
+        }
+        if root.text != "": Text {
+            text: root.text;
+            color: root.fg;
+            font-size: root.size == "sm" ? Theme.text-xs : root.size == "lg" ? Theme.text-base : Theme.text-sm;
+            font-weight: 500;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component IconButton {
+    in property <image> icon;
+    in property <length> icon-size: 16px;
+    in property <color> color: Theme.text-muted;
+    in property <color> hover-color: Theme.text-primary;
+    in property <bool> enabled: true;
+    in property <string> tooltip;
+    callback clicked();
+    width: icon-size + 8px;
+    height: icon-size + 8px;
+    accessible-role: button;
+    accessible-label: tooltip;
+    Rectangle {
+        border-radius: 4px;
+        background: touch.has-hover && root.enabled ? Theme.bg-elevated : transparent;
+        opacity: root.enabled ? 1 : 0.4;
+        Icon {
+            source: root.icon;
+            size: root.icon-size;
+            color: touch.has-hover && root.enabled ? root.hover-color : root.color;
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export component LinkButton inherits Text {
+    callback clicked();
+    color: touch.has-hover ? Theme.accent-hover : Theme.accent;
+    font-size: Theme.text-sm;
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export component Card inherits Rectangle {
+    in property <string> title;
+    in property <length> pad: 12px;
+    background: Theme.bg-surface;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: Theme.border;
+    VerticalLayout {
+        padding: root.pad;
+        spacing: 10px;
+        if root.title != "": Text {
+            text: root.title;
+            font-size: Theme.text-sm;
+            font-weight: 600;
+            color: Theme.text-primary;
+        }
+        @children
+    }
+}
+
+export component Badge inherits Rectangle {
+    in property <string> text;
+    // default / secondary / primary / muted / destructive / success
+    in property <string> variant: "secondary";
+    in property <bool> clickable: false;
+    callback clicked();
+    border-radius: 999px;
+    height: 22px;
+    min-width: label.preferred-width + 16px;
+    background: variant == "primary" ? Theme.accent
+        : variant == "default" ? Theme.text-primary
+        : variant == "destructive" ? Theme.danger-soft
+        : variant == "success" ? #22c55e22
+        : variant == "muted" ? Theme.bg-elevated
+        : Theme.accent-subtle;
+    label := Text {
+        text: root.text;
+        font-size: 11px;
+        font-weight: 500;
+        color: root.variant == "primary" || root.variant == "default" ? #ffffff
+            : root.variant == "destructive" ? Theme.danger
+            : root.variant == "success" ? #15803d
+            : root.variant == "muted" ? Theme.text-secondary
+            : Theme.accent-hover;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    TouchArea {
+        enabled: root.clickable;
+        mouse-cursor: root.clickable ? pointer : default;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// 選択式のチップ（ラベル選択・文字種トグルなど）
+export component Chip inherits Rectangle {
+    in property <string> text;
+    in property <bool> selected;
+    in property <image> icon;
+    in property <bool> has-icon: false;
+    in property <bool> dashed: false;
+    callback clicked();
+    height: 26px;
+    min-width: row.preferred-width;
+    border-radius: 999px;
+    border-width: 1px;
+    border-color: selected ? Theme.accent : touch.has-hover ? Theme.accent : Theme.border;
+    background: selected ? Theme.accent : touch.has-hover ? Theme.accent-subtle : transparent;
+    row := HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 4px;
+        alignment: center;
+        if root.has-icon: Icon {
+            source: root.icon;
+            size: 12px;
+            color: root.selected ? #ffffff : Theme.text-secondary;
+            y: (parent.height - self.height) / 2;
+        }
+        Text {
+            text: root.text;
+            font-size: Theme.text-xs;
+            color: root.selected ? #ffffff : Theme.text-secondary;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export component ErrorBanner inherits Rectangle {
+    in property <string> text;
+    visible: text != "";
+    height: text != "" ? inner.preferred-height : 0px;
+    background: Theme.danger-soft;
+    border-color: Theme.danger-border;
+    border-width: 1px;
+    border-radius: Theme.radius;
+    inner := VerticalLayout {
+        padding: 10px;
+        Text {
+            text: root.text;
+            color: Theme.danger;
+            font-size: Theme.text-sm;
+            wrap: word-wrap;
+        }
+    }
+}
+
+export component FieldLabel inherits HorizontalLayout {
+    in property <string> text;
+    in property <bool> required: false;
+    in property <length> font-size: Theme.text-sm;
+    spacing: 4px;
+    alignment: start;
+    Text {
+        text: root.text;
+        font-size: root.font-size;
+        font-weight: 500;
+        color: Theme.text-primary;
+    }
+
+    if root.required: Text {
+        text: "*";
+        color: Theme.danger;
+        font-size: root.font-size;
+    }
+}
+
+export component HelpText inherits Text {
+    font-size: Theme.text-xs;
+    color: Theme.text-muted;
+    wrap: word-wrap;
+}
+
+// パスワード入力（std-widgets の LineEdit が表示切替ボタンを内蔵している）
+export component PasswordInput inherits HorizontalLayout {
+    in-out property <string> text;
+    in property <string> placeholder-text;
+    in property <bool> enabled: true;
+    out property <bool> has-focus: edit.has-focus;
+    callback accepted();
+    callback edited(string);
+    forward-focus: edit;
+    edit := LineEdit {
+        horizontal-stretch: 1;
+        text <=> root.text;
+        placeholder-text: root.placeholder-text;
+        enabled: root.enabled;
+        input-type: InputType.password;
+        accepted => {
+            root.accepted();
+        }
+        edited(t) => {
+            root.edited(t);
+        }
+    }
+}
+
+export component SectionHeading inherits HorizontalLayout {
+    in property <string> text;
+    spacing: 8px;
+    padding-top: 12px;
+    padding-bottom: 4px;
+    padding-left: 4px;
+    Text {
+        text: root.text;
+        font-size: Theme.text-xs;
+        font-weight: 500;
+        color: Theme.text-secondary;
+        vertical-alignment: center;
+    }
+
+    Rectangle {
+        horizontal-stretch: 1;
+        Rectangle {
+            height: 1px;
+            y: (parent.height - 1px) / 2;
+            background: Theme.border;
+        }
+    }
+}
+
+export component EmptyState inherits VerticalLayout {
+    in property <string> emoji;
+    in property <string> title;
+    in property <string> description;
+    padding-top: 48px;
+    padding-bottom: 48px;
+    padding-left: 16px;
+    padding-right: 16px;
+    spacing: 8px;
+    alignment: start;
+    if root.emoji != "": Text {
+        text: root.emoji;
+        font-size: 40px;
+        horizontal-alignment: center;
+    }
+    Text {
+        text: root.title;
+        font-size: Theme.text-xl;
+        font-weight: 600;
+        color: Theme.text-primary;
+        horizontal-alignment: center;
+        wrap: word-wrap;
+    }
+
+    if root.description != "": Text {
+        text: root.description;
+        font-size: Theme.text-sm;
+        color: Theme.text-secondary;
+        horizontal-alignment: center;
+        wrap: word-wrap;
+    }
+    @children
+}
+
+// 中央寄せの縦スクロールページ
+export component ScrollPage inherits ScrollView {
+    in property <length> max-content-width: 672px;
+    in property <length> pad: 24px;
+    in property <length> spacing: 16px;
+    private property <length> inner-width: min(root.max-content-width, root.visible-width - 2 * root.pad);
+    content-width: root.visible-width;
+    content-height: col.preferred-height + 2 * root.pad;
+    col := VerticalLayout {
+        x: (root.visible-width - root.inner-width) / 2;
+        y: root.pad;
+        width: root.inner-width;
+        height: self.preferred-height;
+        spacing: root.spacing;
+        @children
+    }
+}
+
+// オンボーディング画面の大きめの見出し（旧 PageHeader）
+export component PageHeader inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    VerticalLayout {
+        padding-left: 24px;
+        padding-right: 24px;
+        padding-top: 16px;
+        padding-bottom: 16px;
+        spacing: 4px;
+        Text {
+            text: root.title;
+            font-size: Theme.text-2xl;
+            font-weight: 700;
+            color: Theme.text-primary;
+        }
+
+        if root.subtitle != "": Text {
+            text: root.subtitle;
+            font-size: Theme.text-sm;
+            color: Theme.text-secondary;
+        }
+    }
+
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.border;
+    }
+}
+
+// モーダルダイアログの外枠。ウィンドウ直下に置いて全体を覆う
+export component Dialog inherits Rectangle {
+    in property <string> title;
+    in property <string> description;
+    in property <bool> dangerous: false;
+    in property <length> dialog-width: 460px;
+    // false の場合、背景クリックで閉じない（処理中など）
+    in property <bool> dismissable: true;
+    callback dismissed();
+    private property <length> panel-width: min(root.dialog-width, root.width - 32px);
+    background: #00000066;
+
+    TouchArea {
+        clicked => {
+            if root.dismissable {
+                root.dismissed();
+            }
+        }
+    }
+
+    panel := Rectangle {
+        width: root.panel-width;
+        height: min(content.preferred-height, root.height - 48px);
+        background: Theme.bg-surface;
+        border-radius: 10px;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #0000003a;
+        // パネル内のクリックを背景に伝えない
+        TouchArea { }
+
+        content := VerticalLayout {
+            padding: 24px;
+            spacing: 14px;
+            if root.title != "": HorizontalLayout {
+                spacing: 12px;
+                if root.dangerous: Icon {
+                    source: Icons.alert-circle;
+                    color: Theme.danger;
+                    size: 20px;
+                }
+                VerticalLayout {
+                    spacing: 6px;
+                    // 折り返しの高さを正しく計算させるため、幅を明示する
+                    width: root.panel-width - 48px - (root.dangerous ? 32px : 0px);
+                    Text {
+                        text: root.title;
+                        font-size: Theme.text-lg;
+                        font-weight: 600;
+                        color: Theme.text-primary;
+                        wrap: word-wrap;
+                    }
+
+                    if root.description != "": Text {
+                        text: root.description;
+                        font-size: Theme.text-sm;
+                        color: Theme.text-secondary;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+            @children
+        }
+    }
+}
+
+export component DialogFooter inherits HorizontalLayout {
+    spacing: 8px;
+    alignment: end;
+    padding-top: 4px;
+    @children
+}
+
+// 選択可能な等幅テキストのブロック（リカバリーキーや転送コードの表示用）
+export component CodeBlock inherits Rectangle {
+    in property <string> text;
+    in property <length> font-size: Theme.text-sm;
+    background: Theme.bg-elevated;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: Theme.border;
+    min-height: body.preferred-height;
+    body := VerticalLayout {
+        padding: 16px;
+        Text {
+            text: root.text;
+            font-family: Theme.mono;
+            font-size: root.font-size;
+            color: Theme.text-primary;
+            wrap: char-wrap;
+        }
+    }
+}
+
+// TOTP の残り時間を示すリング
+export component TotpRing inherits Rectangle {
+    in property <int> remaining;
+    in property <int> period: 30;
+    width: 28px;
+    height: 28px;
+    private property <float> progress: period > 0 ? remaining / period : 0;
+    private property <angle> sweep: 360deg * min(progress, 0.9999);
+    Path {
+        width: 28px;
+        height: 28px;
+        viewbox-width: 28;
+        viewbox-height: 28;
+        stroke: Theme.border;
+        stroke-width: 2.5px;
+        fill: transparent;
+        MoveTo {
+            x: 14;
+            y: 4;
+        }
+
+        ArcTo {
+            x: 14;
+            y: 24;
+            radius-x: 10;
+            radius-y: 10;
+            sweep: true;
+        }
+
+        ArcTo {
+            x: 14;
+            y: 4;
+            radius-x: 10;
+            radius-y: 10;
+            sweep: true;
+        }
+    }
+
+    Path {
+        width: 28px;
+        height: 28px;
+        viewbox-width: 28;
+        viewbox-height: 28;
+        stroke: Theme.accent;
+        stroke-width: 2.5px;
+        fill: transparent;
+        MoveTo {
+            x: 14;
+            y: 4;
+        }
+
+        ArcTo {
+            x: 14 + 10 * sin(root.sweep);
+            y: 14 - 10 * cos(root.sweep);
+            radius-x: 10;
+            radius-y: 10;
+            sweep: true;
+            large-arc: root.sweep > 180deg;
+        }
+    }
+
+    Text {
+        text: root.remaining;
+        font-size: 8px;
+        color: Theme.text-secondary;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+// Markdown の簡易レンダラ。ブロック分割は Rust 側（markdown.rs）、インライン装飾は StyledText が担う
+export component MarkdownView inherits VerticalLayout {
+    in property <[MdBlock]> blocks;
+    in property <length> base-size: Theme.text-sm;
+    callback link-clicked(string);
+    spacing: 6px;
+    for block in root.blocks: VerticalLayout {
+        if block.kind == "h1" || block.kind == "h2" || block.kind == "h3": StyledText {
+            text: block.text;
+            default-font-size: block.kind == "h1" ? root.base-size * 1.5 : block.kind == "h2" ? root.base-size * 1.3 : root.base-size * 1.15;
+            default-color: Theme.text-primary;
+            link-color: Theme.accent;
+            link-clicked(url) => {
+                root.link-clicked(url);
+            }
+        }
+        if block.kind == "p": StyledText {
+            text: block.text;
+            default-font-size: root.base-size;
+            default-color: Theme.text-primary;
+            link-color: Theme.accent;
+            link-clicked(url) => {
+                root.link-clicked(url);
+            }
+        }
+        if block.kind == "li": HorizontalLayout {
+            padding-left: 16px * block.depth;
+            spacing: 6px;
+            Text {
+                text: block.marker;
+                font-size: root.base-size;
+                color: Theme.text-primary;
+                min-width: 14px;
+                horizontal-alignment: right;
+            }
+
+            StyledText {
+                horizontal-stretch: 1;
+                text: block.text;
+                default-font-size: root.base-size;
+                default-color: Theme.text-primary;
+                link-color: Theme.accent;
+                link-clicked(url) => {
+                    root.link-clicked(url);
+                }
+            }
+        }
+        if block.kind == "quote": HorizontalLayout {
+            spacing: 10px;
+            Rectangle {
+                width: 4px;
+                background: Theme.accent;
+            }
+
+            StyledText {
+                horizontal-stretch: 1;
+                text: block.text;
+                default-font-size: root.base-size;
+                default-color: Theme.text-secondary;
+                link-color: Theme.accent;
+            }
+        }
+        if block.kind == "code": Rectangle {
+            background: Theme.bg-elevated;
+            border-radius: 4px;
+            VerticalLayout {
+                padding: 10px;
+                Text {
+                    text: block.plain;
+                    font-family: Theme.mono;
+                    font-size: root.base-size * 0.9;
+                    color: Theme.text-primary;
+                    wrap: char-wrap;
+                }
+            }
+        }
+        if block.kind == "hr": Rectangle {
+            height: 1px;
+            background: Theme.border;
+        }
+        if block.kind == "row": Rectangle {
+            background: block.header ? Theme.bg-elevated : transparent;
+            border-width: 1px;
+            border-color: Theme.border;
+            min-height: cells.preferred-height;
+            cells := HorizontalLayout {
+                padding: 6px;
+                spacing: 12px;
+                for cell in block.cells: Text {
+                    horizontal-stretch: 1;
+                    width: (root.width - 12px - 12px * max(0, block.cells.length - 1)) / max(1, block.cells.length);
+                    text: cell;
+                    font-size: root.base-size;
+                    font-weight: block.header ? 700 : 400;
+                    color: Theme.text-primary;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+}
