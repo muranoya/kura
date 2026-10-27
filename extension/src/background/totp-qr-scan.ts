@@ -213,7 +213,12 @@ export function handleTotpQrMessage(
 
           scanContext = null
           sendResponse({ success: true })
-          broadcastToExtensionPages({ type: 'ENTRY_UPDATED_IN_BACKGROUND', entryId, fieldId })
+          broadcastToExtensionPages({
+            type: 'ENTRY_UPDATED_IN_BACKGROUND',
+            entryId,
+            fieldId,
+            change: 'totp',
+          })
         } catch (e) {
           console.error(LOG_PREFIX, 'TOTP_QR_APPLY failed:', e)
           sendResponse({ success: false, error: String(e) })

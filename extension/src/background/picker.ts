@@ -173,7 +173,12 @@ export function handlePickerMessage(
 
           pickerContext = null
           sendResponse({ success: true })
-          broadcastToExtensionPages({ type: 'ENTRY_UPDATED_IN_BACKGROUND', entryId, fieldId })
+          broadcastToExtensionPages({
+            type: 'ENTRY_UPDATED_IN_BACKGROUND',
+            entryId,
+            fieldId,
+            change: 'autofillSelector',
+          })
         } catch (e) {
           console.error(LOG_PREFIX, 'PICKER_RESULT failed:', e)
           sendResponse({ success: false, error: String(e) })

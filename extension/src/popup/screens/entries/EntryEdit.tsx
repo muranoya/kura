@@ -60,7 +60,7 @@ export default function EntryEdit() {
   }, [id, t])
 
   // ピッカー / TOTP QRスキャンの結果はSW側でエントリへ直接書き込まれるため、
-  // 該当フィールドだけを最新値に差し替える（他の編集中の内容は保持する）
+  // SWが書き換えた属性だけを反映する（同じフィールドの名前など、編集中の内容は保持する）
   useEffect(() => {
     if (!id) return
     const listener = (message: ExtensionPageBroadcast) => {
@@ -70,11 +70,15 @@ export default function EntryEdit() {
         .then((latest) => {
           const updated = latest.customFields?.find((f) => f.id === message.fieldId)
           if (!updated) return
-          setCustomFields((prev) =>
-            prev.some((f) => f.id === updated.id)
-              ? prev.map((f) => (f.id === updated.id ? updated : f))
-              : [...prev, updated],
-          )
+          setCustomFields((prev) => {
+            if (!prev.some((f) => f.id === updated.id)) return [...prev, updated]
+            return prev.map((f) => {
+              if (f.id !== updated.id) return f
+              return message.change === 'autofillSelector'
+                ? { ...f, autofillSelector: updated.autofillSelector }
+                : { ...f, fieldType: updated.fieldType, value: updated.value }
+            })
+          })
         })
         .catch((err) => setError(t('entries.edit.loadFailed', { error: String(err) })))
     }

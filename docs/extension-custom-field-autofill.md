@@ -259,10 +259,12 @@ CLAUDE.mdに定める通り、拡張機能のUIではRadix UIのPortal系コン�
    → Service Worker に PICKER_RESULT { fieldId, selector } を送信
 
 4. Service Worker: 受け取った結果を api_update_entry で該当カスタムフィールドへ直接書き込む
-   → ENTRY_UPDATED_IN_BACKGROUND { entryId, fieldId } を拡張機能ページへブロードキャスト
+   → ENTRY_UPDATED_IN_BACKGROUND { entryId, fieldId, change: 'autofillSelector' } を
+     拡張機能ページへブロードキャスト
 
 5. サイドバー: 編集画面を開いていれば該当エントリを再取得し、
-   対象フィールドだけを最新値に差し替える（他の編集中の内容は保持する）
+   対象フィールドの autofillSelector だけを最新値に差し替える
+   （ピッカー実行中に編集したフィールド名・値など、他の編集中の内容は保持する）
 ```
 
 ## 4-3. popupのライフサイクル問題と対処方針
