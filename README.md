@@ -1,128 +1,124 @@
 # kura
 
-A serverless password manager. Your vault lives in your own S3-compatible storage.
+サーバ不要のパスワードマネージャー。あなた自身のS3互換ストレージにvaultを保管します。
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/bkhdjpmpbkaiafemghempeagliblhofc?label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/kura/bkhdjpmpbkaiafemghempeagliblhofc)
-[![Mozilla Add-on](https://img.shields.io/amo/v/dc747ff47c9d45f4b4fd?label=Firefox%20Add-ons)](https://addons.mozilla.org/firefox/addon/dc747ff47c9d45f4b4fd/)
 
-[日本語](README_ja.md)
+> **注意:** kura は開発初期段階であり、最初の安定版リリースには至っていません。データ形式、API、機能は予告なく変更される可能性があります。ご利用は自己責任でお願いします。
 
-> **Note:** kura is in early development and has not yet reached its first stable release. Data formats, APIs, and features may change without notice. Use at your own risk.
+## 特徴
 
-## Features
+- **サーバ不要** -- 暗号化されたvaultを単一ファイルとしてS3互換ストレージ（AWS S3、Cloudflare R2、MinIOなど）に保存するだけ
+- **ゼロ知識暗号化** -- 暗号化・復号はすべてデバイス上で実行。ストレージプロバイダーが平文データを見ることはありません
+- **マルチプラットフォーム** -- デスクトップ（Windows、macOS、Linux）、Android、ブラウザ拡張機能（Chrome、Firefox）に対応
+- **オフラインファースト** -- オフライン時はローカルキャッシュで動作。接続が回復すると自動的に同期
+- **自動コンフリクト解消** -- 複数デバイスで編集してもデータロストの心配なし。タイムスタンプベースのマージで自動解消
+- **1Passwordからのインポート** -- 1puxエクスポート形式を使って1Passwordから移行可能
 
-- **No server required** -- Store your encrypted vault as a single file on S3-compatible storage (AWS S3, Cloudflare R2, MinIO, etc.)
-- **Zero-knowledge encryption** -- All encryption and decryption happens on your device. Your storage provider never sees your plaintext data.
-- **Multi-platform** -- Desktop (Windows, macOS, Linux), Android, and browser extensions (Chrome, Firefox)
-- **Offline-first** -- Works with a local cache when you're offline. Syncs automatically when connectivity is restored.
-- **Automatic conflict resolution** -- Edit on multiple devices without worrying about data loss. Conflicts are resolved automatically via timestamp-based merge.
-- **Import from 1Password** -- Migrate from 1Password using the 1pux export format.
+## 対応プラットフォーム
 
-## Supported Platforms
+| プラットフォーム | 技術 | 状態 |
+|----------------|------|------|
+| Windows / Linux | Tauri (Rust + React) | 利用可能 |
+| macOS (Apple Silicon) | Tauri (Rust + React) | 利用可能（[インストール手順](#macos-インストール手順)参照） |
+| Android | Kotlin + Jetpack Compose | 利用可能 |
+| Chrome 拡張機能 | React + WASM | 利用可能 |
+| Firefox 拡張機能 | React + WASM | 利用可能 |
 
-| Platform | Technology | Status |
-|----------|-----------|--------|
-| Windows / Linux | Tauri (Rust + React) | Available |
-| macOS (Apple Silicon) | Tauri (Rust + React) | Available (see [installation steps](#macos-installation)) |
-| Android | Kotlin + Jetpack Compose | Available |
-| Chrome extension | React + WASM | [Available on Chrome Web Store](https://chromewebstore.google.com/detail/kura/bkhdjpmpbkaiafemghempeagliblhofc) |
-| Firefox extension | React + WASM | [Available on Firefox Add-ons](https://addons.mozilla.org/firefox/addon/dc747ff47c9d45f4b4fd/) |
+すべてのプラットフォームでRust製のコアライブラリ（`vault-core`）を共有しており、暗号化と同期の挙動がどの環境でも同一であることを保証しています。
 
-All platforms share the same core library (`vault-core`), written in Rust, ensuring consistent encryption and sync behavior everywhere.
+## セキュリティ
 
-## Security
-
-kura uses a two-layer encryption architecture:
+kuraは二層暗号化アーキテクチャを採用しています。
 
 ```
-Master Password
-    |  Argon2id key derivation
+マスターパスワード
+    |  Argon2idで鍵導出
     v
-KEK (Key Encryption Key)
+KEK（Key Encryption Key）
     |
     v
-DEK (Data Encryption Key)  -- encrypted by KEK, stored in vault metadata
-    |  HKDF-SHA256 sub-key derivation
+DEK（Data Encryption Key） -- KEKで暗号化し、vaultメタデータに保存
+    |  HKDF-SHA256でサブ鍵を導出
     v
-Vault data encrypted with XChaCha20-Poly1305 (a searchable index + per-entry secrets)
+vaultデータをXChaCha20-Poly1305で暗号化（一覧用のindexと、エントリごとの秘匿値に分けて暗号化）
 ```
 
-- **Client-side only** -- Encryption keys never leave your device. The storage provider only sees encrypted blobs.
-- **XChaCha20-Poly1305** -- Authenticated encryption for vault data. Secrets such as passwords are encrypted per entry and decrypted only when you need that entry.
-- **Argon2id** -- Memory-hard key derivation to resist brute-force attacks.
-- **Recovery key** -- Generated during setup. If you forget your master password, the recovery key can unlock your vault and set a new one.
+- **クライアントサイドのみ** -- 暗号化鍵がデバイスの外に出ることはありません。ストレージプロバイダーには暗号化されたデータのみが見えます
+- **XChaCha20-Poly1305** -- 認証付き暗号化でvaultデータを保護。パスワードなどの秘匿値はエントリごとに暗号化し、必要になったときにそのエントリの分だけ復号します
+- **Argon2id** -- メモリハードな鍵導出関数でブルートフォース攻撃に対抗
+- **リカバリーキー** -- セットアップ時に生成。マスターパスワードを忘れた場合でも、リカバリーキーでvaultのロック解除と新しいマスターパスワードの設定が可能
 
-## How It Works
+## 仕組み
 
 ```
-Client (Desktop / Android / Browser Extension)
-  |- Encryption & decryption (all client-side)
-  |- Local cache (offline support)
-  '- Read/write to cloud storage
+クライアント（デスクトップ / Android / ブラウザ拡張機能）
+  |- 暗号化・復号（すべてクライアントサイド）
+  |- ローカルキャッシュ（オフライン対応）
+  '- クラウドストレージへの読み書き
             |
-      vault.json (single encrypted file)
+      vault.json（単一の暗号化ファイル）
             |
-   S3 / Cloudflare R2 / MinIO (your choice)
+   S3 / Cloudflare R2 / MinIO（ユーザーが選択）
 ```
 
-The shared Rust core (`vault-core`) compiles to:
-- **Native binary** -- for the Tauri desktop backend
-- **JNI library** -- for Android via Java Native Interface
-- **WebAssembly** -- for browser extensions
+共有Rustコア（`vault-core`）は以下にコンパイルされます。
+- **ネイティブバイナリ** -- Tauriデスクトップバックエンド用
+- **JNIライブラリ** -- Java Native Interfaceを介したAndroid用
+- **WebAssembly** -- ブラウザ拡張機能用
 
-This means encryption logic, sync algorithms, and data handling are identical across all platforms.
+これにより、暗号化ロジック・同期アルゴリズム・データ処理がすべてのプラットフォームで同一です。
 
-## macOS Installation
+## macOS インストール手順
 
-> **Note:** kura is distributed with ad-hoc code signing and is not enrolled in the Apple Developer Program. Because of this, macOS Gatekeeper will show `"kura" is damaged and can't be opened` the first time you launch it. The binary is not actually damaged — this is the standard macOS behavior for applications that are not notarized by Apple.
+> **注意:** kura は Apple Developer Program に加入せず ad-hoc 署名で配布しています。そのため macOS 標準のセキュリティ機構（Gatekeeper）により、初回起動時に「"kura" は壊れているため開けません」と表示されます。これは kura のバイナリが実際に壊れているわけではなく、Apple による公証（Notarization）を受けていないために発生する既知の挙動です。
 
-### Supported architecture
+### 対応アーキテクチャ
 
-The macOS build targets **Apple Silicon (M1/M2/M3, arm64)** only. Intel Macs are not supported.
+macOS 版は **Apple Silicon (M1/M2/M3 など、arm64)** のみ対応しています。Intel Mac には対応していません。
 
-### Installation steps
+### インストール手順
 
-1. Download `kura-desktop-macos-arm64-<VERSION>.dmg` from GitHub Releases.
-2. Double-click the dmg to mount it, then drag `kura.app` into `/Applications`.
-3. Open Terminal and strip the quarantine attribute:
+1. GitHub Releases から `kura-desktop-macos-arm64-<VERSION>.dmg` をダウンロード
+2. dmg をダブルクリックでマウントし、`kura.app` を `/Applications` へドラッグ&ドロップ
+3. ターミナルで以下を実行し、quarantine 属性を削除
 
    ```sh
    xattr -cr /Applications/kura.app
    ```
 
-4. Launch `kura.app` from Launchpad or Finder.
+4. Launchpad または Finder から `kura.app` を起動
 
-### What `xattr -cr` does
+### この手順は何をしているのか
 
-`xattr -cr` recursively removes the `com.apple.quarantine` extended attribute that macOS automatically attaches to files downloaded from the internet. kura is open source and its entire source is published in this repository. If you build it yourself (`just release-desktop-macos`), this step is not required.
+`xattr -cr` は macOS がインターネット経由のファイルに自動で付ける `com.apple.quarantine` 拡張属性を再帰的に削除するコマンドです。kura は本リポジトリで公開されているオープンソースソフトウェアです。自分でビルドする場合（`just release-desktop-macos`）はこの手順は不要です。
 
-## Setup
+## セットアップ
 
-Build and test commands are available via `just help`.
+ビルドやテストの実行方法は `just help` で確認できます。
 
-### AWS S3 Setup
+### AWS S3 のセットアップ
 
-Create an IAM user for kura and configure access to your S3 bucket.
+kura 用の IAM ユーザーを作成し、S3 バケットへのアクセス権限を設定します。
 
-#### 1. Create an S3 bucket
+#### 1. S3 バケットを作成
 
 ```sh
 aws s3 mb s3://your-kura-vault-bucket
 ```
 
-#### 2. Create an IAM user and generate access keys
+#### 2. IAM ユーザーを作成しアクセスキーを発行
 
 ```sh
 aws iam create-user --user-name kura
 aws iam create-access-key --user-name kura
 ```
 
-Use the returned `AccessKeyId` and `SecretAccessKey` in the app's storage settings.
+発行された `AccessKeyId` と `SecretAccessKey` をアプリのストレージ設定で使用します。
 
-#### 3. Configure the IAM policy
+#### 3. IAM ポリシーを設定
 
-kura requires `s3:GetObject`, `s3:PutObject`, and `s3:ListBucket` permissions. Create and attach the following policy:
+kura が必要とする権限は `s3:GetObject`、`s3:PutObject`、`s3:ListBucket` です。以下のポリシーを作成してユーザーにアタッチします。
 
 ```json
 {
@@ -152,17 +148,17 @@ aws iam put-user-policy \
   --policy-document file://policy.json
 ```
 
-> For other S3-compatible storage services like Cloudflare R2 or MinIO, follow each service's documentation to generate access keys.
+> Cloudflare R2 や MinIO など他の S3 互換ストレージを使う場合は、各サービスのドキュメントに従ってアクセスキーを発行してください。
 
-## Links
+## リンク
 
-- Website: https://muranoya.github.io/kura.github.io/
-- Privacy Policy: https://muranoya.github.io/kura.github.io/privacy-en.html
-- Terms of Use: https://muranoya.github.io/kura.github.io/terms-en.html
-- Security reports: see [SECURITY.md](SECURITY.md)
-- Contact: daisuke.muraoka.jp@gmail.com
+- 公式サイト: https://github.com/muranoya/kura
+- プライバシーポリシー: [assets/legal/privacy.md](assets/legal/privacy.md)
+- 利用規約: [assets/legal/terms.md](assets/legal/terms.md)
+- セキュリティ報告: [SECURITY.md](SECURITY.md) を参照
+- 連絡先: daisuke.muraoka.jp@gmail.com
 - Issues: https://github.com/muranoya/kura/issues
 
-## License
+## ライセンス
 
-Licensed under the [Apache License, Version 2.0](LICENSE).
+[Apache License, Version 2.0](LICENSE) でライセンスされています。

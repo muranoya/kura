@@ -275,7 +275,7 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: cd extension && pnpm exec tsx scripts/source-bundle.ts
 
-      - name: Submit Firefox extension to AMO (listed)
+      - name: Sign Firefox extension on AMO (unlisted)
         continue-on-error: true
         env:
           AMO_API_KEY: ${{ secrets.AMO_API_KEY }}
@@ -290,6 +290,14 @@ jobs:
         run: |
           mv extension/kura-extension-chrome.zip "extension/kura-chrome-extension-${VERSION}.zip"
           mv extension/kura-extension-firefox.zip "extension/kura-firefox-extension-${VERSION}.zip"
+          # 署名済み xpi（AMO の資格情報がない、または署名に失敗した場合は存在しない）
+          shopt -s nullglob
+          xpis=(extension/*.xpi)
+          if [ ${#xpis[@]} -eq 1 ]; then
+            mv "${xpis[0]}" "extension/kura-firefox-extension-${VERSION}.xpi"
+          elif [ ${#xpis[@]} -gt 1 ]; then
+            echo "::warning::Multiple xpi files found: ${xpis[*]}"
+          fi
 
       - name: Upload Chrome zip
         uses: actions/upload-artifact@v7
@@ -301,7 +309,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: extension-firefox
-          path: extension/kura-firefox-extension-${{ needs.prepare.outputs.version }}.zip
+          path: |
+            extension/kura-firefox-extension-${{ needs.prepare.outputs.version }}.zip
+            extension/kura-firefox-extension-${{ needs.prepare.outputs.version }}.xpi
 
   # ---------------------------------------------------------------------------
   # Android APK

@@ -123,7 +123,6 @@ export interface AppSettings {
   clipboardClearSeconds: number
   autolockMinutes: number
   theme?: 'light' | 'dark'
-  language?: 'ja' | 'en'
   /** WebAuthn/Passkey対応のON/OFF。デフォルトOFF（未設定時はfalse扱い）。 */
   passkeyEnabled?: boolean
 }

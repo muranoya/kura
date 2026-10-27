@@ -1,8 +1,6 @@
 // TOTP QR scan mode — page overlay + screenshot decode
 
-import enLocale from '../popup/i18n/locales/en.json'
 import jaLocale from '../popup/i18n/locales/ja.json'
-import { STORAGE_KEYS } from '../shared/constants'
 import {
   decodeAllQrFromDataUrl,
   normalizeTotpQrPayload,
@@ -35,35 +33,7 @@ let scanning = false
 let applying = false
 let selectedValue: string | null = null
 
-type OverlayStrings = typeof enLocale.content.totpQr
-
-const STRINGS: Record<'en' | 'ja', OverlayStrings> = {
-  en: enLocale.content.totpQr,
-  ja: jaLocale.content.totpQr,
-}
-
-let t: OverlayStrings = STRINGS.en
-
-function detectLangFromNavigator(): 'en' | 'ja' {
-  const raw = (navigator.language || '').toLowerCase()
-  return raw.split('-')[0] === 'ja' ? 'ja' : 'en'
-}
-
-async function resolveOverlayStrings(): Promise<OverlayStrings> {
-  let lang: 'en' | 'ja' = detectLangFromNavigator()
-  try {
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-      const result = await chrome.storage.local.get([STORAGE_KEYS.APP_SETTINGS])
-      const settings = result?.[STORAGE_KEYS.APP_SETTINGS] as { language?: string } | undefined
-      if (settings?.language === 'ja' || settings?.language === 'en') {
-        lang = settings.language
-      }
-    }
-  } catch {
-    // fall back to navigator
-  }
-  return STRINGS[lang]
-}
+const t = jaLocale.content.totpQr
 
 function ensureShadowHost(): ShadowRoot {
   if (shadowRoot) return shadowRoot
@@ -438,8 +408,6 @@ export async function startTotpQrScanMode() {
   isActive = true
   scanning = false
   applying = false
-  t = await resolveOverlayStrings()
-  if (!isActive) return
   ensureShadowHost()
   renderToolbar()
   document.addEventListener('keydown', onKeydown, true)

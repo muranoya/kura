@@ -9,7 +9,6 @@ export function getEntryTypeLabel(type: string): string {
 export const DEFAULT_SETTINGS: AppSettings = {
   clipboardClearSeconds: 30,
   autolockMinutes: 5,
-  language: 'system',
 }
 
 // Default vault ID (single vault for now)

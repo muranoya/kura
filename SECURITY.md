@@ -1,54 +1,54 @@
-# Security Policy
+# セキュリティポリシー
 
-## Supported Versions
+## サポート対象のバージョン
 
-kura is in early development. Only the latest released version receives security updates.
+kura は開発初期段階です。セキュリティ修正の対象は最新のリリースのみです。
 
-| Version | Supported |
-| ------- | --------- |
-| Latest release | Yes |
-| Older releases | No |
+| バージョン | サポート |
+| ---------- | -------- |
+| 最新リリース | あり |
+| それ以前のリリース | なし |
 
-## Reporting a Vulnerability
+## 脆弱性の報告
 
-Please report security vulnerabilities privately through one of the following channels:
+脆弱性は以下のいずれかの方法で非公開に報告してください。
 
-1. **GitHub Security Advisories** (preferred): open a private advisory at
+1. **GitHub Security Advisories**（推奨）: 次の URL から非公開のアドバイザリを作成してください。
    https://github.com/muranoya/kura/security/advisories/new
-2. **Email**: daisuke.muraoka.jp@gmail.com
+2. **メール**: daisuke.muraoka.jp@gmail.com
 
-Please include:
+報告には以下を含めてください。
 
-- A description of the vulnerability
-- Steps to reproduce, or a proof-of-concept
-- Affected version(s), platform(s), and component (`vault-core`, extension, desktop, Android)
-- Your contact information for follow-up
+- 脆弱性の説明
+- 再現手順、または PoC
+- 影響を受けるバージョン、プラットフォーム、コンポーネント（`vault-core`、拡張機能、デスクトップ、Android）
+- 追加の確認のための連絡先
 
-Please do **not** open a public GitHub Issue for security reports.
+セキュリティに関する報告を公開の GitHub Issue に投稿しないでください。
 
-### Response expectations
+### 対応の目安
 
-- Acknowledgement within 7 days of receipt
-- Initial assessment and expected remediation timeline within 14 days
-- Fixes released as patch versions; the advisory is published after users have had a reasonable window to update
+- 受領から 7 日以内に受領の連絡
+- 14 日以内に初期評価と修正の見通しを連絡
+- 修正はパッチバージョンとしてリリースし、ユーザーが更新できる期間を置いてからアドバイザリを公開
 
-### Scope
+### 対象範囲
 
-In scope:
+対象:
 
-- `vault-core` (Rust library, including cryptography and sync logic)
-- Browser extension (Firefox / Chrome) — client-side encryption, content script, background / offscreen contexts
-- Desktop app (Tauri backend, S3 integration)
-- Android app (JNI, S3 integration)
-- Build and release pipelines that affect the integrity of published artifacts
+- `vault-core`（暗号処理と同期ロジックを含む Rust ライブラリ）
+- ブラウザ拡張機能（Firefox / Chrome）: クライアント側暗号化、コンテンツスクリプト、background / offscreen コンテキスト
+- デスクトップアプリ（Tauri バックエンド、S3 連携）
+- Android アプリ（JNI、S3 連携）
+- 配布物の完全性に影響するビルド・リリースのパイプライン
 
-Out of scope:
+対象外:
 
-- Vulnerabilities in third-party S3-compatible storage services
-- Issues arising from users running modified or outdated versions
-- Social engineering attacks that do not exploit a specific vulnerability in the code
-- Loss of data when the user has forgotten both the master password and the recovery key (this is a documented limitation — see the Terms of Use)
+- 第三者が提供する S3 互換ストレージサービスの脆弱性
+- 改変されたバージョンや古いバージョンの利用に起因する問題
+- コード上の特定の脆弱性を突かないソーシャルエンジニアリング
+- マスターパスワードとリカバリーキーの両方を失った場合のデータ損失（既知の制約です。利用規約を参照してください）
 
-### Disclosure Policy
+### 公開の方針
 
-We follow coordinated disclosure. Please do not publicly disclose a vulnerability until a fix has been released. Reporters are credited in the advisory unless anonymity is requested.
+協調的な開示（coordinated disclosure）に従います。修正がリリースされるまで脆弱性を公開しないでください。報告者は、匿名を希望されない限りアドバイザリにクレジットします。

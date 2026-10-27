@@ -22,11 +22,10 @@ import { PasswordInput } from '../../components/ui/password-input'
 import { Separator } from '../../components/ui/separator'
 import TypeFilterDropdown from '../../components/ui/type-filter-dropdown'
 import { usePushError } from '../../contexts/ErrorContext'
-import { SUPPORTED_LANGUAGES, type SupportedLanguage, setLanguage } from '../../i18n'
 import { copySensitive } from '../../lib/clipboard'
 
 export default function Settings() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const pushError = usePushError()
   const [storageConfig, setStorageConfig] = useState<Record<string, string> | null>(null)
@@ -36,9 +35,6 @@ export default function Settings() {
   const [autolockMinutes, setAutolockMinutes] = useState<number>(DEFAULT_SETTINGS.autolockMinutes)
   const [clipboardClearSeconds, setClipboardClearSeconds] = useState<number>(
     DEFAULT_SETTINGS.clipboardClearSeconds,
-  )
-  const [language, setLanguageState] = useState<SupportedLanguage>(
-    (i18n.language as SupportedLanguage) ?? 'en',
   )
   const [passkeyEnabled, setPasskeyEnabled] = useState(false)
 
@@ -103,11 +99,6 @@ export default function Settings() {
     { value: '60', label: t('settings.general.clipboardClearOptions.1min') },
     { value: '120', label: t('settings.general.clipboardClearOptions.2min') },
   ]
-
-  const LANGUAGE_OPTIONS = SUPPORTED_LANGUAGES.map((lng) => ({
-    value: lng,
-    label: t(`language.${lng}`),
-  }))
 
   const openReauth = (next: () => void) => {
     setReauthPassword('')
@@ -187,12 +178,6 @@ export default function Settings() {
       setClipboardClearSeconds(
         settings.clipboardClearSeconds ?? DEFAULT_SETTINGS.clipboardClearSeconds,
       )
-      if (
-        settings.language &&
-        (SUPPORTED_LANGUAGES as readonly string[]).includes(settings.language)
-      ) {
-        setLanguageState(settings.language as SupportedLanguage)
-      }
       setPasskeyEnabled(settings.passkeyEnabled === true)
     } catch (err) {
       console.error('Failed to load settings:', err)
@@ -234,19 +219,6 @@ export default function Settings() {
       await commands.saveSettings({ ...currentSettings, passkeyEnabled: next })
     } catch (err) {
       setPasskeyEnabled(!next)
-      pushError(t('errors.saveSettingsFailed', { error: String(err) }))
-    }
-  }
-
-  const handleLanguageChange = async (value: string) => {
-    if (!(SUPPORTED_LANGUAGES as readonly string[]).includes(value)) return
-    const lang = value as SupportedLanguage
-    setLanguageState(lang)
-    try {
-      await setLanguage(lang)
-      const currentSettings = await commands.getSettings()
-      await commands.saveSettings({ ...currentSettings, language: lang })
-    } catch (err) {
       pushError(t('errors.saveSettingsFailed', { error: String(err) }))
     }
   }
@@ -397,18 +369,6 @@ export default function Settings() {
             {t('settings.sections.general')}
           </h2>
           <div className="flex items-center justify-between px-1 gap-2">
-            <span className="text-sm text-text-primary shrink-0">
-              {t('settings.general.language')}
-            </span>
-            <div className="w-32">
-              <TypeFilterDropdown
-                value={language}
-                onChange={handleLanguageChange}
-                options={LANGUAGE_OPTIONS}
-              />
-            </div>
-          </div>
-          <div className="flex items-center justify-between px-1 gap-2 mt-2">
             <span className="text-sm text-text-primary shrink-0">
               {t('settings.general.autoLock')}
             </span>

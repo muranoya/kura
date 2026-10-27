@@ -6,7 +6,6 @@ import Sidebar from './components/Sidebar'
 import ErrorBar from './components/layout/ErrorBar'
 import { ErrorProvider, usePushError } from './contexts/ErrorContext'
 import { SyncProvider, useNotifySynced } from './contexts/SyncContext'
-import { setLanguage } from './i18n'
 import Lock from './screens/auth/Lock'
 import Recovery from './screens/auth/Recovery'
 import EntryCreate from './screens/entries/EntryCreate'
@@ -41,9 +40,6 @@ function AppContent() {
     try {
       const settings = await getFromStorage<AppSettings>(STORAGE_KEYS.APP_SETTINGS)
       setAutolockMinutes(settings?.autolockMinutes ?? DEFAULT_SETTINGS.autolockMinutes)
-      if (settings?.language) {
-        await setLanguage(settings.language)
-      }
     } catch {
       // デフォルト値を使用
     }

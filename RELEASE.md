@@ -22,32 +22,27 @@ GitHub の **Actions → Release → Run workflow** からワークフローを�
 CI が自動で行うこと：
 - デスクトップアプリのビルド（Linux AppImage / `.deb`、macOS DMG、Windows NSIS インストーラー）
 - Chrome 拡張 ZIP のビルド → GitHub Release に添付（`kura-chrome-extension-*.zip`）
-- Firefox 拡張のビルド → Firefox AMO に自動提出・署名
+- Firefox 拡張のビルド → AMO に unlisted（ストア非公開）で提出して署名 → 署名済み xpi を GitHub Release に添付（`kura-firefox-extension-*.xpi`）
 - Android APK のビルド
 - GitHub Release の作成（全成果物を添付）
 
-## 3. Chrome Web Store に手動アップロード
+## 3. 拡張機能のインストール
 
-CI は Chrome Web Store への提出を自動化していない。リリースワークフロー完了後に手動で行う。
+拡張機能はストアに公開していないため、GitHub Release の成果物から手動でインストールする。
 
-1. GitHub Release から `kura-chrome-extension-*.zip` をダウンロード
-2. [Chrome Web Store デベロッパーダッシュボード](https://chrome.google.com/webstore/devconsole) を開く
-3. kura 拡張機能（ID: `bkhdjpmpbkaiafemghempeagliblhofc`）の管理画面へ移動
-4. **パッケージ** タブ → ZIP をアップロード
-5. 更新内容の説明を入力して審査提出
-
-審査には通常数営業日かかる。
+- **Chrome**: `kura-chrome-extension-*.zip` を展開し、`chrome://extensions` でデベロッパーモードを有効にして「パッケージ化されていない拡張機能を読み込む」から展開先を指定する
+- **Firefox**: `kura-firefox-extension-*.xpi` を Firefox にドラッグ&ドロップしてインストールする（unlisted 署名済みのため通常版の Firefox でもインストールできる）
 
 ## 必要な GitHub Secrets
 
 | Secret | 用途 |
 |--------|------|
-| `AMO_API_KEY` | Firefox AMO 自動提出 |
-| `AMO_API_SECRET` | Firefox AMO 自動提出 |
+| `AMO_API_KEY` | Firefox 拡張の署名 |
+| `AMO_API_SECRET` | Firefox 拡張の署名 |
 | `KEYSTORE_BASE64` | Android APK 署名 |
 | `KEYSTORE_PASSWORD` | Android APK 署名 |
 | `KEY_ALIAS` | Android APK 署名 |
 | `KEY_PASSWORD` | Android APK 署名 |
 
-`AMO_API_KEY` / `AMO_API_SECRET` が未設定の場合、Firefox 提出ステップは警告を出してスキップされる（他のビルドは継続）。
+`AMO_API_KEY` / `AMO_API_SECRET` が未設定の場合、Firefox の署名ステップは警告を出してスキップされ、署名済み xpi は添付されない（他のビルドは継続）。
 `KEYSTORE_BASE64` が未設定の場合、Android APK は署名なしでビルドされる。

@@ -32,7 +32,6 @@ const INCLUDE_PATHS = [
   'justfile',
   'LICENSE',
   'README.md',
-  'README_ja.md',
 ]
 
 function readVersion(): string {

@@ -378,11 +378,6 @@
     "title": "設定",
     "general": {
       "title": "一般",
-      "language": "言語",
-      "languageDescription": "UI で使用する言語を選択します",
-      "languageSystem": "システム",
-      "languageJa": "日本語",
-      "languageEn": "English",
       "autolock": "自動ロック",
       "autolockDescription": "ウィンドウのフォーカスが外れてからの時間",
       "clipboardClear": "クリップボード自動クリア",

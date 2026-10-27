@@ -32,15 +32,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.core.os.LocaleListCompat
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.fragment.app.FragmentActivity
 import net.meshpeak.kura.R
 import net.meshpeak.kura.bridge.VaultBridge
 import net.meshpeak.kura.data.model.S3Config
 import net.meshpeak.kura.ui.components.ConfirmDialog
 import net.meshpeak.kura.util.ClipboardUtil
-import net.meshpeak.kura.util.findActivity
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -468,74 +465,6 @@ fun SettingsScreen(
                     supportingContent = { Text(stringResource(R.string.settings_transfer_card_description)) },
                     leadingContent = { Icon(Icons.Default.PhoneAndroid, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider()
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Language section
-            Text(stringResource(R.string.settings_section_language), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(4.dp))
-
-            var languageExpanded by remember { mutableStateOf(false) }
-            val currentLocales = AppCompatDelegate.getApplicationLocales()
-            val currentLanguageTag = if (currentLocales.isEmpty) "" else currentLocales.toLanguageTags().substringBefore(',')
-            val languageLabel = when (currentLanguageTag) {
-                "en" -> stringResource(R.string.settings_language_english)
-                "ja" -> stringResource(R.string.settings_language_japanese)
-                else -> stringResource(R.string.settings_language_system)
-            }
-
-            Card(modifier = Modifier.fillMaxWidth()) {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_section_language)) },
-                    leadingContent = {
-                        Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    },
-                    trailingContent = {
-                        ExposedDropdownMenuBox(
-                            expanded = languageExpanded,
-                            onExpandedChange = { languageExpanded = it }
-                        ) {
-                            OutlinedTextField(
-                                value = languageLabel,
-                                onValueChange = {},
-                                readOnly = true,
-                                modifier = Modifier
-                                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                                    .width(180.dp),
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = languageExpanded) },
-                                singleLine = true
-                            )
-                            ExposedDropdownMenu(
-                                expanded = languageExpanded,
-                                onDismissRequest = { languageExpanded = false }
-                            ) {
-                                val languageOptions = listOf(
-                                    "" to stringResource(R.string.settings_language_system),
-                                    "en" to stringResource(R.string.settings_language_english),
-                                    "ja" to stringResource(R.string.settings_language_japanese)
-                                )
-                                languageOptions.forEach { (tag, label) ->
-                                    DropdownMenuItem(
-                                        text = { Text(label) },
-                                        onClick = {
-                                            val locales = if (tag.isEmpty()) {
-                                                LocaleListCompat.getEmptyLocaleList()
-                                            } else {
-                                                LocaleListCompat.forLanguageTags(tag)
-                                            }
-                                            AppCompatDelegate.setApplicationLocales(locales)
-                                            languageExpanded = false
-                                            context.findActivity()?.recreate()
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
                 )
             }
 
