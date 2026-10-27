@@ -133,7 +133,8 @@ export default function EntryForm({
   const [scanningTotpQr, setScanningTotpQr] = useState(false)
   const [totpQrError, setTotpQrError] = useState<string | null>(null)
   const [startingPickerFieldId, setStartingPickerFieldId] = useState<string | null>(null)
-  const [pickerError, setPickerError] = useState<string | null>(null)
+  // 起動中の表示（startingPickerFieldId）は失敗時にも解除されるため、エラーは対象フィールドと組で持つ
+  const [pickerError, setPickerError] = useState<{ fieldId: string; message: string } | null>(null)
   const [expandedSelectorFieldId, setExpandedSelectorFieldId] = useState<string | null>(null)
 
   const updateTypedValue = useCallback(
@@ -188,7 +189,7 @@ export default function EntryForm({
       try {
         await onStartPicker(fieldId)
       } catch (err) {
-        setPickerError(String(err))
+        setPickerError({ fieldId, message: String(err) })
       } finally {
         setStartingPickerFieldId(null)
       }
@@ -898,8 +899,8 @@ export default function EntryForm({
                 )}
               </div>
             )}
-            {startingPickerFieldId === field.id && pickerError && (
-              <div className="pl-[3.75rem] text-[11px] text-danger">{pickerError}</div>
+            {pickerError?.fieldId === field.id && (
+              <div className="pl-[3.75rem] text-[11px] text-danger">{pickerError.message}</div>
             )}
           </div>
         ))}
