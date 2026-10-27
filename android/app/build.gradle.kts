@@ -115,7 +115,7 @@ dependencies {
     // Security (EncryptedSharedPreferences)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
-    // AppCompat (needed for AppCompatDelegate.setApplicationLocales on per-app language preferences)
+    // AppCompat (AppCompatActivity / Theme.AppCompat)
     implementation("androidx.appcompat:appcompat:1.7.0")
 
     // Credential Manager (Passkey / Credential Provider)
