@@ -50,6 +50,14 @@ component TypedFieldEditor inherits VerticalLayout {
     }
     if root.field.kind == "text": LineEdit {
         text: root.field.value;
+        // ユーザーが入力すると text のバインディングは外れるので、
+        // パスワード生成や QR 読み取りなどでモデル側が変わったときは明示的に反映する
+        property <string> model-value: root.field.value;
+        changed model-value => {
+            if self.text != self.model-value {
+                self.text = self.model-value;
+            }
+        }
         placeholder-text: root.field.placeholder;
         edited(t) => {
             root.value-edited(t);
@@ -60,6 +68,12 @@ component TypedFieldEditor inherits VerticalLayout {
         secret-edit := LineEdit {
             horizontal-stretch: 1;
             text: root.field.value;
+            property <string> model-value: root.field.value;
+            changed model-value => {
+                if self.text != self.model-value {
+                    self.text = self.model-value;
+                }
+            }
             placeholder-text: root.field.placeholder;
             // フォーカス中だけ平文で表示する
             input-type: self.has-focus ? InputType.text : InputType.password;
@@ -93,6 +107,12 @@ component TypedFieldEditor inherits VerticalLayout {
     if root.field.kind == "multiline": TextEdit {
         min-height: 120px;
         text: root.field.value;
+        property <string> model-value: root.field.value;
+        changed model-value => {
+            if self.text != self.model-value {
+                self.text = self.model-value;
+            }
+        }
         font-size: Theme.text-sm;
         wrap: char-wrap;
         edited(t) => {
@@ -102,6 +122,12 @@ component TypedFieldEditor inherits VerticalLayout {
     if root.field.kind == "markdown" && !root.preview: TextEdit {
         min-height: 160px;
         text: root.field.value;
+        property <string> model-value: root.field.value;
+        changed model-value => {
+            if self.text != self.model-value {
+                self.text = self.model-value;
+            }
+        }
         wrap: word-wrap;
         edited(t) => {
             root.value-edited(t);
@@ -141,6 +167,12 @@ component SelectorInput inherits VerticalLayout {
 
     LineEdit {
         text: root.value;
+        property <string> model-value: root.value;
+        changed model-value => {
+            if self.text != self.model-value {
+                self.text = self.model-value;
+            }
+        }
         placeholder-text: root.placeholder;
         font-size: Theme.text-xs;
         edited(t) => {
@@ -209,6 +241,12 @@ component CustomFieldEditor inherits VerticalLayout {
         if root.item.field-type != "passkey": LineEdit {
             horizontal-stretch: 3;
             text: root.item.value;
+            property <string> model-value: root.item.value;
+            changed model-value => {
+                if self.text != self.model-value {
+                    self.text = self.model-value;
+                }
+            }
             placeholder-text: root.item.field-type == "totp" ? "otpauth:// URI または Base32 シークレット" : "値";
             font-size: Theme.text-xs;
             input-type: root.masked-type && !self.has-focus ? InputType.password : InputType.text;
