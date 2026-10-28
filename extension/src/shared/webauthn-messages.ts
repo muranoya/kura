@@ -5,7 +5,7 @@
 //     --chrome.runtime.sendMessage-->  background/webauthn.ts (Service Worker)
 //
 // All BufferSource fields (challenge, credential ids, user.id, signatures, …)
-// are base64url strings — see shared/webauthn-codec.ts.
+// are base64url strings, encoded/decoded in main-world/webauthn-main-injected.js.
 
 export const KURA_WEBAUTHN_MAIN_SOURCE = 'kura-webauthn-main'
 export const KURA_WEBAUTHN_BRIDGE_SOURCE = 'kura-webauthn-bridge'

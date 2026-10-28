@@ -6,8 +6,7 @@
 // dependency-free plain script instead of a normal crx-bundled TS module.
 //
 // This file intentionally duplicates the source/message-shape constants from
-// src/shared/webauthn-messages.ts and the base64url codec from
-// src/shared/webauthn-codec.ts, because it cannot import them (see Part 3-2).
+// src/shared/webauthn-messages.ts, because it cannot import them (see Part 3-2).
 // Keep both copies in sync by hand if either side changes.
 //
 // Protocol (docs/webauthn-passkey.md Part 3-6):
@@ -47,7 +46,7 @@
   // authenticator exists.
   let passkeyEnabled = false
 
-  // ---- src/shared/webauthn-codec.ts (duplicated) ----
+  // ---- base64url codec ----
 
   function bufferSourceToBase64Url(buffer) {
     const bytes =
