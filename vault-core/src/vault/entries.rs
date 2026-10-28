@@ -126,7 +126,16 @@ impl UnlockedVault {
 
     /// Update entry (only active entries can be updated)
     /// secret は平文が変わった場合だけ再暗号化する（`docs/vault-format-v2.md` 5-4）
-    pub fn update_entry(&mut self, id: &str, name: String, data: EntryData) -> Result<()> {
+    ///
+    /// `label_ids` が Some ならラベルも同じ書き込みで置き換える。存在しない・削除済みの
+    /// ラベル ID は外す（編集中に別の画面や同期マージでラベルが消えても、編集内容を失わないため）
+    pub fn update_entry(
+        &mut self,
+        id: &str,
+        name: String,
+        data: EntryData,
+        label_ids: Option<Vec<String>>,
+    ) -> Result<()> {
         let entry = self
             .index
             .entries
@@ -139,6 +148,10 @@ impl UnlockedVault {
 
         let mut entry = entry.clone();
         entry.name = PublicString::new(name);
+        if let Some(mut label_ids) = label_ids {
+            label_ids.retain(|lid| self.is_active_label(lid));
+            entry.label_ids = label_ids;
+        }
         entry.updated_at = crate::get_timestamp();
         self.store_entry(id, entry, &data)
     }
@@ -515,7 +528,7 @@ mod tests {
         let before_rev = vault.index.entries["e1"].secret_rev.clone();
 
         assert!(vault
-            .update_entry("e1", "After".into(), invalid_data())
+            .update_entry("e1", "After".into(), invalid_data(), None)
             .is_err());
 
         let entry = &vault.index.entries["e1"];
@@ -839,7 +852,7 @@ mod tests {
             Some(SecretString::from_string("notes".to_string())),
         );
         vault
-            .update_entry("e1", "Updated".into(), new_data)
+            .update_entry("e1", "Updated".into(), new_data, None)
             .unwrap();
 
         let entry = vault.get_entry("e1").unwrap().unwrap();
@@ -849,10 +862,42 @@ mod tests {
     }
 
     #[test]
+    fn test_update_entry_replaces_labels_and_drops_inactive_ones() {
+        let mut vault = make_vault();
+        let active = vault.create_label("Active".into()).unwrap();
+        let deleted = vault.create_label("Deleted".into()).unwrap();
+        vault.delete_label(&deleted.id).unwrap();
+        insert_entry(&mut vault, "e1", "Original", 1000);
+
+        // 存在しない・削除済みのラベルは外し、内容の更新は通す
+        vault
+            .update_entry(
+                "e1",
+                "Updated".into(),
+                make_login_data(),
+                Some(vec![
+                    active.id.clone(),
+                    "nonexistent".into(),
+                    deleted.id.clone(),
+                ]),
+            )
+            .unwrap();
+        let entry = &vault.index.entries["e1"];
+        assert_eq!(entry.name, "Updated");
+        assert_eq!(entry.label_ids, vec![active.id.clone()]);
+
+        // None ならラベルはそのまま
+        vault
+            .update_entry("e1", "Again".into(), make_login_data(), None)
+            .unwrap();
+        assert_eq!(vault.index.entries["e1"].label_ids, vec![active.id]);
+    }
+
+    #[test]
     fn test_update_nonexistent_entry() {
         let mut vault = make_vault();
         let data = make_login_data();
-        let result = vault.update_entry("nonexistent", "Name".into(), data);
+        let result = vault.update_entry("nonexistent", "Name".into(), data, None);
         assert!(result.is_err());
     }
 
@@ -1290,8 +1335,7 @@ mod tests {
 
         let label = vault.create_label("L".into()).unwrap();
         vault.set_favorite(&entry.id, true).unwrap();
-        vault.set_entry_labels(&entry.id, vec![label.id]).unwrap();
-        // 名前と public_fields だけの変更でも secret は再暗号化しない
+        // 名前・ラベル・public_fields だけの変更でも secret は再暗号化しない
         let data = EntryData::new_login(
             Some("https://changed.example".into()),
             "changed-user".into(),
@@ -1299,7 +1343,7 @@ mod tests {
             None,
         );
         vault
-            .update_entry(&entry.id, "Renamed".into(), data)
+            .update_entry(&entry.id, "Renamed".into(), data, Some(vec![label.id]))
             .unwrap();
 
         assert_eq!(secret_rev(&vault, &entry.id), rev);
@@ -1328,7 +1372,9 @@ mod tests {
             "new-password".into(),
             None,
         );
-        vault.update_entry(&entry.id, "Name".into(), data).unwrap();
+        vault
+            .update_entry(&entry.id, "Name".into(), data, None)
+            .unwrap();
         assert_ne!(secret_rev(&vault, &entry.id), rev);
 
         // notes の変更も secret の変更
@@ -1339,7 +1385,9 @@ mod tests {
             "new-password".into(),
             Some(SecretString::from_string("memo".to_string())),
         );
-        vault.update_entry(&entry.id, "Name".into(), data).unwrap();
+        vault
+            .update_entry(&entry.id, "Name".into(), data, None)
+            .unwrap();
         assert_ne!(secret_rev(&vault, &entry.id), rev);
     }
 
@@ -1531,7 +1579,7 @@ mod tests {
         vault.delete_entry("e1").unwrap();
 
         let data = make_login_data();
-        let result = vault.update_entry("e1", "Updated".into(), data);
+        let result = vault.update_entry("e1", "Updated".into(), data, None);
         assert!(result.is_err());
     }
 
@@ -1542,7 +1590,7 @@ mod tests {
         vault.purge_entry("e1").unwrap();
 
         let data = make_login_data();
-        let result = vault.update_entry("e1", "Updated".into(), data);
+        let result = vault.update_entry("e1", "Updated".into(), data, None);
         assert!(result.is_err());
     }
 

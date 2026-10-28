@@ -1011,8 +1011,11 @@ mod vault_manager_api {
     }
 
     #[test]
-    fn test_update_entry_with_unknown_label_changes_nothing() {
+    fn test_update_entry_drops_unknown_label() {
         let (m, _) = setup_unlocked_vault();
+        let label = m
+            .api_create_label("Label".to_string())
+            .expect("Failed to create label");
 
         let entry_id = m
             .api_create_entry(
@@ -1025,19 +1028,21 @@ mod vault_manager_api {
             )
             .expect("Failed to create entry");
 
-        let result = m.api_update_entry(
+        // 編集中に消えたラベルは外し、編集内容は保存する
+        m.api_update_entry(
             entry_id.clone(),
             Some("After".to_string()),
             None,
             Some(r#"{"content":"after"}"#.to_string()),
-            Some(vec!["nonexistent".to_string()]),
+            Some(vec![label.clone(), "nonexistent".to_string()]),
             None,
-        );
-        assert!(result.is_err());
+        )
+        .expect("Failed to update entry");
 
         let detail = m.api_get_entry(entry_id).expect("Failed to get entry");
-        assert_eq!(detail.name, "Before");
-        assert!(detail.typed_value.contains("before"));
+        assert_eq!(detail.name, "After");
+        assert!(detail.typed_value.contains("after"));
+        assert_eq!(detail.labels, vec![label]);
     }
 
     #[test]

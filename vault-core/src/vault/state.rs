@@ -242,7 +242,7 @@ mod tests {
         // リモートでは secret も変更した（secret_rev が違う）うえで、ブロックが欠けている
         let mut remote = device(&local.to_vault_file().unwrap());
         remote
-            .update_entry(&entry.id, "E".into(), login("new"))
+            .update_entry(&entry.id, "E".into(), login("new"), None)
             .unwrap();
         remote.secrets.remove(&entry.id);
 
@@ -268,7 +268,7 @@ mod tests {
         let a_only = a
             .create_entry("A only".into(), "login".into(), login("a"), vec![])
             .unwrap();
-        b.update_entry(&shared.id, "Shared".into(), login("v2"))
+        b.update_entry(&shared.id, "Shared".into(), login("v2"), None)
             .unwrap();
         let b_only = b
             .create_entry("B only".into(), "login".into(), login("b"), vec![])

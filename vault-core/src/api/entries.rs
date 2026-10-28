@@ -167,12 +167,6 @@ impl VaultManager {
                 .map_err(|e| format!("Failed to get entry: {}", e))?
                 .ok_or_else(|| format!("Entry not found: {}", id))?;
 
-            if let Some(label_ids) = &label_ids {
-                unlocked
-                    .validate_label_ids(label_ids)
-                    .map_err(|e| format!("Failed to set labels: {}", e))?;
-            }
-
             let typed_value = if let Some(json) = typed_value_json {
                 TypedValue::parse(&current.entry_type, &json)
                     .map_err(|e| format!("Failed to parse typed_value: {}", e))?
@@ -206,16 +200,8 @@ impl VaultManager {
             };
 
             unlocked
-                .update_entry(&id, name.unwrap_or(current.name), data)
-                .map_err(|e| format!("Failed to update entry: {}", e))?;
-
-            if let Some(label_ids) = label_ids {
-                unlocked
-                    .set_entry_labels(&id, label_ids)
-                    .map_err(|e| format!("Failed to set labels: {}", e))?;
-            }
-
-            Ok(())
+                .update_entry(&id, name.unwrap_or(current.name), data, label_ids)
+                .map_err(|e| format!("Failed to update entry: {}", e))
         })
     }
 
