@@ -162,6 +162,12 @@ impl VaultManager {
                 .map_err(|e| format!("Failed to get entry: {}", e))?
                 .ok_or_else(|| format!("Entry not found: {}", id))?;
 
+            if let Some(label_ids) = &label_ids {
+                unlocked
+                    .validate_label_ids(label_ids)
+                    .map_err(|e| format!("Failed to set labels: {}", e))?;
+            }
+
             let typed_value = if let Some(json) = typed_value_json {
                 // Validate JSON format
                 serde_json::from_str::<serde_json::Value>(&json)

@@ -74,16 +74,7 @@ impl UnlockedVault {
 
     /// Set entry labels (only active entries, all label IDs must exist)
     pub fn set_entry_labels(&mut self, entry_id: &str, label_ids: Vec<String>) -> Result<()> {
-        // Validate all label IDs exist and are not deleted
-        for lid in &label_ids {
-            match self.index.labels.get(lid) {
-                None => return Err(VaultError::LabelNotFound(lid.to_string())),
-                Some(l) if l.deleted_at.is_some() => {
-                    return Err(VaultError::LabelNotFound(lid.to_string()))
-                }
-                _ => {}
-            }
-        }
+        self.validate_label_ids(&label_ids)?;
 
         let entry = self
             .index
@@ -97,6 +88,17 @@ impl UnlockedVault {
 
         entry.label_ids = label_ids;
         entry.updated_at = crate::get_timestamp();
+        Ok(())
+    }
+
+    /// すべてのラベル ID が存在し、削除されていないことを確かめる
+    pub(crate) fn validate_label_ids(&self, label_ids: &[String]) -> Result<()> {
+        for lid in label_ids {
+            match self.index.labels.get(lid) {
+                Some(l) if l.deleted_at.is_none() => {}
+                _ => return Err(VaultError::LabelNotFound(lid.to_string())),
+            }
+        }
         Ok(())
     }
 }
