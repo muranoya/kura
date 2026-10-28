@@ -476,6 +476,10 @@ fn window_has_focus(app: &AppWindow) -> bool {
 
 fn on_focus_changed(app: &AppWindow, focused: bool) {
     AUTOLOCK.with(|timer| {
+        // 最初にフォーカスを失った時点から数える。隠れるたびに仕掛け直すと期限が延び続ける
+        if !focused && timer.running() {
+            return;
+        }
         timer.stop();
         if focused || !UNLOCKED.get() {
             return;
