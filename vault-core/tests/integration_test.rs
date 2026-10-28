@@ -153,9 +153,7 @@ fn test_multiple_entries_and_labels() {
 
     // List entries
     let filter = vault_core::models::EntryFilter::new();
-    let all_entries = unlocked
-        .list_entries(&filter)
-        .expect("Failed to list entries");
+    let all_entries = unlocked.list_entry_summaries(&filter);
 
     assert_eq!(all_entries.len(), 2, "Should have 2 entries");
 
@@ -211,9 +209,7 @@ fn test_entry_deletion_and_restoration() {
 
     // Verify deleted
     let filter = vault_core::models::EntryFilter::new();
-    let active_entries = unlocked
-        .list_entries(&filter)
-        .expect("Failed to list entries");
+    let active_entries = unlocked.list_entry_summaries(&filter);
     assert_eq!(active_entries.len(), 0, "Should have no active entries");
 
     // Restore
@@ -221,9 +217,7 @@ fn test_entry_deletion_and_restoration() {
         .restore_entry(&entry_id)
         .expect("Failed to restore entry");
 
-    let restored_entries = unlocked
-        .list_entries(&filter)
-        .expect("Failed to list entries");
+    let restored_entries = unlocked.list_entry_summaries(&filter);
     assert_eq!(restored_entries.len(), 1, "Should have 1 restored entry");
 
     // Purge (permanent delete)
@@ -231,9 +225,7 @@ fn test_entry_deletion_and_restoration() {
         .purge_entry(&entry_id)
         .expect("Failed to purge entry");
 
-    let final_entries = unlocked
-        .list_entries(&filter)
-        .expect("Failed to list entries");
+    let final_entries = unlocked.list_entry_summaries(&filter);
     assert_eq!(final_entries.len(), 0, "Should have no entries after purge");
 }
 
