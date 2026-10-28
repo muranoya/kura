@@ -1,16 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "__MSG_appName__",
+  "name": "kura",
   "version": "0.4.0",
-  "description": "__MSG_appDescription__",
-  "default_locale": "ja",
+  "description": "サーバ不要のパスワードマネージャー。暗号化されたデータはあなた自身のS3互換ストレージに保存。サブスクなし、ベンダーロックインなし。",
 
   "permissions": ["storage", "alarms", "clipboardWrite", "clipboardRead", "tabs", "activeTab"],
 
   "host_permissions": ["<all_urls>"],
 
   "action": {
-    "default_title": "__MSG_appName__",
+    "default_title": "kura",
     "default_icon": {
       "16": "icons/locked-16.png",
       "48": "icons/locked-48.png",
@@ -19,7 +18,7 @@
   },
 
   "sidebar_action": {
-    "default_title": "__MSG_appName__",
+    "default_title": "kura",
     "default_panel": "src/popup/index.html",
     "default_icon": {
       "16": "icons/locked-16.png",
