@@ -58,7 +58,6 @@ export type Message =
   | { type: 'CREATE_LABEL'; name: string }
   | { type: 'DELETE_LABEL'; id: string }
   | { type: 'RENAME_LABEL'; id: string; newName: string }
-  | { type: 'SET_ENTRY_LABELS'; entryId: string; labelIds: string[] }
 
   // Password & TOTP
   | {

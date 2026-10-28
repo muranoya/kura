@@ -157,11 +157,6 @@ export async function renameLabel(id: string, newName: string): Promise<void> {
   if (!res.success) throw new Error(field<'error', string>(res, 'error'))
 }
 
-export async function setEntryLabels(entryId: string, labelIds: string[]): Promise<void> {
-  const res = await sendMessage({ type: 'SET_ENTRY_LABELS', entryId, labelIds })
-  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
-}
-
 // Password & TOTP
 export async function generatePassword(
   length = 16,

@@ -992,8 +992,15 @@ mod vault_manager_api {
             )
             .expect("Failed to create entry");
 
-        m.api_set_entry_labels(entry_id.clone(), vec![label1.clone(), label2.clone()])
-            .expect("Failed to set labels");
+        m.api_update_entry(
+            entry_id.clone(),
+            None,
+            None,
+            None,
+            Some(vec![label1.clone(), label2.clone()]),
+            None,
+        )
+        .expect("Failed to set labels");
 
         let detail = m
             .api_get_entry(entry_id.clone())
@@ -1005,7 +1012,7 @@ mod vault_manager_api {
             .expect("Failed to filter by label");
         assert_eq!(filtered.len(), 1);
 
-        m.api_set_entry_labels(entry_id.clone(), vec![])
+        m.api_update_entry(entry_id.clone(), None, None, None, Some(vec![]), None)
             .expect("Failed to clear labels");
         let detail = m.api_get_entry(entry_id).expect("Failed to get entry");
         assert_eq!(detail.labels.len(), 0);

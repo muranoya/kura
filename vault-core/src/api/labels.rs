@@ -46,17 +46,4 @@ impl VaultManager {
                 .map_err(|e| format!("Failed to rename label: {}", e))
         })
     }
-
-    /// エントリにラベルを紐付け
-    pub fn api_set_entry_labels(
-        &self,
-        entry_id: String,
-        label_ids: Vec<String>,
-    ) -> Result<(), String> {
-        self.with_unlocked_mut(|unlocked| {
-            unlocked
-                .set_entry_labels(&entry_id, label_ids)
-                .map_err(|e| format!("Failed to set entry labels: {}", e))
-        })
-    }
 }

@@ -118,7 +118,6 @@ class FakeVaultRepository : IVaultRepository {
     override suspend fun createLabel(name: String): String = ""
     override suspend fun deleteLabel(id: String) {}
     override suspend fun renameLabel(id: String, newName: String) {}
-    override suspend fun setEntryLabels(entryId: String, labelIds: List<String>) {}
 
     override suspend fun verifyPassword(password: String) {}
     override suspend fun changeMasterPassword(oldPassword: String, newPassword: String) {}

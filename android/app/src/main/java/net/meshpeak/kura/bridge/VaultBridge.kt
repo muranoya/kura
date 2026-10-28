@@ -61,7 +61,6 @@ object VaultBridge {
     external fun createLabel(vaultId: String, name: String): String
     external fun deleteLabel(vaultId: String, id: String)
     external fun renameLabel(vaultId: String, id: String, newName: String)
-    external fun setEntryLabels(vaultId: String, entryId: String, labelIdsJson: String)
 
     // Security
     external fun verifyPassword(vaultId: String, password: String)

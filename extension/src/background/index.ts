@@ -80,7 +80,6 @@ interface WasmApi {
   api_create_label(vaultId: string, name: string): string
   api_delete_label(vaultId: string, id: string): void
   api_rename_label(vaultId: string, id: string, newName: string): void
-  api_set_entry_labels(vaultId: string, entryId: string, labelIds: string[]): void
   api_generate_password(
     length: number,
     includeLowercase: boolean,
@@ -1131,22 +1130,6 @@ async function handleMessage(
         }
         try {
           vault.api_rename_label(DEFAULT_VAULT_ID, message.id, message.newName)
-          await saveLocally()
-          autoSync().catch((e) => console.error('[SW] Sync failed:', e))
-          sendResponse({ success: true })
-        } catch (err) {
-          sendResponse({ success: false, error: String(err) })
-        }
-        break
-      }
-
-      case 'SET_ENTRY_LABELS': {
-        if (!unlocked) {
-          sendResponse({ success: false, error: 'Vault not unlocked' })
-          break
-        }
-        try {
-          vault.api_set_entry_labels(DEFAULT_VAULT_ID, message.entryId, message.labelIds || [])
           await saveLocally()
           autoSync().catch((e) => console.error('[SW] Sync failed:', e))
           sendResponse({ success: true })

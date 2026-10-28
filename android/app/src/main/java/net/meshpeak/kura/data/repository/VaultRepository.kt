@@ -66,7 +66,6 @@ interface IVaultRepository {
     suspend fun createLabel(name: String): String
     suspend fun deleteLabel(id: String)
     suspend fun renameLabel(id: String, newName: String)
-    suspend fun setEntryLabels(entryId: String, labelIds: List<String>)
 
     // Security
     suspend fun verifyPassword(password: String)
@@ -275,11 +274,6 @@ class VaultRepository(private val context: Context) : IVaultRepository {
 
     override suspend fun renameLabel(id: String, newName: String) = withContext(Dispatchers.IO) {
         VaultBridge.renameLabel(DEFAULT_VAULT_ID, id, newName)
-    }
-
-    override suspend fun setEntryLabels(entryId: String, labelIds: List<String>) = withContext(Dispatchers.IO) {
-        val labelIdsJson = json.encodeToString(ListSerializer(String.serializer()), labelIds)
-        VaultBridge.setEntryLabels(DEFAULT_VAULT_ID, entryId, labelIdsJson)
     }
 
     // ========================================================================

@@ -507,24 +507,6 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_renameLabel(
     });
 }
 
-#[no_mangle]
-pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_setEntryLabels(
-    mut env: JNIEnv,
-    _class: JClass,
-    vault_id: JString,
-    entry_id: JString,
-    label_ids_json: JString,
-) {
-    jni_catch_void(&mut env, |env| {
-        let vid = get_string(env, &vault_id)?;
-        let eid = get_string(env, &entry_id)?;
-        let li_json = get_string(env, &label_ids_json)?;
-        let label_ids: Vec<String> = serde_json::from_str(&li_json).unwrap_or_default();
-        with_manager(&vid, |m| m.api_set_entry_labels(eid, label_ids))
-            .map_err(|e| format!("Failed to set entry labels: {}", e))
-    });
-}
-
 // ============================================================================
 // Security Operations
 // ============================================================================
