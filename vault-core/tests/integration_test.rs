@@ -1040,6 +1040,34 @@ mod vault_manager_api {
         assert!(detail.typed_value.contains("before"));
     }
 
+    #[test]
+    fn test_update_entry_rejects_unknown_custom_field_type() {
+        let (m, _) = setup_unlocked_vault();
+
+        let entry_id = m
+            .api_create_entry(
+                "secure_note".to_string(),
+                "Note".to_string(),
+                None,
+                r#"{"content":"x"}"#.to_string(),
+                vec![],
+                None,
+            )
+            .expect("Failed to create entry");
+
+        let result = m.api_update_entry(
+            entry_id,
+            None,
+            None,
+            None,
+            None,
+            Some(
+                r#"[{"id":"cf1","name":"X","field_type":"no_such_type","value":"v"}]"#.to_string(),
+            ),
+        );
+        assert!(result.is_err());
+    }
+
     // D. vault.json Validation
 
     #[test]
