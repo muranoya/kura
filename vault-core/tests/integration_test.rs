@@ -851,10 +851,8 @@ mod vault_manager_api {
             .expect("Failed to list active");
         assert_eq!(active.len(), 0);
 
-        let detail = m
-            .api_get_entry(entry_id)
-            .expect("Failed to get purged entry");
-        assert!(detail.deleted_at.is_some());
+        // 完全削除したエントリは tombstone として残るが、ID 指定でも見つからない扱いになる
+        assert!(m.api_get_entry(entry_id).is_err());
     }
 
     #[test]
