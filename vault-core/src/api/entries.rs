@@ -124,10 +124,6 @@ impl VaultManager {
         label_ids: Vec<String>,
         custom_fields_json: Option<String>,
     ) -> Result<String, String> {
-        // Validate JSON format
-        serde_json::from_str::<serde_json::Value>(&typed_value_json)
-            .map_err(|e| format!("Invalid typed_value JSON: {}", e))?;
-
         // Validate that the entry type is known (refuse to create unknown types)
         EntryType::from_str(&entry_type)
             .ok_or_else(|| format!("Invalid entry type: {}", entry_type))?;
@@ -178,9 +174,6 @@ impl VaultManager {
             }
 
             let typed_value = if let Some(json) = typed_value_json {
-                // Validate JSON format
-                serde_json::from_str::<serde_json::Value>(&json)
-                    .map_err(|e| format!("Invalid typed_value JSON: {}", e))?;
                 TypedValue::parse(&current.entry_type, &json)
                     .map_err(|e| format!("Failed to parse typed_value: {}", e))?
             } else {
