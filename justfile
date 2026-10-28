@@ -2,7 +2,6 @@ set shell := ["bash", "-c"]
 set positional-arguments := true
 
 # ディレクトリの定義
-MOBILE_DIR := "mobile"
 DESKTOP_DIR := "desktop"
 EXTENSION_DIR := "extension"
 VAULT_CORE_DIR := "vault-core"

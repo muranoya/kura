@@ -61,7 +61,6 @@ object VaultBridge {
     external fun createLabel(vaultId: String, name: String): String
     external fun deleteLabel(vaultId: String, id: String)
     external fun renameLabel(vaultId: String, id: String, newName: String)
-    external fun setEntryLabels(vaultId: String, entryId: String, labelIdsJson: String)
 
     // Security
     external fun verifyPassword(vaultId: String, password: String)
@@ -84,8 +83,6 @@ object VaultBridge {
         symbols3: Boolean
     ): String
 
-    external fun generateTotp(secret: String, digits: Int, period: Int): String
-    external fun generateTotpDefault(secret: String): String
     external fun generateTotpFromValue(value: String): String
     external fun parseTotpPeriod(value: String): Long
     external fun isValidWebauthnRpId(originHost: String, claimedRpId: String): Boolean

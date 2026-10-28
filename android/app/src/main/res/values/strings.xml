@@ -3,7 +3,6 @@
     <!-- App -->
     <string name="app_name">kura</string>
     <string name="app_subtitle">パスワードマネージャー</string>
-    <string name="app_tagline">サーバ不要、自分一人のための\nパスワードマネージャー</string>
 
     <!-- Common actions -->
     <string name="action_ok">OK</string>
@@ -13,13 +12,9 @@
     <string name="action_delete">削除</string>
     <string name="action_close">閉じる</string>
     <string name="action_back">戻る</string>
-    <string name="action_edit">編集</string>
-    <string name="action_restore">復元</string>
     <string name="action_add">追加</string>
-    <string name="action_purge">完全削除</string>
     <string name="action_logout">ログアウト</string>
     <string name="action_copy">コピー</string>
-    <string name="action_menu">メニュー</string>
     <string name="action_clear">クリア</string>
     <string name="action_unlock">アンロック</string>
     <string name="action_regenerate">再生成</string>
@@ -28,18 +23,10 @@
     <string name="action_new">新規</string>
     <string name="action_use">使用する</string>
     <string name="action_change">変更</string>
-    <string name="action_generate">生成</string>
     <string name="action_rename">名前変更</string>
     <string name="action_sort">並び替え</string>
-    <string name="action_move_up">上へ移動</string>
-    <string name="action_move_down">下へ移動</string>
-    <string name="action_show">表示</string>
-    <string name="action_hide">隠す</string>
-    <string name="action_expand">拡大表示</string>
     <string name="action_execute">実行</string>
     <string name="action_complete">完了</string>
-    <string name="action_retry">再試行</string>
-    <string name="action_search">検索</string>
     <string name="action_move_to_trash">ゴミ箱に移動</string>
     <string name="action_purge_permanently">完全削除</string>
 
@@ -61,8 +48,6 @@
     <string name="nav_label_manager">ラベル管理</string>
     <string name="nav_trash">ゴミ箱</string>
     <string name="nav_settings">設定</string>
-    <string name="nav_last_synced_prefix">最終同期: %1$s</string>
-    <string name="nav_sync_error">同期エラー</string>
 
     <!-- Welcome screen -->
     <string name="welcome_title">kura</string>
@@ -75,26 +60,8 @@
 
     <!-- Storage setup -->
     <string name="storage_title">ストレージ設定</string>
-    <string name="storage_description">vaultの保存先となるS3互換ストレージを設定します。</string>
-    <string name="storage_region">リージョン</string>
-    <string name="storage_region_hint">例: us-east-1, auto</string>
-    <string name="storage_bucket">バケット</string>
-    <string name="storage_bucket_hint">バケット名</string>
-    <string name="storage_file_path">ファイルパス</string>
-    <string name="storage_file_path_hint">vault.json</string>
-    <string name="storage_access_key">アクセスキーID</string>
-    <string name="storage_secret_key">シークレットアクセスキー</string>
-    <string name="storage_endpoint">エンドポイント (任意)</string>
-    <string name="storage_endpoint_hint">https://s3.example.com</string>
-    <string name="storage_next">次へ</string>
-    <string name="storage_restore_from_transfer">転送コードから復元</string>
-    <string name="storage_transfer_title">転送コードから復元</string>
-    <string name="storage_transfer_description">別端末でエクスポートした転送コードを入力してください。</string>
     <string name="storage_transfer_code">転送コード</string>
     <string name="storage_transfer_password">転送用パスワード</string>
-    <string name="storage_transfer_decrypt">復号</string>
-    <string name="storage_transfer_error">復号に失敗しました: %1$s</string>
-    <string name="storage_validation_required">この項目は必須です</string>
     <string name="storage_region_required">リージョン *</string>
     <string name="storage_region_placeholder">例: ap-northeast-1</string>
     <string name="storage_bucket_required">バケット *</string>
@@ -137,7 +104,6 @@
 
     <!-- Recovery key screen -->
     <string name="recovery_key_title">リカバリーキー</string>
-    <string name="recovery_key_description">このリカバリーキーを安全な場所に保管してください。マスターパスワードを忘れた場合、これが唯一の復旧手段です。</string>
 
     <!-- Lock screen -->
     <string name="lock_title">kura</string>
@@ -334,14 +300,8 @@
     <string name="settings_passcode">パスコードでアンロック</string>
     <string name="settings_passcode_description">生体認証が使えない場合に短いパスコードでアンロック</string>
     <string name="settings_autolock">自動ロック</string>
-    <string name="settings_autolock_description">一定時間操作がない場合に自動でロックします。</string>
     <string name="settings_autolock_description_background">バックグラウンド移行後の自動ロック時間</string>
     <string name="settings_autolock_disabled">無効</string>
-    <string name="settings_autolock_1_min">1分</string>
-    <string name="settings_autolock_5_min">5分</string>
-    <string name="settings_autolock_15_min">15分</string>
-    <string name="settings_autolock_30_min">30分</string>
-    <string name="settings_autolock_60_min">1時間</string>
     <string name="settings_autolock_minutes_format">%1$d分</string>
     <string name="settings_clipboard_clear">クリップボード自動クリア</string>
     <string name="settings_clipboard_clear_description">コピー後に自動でクリップボードをクリア</string>
@@ -352,29 +312,18 @@
     <string name="settings_clipboard_clear_2min">2分</string>
     <string name="settings_change_master_password">マスターパスワード変更</string>
     <string name="settings_change_master_password_description">マスターパスワードを新しいものに変更</string>
-    <string name="settings_argon2_upgrade">Argon2パラメータ強化</string>
-    <string name="settings_argon2_upgrade_description">より強いパラメータでKEKを再導出します。</string>
-    <string name="settings_recovery_key_show">リカバリーキーを表示</string>
     <string name="settings_recovery_key_rotate">リカバリーキー再生成</string>
     <string name="settings_recovery_key_rotate_description">新しいリカバリーキーを生成して表示</string>
     <string name="settings_dek_rotate">DEK更新</string>
-    <string name="settings_dek_rotate_description">新しいデータ暗号化鍵でvaultを再暗号化します。</string>
     <string name="settings_dek_rotate_description_long">データ暗号化キーを更新し、リカバリーキーも再生成</string>
     <string name="settings_storage_region">リージョン</string>
     <string name="settings_storage_bucket">バケット</string>
     <string name="settings_storage_file_path">ファイルパス</string>
-    <string name="settings_storage_access_key">アクセスキーID</string>
     <string name="settings_storage_endpoint">エンドポイント</string>
-    <string name="settings_storage_edit">ストレージ設定を編集</string>
-    <string name="settings_export_vault">暗号化済みvaultをエクスポート</string>
     <string name="settings_storage_not_configured">ストレージ設定が見つかりません</string>
-    <string name="settings_transfer_export">転送コードを生成</string>
-    <string name="settings_transfer_export_description">別の端末にvault設定を移す転送コードを生成します。</string>
     <string name="settings_transfer_card_title">設定を別端末に転送</string>
     <string name="settings_transfer_card_description">S3設定を暗号化した転送コードを生成</string>
-    <string name="settings_transfer_password">転送用パスワード</string>
     <string name="settings_about_version">バージョン</string>
-    <string name="settings_about_licenses">オープンソースライセンス</string>
     <string name="settings_logout_title">ログアウト</string>
     <string name="settings_logout_description">ログアウトするとローカルキャッシュとS3設定がクリアされます。再度ログインには設定の再入力が必要になります。</string>
     <string name="settings_logout_description_short">ローカルキャッシュとS3設定をクリア</string>
@@ -385,30 +334,19 @@
     <string name="password_change_current">現在のパスワード</string>
     <string name="password_change_new">新しいパスワード</string>
     <string name="password_change_confirm">新しいパスワード（確認）</string>
-    <string name="password_change_incorrect">現在のパスワードが正しくありません</string>
-    <string name="password_change_min_length">パスワードは8文字以上必要です</string>
     <string name="password_change_mismatch">新しいパスワードが一致しません</string>
     <string name="password_change_all_required">すべてのフィールドを入力してください</string>
     <string name="password_change_same_as_old">新しいパスワードは現在のものと異なる必要があります</string>
-    <string name="password_change_failed">変更に失敗しました: %1$s</string>
     <string name="password_change_failed_default">パスワード変更に失敗しました</string>
-    <string name="password_change_success">パスワードを変更しました</string>
 
     <!-- Single password dialog -->
-    <string name="single_password_title">マスターパスワードを入力</string>
     <string name="single_password_label">マスターパスワード</string>
-    <string name="single_password_incorrect">パスワードが正しくありません</string>
     <string name="single_password_empty">パスワードを入力してください</string>
     <string name="single_password_failed">操作に失敗しました: %1$s</string>
 
     <!-- Transfer dialog -->
-    <string name="transfer_dialog_title">転送コード</string>
-    <string name="transfer_dialog_description">転送コードを暗号化するパスワードを入力してください。受信側の端末でも同じパスワードが必要です。</string>
     <string name="transfer_dialog_password">転送用パスワード</string>
-    <string name="transfer_dialog_password_min">8文字以上</string>
     <string name="transfer_dialog_generate">生成</string>
-    <string name="transfer_dialog_code_label">転送コード</string>
-    <string name="transfer_dialog_code_note">受信側の端末でこのコードと設定したパスワードを入力してください。</string>
     <string name="transfer_dialog_generate_failed">生成に失敗しました: %1$s</string>
     <string name="transfer_config_card_title">設定を別端末に転送</string>
     <string name="transfer_config_description">転送パスワードで暗号化した転送コードを生成します。受信側にこのパスワードを共有してください。</string>
@@ -461,11 +399,6 @@
     <string name="cd_menu">メニュー</string>
     <string name="cd_edit">編集</string>
     <string name="cd_trash">ゴミ箱に移動</string>
-    <string name="cd_close">閉じる</string>
-
-    <!-- Misc labels -->
-    <string name="misc_not_set">未設定</string>
-    <string name="misc_copied">コピーしました</string>
 
     <!-- Autofill -->
     <string name="autofill_unlock_prompt">kuraのロックを解除してオートフィル</string>

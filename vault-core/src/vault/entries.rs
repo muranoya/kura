@@ -15,22 +15,6 @@ use super::UnlockedVault;
 pub(crate) const MAX_ENTRIES: usize = 2000;
 
 impl UnlockedVault {
-    /// フィルタに一致するエントリを、秘匿値も含めて復号して返す（エクスポート・重複検出用）。
-    /// 一致したエントリの数だけ secret を復号するため、一覧表示には
-    /// `list_entry_summaries` を使うこと。破損エントリが含まれる場合はエラーを返す。
-    pub fn list_entries(&self, filter: &EntryFilter) -> Result<Vec<Entry>> {
-        let mut result = Vec::new();
-        for (id, vault_entry) in &self.index.entries {
-            if filter.matches(vault_entry) {
-                result.push(self.decrypt_entry(id, vault_entry)?);
-            }
-        }
-        sort_by_filter(&mut result, filter, |e| {
-            (&e.name, e.created_at, e.updated_at)
-        });
-        Ok(result)
-    }
-
     /// エントリのサマリ一覧をフィルタのソート順で返す（一覧表示・オートフィル候補抽出用）。
     /// index だけから作るため、secret ブロックは一切復号しない。
     pub fn list_entry_summaries(&self, filter: &EntryFilter) -> Vec<EntrySummary> {
@@ -41,9 +25,7 @@ impl UnlockedVault {
             .filter(|(_, e)| filter.matches(e))
             .map(|(id, e)| vault_entry_to_summary(id.clone(), e))
             .collect();
-        sort_by_filter(&mut result, filter, |e| {
-            (&e.name, e.created_at, e.updated_at)
-        });
+        sort_by_filter(&mut result, filter);
         result
     }
 
@@ -110,7 +92,8 @@ impl UnlockedVault {
     }
 
     /// Create entry
-    /// エントリ数（ゴミ箱を含み、完全削除済みは除く）が `MAX_ENTRIES` に達していれば作らない
+    /// エントリ数（ゴミ箱を含み、完全削除済みは除く）が `MAX_ENTRIES` に達していれば作らない。
+    /// 存在しない・削除済みのラベル ID が含まれていれば作らない
     pub fn create_entry(
         &mut self,
         name: String,
@@ -118,6 +101,8 @@ impl UnlockedVault {
         data: EntryData,
         label_ids: Vec<String>,
     ) -> Result<Entry> {
+        self.validate_label_ids(&label_ids)?;
+
         let count = self
             .index
             .entries
@@ -141,7 +126,16 @@ impl UnlockedVault {
 
     /// Update entry (only active entries can be updated)
     /// secret は平文が変わった場合だけ再暗号化する（`docs/vault-format-v2.md` 5-4）
-    pub fn update_entry(&mut self, id: &str, name: String, data: EntryData) -> Result<()> {
+    ///
+    /// `label_ids` が Some ならラベルも同じ書き込みで置き換える。存在しない・削除済みの
+    /// ラベル ID は外す（編集中に別の画面や同期マージでラベルが消えても、編集内容を失わないため）
+    pub fn update_entry(
+        &mut self,
+        id: &str,
+        name: String,
+        data: EntryData,
+        label_ids: Option<Vec<String>>,
+    ) -> Result<()> {
         let entry = self
             .index
             .entries
@@ -154,6 +148,10 @@ impl UnlockedVault {
 
         let mut entry = entry.clone();
         entry.name = PublicString::new(name);
+        if let Some(mut label_ids) = label_ids {
+            label_ids.retain(|lid| self.is_active_label(lid));
+            entry.label_ids = label_ids;
+        }
         entry.updated_at = crate::get_timestamp();
         self.store_entry(id, entry, &data)
     }
@@ -338,18 +336,12 @@ impl UnlockedVault {
     }
 }
 
-fn sort_by_filter<T>(
-    items: &mut [T],
-    filter: &EntryFilter,
-    key: impl Fn(&T) -> (&String, i64, i64),
-) {
+fn sort_by_filter(items: &mut [EntrySummary], filter: &EntryFilter) {
     items.sort_by(|a, b| {
-        let (a_name, a_created, a_updated) = key(a);
-        let (b_name, b_created, b_updated) = key(b);
         let cmp = match filter.sort_field {
-            SortField::Name => a_name.to_lowercase().cmp(&b_name.to_lowercase()),
-            SortField::CreatedAt => a_created.cmp(&b_created),
-            SortField::UpdatedAt => a_updated.cmp(&b_updated),
+            SortField::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+            SortField::CreatedAt => a.created_at.cmp(&b.created_at),
+            SortField::UpdatedAt => a.updated_at.cmp(&b.updated_at),
         };
         match filter.sort_order {
             SortOrder::Asc => cmp,
@@ -472,6 +464,24 @@ mod tests {
     }
 
     #[test]
+    fn test_create_entry_rejects_unknown_or_deleted_label() {
+        let mut vault = make_vault();
+        let deleted = vault.create_label("Deleted".into()).unwrap();
+        vault.delete_label(&deleted.id).unwrap();
+
+        for label_id in ["nonexistent".to_string(), deleted.id] {
+            let result = vault.create_entry(
+                "Test".into(),
+                "login".into(),
+                make_login_data(),
+                vec![label_id],
+            );
+            assert!(matches!(result, Err(VaultError::LabelNotFound(_))));
+        }
+        assert!(vault.index.entries.is_empty());
+    }
+
+    #[test]
     fn test_create_entry_stops_at_limit() {
         // ゴミ箱のエントリも数え、完全削除済み（tombstone）は数えない
         let mut vault = make_vault();
@@ -518,7 +528,7 @@ mod tests {
         let before_rev = vault.index.entries["e1"].secret_rev.clone();
 
         assert!(vault
-            .update_entry("e1", "After".into(), invalid_data())
+            .update_entry("e1", "After".into(), invalid_data(), None)
             .is_err());
 
         let entry = &vault.index.entries["e1"];
@@ -567,14 +577,14 @@ mod tests {
     }
 
     #[test]
-    fn test_list_entries_default_sort_created_at_desc() {
+    fn test_list_entry_summaries_default_sort_created_at_desc() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "old", "Old", 1000);
         insert_entry(&mut vault, "mid", "Mid", 2000);
         insert_entry(&mut vault, "new", "New", 3000);
 
         let filter = EntryFilter::new();
-        let entries = vault.list_entries(&filter).unwrap();
+        let entries = vault.list_entry_summaries(&filter);
 
         assert_eq!(entries.len(), 3);
         assert_eq!(entries[0].id, "new");
@@ -583,14 +593,14 @@ mod tests {
     }
 
     #[test]
-    fn test_list_entries_sort_created_at_asc() {
+    fn test_list_entry_summaries_sort_created_at_asc() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "old", "Old", 1000);
         insert_entry(&mut vault, "mid", "Mid", 2000);
         insert_entry(&mut vault, "new", "New", 3000);
 
         let filter = EntryFilter::new().with_sort(SortField::CreatedAt, SortOrder::Asc);
-        let entries = vault.list_entries(&filter).unwrap();
+        let entries = vault.list_entry_summaries(&filter);
 
         assert_eq!(entries[0].id, "old");
         assert_eq!(entries[1].id, "mid");
@@ -598,14 +608,14 @@ mod tests {
     }
 
     #[test]
-    fn test_list_entries_sort_name_asc() {
+    fn test_list_entry_summaries_sort_name_asc() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "Charlie", 1000);
         insert_entry(&mut vault, "e2", "Alice", 2000);
         insert_entry(&mut vault, "e3", "Bob", 3000);
 
         let filter = EntryFilter::new().with_sort(SortField::Name, SortOrder::Asc);
-        let entries = vault.list_entries(&filter).unwrap();
+        let entries = vault.list_entry_summaries(&filter);
 
         assert_eq!(entries[0].name, "Alice");
         assert_eq!(entries[1].name, "Bob");
@@ -613,14 +623,14 @@ mod tests {
     }
 
     #[test]
-    fn test_list_entries_sort_name_desc() {
+    fn test_list_entry_summaries_sort_name_desc() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "Charlie", 1000);
         insert_entry(&mut vault, "e2", "Alice", 2000);
         insert_entry(&mut vault, "e3", "Bob", 3000);
 
         let filter = EntryFilter::new().with_sort(SortField::Name, SortOrder::Desc);
-        let entries = vault.list_entries(&filter).unwrap();
+        let entries = vault.list_entry_summaries(&filter);
 
         assert_eq!(entries[0].name, "Charlie");
         assert_eq!(entries[1].name, "Bob");
@@ -628,14 +638,14 @@ mod tests {
     }
 
     #[test]
-    fn test_list_entries_sort_name_case_insensitive() {
+    fn test_list_entry_summaries_sort_name_case_insensitive() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "banana", 1000);
         insert_entry(&mut vault, "e2", "Apple", 2000);
         insert_entry(&mut vault, "e3", "cherry", 3000);
 
         let filter = EntryFilter::new().with_sort(SortField::Name, SortOrder::Asc);
-        let entries = vault.list_entries(&filter).unwrap();
+        let entries = vault.list_entry_summaries(&filter);
 
         assert_eq!(entries[0].name, "Apple");
         assert_eq!(entries[1].name, "banana");
@@ -643,14 +653,14 @@ mod tests {
     }
 
     #[test]
-    fn test_list_entries_sort_updated_at_desc() {
+    fn test_list_entry_summaries_sort_updated_at_desc() {
         let mut vault = make_vault();
         insert_entry_with_updated(&mut vault, "e1", "First", 1000, 5000);
         insert_entry_with_updated(&mut vault, "e2", "Second", 2000, 3000);
         insert_entry_with_updated(&mut vault, "e3", "Third", 3000, 4000);
 
         let filter = EntryFilter::new().with_sort(SortField::UpdatedAt, SortOrder::Desc);
-        let entries = vault.list_entries(&filter).unwrap();
+        let entries = vault.list_entry_summaries(&filter);
 
         assert_eq!(entries[0].id, "e1"); // updated_at=5000
         assert_eq!(entries[1].id, "e3"); // updated_at=4000
@@ -658,14 +668,14 @@ mod tests {
     }
 
     #[test]
-    fn test_list_entries_sort_updated_at_asc() {
+    fn test_list_entry_summaries_sort_updated_at_asc() {
         let mut vault = make_vault();
         insert_entry_with_updated(&mut vault, "e1", "First", 1000, 5000);
         insert_entry_with_updated(&mut vault, "e2", "Second", 2000, 3000);
         insert_entry_with_updated(&mut vault, "e3", "Third", 3000, 4000);
 
         let filter = EntryFilter::new().with_sort(SortField::UpdatedAt, SortOrder::Asc);
-        let entries = vault.list_entries(&filter).unwrap();
+        let entries = vault.list_entry_summaries(&filter);
 
         assert_eq!(entries[0].id, "e2"); // updated_at=3000
         assert_eq!(entries[1].id, "e3"); // updated_at=4000
@@ -673,19 +683,19 @@ mod tests {
     }
 
     #[test]
-    fn test_list_entries_excludes_deleted_by_default() {
+    fn test_list_entry_summaries_excludes_deleted_by_default() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "Active", 1000);
         insert_entry(&mut vault, "e2", "Deleted", 2000);
         vault.index.entries.get_mut("e2").unwrap().deleted_at = Some(2000);
 
         let filter = EntryFilter::new();
-        let entries = vault.list_entries(&filter).unwrap();
+        let entries = vault.list_entry_summaries(&filter);
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].id, "e1");
 
         let filter_with_trash = EntryFilter::new().with_trash(true);
-        let entries = vault.list_entries(&filter_with_trash).unwrap();
+        let entries = vault.list_entry_summaries(&filter_with_trash);
         assert_eq!(entries.len(), 2);
     }
 
@@ -831,24 +841,6 @@ mod tests {
     }
 
     #[test]
-    fn test_list_entry_summaries_sort_and_filter_match_list_entries() {
-        let mut vault = make_vault();
-        insert_entry(&mut vault, "old", "Old", 1000);
-        insert_entry(&mut vault, "mid", "Mid", 2000);
-        insert_entry(&mut vault, "new", "New", 3000);
-        vault.index.entries.get_mut("mid").unwrap().deleted_at = Some(2000);
-
-        let filter = EntryFilter::new();
-        let summaries = vault.list_entry_summaries(&filter);
-
-        // 削除済みはデフォルトで除外され、created_at降順でソートされる
-        // （list_entriesと同じフィルタ/ソートロジックを共有しているため一致するはず）
-        assert_eq!(summaries.len(), 2);
-        assert_eq!(summaries[0].id, "new");
-        assert_eq!(summaries[1].id, "old");
-    }
-
-    #[test]
     fn test_update_entry() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "Original", 1000);
@@ -860,7 +852,7 @@ mod tests {
             Some(SecretString::from_string("notes".to_string())),
         );
         vault
-            .update_entry("e1", "Updated".into(), new_data)
+            .update_entry("e1", "Updated".into(), new_data, None)
             .unwrap();
 
         let entry = vault.get_entry("e1").unwrap().unwrap();
@@ -870,10 +862,42 @@ mod tests {
     }
 
     #[test]
+    fn test_update_entry_replaces_labels_and_drops_inactive_ones() {
+        let mut vault = make_vault();
+        let active = vault.create_label("Active".into()).unwrap();
+        let deleted = vault.create_label("Deleted".into()).unwrap();
+        vault.delete_label(&deleted.id).unwrap();
+        insert_entry(&mut vault, "e1", "Original", 1000);
+
+        // 存在しない・削除済みのラベルは外し、内容の更新は通す
+        vault
+            .update_entry(
+                "e1",
+                "Updated".into(),
+                make_login_data(),
+                Some(vec![
+                    active.id.clone(),
+                    "nonexistent".into(),
+                    deleted.id.clone(),
+                ]),
+            )
+            .unwrap();
+        let entry = &vault.index.entries["e1"];
+        assert_eq!(entry.name, "Updated");
+        assert_eq!(entry.label_ids, vec![active.id.clone()]);
+
+        // None ならラベルはそのまま
+        vault
+            .update_entry("e1", "Again".into(), make_login_data(), None)
+            .unwrap();
+        assert_eq!(vault.index.entries["e1"].label_ids, vec![active.id]);
+    }
+
+    #[test]
     fn test_update_nonexistent_entry() {
         let mut vault = make_vault();
         let data = make_login_data();
-        let result = vault.update_entry("nonexistent", "Name".into(), data);
+        let result = vault.update_entry("nonexistent", "Name".into(), data, None);
         assert!(result.is_err());
     }
 
@@ -949,13 +973,6 @@ mod tests {
         vault.purge_entry("purged").unwrap();
 
         let filter = EntryFilter::new().with_trash(true);
-        let ids: Vec<String> = vault
-            .list_entries(&filter)
-            .unwrap()
-            .into_iter()
-            .map(|e| e.id)
-            .collect();
-        assert_eq!(ids, vec!["trashed".to_string()]);
         let summary_ids: Vec<String> = vault
             .list_entry_summaries(&filter)
             .into_iter()
@@ -1241,7 +1258,7 @@ mod tests {
     }
 
     #[test]
-    fn test_list_entries_filter_by_type() {
+    fn test_list_entry_summaries_filter_by_type() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "Login", 1000);
 
@@ -1251,46 +1268,46 @@ mod tests {
             .unwrap();
 
         let filter = EntryFilter::new().with_type("login");
-        let entries = vault.list_entries(&filter).unwrap();
+        let entries = vault.list_entry_summaries(&filter);
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].name, "Login");
     }
 
     #[test]
-    fn test_list_entries_filter_favorites() {
+    fn test_list_entry_summaries_filter_favorites() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "Normal", 1000);
         insert_entry(&mut vault, "e2", "Fav", 2000);
         vault.index.entries.get_mut("e2").unwrap().is_favorite = true;
 
         let filter = EntryFilter::new().favorites_only();
-        let entries = vault.list_entries(&filter).unwrap();
+        let entries = vault.list_entry_summaries(&filter);
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].name, "Fav");
     }
 
     #[test]
-    fn test_list_entries_filter_by_label() {
+    fn test_list_entry_summaries_filter_by_label() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "NoLabel", 1000);
         insert_entry(&mut vault, "e2", "WithLabel", 2000);
         vault.index.entries.get_mut("e2").unwrap().label_ids = vec!["label1".into()];
 
         let filter = EntryFilter::new().with_label("label1".into());
-        let entries = vault.list_entries(&filter).unwrap();
+        let entries = vault.list_entry_summaries(&filter);
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].name, "WithLabel");
     }
 
     #[test]
-    fn test_list_entries_search() {
+    fn test_list_entry_summaries_search() {
         let mut vault = make_vault();
         insert_entry(&mut vault, "e1", "GitHub Login", 1000);
         insert_entry(&mut vault, "e2", "Gmail Login", 2000);
         insert_entry(&mut vault, "e3", "Bank Account", 3000);
 
         let filter = EntryFilter::new().with_search("github".into());
-        let entries = vault.list_entries(&filter).unwrap();
+        let entries = vault.list_entry_summaries(&filter);
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].name, "GitHub Login");
     }
@@ -1318,8 +1335,7 @@ mod tests {
 
         let label = vault.create_label("L".into()).unwrap();
         vault.set_favorite(&entry.id, true).unwrap();
-        vault.set_entry_labels(&entry.id, vec![label.id]).unwrap();
-        // 名前と public_fields だけの変更でも secret は再暗号化しない
+        // 名前・ラベル・public_fields だけの変更でも secret は再暗号化しない
         let data = EntryData::new_login(
             Some("https://changed.example".into()),
             "changed-user".into(),
@@ -1327,7 +1343,7 @@ mod tests {
             None,
         );
         vault
-            .update_entry(&entry.id, "Renamed".into(), data)
+            .update_entry(&entry.id, "Renamed".into(), data, Some(vec![label.id]))
             .unwrap();
 
         assert_eq!(secret_rev(&vault, &entry.id), rev);
@@ -1356,7 +1372,9 @@ mod tests {
             "new-password".into(),
             None,
         );
-        vault.update_entry(&entry.id, "Name".into(), data).unwrap();
+        vault
+            .update_entry(&entry.id, "Name".into(), data, None)
+            .unwrap();
         assert_ne!(secret_rev(&vault, &entry.id), rev);
 
         // notes の変更も secret の変更
@@ -1367,7 +1385,9 @@ mod tests {
             "new-password".into(),
             Some(SecretString::from_string("memo".to_string())),
         );
-        vault.update_entry(&entry.id, "Name".into(), data).unwrap();
+        vault
+            .update_entry(&entry.id, "Name".into(), data, None)
+            .unwrap();
         assert_ne!(secret_rev(&vault, &entry.id), rev);
     }
 
@@ -1559,7 +1579,7 @@ mod tests {
         vault.delete_entry("e1").unwrap();
 
         let data = make_login_data();
-        let result = vault.update_entry("e1", "Updated".into(), data);
+        let result = vault.update_entry("e1", "Updated".into(), data, None);
         assert!(result.is_err());
     }
 
@@ -1570,7 +1590,7 @@ mod tests {
         vault.purge_entry("e1").unwrap();
 
         let data = make_login_data();
-        let result = vault.update_entry("e1", "Updated".into(), data);
+        let result = vault.update_entry("e1", "Updated".into(), data, None);
         assert!(result.is_err());
     }
 

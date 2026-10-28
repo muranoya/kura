@@ -72,32 +72,20 @@ impl UnlockedVault {
         Ok(())
     }
 
-    /// Set entry labels (only active entries, all label IDs must exist)
-    pub fn set_entry_labels(&mut self, entry_id: &str, label_ids: Vec<String>) -> Result<()> {
-        // Validate all label IDs exist and are not deleted
-        for lid in &label_ids {
-            match self.index.labels.get(lid) {
-                None => return Err(VaultError::LabelNotFound(lid.to_string())),
-                Some(l) if l.deleted_at.is_some() => {
-                    return Err(VaultError::LabelNotFound(lid.to_string()))
-                }
-                _ => {}
-            }
+    /// すべてのラベル ID が存在し、削除されていないことを確かめる
+    pub(crate) fn validate_label_ids(&self, label_ids: &[String]) -> Result<()> {
+        match label_ids.iter().find(|lid| !self.is_active_label(lid)) {
+            Some(lid) => Err(VaultError::LabelNotFound(lid.to_string())),
+            None => Ok(()),
         }
+    }
 
-        let entry = self
-            .index
-            .entries
-            .get_mut(entry_id)
-            .ok_or_else(|| VaultError::EntryNotFound(entry_id.to_string()))?;
-
-        if entry.deleted_at.is_some() || entry.purged_at.is_some() {
-            return Err(VaultError::EntryNotFound(entry_id.to_string()));
-        }
-
-        entry.label_ids = label_ids;
-        entry.updated_at = crate::get_timestamp();
-        Ok(())
+    /// ラベルが存在し、削除されていないか
+    pub(crate) fn is_active_label(&self, label_id: &str) -> bool {
+        self.index
+            .labels
+            .get(label_id)
+            .is_some_and(|l| l.deleted_at.is_none())
     }
 }
 
@@ -183,56 +171,5 @@ mod tests {
     fn test_rename_nonexistent_label_fails() {
         let mut vault = make_vault();
         assert!(vault.rename_label("nonexistent", "Name".into()).is_err());
-    }
-
-    #[test]
-    fn test_set_entry_labels() {
-        let mut vault = make_vault();
-        let l1 = vault.create_label("Work".into()).unwrap();
-        let l2 = vault.create_label("Personal".into()).unwrap();
-        insert_entry(&mut vault, "e1", "Entry1");
-
-        vault
-            .set_entry_labels("e1", vec![l1.id.clone(), l2.id.clone()])
-            .unwrap();
-        assert_eq!(vault.index.entries["e1"].label_ids.len(), 2);
-    }
-
-    #[test]
-    fn test_set_entry_labels_nonexistent_label_fails() {
-        let mut vault = make_vault();
-        insert_entry(&mut vault, "e1", "Entry1");
-
-        let result = vault.set_entry_labels("e1", vec!["nonexistent".into()]);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_set_entry_labels_deleted_label_fails() {
-        let mut vault = make_vault();
-        let label = vault.create_label("Work".into()).unwrap();
-        insert_entry(&mut vault, "e1", "Entry1");
-        vault.delete_label(&label.id).unwrap();
-
-        let result = vault.set_entry_labels("e1", vec![label.id.clone()]);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_set_entry_labels_deleted_entry_fails() {
-        let mut vault = make_vault();
-        let label = vault.create_label("Work".into()).unwrap();
-        insert_entry(&mut vault, "e1", "Entry1");
-        vault.index.entries.get_mut("e1").unwrap().deleted_at = Some(2000);
-
-        let result = vault.set_entry_labels("e1", vec![label.id.clone()]);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_set_entry_labels_nonexistent_entry_fails() {
-        let mut vault = make_vault();
-        let result = vault.set_entry_labels("nonexistent", vec![]);
-        assert!(result.is_err());
     }
 }

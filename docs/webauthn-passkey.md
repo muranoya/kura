@@ -56,7 +56,7 @@ pub struct PasskeyFieldData {
 }
 ```
 
-**`CustomFieldType` enumへの追加は現時点では見送っている**。このenumは`api_create_entry`/`api_update_entry`での作成・編集時バリデーション専用（前方互換性ポリシー）だが、passkeyフィールドを作成する専用APIがまだ存在しないため、バリデーション対象に加える必要がない。また、汎用の自由テキスト入力経路でpasskeyの値を人間が手打ちできてしまう状態を避ける意味もある。専用の作成APIを実装する段階で、必要に応じて追加を検討する。
+**`CustomFieldType` enumには追加しない**。このenumはユーザーがフォームで選べる型を表すもので、passkeyフィールドはWebAuthnの専用API（`create_passkey_credential`）だけが作る。汎用の自由テキスト入力経路でpasskeyの値を人間が手打ちできてしまう状態を避ける意味もある。一方で編集フォームはエントリのカスタムフィールドを丸ごと送り返すため、`api_create_entry`/`api_update_entry`の`field_type`検証では`passkey`を既知の型として受け入れる（`vault-core/src/api/entries.rs`の`PASSKEY_FIELD_TYPE`）。
 
 `CustomField.value`全体が`SecretString`（Zeroizing）でラップされているため、このJSON文字列全体が既存の秘密値と同じメモリ安全性（ロック時ゼロ化）の恩恵を受ける。個々のフィールドをさらに`SecretString`で二重ラップする必要はない。
 

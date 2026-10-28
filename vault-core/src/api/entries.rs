@@ -3,7 +3,31 @@ use crate::models::{
 };
 
 use super::{AutofillCandidate, EntryDetail, EntryRow, TotpPeriodRow, VaultManager};
+use crate::models::entry_data::CustomField;
 use crate::secret::SecretString;
+
+/// passkey は WebAuthn API だけが作るため `CustomFieldType`（ユーザーが選べる型）には含めないが、
+/// 編集フォームはエントリのカスタムフィールドを丸ごと送り返すので、既知の型として受け入れる
+const PASSKEY_FIELD_TYPE: &str = "passkey";
+
+/// カスタムフィールドの JSON を読み、未知のフィールドタイプを拒否する。
+/// ただし `existing` に同じ ID・同じタイプのフィールドがある場合は、新しいクライアントが
+/// 作ったフィールドを編集時に送り返しているだけなので受け入れる（前方互換性）
+fn parse_custom_fields(json: &str, existing: &[CustomField]) -> Result<Vec<CustomField>, String> {
+    let fields: Vec<CustomField> =
+        serde_json::from_str(json).map_err(|e| format!("Invalid custom_fields JSON: {}", e))?;
+    for field in &fields {
+        let known = CustomFieldType::from_str(&field.field_type).is_some()
+            || field.field_type == PASSKEY_FIELD_TYPE;
+        let preserved = existing
+            .iter()
+            .any(|f| f.id == field.id && f.field_type == field.field_type);
+        if !known && !preserved {
+            return Err(format!("Invalid field type: {}", field.field_type));
+        }
+    }
+    Ok(fields)
+}
 
 impl VaultManager {
     /// エントリ一覧（フィルター付き）
@@ -105,10 +129,6 @@ impl VaultManager {
         label_ids: Vec<String>,
         custom_fields_json: Option<String>,
     ) -> Result<String, String> {
-        // Validate JSON format
-        serde_json::from_str::<serde_json::Value>(&typed_value_json)
-            .map_err(|e| format!("Invalid typed_value JSON: {}", e))?;
-
         // Validate that the entry type is known (refuse to create unknown types)
         EntryType::from_str(&entry_type)
             .ok_or_else(|| format!("Invalid entry type: {}", entry_type))?;
@@ -116,19 +136,9 @@ impl VaultManager {
         let typed_value = TypedValue::parse(&entry_type, &typed_value_json)
             .map_err(|e| format!("Failed to parse typed_value: {}", e))?;
 
-        let custom_fields = if let Some(json) = custom_fields_json {
-            let fields: Vec<crate::models::entry_data::CustomField> =
-                serde_json::from_str(&json)
-                    .map_err(|e| format!("Invalid custom_fields JSON: {}", e))?;
-            // Validate that all custom field types are known
-            for field in &fields {
-                CustomFieldType::from_str(&field.field_type)
-                    .ok_or_else(|| format!("Invalid field type: {}", field.field_type))?;
-            }
-            Some(fields)
-        } else {
-            None
-        };
+        let custom_fields = custom_fields_json
+            .map(|json| parse_custom_fields(&json, &[]))
+            .transpose()?;
 
         let data = crate::models::EntryData {
             entry_type: entry_type.clone(),
@@ -163,9 +173,6 @@ impl VaultManager {
                 .ok_or_else(|| format!("Entry not found: {}", id))?;
 
             let typed_value = if let Some(json) = typed_value_json {
-                // Validate JSON format
-                serde_json::from_str::<serde_json::Value>(&json)
-                    .map_err(|e| format!("Invalid typed_value JSON: {}", e))?;
                 TypedValue::parse(&current.entry_type, &json)
                     .map_err(|e| format!("Failed to parse typed_value: {}", e))?
             } else {
@@ -173,10 +180,8 @@ impl VaultManager {
             };
 
             let custom_fields = if let Some(json) = custom_fields_json {
-                Some(
-                    serde_json::from_str(&json)
-                        .map_err(|e| format!("Invalid custom_fields JSON: {}", e))?,
-                )
+                let existing = current.data.custom_fields.as_deref().unwrap_or_default();
+                Some(parse_custom_fields(&json, existing)?)
             } else {
                 current.data.custom_fields.clone()
             };
@@ -200,16 +205,8 @@ impl VaultManager {
             };
 
             unlocked
-                .update_entry(&id, name.unwrap_or(current.name), data)
-                .map_err(|e| format!("Failed to update entry: {}", e))?;
-
-            if let Some(label_ids) = label_ids {
-                unlocked
-                    .set_entry_labels(&id, label_ids)
-                    .map_err(|e| format!("Failed to set labels: {}", e))?;
-            }
-
-            Ok(())
+                .update_entry(&id, name.unwrap_or(current.name), data, label_ids)
+                .map_err(|e| format!("Failed to update entry: {}", e))
         })
     }
 
@@ -367,7 +364,30 @@ fn match_autofill_url(
 
 #[cfg(test)]
 mod tests {
-    use super::match_autofill_url;
+    use super::{match_autofill_url, parse_custom_fields};
+
+    #[test]
+    fn test_parse_custom_fields_rejects_new_unknown_type() {
+        let json = r#"[{"id":"cf1","name":"X","field_type":"future_type","value":"v"}]"#;
+        assert!(parse_custom_fields(json, &[]).is_err());
+    }
+
+    #[test]
+    fn test_parse_custom_fields_accepts_preserved_unknown_type() {
+        // 新しいクライアントが作った未知タイプのフィールドを、古いクライアントが
+        // 編集時にそのまま送り返すケース
+        let json = r#"[{"id":"cf1","name":"X","field_type":"future_type","value":"v"}]"#;
+        let existing = parse_custom_fields(
+            r#"[{"id":"cf1","name":"X","field_type":"text","value":"v"}]"#,
+            &[],
+        )
+        .unwrap();
+        assert!(parse_custom_fields(json, &existing).is_err());
+
+        let mut existing = existing;
+        existing[0].field_type = "future_type".to_string();
+        assert!(parse_custom_fields(json, &existing).is_ok());
+    }
 
     #[test]
     fn test_match_autofill_url_login_url_match() {

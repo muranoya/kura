@@ -30,20 +30,6 @@ class BiometricHelper(private val secureStorage: SecureStorage) {
         return keyStore.getKey(KEY_ALIAS, null) as? SecretKey
     }
 
-    fun hasValidKey(): Boolean {
-        return try {
-            val key = getSecretKey() ?: return false
-            // キーが有効か確認するためにCipherを初期化してみる
-            val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.ENCRYPT_MODE, key)
-            true
-        } catch (_: KeyPermanentlyInvalidatedException) {
-            false
-        } catch (_: Exception) {
-            false
-        }
-    }
-
     fun generateKey() {
         val spec = KeyGenParameterSpec.Builder(
             KEY_ALIAS,

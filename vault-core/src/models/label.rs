@@ -15,12 +15,4 @@ impl Label {
             created_at: crate::get_timestamp(),
         }
     }
-
-    pub fn with_id(id: String, name: String, created_at: i64) -> Self {
-        Label {
-            id,
-            name,
-            created_at,
-        }
-    }
 }

@@ -86,7 +86,7 @@ pub struct CustomField {
 「4属性のうち最低1つは値を持つべき」という制約をどこで強制するかについて、以下の方針とする：
 
 - **vault-core層では強制しない。** バリデーションはUI層（拡張機能 / desktop / Android各フォーム）の入力チェックで行う。
-- 理由: `CustomFieldType`（`Text`/`Password`等）と異なり、これは新規追加のoptional構造体であり、全属性がNoneの状態（意味的には「常にマッチしない」無効な状態）を許容してもデータ破損には繋がらない。また、既存の `api_update_entry` は `field_type` の再検証すら行っていない（後述2-5節）という非対称性が既にコードベースに存在しており、今回新たに厳格なバリデーション層を追加すると、この既存の緩さと整合が取りにくくなる。
+- 理由: `CustomFieldType`（`Text`/`Password`等）と異なり、これは新規追加のoptional構造体であり、全属性がNoneの状態（意味的には「常にマッチしない」無効な状態）を許容してもデータ破損には繋がらない。また、vault-core 層の検証は `field_type` が既知かどうか（後述2-5節）にとどめており、フィールドの中身までは見ていない。
 - ただし、「4項目すべてNoneのCustomFieldSelectorオブジェクトが渡された場合は `None` 自体に正規化する」程度の軽いサニタイズは、`api_create_entry`/`api_update_entry` のJSON→構造体変換直後に入れることを検討する。
 
 ## 2-4. シリアライズ/デシリアライズと後方互換性
@@ -99,7 +99,7 @@ pub struct CustomField {
 
 `api_create_entry` / `api_update_entry` は `custom_fields_json` をそのまま `Vec<CustomField>` にデシリアライズしているだけであるため、**構造体にフィールドを追加するだけで両APIとも自動的に対応する**。コード変更は不要。
 
-なお、既存の非対称性として、`api_create_entry` は `CustomFieldType::from_str` で `field_type` を検証するが、`api_update_entry` はこの検証を行っていない。今回追加する `autofill_selector` はどちらの経路でも検証なしで通る。
+なお、`api_create_entry` / `api_update_entry` はどちらも `field_type` を検証し、`CustomFieldType` にも `passkey` にも当たらない型を拒否する。ただし `api_update_entry` では、既存のエントリに同じ ID・同じ型のフィールドがあれば受け入れる（新しいクライアントが作った型を編集時に送り返すだけのケースを壊さないため）。`autofill_selector` はどちらの経路でも検証なしで通る。
 
 FFIバインディング層（WASM / JNI / デスクトップの Rust 直接呼び出し）は、いずれもcustom_fieldsをJSON文字列としてそのまま透過的に受け渡すだけの設計であるため、**FFI層自体の変更は不要**である。各プラットフォームのAPI（`api_get_entry` / `api_create_entry` / `api_update_entry`）は既にJSON文字列越しにcustom_fieldsを丸ごと運んでいる。
 

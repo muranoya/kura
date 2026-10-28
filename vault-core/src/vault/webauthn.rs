@@ -165,7 +165,7 @@ impl UnlockedVault {
                 let mut fields = data.custom_fields.take().unwrap_or_default();
                 fields.push(custom_field);
                 data.custom_fields = Some(fields);
-                self.update_entry(&id, name, data)?;
+                self.update_entry(&id, name, data, None)?;
                 id
             }
             None => {

@@ -22,28 +22,3 @@ impl Default for Argon2Params {
         }
     }
 }
-
-impl Argon2Params {
-    pub fn to_json(&self) -> crate::error::Result<String> {
-        serde_json::to_string(self).map_err(crate::error::VaultError::JsonError)
-    }
-
-    pub fn from_json(json_str: &str) -> crate::error::Result<Self> {
-        serde_json::from_str(json_str).map_err(crate::error::VaultError::JsonError)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_params_serialization() {
-        let params = Argon2Params::default();
-        let json = params.to_json().unwrap();
-        let deserialized = Argon2Params::from_json(&json).unwrap();
-
-        assert_eq!(params.memory, deserialized.memory);
-        assert_eq!(params.iterations, deserialized.iterations);
-    }
-}

@@ -80,7 +80,6 @@ interface WasmApi {
   api_create_label(vaultId: string, name: string): string
   api_delete_label(vaultId: string, id: string): void
   api_rename_label(vaultId: string, id: string, newName: string): void
-  api_set_entry_labels(vaultId: string, entryId: string, labelIds: string[]): void
   api_generate_password(
     length: number,
     includeLowercase: boolean,
@@ -90,7 +89,6 @@ interface WasmApi {
     includeSymbols2: boolean,
     includeSymbols3: boolean,
   ): string
-  api_generate_totp_default(secret: string): string
   api_generate_totp_from_value(value: string): string
   api_parse_totp_period(value: string): number
   api_verify_password(vaultId: string, password: string): void
@@ -1140,22 +1138,6 @@ async function handleMessage(
         break
       }
 
-      case 'SET_ENTRY_LABELS': {
-        if (!unlocked) {
-          sendResponse({ success: false, error: 'Vault not unlocked' })
-          break
-        }
-        try {
-          vault.api_set_entry_labels(DEFAULT_VAULT_ID, message.entryId, message.labelIds || [])
-          await saveLocally()
-          autoSync().catch((e) => console.error('[SW] Sync failed:', e))
-          sendResponse({ success: true })
-        } catch (err) {
-          sendResponse({ success: false, error: String(err) })
-        }
-        break
-      }
-
       // ========== Password & TOTP ==========
 
       case 'GENERATE_PASSWORD': {
@@ -1170,16 +1152,6 @@ async function handleMessage(
             message.includeSymbols3 ?? true,
           )
           sendResponse({ success: true, password })
-        } catch (err) {
-          sendResponse({ success: false, error: String(err) })
-        }
-        break
-      }
-
-      case 'GENERATE_TOTP': {
-        try {
-          const totp = vault.api_generate_totp_default(message.secret)
-          sendResponse({ success: true, totp })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }
@@ -1302,34 +1274,6 @@ async function handleMessage(
           }
         } catch (err) {
           console.error('[SW] DOWNLOAD_VAULT: Error:', err)
-          sendResponse({ success: false, error: String(err) })
-        }
-        break
-      }
-
-      case 'DOWNLOAD': {
-        try {
-          const s3Config: S3Config | null = message.storageConfig
-            ? JSON.parse(message.storageConfig)
-            : decryptedS3Config
-
-          if (!s3Config) {
-            sendResponse({ success: false, error: 'S3 config not found' })
-            break
-          }
-
-          const client = new VaultS3Client(s3Config)
-          try {
-            const remote = await client.download()
-            if (remote) {
-              vault.api_load_vault(DEFAULT_VAULT_ID, remote.bytes, remote.etag)
-            }
-            sendResponse({ success: true, result: !!remote })
-          } finally {
-            client.destroy()
-          }
-        } catch (err) {
-          console.error('[SW] DOWNLOAD: Error:', err)
           sendResponse({ success: false, error: String(err) })
         }
         break

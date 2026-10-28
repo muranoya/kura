@@ -186,22 +186,14 @@ mod tests {
     }
 
     #[test]
-    fn test_config_survives_master_password_change_and_argon2_upgrade() {
-        // 別の端末でマスターパスワード変更・Argon2 パラメータ更新が行われ、その meta を
-        // 取り込んだ端末でも、変更前に暗号化した設定を新しいパスワードで復号できる
+    fn test_config_survives_master_password_change() {
+        // 別の端末でマスターパスワード変更が行われ、その meta を取り込んだ端末でも、
+        // 変更前に暗号化した設定を新しいパスワードで復号できる
         let mut vault = unlocked_vault("password-1");
         let encrypted = encrypt_config(&vault.meta, &mp("password-1"), b"config").unwrap();
 
         vault
             .change_master_password(&mp("password-1"), &mp("password-2"))
-            .unwrap();
-        let decrypted = decrypt_config(&vault.meta, &mp("password-2"), &encrypted).unwrap();
-        assert_eq!(decrypted.as_slice(), b"config");
-
-        let mut params = vault.meta.argon2_params.clone();
-        params.salt = crate::codec::base32::encode(&rand::random::<[u8; 16]>());
-        vault
-            .upgrade_argon2_params(&mp("password-2"), params)
             .unwrap();
         let decrypted = decrypt_config(&vault.meta, &mp("password-2"), &encrypted).unwrap();
         assert_eq!(decrypted.as_slice(), b"config");

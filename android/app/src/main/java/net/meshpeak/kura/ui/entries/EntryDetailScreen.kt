@@ -3,8 +3,6 @@ package net.meshpeak.kura.ui.entries
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -443,12 +441,6 @@ fun DetailField(
     var copied by remember { mutableStateOf(false) }
     var largeTextOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-
-    val backgroundColor by animateColorAsState(
-        targetValue = if (copied) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent,
-        animationSpec = tween(durationMillis = 300),
-        label = "copyFeedback"
-    )
 
     Column(
         modifier = Modifier

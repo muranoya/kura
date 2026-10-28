@@ -281,15 +281,6 @@ pub fn api_rename_label(vault_id: String, id: String, new_name: String) -> Resul
     with_manager(&vault_id, |m| m.api_rename_label(id, new_name)).map_err(to_js_err)
 }
 
-#[wasm_bindgen]
-pub fn api_set_entry_labels(
-    vault_id: String,
-    entry_id: String,
-    label_ids: Vec<String>,
-) -> Result<(), JsValue> {
-    with_manager(&vault_id, |m| m.api_set_entry_labels(entry_id, label_ids)).map_err(to_js_err)
-}
-
 // ============================================================================
 // セキュリティ関連API
 // ============================================================================
@@ -319,20 +310,6 @@ pub fn api_reset_master_password_with_recovery_key(
 ) -> Result<(), JsValue> {
     with_manager(&vault_id, |m| {
         m.api_reset_master_password_with_recovery_key(recovery_key, new_password)
-    })
-    .map_err(to_js_err)
-}
-
-#[wasm_bindgen]
-pub fn api_upgrade_argon2_params(
-    vault_id: String,
-    password: String,
-    iterations: u32,
-    memory: u32,
-    parallelism: u32,
-) -> Result<String, JsValue> {
-    with_manager(&vault_id, |m| {
-        m.api_upgrade_argon2_params(password, iterations, memory, parallelism)
     })
     .map_err(to_js_err)
 }
@@ -413,16 +390,6 @@ pub fn api_generate_password(
         include_symbols3,
     )
     .map_err(to_js_err)
-}
-
-#[wasm_bindgen]
-pub fn api_generate_totp(secret: String, digits: u32, period: u32) -> Result<String, JsValue> {
-    vault_core::api::api_generate_totp(secret, digits, period).map_err(to_js_err)
-}
-
-#[wasm_bindgen]
-pub fn api_generate_totp_default(secret: String) -> Result<String, JsValue> {
-    vault_core::api::api_generate_totp_default(secret).map_err(to_js_err)
 }
 
 #[wasm_bindgen]

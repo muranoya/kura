@@ -486,10 +486,6 @@ export function showInlineIcon(anchor: HTMLInputElement, onClick: () => void) {
   window.addEventListener('resize', handleResize)
 }
 
-export function isDropdownVisible(): boolean {
-  return dropdownEl !== null
-}
-
 export function destroy() {
   hideDropdown()
   if (shadowHost) {

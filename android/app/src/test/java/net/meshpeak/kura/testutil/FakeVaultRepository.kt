@@ -118,7 +118,6 @@ class FakeVaultRepository : IVaultRepository {
     override suspend fun createLabel(name: String): String = ""
     override suspend fun deleteLabel(id: String) {}
     override suspend fun renameLabel(id: String, newName: String) {}
-    override suspend fun setEntryLabels(entryId: String, labelIds: List<String>) {}
 
     override suspend fun verifyPassword(password: String) {}
     override suspend fun changeMasterPassword(oldPassword: String, newPassword: String) {}
@@ -142,14 +141,11 @@ class FakeVaultRepository : IVaultRepository {
         symbols3: Boolean
     ): String = "generated-password"
 
-    override suspend fun generateTotp(secret: String, digits: Int, period: Int): String = "123456"
-    override suspend fun generateTotpDefault(secret: String): String = "123456"
     override suspend fun generateTotpFromValue(value: String): String = "123456"
     override suspend fun parseTotpPeriod(value: String): Long = 30L
 
     override suspend fun syncVault(configJson: String): SyncResult = syncVaultResult
 
-    override suspend fun pushVault(configJson: String) {}
 
     override suspend fun downloadVault(configJson: String): Boolean {
         downloadVaultCalledWith = configJson
@@ -158,7 +154,6 @@ class FakeVaultRepository : IVaultRepository {
     }
 
     override suspend fun getLastSyncTime(): Long = lastSyncTimeResult
-    override suspend fun restoreLastSyncTime(ts: Long) {}
 
     override suspend fun saveLocally() {
         saveLocallyCalled = true

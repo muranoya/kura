@@ -66,7 +66,6 @@ interface IVaultRepository {
     suspend fun createLabel(name: String): String
     suspend fun deleteLabel(id: String)
     suspend fun renameLabel(id: String, newName: String)
-    suspend fun setEntryLabels(entryId: String, labelIds: List<String>)
 
     // Security
     suspend fun verifyPassword(password: String)
@@ -88,17 +87,13 @@ interface IVaultRepository {
         symbols2: Boolean = true,
         symbols3: Boolean = true
     ): String
-    suspend fun generateTotp(secret: String, digits: Int = 6, period: Int = 30): String
-    suspend fun generateTotpDefault(secret: String): String
     suspend fun generateTotpFromValue(value: String): String
     suspend fun parseTotpPeriod(value: String): Long
 
     // Sync
     suspend fun syncVault(configJson: String): SyncResult
-    suspend fun pushVault(configJson: String)
     suspend fun downloadVault(configJson: String): Boolean
     suspend fun getLastSyncTime(): Long
-    suspend fun restoreLastSyncTime(ts: Long)
 
     // Combined helpers
     suspend fun saveLocally()
@@ -277,11 +272,6 @@ class VaultRepository(private val context: Context) : IVaultRepository {
         VaultBridge.renameLabel(DEFAULT_VAULT_ID, id, newName)
     }
 
-    override suspend fun setEntryLabels(entryId: String, labelIds: List<String>) = withContext(Dispatchers.IO) {
-        val labelIdsJson = json.encodeToString(ListSerializer(String.serializer()), labelIds)
-        VaultBridge.setEntryLabels(DEFAULT_VAULT_ID, entryId, labelIdsJson)
-    }
-
     // ========================================================================
     // Security
     // ========================================================================
@@ -328,14 +318,6 @@ class VaultRepository(private val context: Context) : IVaultRepository {
         symbols3: Boolean
     ): String = withContext(Dispatchers.IO) {
         VaultBridge.generatePassword(length, lowercase, uppercase, numbers, symbols1, symbols2, symbols3)
-    }
-
-    override suspend fun generateTotp(secret: String, digits: Int, period: Int): String = withContext(Dispatchers.IO) {
-        VaultBridge.generateTotp(secret, digits, period)
-    }
-
-    override suspend fun generateTotpDefault(secret: String): String = withContext(Dispatchers.IO) {
-        VaultBridge.generateTotpDefault(secret)
     }
 
     override suspend fun generateTotpFromValue(value: String): String = withContext(Dispatchers.IO) {
@@ -409,7 +391,7 @@ class VaultRepository(private val context: Context) : IVaultRepository {
         throw RuntimeException("Sync failed after maximum retries")
     }
 
-    override suspend fun pushVault(configJson: String): Unit = withContext(Dispatchers.IO) {
+    private suspend fun pushVault(configJson: String): Unit = withContext(Dispatchers.IO) {
         val s3Config = parseS3Config(configJson)
         val client = VaultS3Client(s3Config)
         val vaultBytes = getVaultBytes()
@@ -435,7 +417,7 @@ class VaultRepository(private val context: Context) : IVaultRepository {
         VaultBridge.getLastSyncTime(DEFAULT_VAULT_ID)
     }
 
-    override suspend fun restoreLastSyncTime(ts: Long) = withContext(Dispatchers.IO) {
+    private suspend fun restoreLastSyncTime(ts: Long) = withContext(Dispatchers.IO) {
         VaultBridge.restoreLastSyncTime(DEFAULT_VAULT_ID, ts)
     }
 

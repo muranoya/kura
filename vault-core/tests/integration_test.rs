@@ -153,9 +153,7 @@ fn test_multiple_entries_and_labels() {
 
     // List entries
     let filter = vault_core::models::EntryFilter::new();
-    let all_entries = unlocked
-        .list_entries(&filter)
-        .expect("Failed to list entries");
+    let all_entries = unlocked.list_entry_summaries(&filter);
 
     assert_eq!(all_entries.len(), 2, "Should have 2 entries");
 
@@ -211,9 +209,7 @@ fn test_entry_deletion_and_restoration() {
 
     // Verify deleted
     let filter = vault_core::models::EntryFilter::new();
-    let active_entries = unlocked
-        .list_entries(&filter)
-        .expect("Failed to list entries");
+    let active_entries = unlocked.list_entry_summaries(&filter);
     assert_eq!(active_entries.len(), 0, "Should have no active entries");
 
     // Restore
@@ -221,9 +217,7 @@ fn test_entry_deletion_and_restoration() {
         .restore_entry(&entry_id)
         .expect("Failed to restore entry");
 
-    let restored_entries = unlocked
-        .list_entries(&filter)
-        .expect("Failed to list entries");
+    let restored_entries = unlocked.list_entry_summaries(&filter);
     assert_eq!(restored_entries.len(), 1, "Should have 1 restored entry");
 
     // Purge (permanent delete)
@@ -231,9 +225,7 @@ fn test_entry_deletion_and_restoration() {
         .purge_entry(&entry_id)
         .expect("Failed to purge entry");
 
-    let final_entries = unlocked
-        .list_entries(&filter)
-        .expect("Failed to list entries");
+    let final_entries = unlocked.list_entry_summaries(&filter);
     assert_eq!(final_entries.len(), 0, "Should have no entries after purge");
 }
 
@@ -992,8 +984,15 @@ mod vault_manager_api {
             )
             .expect("Failed to create entry");
 
-        m.api_set_entry_labels(entry_id.clone(), vec![label1.clone(), label2.clone()])
-            .expect("Failed to set labels");
+        m.api_update_entry(
+            entry_id.clone(),
+            None,
+            None,
+            None,
+            Some(vec![label1.clone(), label2.clone()]),
+            None,
+        )
+        .expect("Failed to set labels");
 
         let detail = m
             .api_get_entry(entry_id.clone())
@@ -1005,10 +1004,109 @@ mod vault_manager_api {
             .expect("Failed to filter by label");
         assert_eq!(filtered.len(), 1);
 
-        m.api_set_entry_labels(entry_id.clone(), vec![])
+        m.api_update_entry(entry_id.clone(), None, None, None, Some(vec![]), None)
             .expect("Failed to clear labels");
         let detail = m.api_get_entry(entry_id).expect("Failed to get entry");
         assert_eq!(detail.labels.len(), 0);
+    }
+
+    #[test]
+    fn test_update_entry_drops_unknown_label() {
+        let (m, _) = setup_unlocked_vault();
+        let label = m
+            .api_create_label("Label".to_string())
+            .expect("Failed to create label");
+
+        let entry_id = m
+            .api_create_entry(
+                "secure_note".to_string(),
+                "Before".to_string(),
+                None,
+                r#"{"content":"before"}"#.to_string(),
+                vec![],
+                None,
+            )
+            .expect("Failed to create entry");
+
+        // 編集中に消えたラベルは外し、編集内容は保存する
+        m.api_update_entry(
+            entry_id.clone(),
+            Some("After".to_string()),
+            None,
+            Some(r#"{"content":"after"}"#.to_string()),
+            Some(vec![label.clone(), "nonexistent".to_string()]),
+            None,
+        )
+        .expect("Failed to update entry");
+
+        let detail = m.api_get_entry(entry_id).expect("Failed to get entry");
+        assert_eq!(detail.name, "After");
+        assert!(detail.typed_value.contains("after"));
+        assert_eq!(detail.labels, vec![label]);
+    }
+
+    #[test]
+    fn test_update_entry_rejects_unknown_custom_field_type() {
+        let (m, _) = setup_unlocked_vault();
+
+        let entry_id = m
+            .api_create_entry(
+                "secure_note".to_string(),
+                "Note".to_string(),
+                None,
+                r#"{"content":"x"}"#.to_string(),
+                vec![],
+                None,
+            )
+            .expect("Failed to create entry");
+
+        let result = m.api_update_entry(
+            entry_id,
+            None,
+            None,
+            None,
+            None,
+            Some(
+                r#"[{"id":"cf1","name":"X","field_type":"no_such_type","value":"v"}]"#.to_string(),
+            ),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_update_entry_accepts_passkey_field_missing_from_entry() {
+        let (m, _) = setup_unlocked_vault();
+
+        let entry_id = m
+            .api_create_entry(
+                "login".to_string(),
+                "Login".to_string(),
+                None,
+                r#"{"username":"user","password":"pass"}"#.to_string(),
+                vec![],
+                None,
+            )
+            .expect("Failed to create entry");
+
+        // 同期マージで消えた passkey フィールドを編集フォームが送り返しても、更新は通す
+        m.api_update_entry(
+            entry_id.clone(),
+            Some("Renamed".to_string()),
+            None,
+            None,
+            None,
+            Some(
+                r#"[{"id":"pk1","name":"Passkey","field_type":"passkey","value":"{\"rp_id\":\"example.com\",\"private_key\":\"k\"}","secret":true}]"#
+                    .to_string(),
+            ),
+        )
+        .expect("Failed to update entry");
+
+        let detail = m.api_get_entry(entry_id).expect("Failed to get entry");
+        assert_eq!(detail.name, "Renamed");
+        assert!(detail
+            .custom_fields
+            .is_some_and(|f| f.contains(r#""field_type":"passkey""#)));
     }
 
     // D. vault.json Validation

@@ -7205,7 +7205,6 @@ name = "wasm-bridge"
 version = "0.4.0"
 dependencies = [
  "console_error_panic_hook",
- "js-sys",
  "serde_json",
  "vault_core",
  "wasm-bindgen",
