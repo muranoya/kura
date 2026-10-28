@@ -44,6 +44,14 @@ pub fn copy_sensitive(text: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// 自動クリア待ちの値があれば、タイマーを待たずに今クリアする（終了時用。終了するとタイマーは発火しない）
+pub fn clear_pending() {
+    if CLEAR_TIMER.with(slint::Timer::running) {
+        CLEAR_TIMER.with(slint::Timer::stop);
+        clear_if_unchanged();
+    }
+}
+
 /// OS やクリップボードマネージャーの履歴（自動クリアでは消せない）に残らないようにしてコピーする
 fn set_text_excluded_from_history(
     clipboard: &mut arboard::Clipboard,

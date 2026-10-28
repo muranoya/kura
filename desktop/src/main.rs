@@ -45,6 +45,7 @@ fn main() -> Result<(), slint::PlatformError> {
 
     // 終了時もメモリ上の vault をロックしてから抜ける
     let _ = ctx::shared().vault.api_lock();
+    clipboard::clear_pending();
     drop(runtime);
     Ok(())
 }
