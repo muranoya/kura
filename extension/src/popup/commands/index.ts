@@ -215,13 +215,6 @@ export async function startPicker(entryId: string, fieldId: string): Promise<voi
   if (!res.success) throw new Error(field<'error', string>(res, 'error'))
 }
 
-// Export
-export async function exportBitwardenJson(): Promise<string> {
-  const res = await sendMessage({ type: 'EXPORT_BITWARDEN_JSON' })
-  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
-  return field<'json', string>(res, 'json') ?? ''
-}
-
 // Security
 export async function changeMasterPassword(
   oldPassword: string,

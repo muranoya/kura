@@ -29,7 +29,6 @@
     <string name="action_use">使用する</string>
     <string name="action_change">変更</string>
     <string name="action_generate">生成</string>
-    <string name="action_export">エクスポート</string>
     <string name="action_rename">名前変更</string>
     <string name="action_sort">並び替え</string>
     <string name="action_move_up">上へ移動</string>
@@ -327,7 +326,6 @@
     <string name="settings_title">設定</string>
     <string name="settings_section_security">セキュリティ</string>
     <string name="settings_section_storage">ストレージ</string>
-    <string name="settings_section_data">データ</string>
     <string name="settings_section_transfer">端末間転送</string>
     <string name="settings_section_about">アプリ情報</string>
 
@@ -369,8 +367,6 @@
     <string name="settings_storage_endpoint">エンドポイント</string>
     <string name="settings_storage_edit">ストレージ設定を編集</string>
     <string name="settings_export_vault">暗号化済みvaultをエクスポート</string>
-    <string name="settings_export_bitwarden">Bitwarden形式でエクスポート</string>
-    <string name="settings_export_bitwarden_description">他のパスワードマネージャーへ移行するためにデータをエクスポート</string>
     <string name="settings_storage_not_configured">ストレージ設定が見つかりません</string>
     <string name="settings_transfer_export">転送コードを生成</string>
     <string name="settings_transfer_export_description">別の端末にvault設定を移す転送コードを生成します。</string>
@@ -442,13 +438,9 @@
     <string name="passcode_setup_mismatch">パスコードが一致しません</string>
     <string name="passcode_setup_failed">パスコードの有効化に失敗しました: %1$s</string>
 
-    <!-- Reauth / export dialogs -->
+    <!-- Reauth dialogs -->
     <string name="reauth_master_password_title">マスターパスワードの確認</string>
     <string name="reauth_master_password_description">機密情報を外部に書き出すため、マスターパスワードを再入力してください。</string>
-    <string name="export_dialog_title">データをエクスポート</string>
-    <string name="export_dialog_description">Bitwarden JSON形式でエクスポートします。エクスポートされたファイルにはパスワードが平文で含まれます。取り扱いにご注意ください。</string>
-    <string name="export_success">エクスポートが完了しました</string>
-    <string name="export_failed">エクスポートに失敗しました: %1$s</string>
 
     <!-- Content descriptions (accessibility) -->
     <string name="cd_favorite">お気に入り</string>

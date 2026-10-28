@@ -1,4 +1,4 @@
-import { Check, Code2, Copy, Download, ExternalLink, Send, Tags, Trash2 } from 'lucide-react'
+import { Check, Code2, Copy, ExternalLink, Send, Tags, Trash2 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -63,10 +63,6 @@ export default function Settings() {
   const [recoveryKeyDisplayValue, setRecoveryKeyDisplayValue] = useState('')
   const [recoveryKeyCopied, setRecoveryKeyCopied] = useState(false)
 
-  // Export
-  const [exportConfirmOpen, setExportConfirmOpen] = useState(false)
-  const [exportLoading, setExportLoading] = useState(false)
-
   // Transfer Config Dialog
   const [transferDialogOpen, setTransferDialogOpen] = useState(false)
   const [transferPassword, setTransferPassword] = useState('')
@@ -130,28 +126,6 @@ export default function Settings() {
       setReauthError(t('settings.security.masterPasswordIncorrect'))
     } finally {
       setReauthLoading(false)
-    }
-  }
-
-  const handleExport = async () => {
-    setExportConfirmOpen(false)
-    setExportLoading(true)
-    try {
-      const json = await commands.exportBitwardenJson()
-      const blob = new Blob([json], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const today = new Date().toISOString().split('T')[0]
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `kura-export-${today}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    } catch (err) {
-      pushError(t('errors.exportFailed', { error: String(err) }))
-    } finally {
-      setExportLoading(false)
     }
   }
 
@@ -448,27 +422,6 @@ export default function Settings() {
 
         <Separator className="my-3" />
 
-        {/* データ */}
-        <section>
-          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
-            {t('settings.sections.data')}
-          </h2>
-          <div className="space-y-1.5">
-            <Button
-              variant="secondary"
-              onClick={() => openReauth(() => setExportConfirmOpen(true))}
-              className="w-full text-sm justify-start gap-2"
-              size="sm"
-              disabled={exportLoading}
-            >
-              <Download size={14} />
-              {exportLoading ? t('settings.data.exporting') : t('settings.data.exportBitwarden')}
-            </Button>
-          </div>
-        </section>
-
-        <Separator className="my-3" />
-
         {/* セキュリティ */}
         <section>
           <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
@@ -608,16 +561,6 @@ export default function Settings() {
           </div>
         </section>
       </div>
-
-      {/* エクスポート確認ダイアログ */}
-      <ConfirmDialog
-        open={exportConfirmOpen}
-        title={t('settings.data.exportConfirmTitle')}
-        description={t('settings.data.exportConfirmDesc')}
-        confirmText={t('settings.data.exportConfirmButton')}
-        onConfirm={handleExport}
-        onCancel={() => setExportConfirmOpen(false)}
-      />
 
       {/* ログアウト確認ダイアログ */}
       <ConfirmDialog

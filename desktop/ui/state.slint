@@ -273,7 +273,6 @@ export global Settings {
     in property <string> key;
     in property <string> endpoint;
     in property <string> version;
-    in property <bool> exporting;
     // 開いているダイアログ: "" / change-password / rotate-dek / regenerate-recovery / transfer / reauth / recovery-key
     in-out property <string> dialog;
     in-out property <string> pw-old;
@@ -289,7 +288,7 @@ export global Settings {
     callback rotate-dek();
     callback regenerate-recovery();
     callback generate-transfer();
-    // 再認証が必要な操作（"export" / "transfer"）
+    // 再認証が必要な操作（"transfer"）
     callback reauth-requested(string);
     callback reauth-submit();
     callback close-dialog();

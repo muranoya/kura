@@ -136,18 +136,6 @@ export component SettingsScreen inherits Rectangle {
             }
 
             Card {
-                title: "データ";
-                AppButton {
-                    text: Settings.exporting ? "エクスポート中..." : "Bitwarden形式でエクスポート";
-                    variant: "secondary";
-                    enabled: !Settings.exporting;
-                    clicked => {
-                        Settings.reauth-requested("export");
-                    }
-                }
-            }
-
-            Card {
                 title: "ストレージ設定";
                 if !Settings.has-storage: Text {
                     text: "ストレージ設定が見つかりません";

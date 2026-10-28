@@ -35,7 +35,6 @@
     "title": "エラー",
     "saveSettingsFailed": "設定の保存に失敗しました: {{error}}",
     "logoutFailed": "ログアウトに失敗しました: {{error}}",
-    "exportFailed": "エクスポートに失敗しました: {{error}}",
     "syncFailed": "同期に失敗しました: {{error}}",
     "labelCreateFailed": "ラベル作成に失敗しました"
   },
@@ -400,7 +399,6 @@
     "sections": {
       "general": "一般",
       "management": "管理",
-      "data": "データ",
       "security": "セキュリティ",
       "storage": "ストレージ設定",
       "developer": "開発者",
@@ -431,13 +429,6 @@
     "management": {
       "labels": "ラベル管理",
       "trash": "ゴミ箱"
-    },
-    "data": {
-      "exportBitwarden": "Bitwarden形式でエクスポート",
-      "exporting": "エクスポート中...",
-      "exportConfirmTitle": "データをエクスポート",
-      "exportConfirmDesc": "Bitwarden JSON形式でエクスポートします。エクスポートされたファイルにはパスワードが平文で含まれます。取り扱いにご注意ください。",
-      "exportConfirmButton": "エクスポート"
     },
     "security": {
       "changePassword": "マスターパスワード変更",

@@ -192,7 +192,6 @@ fn setup_confirm(app: &AppWindow) {
             "delete-entry" => entries::delete_confirmed(&app),
             "purge-entry" => entries::purge_confirmed(&app),
             "delete-label" => labels::delete_confirmed(&app),
-            "export" => settings::export_confirmed(&app),
             "logout-lock" | "logout-settings" => logout(&app),
             other => eprintln!("Unknown confirm action: {other}"),
         }

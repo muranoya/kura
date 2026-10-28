@@ -87,9 +87,6 @@ export type Message =
   | { type: 'GET_SYNC_CONFLICTS' }
   | { type: 'RESOLVE_SYNC_CONFLICTS'; resolutions: Record<string, 'local' | 'remote'> }
 
-  // Export
-  | { type: 'EXPORT_BITWARDEN_JSON' }
-
   // Transfer
   | { type: 'DECRYPT_TRANSFER_CONFIG'; password: string; transferString: string }
   | { type: 'ENCRYPT_TRANSFER_CONFIG'; password: string; configJson: string }
@@ -176,11 +173,6 @@ export type MessageResponse =
       lastSyncTime?: string | null
       conflicts?: SyncConflict[]
       conflict?: boolean
-    })
-
-  // Export responses
-  | ({ success: true } & {
-      json?: string
     })
 
   // Transfer responses
