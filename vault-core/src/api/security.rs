@@ -100,30 +100,6 @@ impl VaultManager {
         })
     }
 
-    /// Argon2パラメータアップグレード
-    pub fn api_upgrade_argon2_params(
-        &self,
-        password: String,
-        iterations: u32,
-        memory: u32,
-        parallelism: u32,
-    ) -> Result<String, String> {
-        let password = MasterPassword::from_string(password);
-        let new_params = crate::models::Argon2Params {
-            salt: crate::codec::base32::encode(&rand::random::<[u8; 16]>()),
-            iterations,
-            memory,
-            parallelism,
-        };
-
-        self.with_unlocked_mut(|unlocked| {
-            unlocked
-                .upgrade_argon2_params(&password, new_params)
-                .map_err(|e| format!("Failed to upgrade argon2 params: {}", e))
-                .map(|recovery_key| recovery_key.to_display_string())
-        })
-    }
-
     /// DEK ローテーション（新しいリカバリーキーを返す）
     pub fn api_rotate_dek(&self, password: String) -> Result<String, String> {
         let password = MasterPassword::from_string(password);

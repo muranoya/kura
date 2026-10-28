@@ -324,20 +324,6 @@ pub fn api_reset_master_password_with_recovery_key(
 }
 
 #[wasm_bindgen]
-pub fn api_upgrade_argon2_params(
-    vault_id: String,
-    password: String,
-    iterations: u32,
-    memory: u32,
-    parallelism: u32,
-) -> Result<String, JsValue> {
-    with_manager(&vault_id, |m| {
-        m.api_upgrade_argon2_params(password, iterations, memory, parallelism)
-    })
-    .map_err(to_js_err)
-}
-
-#[wasm_bindgen]
 pub fn api_rotate_dek(vault_id: String, password: String) -> Result<String, JsValue> {
     with_manager(&vault_id, |m| m.api_rotate_dek(password)).map_err(to_js_err)
 }

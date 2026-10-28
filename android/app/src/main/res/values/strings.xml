@@ -352,8 +352,6 @@
     <string name="settings_clipboard_clear_2min">2分</string>
     <string name="settings_change_master_password">マスターパスワード変更</string>
     <string name="settings_change_master_password_description">マスターパスワードを新しいものに変更</string>
-    <string name="settings_argon2_upgrade">Argon2パラメータ強化</string>
-    <string name="settings_argon2_upgrade_description">より強いパラメータでKEKを再導出します。</string>
     <string name="settings_recovery_key_show">リカバリーキーを表示</string>
     <string name="settings_recovery_key_rotate">リカバリーキー再生成</string>
     <string name="settings_recovery_key_rotate_description">新しいリカバリーキーを生成して表示</string>

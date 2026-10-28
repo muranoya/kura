@@ -127,42 +127,6 @@ impl UnlockedVault {
         Ok(new_recovery_key)
     }
 
-    /// Upgrade Argon2 parameters for stronger key derivation
-    pub fn upgrade_argon2_params(
-        &mut self,
-        master_password: &MasterPassword,
-        new_params: Argon2Params,
-    ) -> Result<crate::crypto::RecoveryKey> {
-        use base64::Engine;
-
-        // Verify password with old params
-        let old_kek = crate::crypto::kdf::derive_kek_from_master_password(
-            master_password,
-            &self.meta.argon2_params,
-        )?;
-        let engine = base64::engine::general_purpose::STANDARD;
-        let encrypted_dek_bytes = engine
-            .decode(&self.meta.encrypted_dek_master)
-            .map_err(|_| VaultError::DecryptionError("Invalid base64".to_string()))?;
-        let _old_dek = Dek::unwrap(&encrypted_dek_bytes, &old_kek)?;
-
-        // Derive new KEK with new params
-        let new_kek =
-            crate::crypto::kdf::derive_kek_from_master_password(master_password, &new_params)?;
-        let encrypted_dek_master = self.dek.wrap(&new_kek)?;
-
-        // Generate new recovery key with new params
-        let new_recovery_key = crate::crypto::RecoveryKey::generate();
-        let kek_recovery = new_recovery_key.derive_kek(&new_params)?;
-        let encrypted_dek_recovery = self.dek.wrap(&kek_recovery)?;
-
-        // Update vault_meta
-        self.set_master_slot(engine.encode(&encrypted_dek_master), new_params.clone());
-        self.set_recovery_slot(engine.encode(&encrypted_dek_recovery), new_params);
-
-        Ok(new_recovery_key)
-    }
-
     /// Regenerate recovery key
     pub fn regenerate_recovery_key(
         &mut self,
@@ -385,26 +349,6 @@ mod tests {
     }
 
     #[test]
-    fn test_merge_keeps_recovery_slot_params_after_concurrent_argon2_upgrade() {
-        // 端末 A で Argon2 パラメータを更新し、その後それを知らない端末 B でリカバリーキーを
-        // 再発行する。recovery スロットは B の（古いパラメータで包んだ）ものになるが、
-        // スロットごとにパラメータを持つので、どちらの鍵でも開ける
-        let (mut a, mut b) = two_devices();
-        let mut params = a.meta.argon2_params.clone();
-        params.salt = crate::codec::base32::encode(&rand::random::<[u8; 16]>());
-        a.upgrade_argon2_params(&mp(PASSWORD), params).unwrap();
-        let recovery_key = b.regenerate_recovery_key(&mp(PASSWORD)).unwrap();
-
-        b.merge_remote(&v2(&a)).unwrap();
-
-        let locked = lock_vault(b);
-        assert!(locked.clone().unlock(&mp(PASSWORD)).is_ok());
-        assert!(locked
-            .unlock_with_recovery_key(&recovery_key_input(recovery_key.to_display_string()))
-            .is_ok());
-    }
-
-    #[test]
     fn test_merge_converges_when_slot_times_are_equal() {
         // 移行直後など、両端末のスロットの更新時刻が同じで中身が異なる場合でも、
         // どちらの端末も同じ方を採用して収束する
@@ -505,51 +449,6 @@ mod tests {
         let mut vault = create_unlocked_vault();
 
         let result = vault.rotate_dek(&mp("wrong-password"));
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_upgrade_argon2_params() {
-        let mut vault = create_unlocked_vault();
-
-        let new_params = Argon2Params {
-            salt: vault.meta.argon2_params.salt.clone(),
-            iterations: 4,
-            memory: 131072,
-            parallelism: 4,
-        };
-
-        let recovery_key = vault
-            .upgrade_argon2_params(&mp(PASSWORD), new_params)
-            .unwrap();
-
-        // Verify params were updated
-        assert_eq!(vault.meta.argon2_params.iterations, 4);
-        assert_eq!(vault.meta.argon2_params.memory, 131072);
-
-        // Should still work with master password
-        let locked = vault.lock().unwrap();
-        let unlocked = locked.unlock(&mp(PASSWORD)).unwrap();
-
-        // Recovery key should also work
-        let locked2 = unlocked.lock().unwrap();
-        let _unlocked2 = locked2
-            .unlock_with_recovery_key(&recovery_key_input(recovery_key.to_display_string()))
-            .unwrap();
-    }
-
-    #[test]
-    fn test_upgrade_argon2_params_wrong_password() {
-        let mut vault = create_unlocked_vault();
-
-        let new_params = Argon2Params {
-            salt: vault.meta.argon2_params.salt.clone(),
-            iterations: 4,
-            memory: 131072,
-            parallelism: 4,
-        };
-
-        let result = vault.upgrade_argon2_params(&mp("wrong-password"), new_params);
         assert!(result.is_err());
     }
 
