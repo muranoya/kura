@@ -1279,34 +1279,6 @@ async function handleMessage(
         break
       }
 
-      case 'DOWNLOAD': {
-        try {
-          const s3Config: S3Config | null = message.storageConfig
-            ? JSON.parse(message.storageConfig)
-            : decryptedS3Config
-
-          if (!s3Config) {
-            sendResponse({ success: false, error: 'S3 config not found' })
-            break
-          }
-
-          const client = new VaultS3Client(s3Config)
-          try {
-            const remote = await client.download()
-            if (remote) {
-              vault.api_load_vault(DEFAULT_VAULT_ID, remote.bytes, remote.etag)
-            }
-            sendResponse({ success: true, result: !!remote })
-          } finally {
-            client.destroy()
-          }
-        } catch (err) {
-          console.error('[SW] DOWNLOAD: Error:', err)
-          sendResponse({ success: false, error: String(err) })
-        }
-        break
-      }
-
       case 'SYNC': {
         if (!unlocked) {
           sendResponse({ success: false, error: 'Vault not unlocked' })
