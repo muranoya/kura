@@ -6,6 +6,10 @@ use super::{AutofillCandidate, EntryDetail, EntryRow, TotpPeriodRow, VaultManage
 use crate::models::entry_data::CustomField;
 use crate::secret::SecretString;
 
+/// passkey は WebAuthn API だけが作るため `CustomFieldType`（ユーザーが選べる型）には含めないが、
+/// 編集フォームはエントリのカスタムフィールドを丸ごと送り返すので、既知の型として受け入れる
+const PASSKEY_FIELD_TYPE: &str = "passkey";
+
 /// カスタムフィールドの JSON を読み、未知のフィールドタイプを拒否する。
 /// ただし `existing` に同じ ID・同じタイプのフィールドがある場合は、新しいクライアントが
 /// 作ったフィールドを編集時に送り返しているだけなので受け入れる（前方互換性）
@@ -13,7 +17,8 @@ fn parse_custom_fields(json: &str, existing: &[CustomField]) -> Result<Vec<Custo
     let fields: Vec<CustomField> =
         serde_json::from_str(json).map_err(|e| format!("Invalid custom_fields JSON: {}", e))?;
     for field in &fields {
-        let known = CustomFieldType::from_str(&field.field_type).is_some();
+        let known = CustomFieldType::from_str(&field.field_type).is_some()
+            || field.field_type == PASSKEY_FIELD_TYPE;
         let preserved = existing
             .iter()
             .any(|f| f.id == field.id && f.field_type == field.field_type);

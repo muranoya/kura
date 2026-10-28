@@ -1073,6 +1073,42 @@ mod vault_manager_api {
         assert!(result.is_err());
     }
 
+    #[test]
+    fn test_update_entry_accepts_passkey_field_missing_from_entry() {
+        let (m, _) = setup_unlocked_vault();
+
+        let entry_id = m
+            .api_create_entry(
+                "login".to_string(),
+                "Login".to_string(),
+                None,
+                r#"{"username":"user","password":"pass"}"#.to_string(),
+                vec![],
+                None,
+            )
+            .expect("Failed to create entry");
+
+        // 同期マージで消えた passkey フィールドを編集フォームが送り返しても、更新は通す
+        m.api_update_entry(
+            entry_id.clone(),
+            Some("Renamed".to_string()),
+            None,
+            None,
+            None,
+            Some(
+                r#"[{"id":"pk1","name":"Passkey","field_type":"passkey","value":"{\"rp_id\":\"example.com\",\"private_key\":\"k\"}","secret":true}]"#
+                    .to_string(),
+            ),
+        )
+        .expect("Failed to update entry");
+
+        let detail = m.api_get_entry(entry_id).expect("Failed to get entry");
+        assert_eq!(detail.name, "Renamed");
+        assert!(detail
+            .custom_fields
+            .is_some_and(|f| f.contains(r#""field_type":"passkey""#)));
+    }
+
     // D. vault.json Validation
 
     #[test]
