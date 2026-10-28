@@ -12,6 +12,7 @@ use zeroize::Zeroizing;
 
 /// Encrypt entire v1 VaultContents with DEK（v1 のフィクスチャを作るテスト用）
 /// Returns: base64-encoded [12-byte IV | ciphertext | 16-byte GCM tag]
+#[cfg(test)]
 pub fn encrypt_vault(contents: &VaultContentsV1, dek: &super::Dek) -> Result<String> {
     use base64::Engine;
 

@@ -6,6 +6,7 @@
 use crate::secret::{EntrySecretJson, SecretString};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+#[cfg(test)]
 use zeroize::Zeroizing;
 
 use super::LabelValue;
@@ -50,6 +51,7 @@ impl VaultContentsV1 {
     /// JSONバイト列に変換する。
     /// `Zeroizing`バッファへ直接シリアライズすることで、平文（全エントリの
     /// 秘匿値を含む）が非保護の`Vec<u8>`として一瞬たりとも存在しないようにする。
+    #[cfg(test)]
     pub fn to_bytes(&self) -> crate::error::Result<Zeroizing<Vec<u8>>> {
         let mut buf = Zeroizing::new(Vec::new());
         serde_json::to_writer(&mut *buf, self).map_err(crate::error::VaultError::JsonError)?;
