@@ -1,0 +1,745 @@
+import { ComboBox, LineEdit, ListView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { AppButton, Badge, Card, CodeBlock, Dialog, DialogFooter, ErrorBanner, FieldLabel, Icon, PasswordInput, ScrollPage } from "../widgets.slint";
+import { Confirm, Import, Settings, Util } from "../state.slint";
+import { HorizontalDivider, ScreenHeader } from "layout.slint";
+
+component SettingRow inherits HorizontalLayout {
+    in property <string> title;
+    in property <string> description;
+    spacing: 12px;
+    VerticalLayout {
+        horizontal-stretch: 1;
+        alignment: center;
+        spacing: 2px;
+        Text {
+            text: root.title;
+            font-size: Theme.text-sm;
+            color: Theme.text-primary;
+        }
+
+        Text {
+            text: root.description;
+            font-size: Theme.text-xs;
+            color: Theme.text-muted;
+        }
+    }
+
+    @children
+}
+
+component InfoItem inherits VerticalLayout {
+    in property <string> label;
+    in property <string> value;
+    spacing: 4px;
+    Text {
+        text: root.label;
+        font-size: Theme.text-xs;
+        font-weight: 500;
+        color: Theme.text-secondary;
+    }
+
+    Text {
+        text: root.value;
+        font-family: Theme.mono;
+        font-size: Theme.text-sm;
+        color: Theme.text-primary;
+        wrap: char-wrap;
+    }
+}
+
+export component SettingsScreen inherits Rectangle {
+    background: Theme.bg-base;
+    VerticalLayout {
+        ScreenHeader {
+            title: "設定";
+        }
+
+        HorizontalDivider { }
+
+        ScrollPage {
+            vertical-stretch: 1;
+            max-content-width: 100000px;
+            pad: 12px;
+            spacing: 12px;
+            Card {
+                title: "一般";
+                SettingRow {
+                    title: "自動ロック";
+                    description: "ウィンドウのフォーカスが外れてからの時間";
+                    ComboBox {
+                        width: 120px;
+                        model: ["無効", "1分", "3分", "5分", "10分", "15分", "30分", "60分"];
+                        current-index <=> Settings.autolock-index;
+                        selected => {
+                            Settings.settings-changed();
+                        }
+                    }
+                }
+
+                SettingRow {
+                    title: "クリップボード自動クリア";
+                    description: "コピー後の自動クリアまでの時間";
+                    ComboBox {
+                        width: 120px;
+                        model: ["無効", "30秒", "1分", "2分"];
+                        current-index <=> Settings.clipboard-index;
+                        selected => {
+                            Settings.settings-changed();
+                        }
+                    }
+                }
+            }
+
+            Card {
+                title: "セキュリティ";
+                AppButton {
+                    text: "マスターパスワード変更";
+                    variant: "secondary";
+                    clicked => {
+                        Settings.dialog-error = "";
+                        Settings.dialog = "change-password";
+                    }
+                }
+
+                AppButton {
+                    text: "DEK更新";
+                    variant: "secondary";
+                    clicked => {
+                        Settings.dialog-error = "";
+                        Settings.dialog = "rotate-dek";
+                    }
+                }
+
+                AppButton {
+                    text: "リカバリーキー再生成";
+                    variant: "secondary";
+                    clicked => {
+                        Settings.dialog-error = "";
+                        Settings.dialog = "regenerate-recovery";
+                    }
+                }
+
+                AppButton {
+                    text: "ログアウト";
+                    variant: "destructive";
+                    clicked => {
+                        Confirm.action = "logout-settings";
+                        Confirm.title = "ログアウト";
+                        Confirm.description = "ログアウトするとローカルキャッシュとS3設定がクリアされます。再度ログインには設定の再入力が必要になります。";
+                        Confirm.confirm-text = "ログアウト";
+                        Confirm.dangerous = true;
+                        Confirm.open = true;
+                    }
+                }
+            }
+
+            Card {
+                title: "データ";
+                AppButton {
+                    text: "1Passwordからインポート";
+                    variant: "secondary";
+                    clicked => {
+                        Settings.dialog = "import";
+                    }
+                }
+
+                AppButton {
+                    text: Settings.exporting ? "エクスポート中..." : "Bitwarden形式でエクスポート";
+                    variant: "secondary";
+                    enabled: !Settings.exporting;
+                    clicked => {
+                        Settings.reauth-requested("export");
+                    }
+                }
+            }
+
+            Card {
+                title: "ストレージ設定";
+                if !Settings.has-storage: Text {
+                    text: "ストレージ設定が見つかりません";
+                    font-size: Theme.text-sm;
+                    color: Theme.text-muted;
+                }
+                if Settings.has-storage: VerticalLayout {
+                    spacing: 12px;
+                    InfoItem {
+                        label: "バケット";
+                        value: Settings.bucket != "" ? Settings.bucket : "N/A";
+                    }
+
+                    InfoItem {
+                        label: "リージョン";
+                        value: Settings.region != "" ? Settings.region : "N/A";
+                    }
+
+                    InfoItem {
+                        label: "ファイルパス";
+                        value: Settings.key;
+                    }
+
+                    if Settings.endpoint != "": InfoItem {
+                        label: "エンドポイント";
+                        value: Settings.endpoint;
+                    }
+                    AppButton {
+                        text: "設定を別端末に転送";
+                        variant: "secondary";
+                        has-icon: true;
+                        icon: Icons.smartphone;
+                        clicked => {
+                            Settings.reauth-requested("transfer");
+                        }
+                    }
+                }
+            }
+
+            Card {
+                title: "このアプリについて";
+                HorizontalLayout {
+                    Text {
+                        horizontal-stretch: 1;
+                        text: "バージョン";
+                        font-size: Theme.text-sm;
+                        color: Theme.text-muted;
+                    }
+
+                    Text {
+                        text: Settings.version;
+                        font-size: Theme.text-sm;
+                        color: Theme.text-primary;
+                    }
+                }
+
+                HorizontalLayout {
+                    Text {
+                        horizontal-stretch: 1;
+                        text: "リポジトリ";
+                        font-size: Theme.text-sm;
+                        color: Theme.text-muted;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 4px;
+                        Text {
+                            text: "GitHub";
+                            font-size: Theme.text-sm;
+                            color: Theme.accent;
+                            gh-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    Util.open-url("https://github.com/muranoya/kura");
+                                }
+                            }
+                        }
+
+                        Icon {
+                            y: (parent.height - self.height) / 2;
+                            source: Icons.external-link;
+                            size: 12px;
+                            color: Theme.accent;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component DialogError inherits ErrorBanner {
+    text: Settings.dialog-error;
+}
+
+component CancelButton inherits AppButton {
+    text: "キャンセル";
+    variant: "secondary";
+    enabled: !Settings.dialog-loading;
+    clicked => {
+        Settings.close-dialog();
+    }
+}
+
+component PasswordField inherits VerticalLayout {
+    in property <string> label;
+    in-out property <string> text;
+    in property <string> placeholder;
+    callback accepted();
+    spacing: 6px;
+    FieldLabel {
+        text: root.label;
+    }
+
+    PasswordInput {
+        text <=> root.text;
+        placeholder-text: root.placeholder;
+        enabled: !Settings.dialog-loading;
+        accepted => {
+            root.accepted();
+        }
+    }
+}
+
+component ImportDialog inherits Dialog {
+    dialog-width: 672px;
+    dismissable: Import.step != "loading" && Import.step != "executing";
+    title: Import.step == "idle" || Import.step == "loading" ? "1Passwordからインポート"
+        : Import.step == "preview" ? "インポートプレビュー"
+        : Import.step == "executing" ? "インポート実行中" : "インポート完了";
+    description: Import.step == "idle" ? "1Passwordからエクスポートした .1pux ファイルを選択してください。" : Import.step == "preview" ? Import.subtitle : "";
+    dismissed => {
+        Import.close();
+    }
+    if Import.step == "idle": VerticalLayout {
+        alignment: center;
+        spacing: 16px;
+        padding-top: 24px;
+        padding-bottom: 24px;
+        HorizontalLayout {
+            alignment: center;
+            Icon {
+                source: Icons.file-up;
+                size: 48px;
+                color: Theme.text-secondary;
+            }
+        }
+
+        HorizontalLayout {
+            alignment: center;
+            AppButton {
+                text: "ファイルを選択";
+                clicked => {
+                    Import.select-file();
+                }
+            }
+        }
+    }
+    if Import.step == "loading" || Import.step == "executing": VerticalLayout {
+        alignment: center;
+        spacing: 16px;
+        padding-top: 24px;
+        padding-bottom: 24px;
+        Text {
+            text: Import.step == "loading" ? "ファイルを解析中..." : "エントリを作成しています...";
+            font-size: Theme.text-sm;
+            color: Theme.text-secondary;
+            horizontal-alignment: center;
+        }
+    }
+    if Import.error != "": Text {
+        text: Import.error;
+        font-size: Theme.text-sm;
+        color: Theme.danger;
+        wrap: word-wrap;
+    }
+    if Import.step == "preview": VerticalLayout {
+        spacing: 10px;
+        // 統計 / フィルター
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: start;
+            for chip in Import.chips: Badge {
+                text: chip.text;
+                variant: chip.variant;
+                clickable: chip.clickable;
+                clicked => {
+                    Import.chip-clicked(chip.key);
+                }
+            }
+        }
+
+        LineEdit {
+            text <=> Import.search;
+            placeholder-text: "名前で検索...";
+            edited => {
+                Import.search-changed();
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            Text {
+                text: "一括操作:";
+                font-size: Theme.text-sm;
+                color: Theme.text-secondary;
+                vertical-alignment: center;
+            }
+
+            AppButton {
+                text: "全て取り込む";
+                variant: "ghost";
+                size: "sm";
+                clicked => {
+                    Import.bulk(true);
+                }
+            }
+
+            AppButton {
+                text: "全てスキップ";
+                variant: "ghost";
+                size: "sm";
+                clicked => {
+                    Import.bulk(false);
+                }
+            }
+        }
+
+        ListView {
+            min-height: 120px;
+            preferred-height: 320px;
+            for row in Import.rows: HorizontalLayout {
+                padding: 4px;
+                padding-left: 8px;
+                spacing: 12px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: center;
+                    spacing: 2px;
+                    HorizontalLayout {
+                        spacing: 6px;
+                        Text {
+                            text: row.name;
+                            font-size: Theme.text-sm;
+                            font-weight: 500;
+                            color: Theme.text-primary;
+                            overflow: elide;
+                        }
+
+                        if row.archived: Badge {
+                            text: "アーカイブ済み";
+                            variant: "muted";
+                        }
+                        if row.category != "": Badge {
+                            text: row.category;
+                            variant: "muted";
+                        }
+                        if row.has-attachments: Icon {
+                            source: Icons.alert-triangle;
+                            size: 12px;
+                            color: Theme.warning;
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+                        Text {
+                            text: row.type-label;
+                            font-size: Theme.text-xs;
+                            color: Theme.text-secondary;
+                        }
+
+                        if row.duplicate != "": Text {
+                            text: row.duplicate;
+                            font-size: Theme.text-xs;
+                            color: Theme.warning;
+                            overflow: elide;
+                        }
+                    }
+                }
+
+                ComboBox {
+                    width: 160px;
+                    model: row.actions;
+                    current-index: row.action-index;
+                    selected => {
+                        Import.set-action(row.source-id, self.current-index);
+                    }
+                }
+            }
+        }
+
+        DialogFooter {
+            AppButton {
+                text: "キャンセル";
+                variant: "ghost";
+                clicked => {
+                    Import.close();
+                }
+            }
+
+            AppButton {
+                text: Import.import-count + " 件をインポート";
+                enabled: Import.import-count > 0;
+                clicked => {
+                    Import.execute();
+                }
+            }
+        }
+    }
+    if Import.step == "result": VerticalLayout {
+        spacing: 12px;
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: start;
+            for chip in Import.result-chips: Badge {
+                text: chip.text;
+                variant: chip.variant;
+            }
+        }
+
+        if Import.labels-created != "": Text {
+            text: "新規作成ラベル: " + Import.labels-created;
+            font-size: Theme.text-sm;
+            color: Theme.text-secondary;
+            wrap: word-wrap;
+        }
+        for err in Import.result-errors: Text {
+            text: "× " + err;
+            font-size: Theme.text-sm;
+            color: Theme.danger;
+            wrap: word-wrap;
+        }
+        DialogFooter {
+            AppButton {
+                text: "閉じる";
+                clicked => {
+                    Import.close();
+                }
+            }
+        }
+    }
+}
+
+// 設定画面のダイアログ群（Settings.dialog で切り替える）
+export component SettingsDialogs inherits Rectangle {
+    private property <bool> copied;
+    if Settings.dialog == "change-password": Dialog {
+        title: "マスターパスワード変更";
+        description: "新しいマスターパスワードを設定します。現在のパスワードで認証が必要です。 変更後、他のセットアップ済み端末では新しいマスターパスワードでの再ログインが必要になります。";
+        dismissable: !Settings.dialog-loading;
+        dismissed => {
+            Settings.close-dialog();
+        }
+        PasswordField {
+            label: "現在のパスワード";
+            placeholder: "現在のパスワード";
+            text <=> Settings.pw-old;
+        }
+
+        PasswordField {
+            label: "新しいパスワード";
+            placeholder: "新しいパスワード";
+            text <=> Settings.pw-new;
+        }
+
+        PasswordField {
+            label: "新しいパスワード（確認）";
+            placeholder: "新しいパスワード（確認）";
+            text <=> Settings.pw-confirm;
+            accepted => {
+                Settings.change-password();
+            }
+        }
+
+        if Settings.dialog-error != "": DialogError { }
+
+        DialogFooter {
+            CancelButton { }
+
+            AppButton {
+                text: Settings.dialog-loading ? "変更中..." : "変更";
+                enabled: !Settings.dialog-loading;
+                clicked => {
+                    Settings.change-password();
+                }
+            }
+        }
+    }
+    if Settings.dialog == "rotate-dek": Dialog {
+        title: "DEK更新";
+        description: "データ暗号化キーを新しく生成します。マスターパスワードで認証が必要です。 同時にリカバリーキーも更新されます。";
+        dismissable: !Settings.dialog-loading;
+        dismissed => {
+            Settings.close-dialog();
+        }
+        PasswordField {
+            label: "マスターパスワード";
+            placeholder: "マスターパスワード";
+            text <=> Settings.pw-old;
+            accepted => {
+                Settings.rotate-dek();
+            }
+        }
+
+        if Settings.dialog-error != "": DialogError { }
+
+        DialogFooter {
+            CancelButton { }
+
+            AppButton {
+                text: Settings.dialog-loading ? "更新中..." : "更新";
+                enabled: !Settings.dialog-loading;
+                clicked => {
+                    Settings.rotate-dek();
+                }
+            }
+        }
+    }
+    if Settings.dialog == "regenerate-recovery": Dialog {
+        title: "リカバリーキー再生成";
+        description: "新しいリカバリーキーを生成します。マスターパスワードで認証が必要です。";
+        dismissable: !Settings.dialog-loading;
+        dismissed => {
+            Settings.close-dialog();
+        }
+        PasswordField {
+            label: "マスターパスワード";
+            placeholder: "マスターパスワード";
+            text <=> Settings.pw-old;
+            accepted => {
+                Settings.regenerate-recovery();
+            }
+        }
+
+        if Settings.dialog-error != "": DialogError { }
+
+        DialogFooter {
+            CancelButton { }
+
+            AppButton {
+                text: Settings.dialog-loading ? "生成中..." : "生成";
+                enabled: !Settings.dialog-loading;
+                clicked => {
+                    Settings.regenerate-recovery();
+                }
+            }
+        }
+    }
+    if Settings.dialog == "reauth": Dialog {
+        title: "マスターパスワードの確認";
+        description: "機密情報を外部に書き出すため、マスターパスワードを再入力してください。";
+        dismissable: !Settings.dialog-loading;
+        dismissed => {
+            Settings.close-dialog();
+        }
+        PasswordField {
+            label: "マスターパスワード";
+            placeholder: "マスターパスワード";
+            text <=> Settings.pw-old;
+            accepted => {
+                if Settings.pw-old != "" {
+                    Settings.reauth-submit();
+                }
+            }
+        }
+
+        if Settings.dialog-error != "": DialogError { }
+
+        DialogFooter {
+            CancelButton { }
+
+            AppButton {
+                text: Settings.dialog-loading ? "確認中..." : "確認";
+                enabled: !Settings.dialog-loading && Settings.pw-old != "";
+                clicked => {
+                    Settings.reauth-submit();
+                }
+            }
+        }
+    }
+    if Settings.dialog == "transfer": Dialog {
+        title: "設定を別端末に転送";
+        description: "転送パスワードで暗号化した転送コードを生成します。別の端末のセットアップ時にこのコードと転送パスワードを入力してください。";
+        dialog-width: 520px;
+        dismissable: !Settings.dialog-loading;
+        dismissed => {
+            Settings.close-dialog();
+        }
+        if Settings.transfer-code == "": PasswordField {
+            label: "転送パスワード";
+            placeholder: "受信側に共有するパスワードを設定";
+            text <=> Settings.pw-old;
+            accepted => {
+                if Settings.pw-old != "" {
+                    Settings.generate-transfer();
+                }
+            }
+        }
+        if Settings.transfer-code == "" && Settings.dialog-error != "": DialogError { }
+        if Settings.transfer-code == "": DialogFooter {
+            CancelButton { }
+
+            AppButton {
+                text: Settings.dialog-loading ? "生成中..." : "転送コードを生成";
+                enabled: !Settings.dialog-loading && Settings.pw-old != "";
+                clicked => {
+                    Settings.generate-transfer();
+                }
+            }
+        }
+        if Settings.transfer-code != "": Rectangle {
+            height: 232px;
+            background: #ffffff;
+            border-radius: 4px;
+            Image {
+                width: 200px;
+                height: 200px;
+                source: Settings.transfer-qr;
+                image-rendering: pixelated;
+            }
+        }
+        if Settings.transfer-code != "": CodeBlock {
+            text: Settings.transfer-code;
+            font-size: Theme.text-xs;
+        }
+        if Settings.transfer-code != "": AppButton {
+            text: root.copied ? "コピーしました" : "転送コードをコピー";
+            variant: "secondary";
+            has-icon: true;
+            icon: root.copied ? Icons.check : Icons.copy;
+            clicked => {
+                Util.copy(Settings.transfer-code);
+                root.copied = true;
+            }
+        }
+        if Settings.transfer-code != "": DialogFooter {
+            AppButton {
+                text: "閉じる";
+                clicked => {
+                    Settings.close-dialog();
+                }
+            }
+        }
+    }
+    if Settings.dialog == "recovery-key": Dialog {
+        title: "新しいリカバリーキー";
+        description: "新しいリカバリーキーが生成されました。安全な場所に保管してください。 マスターパスワードを忘れた場合に使用できます。";
+        dismissed => {
+            Settings.close-dialog();
+        }
+        CodeBlock {
+            text: Settings.new-recovery-key;
+        }
+
+        AppButton {
+            text: root.copied ? "コピーしました" : "コピー";
+            variant: "secondary";
+            has-icon: true;
+            icon: root.copied ? Icons.check : Icons.copy;
+            clicked => {
+                Util.copy(Settings.new-recovery-key);
+                root.copied = true;
+            }
+        }
+
+        DialogFooter {
+            AppButton {
+                text: "保管しました";
+                clicked => {
+                    Settings.close-dialog();
+                }
+            }
+        }
+    }
+    if Settings.dialog == "import": ImportDialog { }
+    Timer {
+        interval: 2s;
+        running: root.copied;
+        triggered => {
+            root.copied = false;
+        }
+    }
+}
+

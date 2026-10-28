@@ -101,7 +101,7 @@ pub struct CustomField {
 
 なお、既存の非対称性として、`api_create_entry` は `CustomFieldType::from_str` で `field_type` を検証するが、`api_update_entry` はこの検証を行っていない。今回追加する `autofill_selector` はどちらの経路でも検証なしで通る。
 
-FFIバインディング層（WASM / JNI / Tauriネイティブ）は、いずれもcustom_fieldsをJSON文字列としてそのまま透過的に受け渡すだけの設計であるため、**FFI層自体の変更は不要**である。各プラットフォームのAPI（`api_get_entry` / `api_create_entry` / `api_update_entry`）は既にJSON文字列越しにcustom_fieldsを丸ごと運んでいる。
+FFIバインディング層（WASM / JNI / デスクトップの Rust 直接呼び出し）は、いずれもcustom_fieldsをJSON文字列としてそのまま透過的に受け渡すだけの設計であるため、**FFI層自体の変更は不要**である。各プラットフォームのAPI（`api_get_entry` / `api_create_entry` / `api_update_entry`）は既にJSON文字列越しにcustom_fieldsを丸ごと運んでいる。
 
 # Part 3: オートフィル実行フロー（ブラウザ拡張）
 
@@ -134,7 +134,7 @@ FFIバインディング層（WASM / JNI / Tauriネイティブ）は、いず�
 
 ## 3-2. AutofillFillDataの拡張
 
-`extension/src/shared/types.ts`（および同型定義を持つ `desktop/src/shared/types.ts`）に以下を追加する。
+`extension/src/shared/types.ts` に以下を追加する（デスクトップは `desktop/src/fields.rs` の `Selector` が同じ形を持つ）。
 
 ```ts
 export interface CustomFieldSelector {
@@ -315,9 +315,9 @@ Chrome拡張のaction popupは、ユーザーがpopup外（対象ページ）を
 
 ## 5-1. Desktop: 手動入力フォーム
 
-`desktop/src/components/entries/EntryForm.tsx` のカスタムフィールド描画部分に、折りたたみ可能な「オートフィル対象を指定」サブセクションを追加する。中身は4つのテキスト入力（タグ名 / name属性 / id属性 / type属性）。Desktopには「今開いているページ」という概念がないため、すべて手動テキスト入力とする。UIパターンは既存のカスタムフィールドタイプ選択UIと同じReact実装で構わない。
+`desktop/ui/screens/form.slint` のカスタムフィールド行（`CustomFieldEditor`）に、折りたたみ可能な「オートフィル対象を指定」サブセクションを追加する。中身は4つのテキスト入力（タグ名 / name属性 / id属性 / type属性）。Desktopには「今開いているページ」という概念がないため、すべて手動テキスト入力とする。
 
-読み取り専用のアイテム詳細画面（`desktop/src/components/entries/EntryDetailContent.tsx`）のカスタムフィールド一覧でも、設定済みのオートフィルセレクタがあればその下に要約テキスト（`Crosshair`アイコン + 要約）を表示する。値そのものではなく識別情報のみの表示であるため機密性の問題はない。要約フォーマットは `EntryForm.tsx` の `formatSelectorSummary()` をnamed exportして両画面で共有し、表示フォーマットの二重実装によるズレを防ぐ（ブラウザ拡張の4-1-2節と同じ方針）。詳細画面は読み取り専用であり、セレクタの変更・クリアは編集画面からのみ行う。
+読み取り専用のアイテム詳細画面（`desktop/ui/screens/entries.slint`、行データは `desktop/src/screens/entries.rs` で組み立てる）のカスタムフィールド一覧でも、設定済みのオートフィルセレクタがあればその下に要約テキスト（`Crosshair`アイコン + 要約）を表示する。値そのものではなく識別情報のみの表示であるため機密性の問題はない。要約フォーマットは `desktop/src/fields.rs` の `Selector::summary()` で生成する（編集フォームでは入力中の値から `form.slint` が同じ形式で表示する）。詳細画面は読み取り専用であり、セレクタの変更・クリアは編集画面からのみ行う。
 
 ## 5-2. Android: 手動入力フォーム
 

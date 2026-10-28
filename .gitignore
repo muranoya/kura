@@ -17,13 +17,8 @@ node_modules/
 # Claude
 /.claude/
 
-# Desktop (Tauri)
-desktop/dist/
-desktop/src-tauri/icons/*.png
-desktop/src-tauri/icons/*.ico
-desktop/src-tauri/icons/*.icns
-desktop/src-tauri/icons/android/
-desktop/src-tauri/icons/ios/
+# Desktop (assets/icons/convert2png.sh が生成する)
+desktop/icons/
 
 # Extension
 extension/dist/

@@ -33,15 +33,18 @@ for size in "${EXT_SIZES[@]}"; do
   echo "Extension: ${size}x${size}"
 done
 
-# --- Desktop (Tauri) ---
-# アプリアイコンは `pnpm tauri icon assets/icons/locked_icon.svg` で生成する。
-# ここではトレイアイコン用の locked/unlocked のみ生成する。
-DESKTOP_ICON_DIR="$PROJECT_ROOT/desktop/src-tauri/icons"
+# --- Desktop (Slint) ---
+# locked/unlocked はウィンドウ・トレイアイコン用（ビルド時に埋め込む）。
+# NxN.png は cargo-packager がインストーラ用アイコン（.icns / .ico 含む）を作る元画像。
+DESKTOP_ICON_DIR="$PROJECT_ROOT/desktop/icons"
 
 mkdir -p "$DESKTOP_ICON_DIR"
 svg2png "$SCRIPT_DIR/locked_icon.svg" "$DESKTOP_ICON_DIR/locked.png" 512
 svg2png "$SCRIPT_DIR/unlocked_icon.svg" "$DESKTOP_ICON_DIR/unlocked.png" 512
-echo "Desktop tray icons: 512x512"
+for size in 32 128 256 512; do
+  svg2png "$SCRIPT_DIR/locked_icon.svg" "$DESKTOP_ICON_DIR/${size}x${size}.png" "$size"
+done
+echo "Desktop icons: locked/unlocked 512x512, app icons 32-512"
 
 # --- Android (mipmap) ---
 declare -A ANDROID_DENSITIES=(

@@ -1,0 +1,808 @@
+import { LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { AppButton, Badge, Chip, Dialog, ErrorBanner, Icon, IconButton, MarkdownView } from "../widgets.slint";
+import { CustomFieldItem, EntryForm, FormField, LabelItem, Util } from "../state.slint";
+import { EntryTypes, HorizontalDivider, ScreenHeader } from "layout.slint";
+import { PwGenInline } from "generator.slint";
+
+component SmallLabel inherits Text {
+    font-size: Theme.text-xs;
+    font-weight: 500;
+    color: Theme.text-primary;
+}
+
+// 種別固有フィールド1つ分の入力欄
+component TypedFieldEditor inherits VerticalLayout {
+    in property <FormField> field;
+    callback value-edited(string);
+    private property <string> gen-key: "typed:" + field.key;
+    private property <bool> preview;
+    spacing: 4px;
+    if root.field.kind != "markdown": SmallLabel {
+        text: root.field.label;
+    }
+    if root.field.kind == "markdown": HorizontalLayout {
+        SmallLabel {
+            horizontal-stretch: 1;
+            text: root.field.label;
+            vertical-alignment: center;
+        }
+
+        HorizontalLayout {
+            spacing: 8px;
+            Chip {
+                text: "編集";
+                selected: !root.preview;
+                clicked => {
+                    root.preview = false;
+                }
+            }
+
+            Chip {
+                text: "プレビュー";
+                selected: root.preview;
+                clicked => {
+                    root.preview = true;
+                }
+            }
+        }
+    }
+    if root.field.kind == "text": LineEdit {
+        text: root.field.value;
+        // ユーザーが入力すると text のバインディングは外れるので、
+        // パスワード生成や QR 読み取りなどでモデル側が変わったときは明示的に反映する
+        property <string> model-value: root.field.value;
+        changed model-value => {
+            if self.text != self.model-value {
+                self.text = self.model-value;
+            }
+        }
+        placeholder-text: root.field.placeholder;
+        edited(t) => {
+            root.value-edited(t);
+        }
+    }
+    if root.field.kind == "secret": HorizontalLayout {
+        spacing: 4px;
+        secret-edit := LineEdit {
+            horizontal-stretch: 1;
+            text: root.field.value;
+            property <string> model-value: root.field.value;
+            changed model-value => {
+                if self.text != self.model-value {
+                    self.text = self.model-value;
+                }
+            }
+            placeholder-text: root.field.placeholder;
+            // フォーカス中だけ平文で表示する
+            input-type: self.has-focus ? InputType.text : InputType.password;
+            edited(t) => {
+                root.value-edited(t);
+            }
+            changed has-focus => {
+                if self.has-focus && root.field.generator && root.field.value == "" {
+                    EntryForm.active-generator = root.gen-key;
+                }
+            }
+        }
+
+        if root.field.generator: IconButton {
+            y: (parent.height - self.height) / 2;
+            icon: Icons.wand-2;
+            hover-color: Theme.accent;
+            color: EntryForm.active-generator == root.gen-key ? Theme.accent : Theme.text-muted;
+            tooltip: "パスワード生成";
+            clicked => {
+                EntryForm.active-generator = EntryForm.active-generator == root.gen-key ? "" : root.gen-key;
+            }
+        }
+    }
+    if root.field.kind == "secret" && EntryForm.active-generator == root.gen-key: PwGenInline {
+        use(pw) => {
+            root.value-edited(pw);
+            EntryForm.active-generator = "";
+        }
+    }
+    if root.field.kind == "multiline": TextEdit {
+        min-height: 120px;
+        text: root.field.value;
+        property <string> model-value: root.field.value;
+        changed model-value => {
+            if self.text != self.model-value {
+                self.text = self.model-value;
+            }
+        }
+        font-size: Theme.text-sm;
+        wrap: char-wrap;
+        edited(t) => {
+            root.value-edited(t);
+        }
+    }
+    if root.field.kind == "markdown" && !root.preview: TextEdit {
+        min-height: 160px;
+        text: root.field.value;
+        property <string> model-value: root.field.value;
+        changed model-value => {
+            if self.text != self.model-value {
+                self.text = self.model-value;
+            }
+        }
+        wrap: word-wrap;
+        edited(t) => {
+            root.value-edited(t);
+        }
+    }
+    if root.field.kind == "markdown" && root.preview: Rectangle {
+        background: Theme.bg-elevated;
+        border-radius: Theme.radius;
+        border-width: 1px;
+        border-color: Theme.border;
+        min-height: 160px;
+        VerticalLayout {
+            padding: 12px;
+            alignment: start;
+            MarkdownView {
+                blocks: Util.render-markdown(root.field.value);
+                link-clicked(url) => {
+                    Util.open-url(url);
+                }
+            }
+        }
+    }
+}
+
+component SelectorInput inherits VerticalLayout {
+    in property <string> label;
+    in property <string> value;
+    in property <string> placeholder;
+    callback edited(string);
+    spacing: 2px;
+    horizontal-stretch: 1;
+    Text {
+        text: root.label;
+        font-size: 10px;
+        color: Theme.text-secondary;
+    }
+
+    LineEdit {
+        text: root.value;
+        property <string> model-value: root.value;
+        changed model-value => {
+            if self.text != self.model-value {
+                self.text = self.model-value;
+            }
+        }
+        placeholder-text: root.placeholder;
+        font-size: Theme.text-xs;
+        edited(t) => {
+            root.edited(t);
+        }
+    }
+}
+
+// カスタムフィールド1行分
+component CustomFieldEditor inherits VerticalLayout {
+    in property <CustomFieldItem> item;
+    in property <int> index;
+    in property <int> count;
+    callback name-edited(string);
+    callback value-edited(string);
+    callback secret-toggled();
+    callback expanded-toggled();
+    callback selector-edited(string, string);
+    callback selector-cleared();
+    private property <string> gen-key: "custom:" + item.id;
+    private property <bool> fixed-name: item.field-type == "totp" || item.field-type == "passkey";
+    private property <bool> masked-type: item.field-type == "password" || item.field-type == "totp" || item.secret;
+    private property <bool> toggleable: item.field-type == "text" || item.field-type == "email" || item.field-type == "url" || item.field-type == "phone";
+    private property <bool> has-selector: item.selector-tag != "" || item.selector-type != "" || item.selector-name != "" || item.selector-id != "";
+    private property <string> selector-summary: {
+        // docs/extension-custom-field-autofill.md 4-1節の要約形式: input[name="x"][id="y"]
+        let attrs = (item.selector-name != "" ? "[name=\"" + item.selector-name + "\"]" : "")
+            + (item.selector-id != "" ? "[id=\"" + item.selector-id + "\"]" : "")
+            + (item.selector-type != "" ? "[type=\"" + item.selector-type + "\"]" : "");
+        (item.selector-tag != "" ? item.selector-tag : "input") + attrs
+    };
+    spacing: 6px;
+    HorizontalLayout {
+        spacing: 6px;
+        Badge {
+            y: (parent.height - self.height) / 2;
+            text: root.item.type-label;
+            variant: "muted";
+        }
+
+        if !root.fixed-name: LineEdit {
+            horizontal-stretch: 2;
+            text: root.item.name;
+            placeholder-text: "フィールド名";
+            font-size: Theme.text-xs;
+            edited(t) => {
+                root.name-edited(t);
+            }
+        }
+        if root.item.field-type == "passkey": Rectangle {
+            horizontal-stretch: 3;
+            background: Theme.bg-elevated;
+            border-radius: Theme.radius;
+            border-width: 1px;
+            border-color: Theme.border;
+            height: 32px;
+            Text {
+                x: 8px;
+                width: parent.width - 16px;
+                text: root.item.passkey-summary;
+                font-size: Theme.text-xs;
+                color: Theme.text-secondary;
+                overflow: elide;
+            }
+        }
+        if root.item.field-type != "passkey": LineEdit {
+            horizontal-stretch: 3;
+            text: root.item.value;
+            property <string> model-value: root.item.value;
+            changed model-value => {
+                if self.text != self.model-value {
+                    self.text = self.model-value;
+                }
+            }
+            placeholder-text: root.item.field-type == "totp" ? "otpauth:// URI または Base32 シークレット" : "値";
+            font-size: Theme.text-xs;
+            input-type: root.masked-type && !self.has-focus ? InputType.password : InputType.text;
+            edited(t) => {
+                root.value-edited(t);
+            }
+            changed has-focus => {
+                if self.has-focus && root.item.field-type == "password" && root.item.value == "" {
+                    EntryForm.active-generator = root.gen-key;
+                }
+            }
+        }
+        if root.item.field-type == "password": IconButton {
+            y: (parent.height - self.height) / 2;
+            icon: Icons.wand-2;
+            icon-size: 14px;
+            hover-color: Theme.accent;
+            color: EntryForm.active-generator == root.gen-key ? Theme.accent : Theme.text-muted;
+            tooltip: "パスワード生成";
+            clicked => {
+                EntryForm.active-generator = EntryForm.active-generator == root.gen-key ? "" : root.gen-key;
+            }
+        }
+        if root.item.field-type == "totp": IconButton {
+            y: (parent.height - self.height) / 2;
+            icon: Icons.scan-qr-code;
+            icon-size: 14px;
+            hover-color: Theme.accent;
+            enabled: !EntryForm.scanning-qr;
+            tooltip: EntryForm.scanning-qr ? "QRを読み取り中…" : "QR画像からTOTPを読み取る";
+            clicked => {
+                EntryForm.scan-totp-qr(root.index);
+            }
+        }
+        if root.toggleable: IconButton {
+            y: (parent.height - self.height) / 2;
+            icon: root.item.secret ? Icons.lock : Icons.lock-open;
+            icon-size: 14px;
+            color: root.item.secret ? Theme.accent : Theme.text-muted;
+            hover-color: Theme.accent;
+            tooltip: root.item.secret ? "秘匿フィールドを解除する" : "秘匿フィールドにする（検索対象外になり、表示するときだけ復号されます）";
+            clicked => {
+                root.secret-toggled();
+            }
+        }
+        IconButton {
+            y: (parent.height - self.height) / 2;
+            icon: Icons.crosshair;
+            icon-size: 14px;
+            color: root.has-selector ? Theme.accent : Theme.text-muted;
+            hover-color: Theme.accent;
+            tooltip: "オートフィル対象を指定";
+            clicked => {
+                root.expanded-toggled();
+            }
+        }
+
+        if root.count > 1: VerticalLayout {
+            alignment: center;
+            IconButton {
+                icon: Icons.chevron-up;
+                icon-size: 12px;
+                enabled: root.index > 0;
+                clicked => {
+                    EntryForm.move-custom-field(root.index, -1);
+                }
+            }
+
+            IconButton {
+                icon: Icons.chevron-down;
+                icon-size: 12px;
+                enabled: root.index < root.count - 1;
+                clicked => {
+                    EntryForm.move-custom-field(root.index, 1);
+                }
+            }
+        }
+        IconButton {
+            y: (parent.height - self.height) / 2;
+            icon: Icons.trash-2;
+            icon-size: 14px;
+            hover-color: Theme.danger;
+            clicked => {
+                EntryForm.remove-custom-field(root.index);
+            }
+        }
+    }
+
+    if root.item.field-type == "password" && EntryForm.active-generator == root.gen-key: PwGenInline {
+        use(pw) => {
+            root.value-edited(pw);
+            EntryForm.active-generator = "";
+        }
+    }
+    if root.has-selector && !root.item.expanded: Text {
+        x: 60px;
+        text: root.selector-summary;
+        font-family: Theme.mono;
+        font-size: 11px;
+        color: Theme.text-muted;
+        overflow: elide;
+    }
+    if root.item.expanded: HorizontalLayout {
+        padding-left: 60px;
+        Rectangle {
+            background: Theme.bg-elevated;
+            border-radius: Theme.radius;
+            border-width: 1px;
+            border-color: Theme.border;
+            min-height: sel.preferred-height;
+            sel := VerticalLayout {
+                padding: 8px;
+                spacing: 8px;
+                HorizontalLayout {
+                    spacing: 8px;
+                    SelectorInput {
+                        label: "タグ名";
+                        placeholder: "input";
+                        value: root.item.selector-tag;
+                        edited(t) => {
+                            root.selector-edited("tag", t);
+                        }
+                    }
+
+                    SelectorInput {
+                        label: "type属性";
+                        value: root.item.selector-type;
+                        edited(t) => {
+                            root.selector-edited("type", t);
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    SelectorInput {
+                        label: "name属性";
+                        value: root.item.selector-name;
+                        edited(t) => {
+                            root.selector-edited("name", t);
+                        }
+                    }
+
+                    SelectorInput {
+                        label: "id属性";
+                        value: root.item.selector-id;
+                        edited(t) => {
+                            root.selector-edited("id", t);
+                        }
+                    }
+                }
+
+                if root.has-selector: HorizontalLayout {
+                    alignment: start;
+                    Text {
+                        text: "クリア";
+                        font-size: 11px;
+                        color: clear-touch.has-hover ? Theme.danger : Theme.text-muted;
+                        clear-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.selector-cleared();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component FieldTypeChip inherits Chip {
+    in property <string> field-type;
+    has-icon: true;
+    clicked => {
+        EntryForm.add-custom-field(self.field-type);
+    }
+}
+
+export component EntryFormScreen inherits Rectangle {
+    background: Theme.bg-surface;
+    private property <string> new-label;
+    private property <bool> adding-label;
+    VerticalLayout {
+        ScreenHeader {
+            title: EntryForm.editing ? "アイテム編集" : "新規アイテム";
+        }
+
+        HorizontalDivider { }
+
+        if !EntryForm.loaded: Rectangle {
+            vertical-stretch: 1;
+            Text {
+                text: EntryForm.error != "" ? EntryForm.error : "読み込み中...";
+                color: EntryForm.error != "" ? Theme.danger : Theme.text-secondary;
+                font-size: Theme.text-sm;
+            }
+        }
+        if EntryForm.loaded: sv := ScrollView {
+            vertical-stretch: 1;
+            content-height: form.preferred-height;
+            form := VerticalLayout {
+                width: sv.visible-width;
+                padding: 12px;
+                spacing: 24px;
+                if EntryForm.error != "": ErrorBanner {
+                    text: EntryForm.error;
+                }
+
+                if EntryForm.qr-error != "": ErrorBanner {
+
+                    text: EntryForm.qr-error;
+
+                }
+
+                // 種別 + 名前
+                VerticalLayout {
+                    spacing: 8px;
+                    HorizontalLayout {
+                        alignment: start;
+                        Badge {
+                            text: Util.entry-type-label(EntryForm.entry-type);
+                        }
+                    }
+
+                    LineEdit {
+                        text <=> EntryForm.name;
+                        placeholder-text: "例: Gmail アカウント";
+                        font-size: Theme.text-base;
+                    }
+                }
+
+                // 種別固有フィールド
+                if EntryForm.fields.length > 0: VerticalLayout {
+                    spacing: 12px;
+                    for field in EntryForm.fields: TypedFieldEditor {
+                        field: field;
+                        value-edited(v) => {
+                            field.value = v;
+                        }
+                    }
+                }
+
+                // カスタムフィールド
+                VerticalLayout {
+                    spacing: 8px;
+                    for item[i] in EntryForm.custom-fields: CustomFieldEditor {
+                        item: item;
+                        index: i;
+                        count: EntryForm.custom-fields.length;
+                        name-edited(t) => {
+                            item.name = t;
+                        }
+                        value-edited(t) => {
+                            item.value = t;
+                        }
+                        secret-toggled => {
+                            item.secret = !item.secret;
+                        }
+                        expanded-toggled => {
+                            item.expanded = !item.expanded;
+                        }
+                        selector-edited(attr, value) => {
+                            if attr == "tag" {
+                                item.selector-tag = value;
+                            } else if attr == "type" {
+                                item.selector-type = value;
+                            } else if attr == "name" {
+                                item.selector-name = value;
+                            } else {
+                                item.selector-id = value;
+                            }
+                        }
+                        selector-cleared => {
+                            item.selector-tag = "";
+                            item.selector-type = "";
+                            item.selector-name = "";
+                            item.selector-id = "";
+                        }
+                    }
+                    if EntryForm.picking-field-type: VerticalLayout {
+                        spacing: 8px;
+                        Text {
+                            text: "フィールドの種類を選択";
+                            font-size: Theme.text-xs;
+                            color: Theme.text-muted;
+                        }
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+                            FieldTypeChip {
+                                field-type: "text";
+                                text: "テキスト";
+                                icon: Icons.type;
+                            }
+
+                            FieldTypeChip {
+                                field-type: "password";
+                                text: "パスワード";
+                                icon: Icons.lock;
+                            }
+
+                            FieldTypeChip {
+                                field-type: "email";
+                                text: "メール";
+                                icon: Icons.mail;
+                            }
+
+                            FieldTypeChip {
+                                field-type: "url";
+                                text: "URL";
+                                icon: Icons.link;
+                            }
+
+                            FieldTypeChip {
+                                field-type: "phone";
+                                text: "電話番号";
+                                icon: Icons.phone;
+                            }
+
+                            FieldTypeChip {
+                                field-type: "totp";
+                                text: "ワンタイムパスワード";
+                                icon: Icons.timer;
+                            }
+                        }
+
+                        HorizontalLayout {
+                            alignment: start;
+                            Text {
+                                text: "キャンセル";
+                                font-size: Theme.text-xs;
+                                color: cancel-touch.has-hover ? Theme.text-secondary : Theme.text-muted;
+                                cancel-touch := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        EntryForm.picking-field-type = false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if !EntryForm.picking-field-type: AppButton {
+                        text: "フィールドを追加";
+                        variant: "secondary";
+                        size: "sm";
+                        has-icon: true;
+                        icon: Icons.plus;
+                        clicked => {
+                            EntryForm.picking-field-type = true;
+                        }
+                    }
+                }
+
+                // メモ
+                VerticalLayout {
+                    spacing: 4px;
+                    Text {
+                        text: "メモ";
+                        font-size: Theme.text-xs;
+                        color: Theme.text-muted;
+                    }
+
+                    TextEdit {
+                        min-height: 80px;
+                        text <=> EntryForm.notes;
+                        placeholder-text: "メモを追加...";
+                        wrap: word-wrap;
+                    }
+                }
+
+                // ラベル
+                VerticalLayout {
+                    spacing: 8px;
+                    Text {
+                        text: "ラベル";
+                        font-size: Theme.text-xs;
+                        color: Theme.text-muted;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: start;
+                        for label in EntryForm.labels: Chip {
+                            text: label.name;
+                            selected: label.selected;
+                            clicked => {
+                                label.selected = !label.selected;
+                            }
+                        }
+                        if !root.adding-label: Chip {
+                            text: "新規";
+                            has-icon: true;
+                            icon: Icons.plus;
+                            clicked => {
+                                root.adding-label = true;
+                            }
+                        }
+                        if root.adding-label: HorizontalLayout {
+                            spacing: 4px;
+                            new-label-edit := LineEdit {
+                                width: 140px;
+                                placeholder-text: "ラベル名";
+                                font-size: Theme.text-xs;
+                                enabled: !EntryForm.creating-label;
+                                text <=> root.new-label;
+                                init => {
+                                    self.focus();
+                                }
+                                accepted => {
+                                    if root.new-label != "" {
+                                        EntryForm.create-label(root.new-label);
+                                        root.new-label = "";
+                                        root.adding-label = false;
+                                    }
+                                }
+                                key-pressed(event) => {
+                                    if event.text == Key.Escape {
+                                        root.new-label = "";
+                                        root.adding-label = false;
+                                        return accept;
+                                    }
+                                    reject
+                                }
+                            }
+
+                            IconButton {
+                                y: (parent.height - self.height) / 2;
+                                icon: Icons.plus;
+                                icon-size: 14px;
+                                hover-color: Theme.accent;
+                                enabled: root.new-label != "" && !EntryForm.creating-label;
+                                clicked => {
+                                    EntryForm.create-label(root.new-label);
+                                    root.new-label = "";
+                                    root.adding-label = false;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        HorizontalDivider { }
+
+        HorizontalLayout {
+            padding: 8px;
+            padding-left: 12px;
+            padding-right: 12px;
+            spacing: 8px;
+            alignment: end;
+            AppButton {
+                text: "キャンセル";
+                variant: "secondary";
+                size: "sm";
+                clicked => {
+                    EntryForm.cancel();
+                }
+            }
+
+            AppButton {
+                text: EntryForm.saving ? (EntryForm.editing ? "保存中..." : "作成中...") : (EntryForm.editing ? "保存" : "作成");
+                size: "sm";
+                enabled: EntryForm.loaded && !EntryForm.saving;
+                clicked => {
+                    EntryForm.save();
+                }
+            }
+        }
+    }
+}
+
+component TypeOption inherits Rectangle {
+    in property <string> entry-type;
+    height: 56px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: touch.has-hover ? #6366f180 : Theme.border;
+    background: touch.has-hover ? #6366f10d : Theme.bg-base;
+    HorizontalLayout {
+        padding: 10px;
+        spacing: 12px;
+        Rectangle {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: Theme.accent-soft;
+            Icon {
+                source: EntryTypes.icon(root.entry-type);
+                size: 20px;
+                color: Theme.accent;
+            }
+        }
+
+        Text {
+            text: Util.entry-type-label(root.entry-type);
+            font-size: Theme.text-sm;
+            font-weight: 500;
+            color: Theme.text-primary;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            EntryForm.select-type(root.entry-type);
+        }
+    }
+}
+
+export component TypeSelectDialog inherits Dialog {
+    title: "アイテム種別を選択";
+    description: "作成するアイテムの種別を選んでください";
+    dialog-width: 448px;
+    dismissed => {
+        EntryForm.cancel();
+    }
+    GridLayout {
+        spacing: 8px;
+        Row {
+            TypeOption {
+                entry-type: "login";
+            }
+
+            TypeOption {
+                entry-type: "bank";
+            }
+        }
+
+        Row {
+            TypeOption {
+                entry-type: "ssh_key";
+            }
+
+            TypeOption {
+                entry-type: "secure_note";
+            }
+        }
+
+        Row {
+            TypeOption {
+                entry-type: "credit_card";
+            }
+
+            TypeOption {
+                entry-type: "password";
+            }
+        }
+
+        Row {
+            TypeOption {
+                entry-type: "software_license";
+            }
+        }
+    }
+}

@@ -1,0 +1,158 @@
+import { LineEdit } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { AppButton, Badge, Card, EmptyState, ErrorBanner, IconButton, ScrollPage } from "../widgets.slint";
+import { Labels } from "../state.slint";
+import { HorizontalDivider, ScreenHeader } from "layout.slint";
+
+export component LabelManagerScreen inherits Rectangle {
+    background: Theme.bg-base;
+    VerticalLayout {
+        ScreenHeader {
+            title: "ラベル管理";
+        }
+
+        HorizontalDivider { }
+
+        ScrollPage {
+            vertical-stretch: 1;
+            max-content-width: 100000px;
+            pad: 12px;
+            spacing: 12px;
+            if Labels.error != "": ErrorBanner {
+                text: Labels.error;
+            }
+
+            Card {
+                title: "新規ラベル";
+                HorizontalLayout {
+                    spacing: 12px;
+                    LineEdit {
+                        horizontal-stretch: 1;
+                        text <=> Labels.new-name;
+                        placeholder-text: "ラベル名を入力";
+                        enabled: !Labels.creating;
+                        accepted => {
+                            Labels.create();
+                        }
+                    }
+
+                    AppButton {
+                        text: Labels.creating ? "作成中..." : "作成";
+                        has-icon: true;
+                        icon: Icons.plus;
+                        enabled: !Labels.creating && Labels.new-name != "";
+                        clicked => {
+                            Labels.create();
+                        }
+                    }
+                }
+            }
+
+            Text {
+                text: "ラベル一覧";
+                font-size: Theme.text-sm;
+                font-weight: 600;
+                color: Theme.text-primary;
+            }
+
+            if Labels.loading: EmptyState {
+                emoji: "⏳";
+                title: "読み込み中...";
+                description: "ラベルを読み込んでいます";
+            }
+            if !Labels.loading && Labels.items.length == 0: EmptyState {
+                emoji: "🏷";
+                title: "ラベルがありません";
+                description: "最初のラベルを作成してください";
+            }
+            if !Labels.loading: VerticalLayout {
+                spacing: 8px;
+                for label in Labels.items: Rectangle {
+                    height: 56px;
+                    border-radius: 8px;
+                    border-width: 1px;
+                    border-color: row-touch.has-hover ? #6366f180 : Theme.border;
+                    background: Theme.bg-surface;
+                    row-touch := TouchArea { }
+
+                    HorizontalLayout {
+                        padding-left: 16px;
+                        padding-right: 12px;
+                        spacing: 8px;
+                        if Labels.editing-id == label.id: LineEdit {
+                            y: (parent.height - self.height) / 2;
+                            horizontal-stretch: 1;
+                            text <=> Labels.editing-name;
+                            placeholder-text: "ラベル名";
+                            init => {
+                                self.focus();
+                            }
+                            accepted => {
+                                Labels.save-rename();
+                            }
+                            key-pressed(event) => {
+                                if event.text == Key.Escape {
+                                    Labels.editing-id = "";
+                                    Labels.editing-name = "";
+                                    return accept;
+                                }
+                                reject
+                            }
+                        }
+                        if Labels.editing-id != label.id: HorizontalLayout {
+                            horizontal-stretch: 1;
+                            alignment: start;
+                            Badge {
+                                y: (parent.height - self.height) / 2;
+                                text: label.name;
+                                variant: "primary";
+                            }
+                        }
+                        if Labels.editing-id == label.id: IconButton {
+                            y: (parent.height - self.height) / 2;
+                            icon: Icons.check;
+                            color: Theme.success;
+                            hover-color: Theme.success;
+                            tooltip: "保存";
+                            clicked => {
+                                Labels.save-rename();
+                            }
+                        }
+                        if Labels.editing-id == label.id: IconButton {
+                            y: (parent.height - self.height) / 2;
+                            icon: Icons.x;
+                            color: Theme.text-secondary;
+                            tooltip: "キャンセル";
+                            clicked => {
+                                Labels.editing-id = "";
+                                Labels.editing-name = "";
+                            }
+                        }
+                        if Labels.editing-id != label.id: IconButton {
+                            y: (parent.height - self.height) / 2;
+                            icon: Icons.pencil;
+                            color: Theme.accent;
+                            hover-color: Theme.accent;
+                            tooltip: "編集";
+                            clicked => {
+                                Labels.editing-id = label.id;
+                                Labels.editing-name = label.name;
+                            }
+                        }
+                        if Labels.editing-id != label.id: IconButton {
+                            y: (parent.height - self.height) / 2;
+                            icon: Icons.trash-2;
+                            color: Theme.danger;
+                            hover-color: Theme.danger;
+                            tooltip: "削除";
+                            clicked => {
+                                Labels.delete-requested(label.id);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

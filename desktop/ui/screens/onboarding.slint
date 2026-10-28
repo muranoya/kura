@@ -1,0 +1,539 @@
+import { CheckBox, LineEdit, TextEdit, ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { AppButton, Card, CodeBlock, Dialog, DialogFooter, ErrorBanner, FieldLabel, HelpText, Icon, LinkButton, MarkdownView, PageHeader, PasswordInput, ScrollPage } from "../widgets.slint";
+import { Nav, Onboarding, Page, Util } from "../state.slint";
+
+export component WelcomeScreen inherits Rectangle {
+    background: @linear-gradient(135deg, Theme.bg-base 0%, Theme.bg-surface 100%);
+    VerticalLayout {
+        alignment: center;
+        HorizontalLayout {
+            alignment: center;
+            VerticalLayout {
+                width: min(448px, root.width - 32px);
+                spacing: 8px;
+                HorizontalLayout {
+                    alignment: center;
+                    padding-bottom: 24px;
+                    Rectangle {
+                        width: 96px;
+                        height: 96px;
+                        border-radius: 16px;
+                        background: Theme.accent-soft;
+                        Icon {
+                            source: Icons.shield;
+                            size: 48px;
+                            color: Theme.accent;
+                        }
+                    }
+                }
+
+                Text {
+                    text: "kura";
+                    font-size: 36px;
+                    font-weight: 700;
+                    color: Theme.text-primary;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: "サーバ不要、自分一人のための";
+                    font-size: Theme.text-lg;
+                    color: Theme.text-secondary;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: "パスワードマネージャー";
+                    font-size: Theme.text-lg;
+                    color: Theme.text-secondary;
+                    horizontal-alignment: center;
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+                    padding-top: 24px;
+                    padding-bottom: 16px;
+                    spacing: 2px;
+                    CheckBox {
+                        checked <=> Onboarding.agreed;
+                    }
+
+                    LinkButton {
+                        text: "利用規約";
+                        vertical-alignment: center;
+                        clicked => {
+                            Onboarding.terms-open = true;
+                        }
+                    }
+
+                    Text {
+                        text: "に同意する";
+                        font-size: Theme.text-sm;
+                        color: Theme.text-secondary;
+                        vertical-alignment: center;
+                    }
+                }
+
+                AppButton {
+                    text: "始める";
+                    size: "lg";
+                    enabled: Onboarding.agreed;
+                    clicked => {
+                        Nav.navigate(Page.storage-setup);
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component TermsDialog inherits Dialog {
+    title: "利用規約";
+    dialog-width: 672px;
+    dismissed => {
+        Onboarding.terms-open = false;
+    }
+    ScrollView {
+        min-height: 200px;
+        preferred-height: 2000px;
+        content-height: md.preferred-height;
+        md := MarkdownView {
+            width: parent.visible-width - 12px;
+            blocks: Onboarding.terms;
+            link-clicked(url) => {
+                Util.open-url(url);
+            }
+        }
+    }
+
+    DialogFooter {
+        AppButton {
+            text: "閉じる";
+            variant: "secondary";
+            clicked => {
+                Onboarding.terms-open = false;
+            }
+        }
+    }
+}
+
+component LabeledInput inherits VerticalLayout {
+    in property <string> label;
+    in property <bool> required;
+    in property <string> placeholder;
+    in property <string> help;
+    in-out property <string> text;
+    in property <bool> enabled: true;
+    spacing: 6px;
+    FieldLabel {
+        text: root.label;
+        required: root.required;
+    }
+
+    LineEdit {
+        text <=> root.text;
+        placeholder-text: root.placeholder;
+        enabled: root.enabled;
+        edited => {
+            Onboarding.error = "";
+        }
+    }
+
+    if root.help != "": HelpText {
+        text: root.help;
+    }
+}
+
+export component StorageSetupScreen inherits VerticalLayout {
+    PageHeader {
+        title: "ストレージ設定";
+        subtitle: "S3互換のクラウドストレージを設定します";
+    }
+
+    ScrollPage {
+        vertical-stretch: 1;
+        if Onboarding.error != "": ErrorBanner {
+            text: Onboarding.error;
+        }
+
+        if Onboarding.show-transfer: Card {
+            title: "別の端末から設定を転送";
+            pad: 20px;
+            HelpText {
+                text: "設定済みの端末で生成した転送コードと転送パスワードを入力してください。";
+                font-size: Theme.text-sm;
+            }
+
+            FieldLabel {
+                text: "転送コード";
+            }
+
+            TextEdit {
+                min-height: 100px;
+                text <=> Onboarding.transfer-string;
+                placeholder-text: "kura-config-v1$...";
+                enabled: !Onboarding.loading;
+                wrap: char-wrap;
+            }
+
+            FieldLabel {
+                text: "転送パスワード";
+            }
+
+            PasswordInput {
+                text <=> Onboarding.transfer-password;
+                placeholder-text: "転送コード生成時に設定したパスワード";
+                enabled: !Onboarding.loading;
+            }
+
+            HorizontalLayout {
+                spacing: 12px;
+                AppButton {
+                    horizontal-stretch: 1;
+                    text: "キャンセル";
+                    variant: "secondary";
+                    enabled: !Onboarding.loading;
+                    clicked => {
+                        Onboarding.show-transfer = false;
+                        Onboarding.error = "";
+                    }
+                }
+
+                AppButton {
+                    horizontal-stretch: 1;
+                    text: "設定を読み込む";
+                    loading: Onboarding.loading;
+                    enabled: Onboarding.transfer-string != "" && Onboarding.transfer-password != "";
+                    clicked => {
+                        Onboarding.transfer-load();
+                    }
+                }
+            }
+        }
+        if !Onboarding.show-transfer: AppButton {
+            text: "別の端末から設定を転送";
+            variant: "secondary";
+            clicked => {
+                Onboarding.show-transfer = true;
+            }
+        }
+
+        Card {
+            pad: 20px;
+            VerticalLayout {
+                spacing: 20px;
+                LabeledInput {
+                    label: "リージョン";
+                    required: true;
+                    placeholder: "例: ap-northeast-1";
+                    help: "AWS S3 のリージョンコードを入力してください";
+                    text <=> Onboarding.region;
+                }
+
+                LabeledInput {
+                    label: "バケット";
+                    required: true;
+                    placeholder: "例: my-vault";
+                    help: "vaultファイルを保存するバケット名";
+                    text <=> Onboarding.bucket;
+                }
+
+                LabeledInput {
+                    label: "ファイルパス";
+                    required: true;
+                    placeholder: "vault.json";
+                    help: "バケット内の保存パス";
+                    text <=> Onboarding.key;
+                }
+
+                LabeledInput {
+                    label: "アクセスキーID";
+                    required: true;
+                    placeholder: "AKIA...";
+                    text <=> Onboarding.access-key-id;
+                }
+
+                VerticalLayout {
+                    spacing: 6px;
+                    FieldLabel {
+                        text: "シークレットアクセスキー";
+                        required: true;
+                    }
+
+                    PasswordInput {
+                        text <=> Onboarding.secret-access-key;
+                        placeholder-text: "••••••••••••••••";
+                        edited => {
+                            Onboarding.error = "";
+                        }
+                    }
+                }
+
+                LabeledInput {
+                    label: "エンドポイント (オプション)";
+                    placeholder: "例: https://s3.example.com";
+                    help: "自社ホストの S3 互換サーバーを使用する場合のみ入力";
+                    text <=> Onboarding.endpoint;
+                }
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    padding-top: 8px;
+                    AppButton {
+                        horizontal-stretch: 1;
+                        text: "戻る";
+                        variant: "secondary";
+                        enabled: !Onboarding.loading;
+                        clicked => {
+                            Nav.navigate(Page.welcome);
+                        }
+                    }
+
+                    AppButton {
+                        horizontal-stretch: 1;
+                        text: "次へ";
+                        loading: Onboarding.loading;
+                        clicked => {
+                            Onboarding.storage-next();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component MasterPasswordScreen inherits VerticalLayout {
+    PageHeader {
+        title: "マスターパスワード設定";
+        subtitle: "Vault全体を保護するパスワードを設定します";
+    }
+
+    ScrollPage {
+        vertical-stretch: 1;
+        if Onboarding.error != "": ErrorBanner {
+            text: Onboarding.error;
+        }
+
+        Card {
+            pad: 20px;
+            VerticalLayout {
+                spacing: 20px;
+                VerticalLayout {
+                    spacing: 6px;
+                    FieldLabel {
+                        text: "パスワード";
+                        required: true;
+                    }
+
+                    PasswordInput {
+                        text <=> Onboarding.password;
+                        placeholder-text: "強力なパスワードを入力";
+                        edited => {
+                            Onboarding.error = "";
+                        }
+                    }
+
+                    HelpText {
+                        text: "8文字以上の強力なパスワードを設定してください";
+                    }
+                }
+
+                VerticalLayout {
+                    spacing: 6px;
+                    FieldLabel {
+                        text: "パスワード確認";
+                        required: true;
+                    }
+
+                    PasswordInput {
+                        text <=> Onboarding.confirm-password;
+                        placeholder-text: "パスワードを再入力";
+                        edited => {
+                            Onboarding.error = "";
+                        }
+                        accepted => {
+                            Onboarding.create-vault();
+                        }
+                    }
+
+                    if Onboarding.confirm-password != "" && Onboarding.password == Onboarding.confirm-password: HorizontalLayout {
+                        spacing: 6px;
+                        alignment: start;
+                        Icon {
+                            source: Icons.check-circle-2;
+                            color: Theme.success;
+                        }
+
+                        Text {
+                            text: "パスワードが一致しています";
+                            font-size: Theme.text-xs;
+                            color: Theme.success;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    padding-top: 8px;
+                    AppButton {
+                        horizontal-stretch: 1;
+                        text: "戻る";
+                        variant: "secondary";
+                        enabled: !Onboarding.loading;
+                        clicked => {
+                            Nav.navigate(Page.storage-setup);
+                        }
+                    }
+
+                    AppButton {
+                        horizontal-stretch: 1;
+                        text: Onboarding.loading ? "作成中..." : "Vaultを作成";
+                        enabled: !Onboarding.loading && Onboarding.password != "" && Onboarding.confirm-password != "";
+                        clicked => {
+                            Onboarding.create-vault();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component RecoveryKeyScreen inherits VerticalLayout {
+    private property <bool> copied;
+    PageHeader {
+        title: "リカバリーキー";
+        subtitle: "Vaultの復旧に必要です";
+    }
+
+    ScrollPage {
+        vertical-stretch: 1;
+        if Onboarding.error != "": ErrorBanner {
+            text: Onboarding.error;
+        }
+
+        Card {
+            title: "あなたのリカバリーキー";
+            pad: 20px;
+            CodeBlock {
+                text: Onboarding.recovery-key;
+            }
+
+            AppButton {
+                text: root.copied ? "コピーしました" : "リカバリーキーをコピー";
+                variant: "secondary";
+                has-icon: true;
+                icon: root.copied ? Icons.check-circle-2 : Icons.copy;
+                clicked => {
+                    Util.copy(Onboarding.recovery-key);
+                    root.copied = true;
+                }
+            }
+
+            AppButton {
+                text: "完了";
+                clicked => {
+                    Onboarding.recovery-complete();
+                }
+            }
+        }
+    }
+
+    Timer {
+        interval: 2s;
+        running: root.copied;
+        triggered => {
+            root.copied = false;
+        }
+    }
+}
+
+export component UnlockExistingScreen inherits VerticalLayout {
+    PageHeader {
+        title: "既存のVaultを使用";
+        subtitle: "このストレージには既にVaultが存在しています";
+    }
+
+    ScrollPage {
+        vertical-stretch: 1;
+        max-content-width: 448px;
+        pad: 48px;
+        Card {
+            pad: 24px;
+            HorizontalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 8px;
+                    background: Theme.accent-soft;
+                    Icon {
+                        source: Icons.lock;
+                        size: 24px;
+                        color: Theme.accent;
+                    }
+                }
+            }
+
+            Text {
+                text: "このVaultを使用するためには、マスターパスワードを入力してください。";
+                font-size: Theme.text-sm;
+                color: Theme.text-secondary;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+
+            if Onboarding.error != "": ErrorBanner {
+
+                text: Onboarding.error;
+
+            }
+
+            FieldLabel {
+                text: "マスターパスワード";
+            }
+
+            pw := PasswordInput {
+                text <=> Onboarding.password;
+                placeholder-text: "パスワードを入力";
+                enabled: !Onboarding.loading;
+                edited => {
+                    Onboarding.error = "";
+                }
+                accepted => {
+                    Onboarding.unlock-existing();
+                }
+                init => {
+                    self.focus();
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 12px;
+                padding-top: 8px;
+                AppButton {
+                    horizontal-stretch: 1;
+                    text: "戻る";
+                    variant: "secondary";
+                    enabled: !Onboarding.loading;
+                    clicked => {
+                        Nav.navigate(Page.storage-setup);
+                    }
+                }
+
+                AppButton {
+                    horizontal-stretch: 1;
+                    text: "このVaultを使う";
+                    loading: Onboarding.loading;
+                    clicked => {
+                        Onboarding.unlock-existing();
+                    }
+                }
+            }
+        }
+    }
+}

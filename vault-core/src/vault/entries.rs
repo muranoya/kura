@@ -47,9 +47,15 @@ impl UnlockedVault {
         result
     }
 
+    /// ID を指定してエントリを取り出す。完全削除済み（tombstone）は同期のために残しているだけなので、
+    /// 存在しないものとして扱う
+    fn live_entry(&self, id: &str) -> Option<&VaultEntry> {
+        self.index.entries.get(id).filter(|e| e.purged_at.is_none())
+    }
+
     /// Get single entry (decrypted). 対象エントリの secret だけを復号する
     pub fn get_entry(&self, id: &str) -> Result<Option<Entry>> {
-        match self.index.entries.get(id) {
+        match self.live_entry(id) {
             Some(e) => Ok(Some(self.decrypt_entry(id, e)?)),
             None => Ok(None),
         }
@@ -59,7 +65,7 @@ impl UnlockedVault {
     /// 対象エントリの secret だけを復号する。
     /// エントリが存在しない、またはtotpカスタムフィールドを持たない場合は`Ok(None)`。
     pub fn get_totp_code(&self, id: &str) -> Result<Option<String>> {
-        let Some(vault_entry) = self.index.entries.get(id) else {
+        let Some(vault_entry) = self.live_entry(id) else {
             return Ok(None);
         };
         let Some(field) = vault_entry
@@ -93,7 +99,7 @@ impl UnlockedVault {
     pub fn list_totp_periods(&self, ids: &[String]) -> Vec<(String, u64)> {
         ids.iter()
             .filter_map(|id| {
-                let vault_entry = self.index.entries.get(id)?;
+                let vault_entry = self.live_entry(id)?;
                 let field = vault_entry
                     .custom_fields
                     .iter()
@@ -935,6 +941,43 @@ mod tests {
     }
 
     #[test]
+    fn test_purged_entry_is_not_listed_even_with_trash() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "trashed", "Trashed", 1000);
+        insert_entry(&mut vault, "purged", "Purged", 1001);
+        vault.delete_entry("trashed").unwrap();
+        vault.purge_entry("purged").unwrap();
+
+        let filter = EntryFilter::new().with_trash(true);
+        let ids: Vec<String> = vault
+            .list_entries(&filter)
+            .unwrap()
+            .into_iter()
+            .map(|e| e.id)
+            .collect();
+        assert_eq!(ids, vec!["trashed".to_string()]);
+        let summary_ids: Vec<String> = vault
+            .list_entry_summaries(&filter)
+            .into_iter()
+            .map(|e| e.id)
+            .collect();
+        assert_eq!(summary_ids, vec!["trashed".to_string()]);
+        // tombstone 自体は同期のために index に残っている
+        assert!(vault.index.entries.contains_key("purged"));
+    }
+
+    #[test]
+    fn test_purged_entry_is_not_found_by_id() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "purged", "Purged", 1000);
+        vault.purge_entry("purged").unwrap();
+
+        assert!(vault.get_entry("purged").unwrap().is_none());
+        assert!(vault.get_totp_code("purged").unwrap().is_none());
+        assert!(vault.list_totp_periods(&["purged".to_string()]).is_empty());
+    }
+
+    #[test]
     fn test_purge_nonexistent_entry() {
         let mut vault = make_vault();
         assert!(vault.purge_entry("nonexistent").is_err());
@@ -1421,9 +1464,8 @@ mod tests {
         vault.purge_entry("e1").unwrap();
         assert!(!vault.secrets.contains_key("e1"));
         assert!(vault.to_vault_file().unwrap().secrets.is_empty());
-        // purged エントリの get_entry は空の値で返る（secret を持たないため）
-        let entry = vault.get_entry("e1").unwrap().unwrap();
-        assert!(entry.name.is_empty());
+        // purged エントリは tombstone として index に残るが、ID 指定でも見つからない扱いになる
+        assert!(vault.get_entry("e1").unwrap().is_none());
     }
 
     #[test]

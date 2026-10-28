@@ -1,0 +1,204 @@
+import { LineEdit } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { AppButton, Card, ErrorBanner, FieldLabel, Icon, PasswordInput, ScrollPage } from "../widgets.slint";
+import { Auth, Nav, Page } from "../state.slint";
+
+export component LockScreen inherits ScrollPage {
+    max-content-width: 448px;
+    pad: 64px;
+    spacing: 0px;
+    VerticalLayout {
+        spacing: 8px;
+        padding-bottom: 32px;
+        HorizontalLayout {
+            alignment: center;
+            padding-bottom: 8px;
+            Rectangle {
+                width: 64px;
+                height: 64px;
+                border-radius: 8px;
+                background: Theme.accent-soft;
+                Icon {
+                    source: Icons.lock;
+                    size: 32px;
+                    color: Theme.accent;
+                }
+            }
+        }
+
+        Text {
+            text: "kura";
+            font-size: 30px;
+            font-weight: 700;
+            color: Theme.text-primary;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: "Vaultはロックされています";
+            font-size: Theme.text-base;
+            color: Theme.text-secondary;
+            horizontal-alignment: center;
+        }
+    }
+
+    Card {
+        pad: 24px;
+        if Auth.error != "": ErrorBanner {
+            text: Auth.error;
+        }
+
+        FieldLabel {
+            text: "マスターパスワード";
+        }
+
+        PasswordInput {
+            text <=> Auth.password;
+            placeholder-text: "パスワードを入力";
+            edited => {
+                Auth.error = "";
+            }
+            accepted => {
+                Auth.unlock();
+            }
+            init => {
+                self.focus();
+            }
+        }
+
+        Rectangle {
+            height: 8px;
+        }
+
+        AppButton {
+            text: Auth.loading ? "ロック解除中..." : "ロック解除";
+            enabled: !Auth.loading;
+            clicked => {
+                Auth.unlock();
+            }
+        }
+
+        AppButton {
+            text: "リカバリーキーで復旧";
+            variant: "secondary";
+            clicked => {
+                Auth.error = "";
+                Nav.navigate(Page.recovery);
+            }
+        }
+    }
+
+    VerticalLayout {
+        padding-top: 32px;
+        spacing: 24px;
+        Rectangle {
+            height: 1px;
+            background: Theme.border;
+        }
+
+        AppButton {
+            text: "ログアウト";
+            variant: "destructive";
+            clicked => {
+                Auth.logout-requested();
+            }
+        }
+    }
+}
+
+export component RecoveryScreen inherits ScrollPage {
+    max-content-width: 448px;
+    pad: 64px;
+    spacing: 24px;
+    HorizontalLayout {
+        alignment: start;
+        Rectangle {
+            width: back.preferred-width;
+            height: back.preferred-height;
+            back := HorizontalLayout {
+                spacing: 8px;
+                Icon {
+                    source: Icons.arrow-left;
+                    size: 18px;
+                    color: touch.has-hover ? Theme.accent-hover : Theme.accent;
+                }
+
+                Text {
+                    text: "戻る";
+                    font-size: Theme.text-sm;
+                    font-weight: 500;
+                    color: touch.has-hover ? Theme.accent-hover : Theme.accent;
+                    vertical-alignment: center;
+                }
+            }
+
+            touch := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    Auth.error = "";
+                    Nav.navigate(Page.lock);
+                }
+            }
+        }
+    }
+
+    Card {
+        title: "リカバリーキーで復旧";
+        pad: 24px;
+        if Auth.error != "": ErrorBanner {
+            text: Auth.error;
+        }
+
+        FieldLabel {
+            text: "リカバリーキー";
+        }
+
+        LineEdit {
+            text <=> Auth.recovery-key;
+            placeholder-text: "リカバリーキーを入力";
+            edited => {
+                Auth.error = "";
+            }
+        }
+
+        FieldLabel {
+            text: "新しいパスワード";
+        }
+
+        PasswordInput {
+            text <=> Auth.new-password;
+            placeholder-text: "新しいパスワード";
+            edited => {
+                Auth.error = "";
+            }
+        }
+
+        FieldLabel {
+            text: "パスワード確認";
+        }
+
+        PasswordInput {
+            text <=> Auth.confirm-password;
+            placeholder-text: "パスワードを再入力";
+            edited => {
+                Auth.error = "";
+            }
+            accepted => {
+                Auth.recover();
+            }
+        }
+
+        Rectangle {
+            height: 8px;
+        }
+
+        AppButton {
+            text: Auth.loading ? "復旧中..." : "復旧";
+            enabled: !Auth.loading;
+            clicked => {
+                Auth.recover();
+            }
+        }
+    }
+}

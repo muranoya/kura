@@ -1,0 +1,288 @@
+import { CheckBox, Slider } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { AppButton, Card, Chip, Icon, IconButton, ScrollPage } from "../widgets.slint";
+import { PwGen, Util } from "../state.slint";
+import { HorizontalDivider, ScreenHeader } from "layout.slint";
+
+component PasswordDisplay inherits Rectangle {
+    in property <bool> compact;
+    in property <bool> show-use;
+    callback use(string);
+    private property <bool> copied;
+    background: Theme.bg-elevated;
+    border-radius: Theme.radius;
+    border-width: 1px;
+    border-color: Theme.border;
+    min-height: row.preferred-height;
+    row := HorizontalLayout {
+        padding: root.compact ? 8px : 12px;
+        spacing: 6px;
+        if PwGen.password == "": Text {
+            horizontal-stretch: 1;
+            text: "パスワードをまだ生成していません";
+            font-size: root.compact ? Theme.text-xs : Theme.text-sm;
+            color: Theme.text-secondary;
+            horizontal-alignment: center;
+        }
+        if PwGen.password != "": Text {
+            horizontal-stretch: 1;
+            text: PwGen.password;
+            font-family: Theme.mono;
+            font-size: root.compact ? Theme.text-xs : Theme.text-sm;
+            color: Theme.text-primary;
+            wrap: char-wrap;
+            vertical-alignment: center;
+        }
+        if PwGen.password != "": IconButton {
+            y: (parent.height - self.height) / 2;
+            icon: root.copied ? Icons.check : Icons.copy;
+            color: root.copied ? Theme.success : Theme.text-muted;
+            icon-size: root.compact ? 14px : 16px;
+            tooltip: "コピー";
+            clicked => {
+                Util.copy(PwGen.password);
+                root.copied = true;
+            }
+        }
+        if PwGen.password != "": IconButton {
+            y: (parent.height - self.height) / 2;
+            icon: Icons.refresh-cw;
+            icon-size: root.compact ? 14px : 16px;
+            tooltip: "再生成";
+            clicked => {
+                PwGen.generate();
+                root.copied = false;
+            }
+        }
+        if PwGen.password != "" && root.show-use: AppButton {
+            y: (parent.height - self.height) / 2;
+            height: 26px;
+            text: "使用する";
+            size: "sm";
+            clicked => {
+                root.use(PwGen.password);
+            }
+        }
+    }
+
+    Timer {
+        interval: 2s;
+        running: root.copied;
+        triggered => {
+            root.copied = false;
+        }
+    }
+}
+
+component LengthSlider inherits VerticalLayout {
+    spacing: 4px;
+    Text {
+        text: "長さ: " + round(PwGen.length);
+        font-size: Theme.text-xs;
+        font-weight: 500;
+        color: Theme.text-primary;
+    }
+
+    Slider {
+        minimum: 1;
+        maximum: 128;
+        value: PwGen.length;
+        changed(v) => {
+            if round(v) != PwGen.length {
+                PwGen.length = round(v);
+                PwGen.generate();
+            }
+        }
+    }
+
+    HorizontalLayout {
+        Text {
+            text: "1";
+            font-size: Theme.text-xs;
+            color: Theme.text-secondary;
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+
+        Text {
+            text: "128";
+            font-size: Theme.text-xs;
+            color: Theme.text-secondary;
+        }
+    }
+}
+
+// エントリフォーム内に展開するコンパクト版
+export component PwGenInline inherits Rectangle {
+    callback use(string);
+    private property <bool> show-chars;
+    border-width: 1px;
+    border-color: #6366f14d;
+    border-radius: Theme.radius;
+    background: Theme.bg-surface;
+    min-height: col.preferred-height;
+    init => {
+        PwGen.generate();
+    }
+    col := VerticalLayout {
+        padding: 12px;
+        spacing: 10px;
+        PasswordDisplay {
+            compact: true;
+            show-use: true;
+            use(pw) => {
+                root.use(pw);
+            }
+        }
+
+        LengthSlider { }
+
+        HorizontalLayout {
+            alignment: start;
+            spacing: 4px;
+            Icon {
+                source: root.show-chars ? Icons.chevron-down : Icons.chevron-right;
+                size: 14px;
+                color: Theme.text-secondary;
+            }
+
+            Text {
+                text: "文字種の設定";
+                font-size: Theme.text-xs;
+                color: Theme.text-secondary;
+                TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.show-chars = !root.show-chars;
+                    }
+                }
+            }
+        }
+
+        if root.show-chars: HorizontalLayout {
+            spacing: 6px;
+            alignment: start;
+            Chip {
+                text: "a-z";
+                selected: PwGen.lowercase;
+                clicked => {
+                    PwGen.lowercase = !PwGen.lowercase;
+                    PwGen.generate();
+                }
+            }
+
+            Chip {
+                text: "A-Z";
+                selected: PwGen.uppercase;
+                clicked => {
+                    PwGen.uppercase = !PwGen.uppercase;
+                    PwGen.generate();
+                }
+            }
+
+            Chip {
+                text: "0-9";
+                selected: PwGen.numbers;
+                clicked => {
+                    PwGen.numbers = !PwGen.numbers;
+                    PwGen.generate();
+                }
+            }
+
+            Chip {
+                text: "!@#$%^&*";
+                selected: PwGen.symbols1;
+                clicked => {
+                    PwGen.symbols1 = !PwGen.symbols1;
+                    PwGen.generate();
+                }
+            }
+
+            Chip {
+                text: "()[]{}+=";
+                selected: PwGen.symbols2;
+                clicked => {
+                    PwGen.symbols2 = !PwGen.symbols2;
+                    PwGen.generate();
+                }
+            }
+
+            Chip {
+                text: "`<>'\"\\|";
+                selected: PwGen.symbols3;
+                clicked => {
+                    PwGen.symbols3 = !PwGen.symbols3;
+                    PwGen.generate();
+                }
+            }
+        }
+    }
+}
+
+component CharCheckBox inherits CheckBox {
+    toggled => {
+        PwGen.generate();
+    }
+}
+
+export component PasswordGeneratorScreen inherits Rectangle {
+    background: Theme.bg-base;
+    init => {
+        PwGen.generate();
+    }
+    VerticalLayout {
+        ScreenHeader {
+            title: "パスワードジェネレータ";
+        }
+
+        HorizontalDivider { }
+
+        ScrollPage {
+            vertical-stretch: 1;
+            max-content-width: 100000px;
+            pad: 12px;
+            spacing: 12px;
+            Card {
+                title: "生成されたパスワード";
+                PasswordDisplay { }
+            }
+
+            Card {
+                title: "設定";
+                LengthSlider { }
+                CharCheckBox {
+                    text: "小文字 (a-z)";
+                    checked <=> PwGen.lowercase;
+                }
+
+                CharCheckBox {
+                    text: "大文字 (A-Z)";
+                    checked <=> PwGen.uppercase;
+                }
+
+                CharCheckBox {
+                    text: "数字 (0-9)";
+                    checked <=> PwGen.numbers;
+                }
+
+                CharCheckBox {
+                    text: "記号 (!@#$%^&*-_.)";
+                    checked <=> PwGen.symbols1;
+                }
+
+                CharCheckBox {
+                    text: "記号 (()[]{}+=~/)";
+                    checked <=> PwGen.symbols2;
+                }
+
+                CharCheckBox {
+                    text: "記号 (`<>'\"\\|;,:)";
+                    checked <=> PwGen.symbols3;
+                }
+            }
+        }
+    }
+}

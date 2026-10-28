@@ -36,7 +36,7 @@ FFI構成：
 ```
 vault-core（Rust）
     ├── JNI（Java Native Interface）   → Android
-    ├── ネイティブFFI                  → デスクトップ (Tauri backend)
+    ├── Rust クレートとして直接リンク   → デスクトップ (Slint)
     └── WASM（wasm-pack）              → ブラウザ拡張
 ```
 

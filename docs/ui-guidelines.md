@@ -170,7 +170,7 @@ UI 文字列（画面・ラベル・ボタン・メッセージ等の静的テ�
 
 | プラットフォーム | 文言ファイル |
 |----------------|------------|
-| Desktop | `desktop/src/i18n/locales/ja.json`（i18next） |
+| Desktop | 未対応（現状は `desktop/ui/**/*.slint` と `desktop/src/**/*.rs` に直書き。Slint の `@tr()` とバンドル翻訳への移行が課題） |
 | Extension | `extension/src/popup/i18n/locales/ja.json`（i18next）、`extension/_locales/ja/messages.json`（manifest 用） |
 | Android | `android/app/src/main/res/values/strings.xml` |
 
@@ -182,7 +182,7 @@ UI 文字列（画面・ラベル・ボタン・メッセージ等の静的テ�
 
 - 文言はコンポーネント単位で必要になるケースが多く、UI構成の進化速度はプラットフォームごとに異なる
 - 共通化すると、将来あるプラットフォームのUI構成が変わった際に他プラットフォームの文言構造にも影響が及び、メンテナンス負荷が逆に高まる
-- DesktopとExtensionは共にReactベースだが、画面構成・機能範囲が独立しているため、文言の単位も独立させる方が自然である
+- DesktopとExtensionは画面構成・機能範囲が独立しているため、文言の単位も独立させる方が自然である
 
 ### キー設計
 

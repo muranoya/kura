@@ -1,0 +1,337 @@
+// Rust 側と共有する状態とコールバック。画面ごとに global を分けている
+import { MdBlock } from "widgets.slint";
+
+export enum Page {
+    loading,
+    // オンボーディング
+    welcome,
+    storage-setup,
+    master-password,
+    recovery-key,
+    unlock-existing,
+    // 認証
+    lock,
+    recovery,
+    // メイン
+    entries,
+    favorites,
+    label-entries,
+    entry-create,
+    entry-edit,
+    password-generator,
+    trash,
+    labels,
+    settings,
+}
+
+export struct LabelItem {
+    id: string,
+    name: string,
+    selected: bool,
+}
+
+export struct EntryRowItem {
+    id: string,
+    entry-type: string,
+    name: string,
+    subtitle: string,
+    deleted-at: string,
+}
+
+// 詳細ペインの1行。kind: heading / field / totp / passkey / markdown / notes
+export struct DetailRow {
+    kind: string,
+    key: string,
+    label: string,
+    value: string,
+    masked-value: string,
+    secret: bool,
+    masked: bool,
+    is-url: bool,
+    selector: string,
+    totp-code: string,
+    totp-remaining: int,
+    totp-period: int,
+    error: string,
+    sub: string,
+    md: [MdBlock],
+}
+
+// 種別固有フィールドの入力欄。kind: text / secret / multiline / markdown
+export struct FormField {
+    key: string,
+    label: string,
+    value: string,
+    kind: string,
+    placeholder: string,
+    generator: bool,
+}
+
+export struct CustomFieldItem {
+    id: string,
+    name: string,
+    field-type: string,
+    type-label: string,
+    value: string,
+    secret: bool,
+    passkey-summary: string,
+    selector-tag: string,
+    selector-type: string,
+    selector-name: string,
+    selector-id: string,
+    expanded: bool,
+}
+
+export struct ImportRow {
+    source-id: string,
+    name: string,
+    type-label: string,
+    archived: bool,
+    category: string,
+    has-attachments: bool,
+    duplicate: string,
+    // 選択肢（取り込む / スキップ / 上書き: ...）と現在の選択
+    actions: [string],
+    action-index: int,
+}
+
+export struct FilterChip {
+    key: string,
+    text: string,
+    variant: string,
+    clickable: bool,
+}
+
+export global Nav {
+    in-out property <Page> page: Page.loading;
+    in property <[LabelItem]> labels;
+    in-out property <string> label-id;
+    in-out property <string> label-name;
+    callback navigate(Page);
+    callback open-label(string, string);
+}
+
+// 画面上部のエラーバー（旧 ErrorContext）
+export global Errors {
+    in property <string> latest;
+    in property <int> count;
+    callback dismiss();
+}
+
+// 同期ボタンと最終同期時刻（旧 SyncHeaderActions）
+export global SyncState {
+    in property <bool> has-config;
+    in property <string> last-sync;
+    in property <bool> syncing;
+    callback sync-now();
+}
+
+// 画面横断のユーティリティ
+export global Util {
+    callback copy(string);
+    callback open-url(string);
+    pure callback render-markdown(string) -> [MdBlock];
+    pure callback entry-type-label(string) -> string;
+}
+
+export global LargeText {
+    in-out property <bool> open;
+    in-out property <string> label;
+    in-out property <string> value;
+}
+
+// 汎用の確認ダイアログ。action で Rust 側の処理を振り分ける
+export global Confirm {
+    in-out property <bool> open;
+    in-out property <string> action;
+    in-out property <string> title;
+    in-out property <string> description;
+    in-out property <string> confirm-text: "確認";
+    in-out property <bool> dangerous;
+    in-out property <bool> processing;
+    callback confirmed(string);
+}
+
+export global Onboarding {
+    in property <[MdBlock]> terms;
+    in-out property <bool> agreed;
+    in-out property <bool> terms-open;
+    // ストレージ設定
+    in-out property <string> region;
+    in-out property <string> bucket;
+    in-out property <string> key: "vault.json";
+    in-out property <string> access-key-id;
+    in-out property <string> secret-access-key;
+    in-out property <string> endpoint;
+    in-out property <bool> show-transfer;
+    in-out property <string> transfer-string;
+    in-out property <string> transfer-password;
+    in-out property <string> error;
+    in-out property <bool> loading;
+    // マスターパスワード
+    in-out property <string> password;
+    in-out property <string> confirm-password;
+    // リカバリーキー
+    in property <string> recovery-key;
+    callback storage-next();
+    callback transfer-load();
+    callback create-vault();
+    callback recovery-complete();
+    callback unlock-existing();
+}
+
+export global Auth {
+    in-out property <string> password;
+    in-out property <string> recovery-key;
+    in-out property <string> new-password;
+    in-out property <string> confirm-password;
+    in-out property <string> error;
+    in-out property <bool> loading;
+    callback unlock();
+    callback recover();
+    callback logout-requested();
+}
+
+export global EntryList {
+    in property <[EntryRowItem]> entries;
+    in property <bool> loading;
+    in property <string> error;
+    in-out property <string> search;
+    in-out property <int> type-index;
+    in-out property <int> sort-index;
+    in-out property <string> selected-id;
+    in property <bool> detail-loading;
+    in property <bool> has-detail;
+    in property <string> detail-name;
+    in property <string> detail-type;
+    in property <bool> detail-favorite;
+    in property <[string]> detail-labels;
+    in property <[DetailRow]> detail-rows;
+    in property <string> detail-updated;
+    in property <string> detail-created;
+    callback filters-changed();
+    callback select(string);
+    callback toggle-favorite();
+    callback edit();
+    callback delete-requested(string);
+    callback create();
+    // 秘匿値の表示切替（行インデックス）
+    callback toggle-mask(int);
+}
+
+export global Trash {
+    in property <[EntryRowItem]> entries;
+    in property <bool> loading;
+    in property <string> error;
+    in-out property <string> search;
+    in-out property <int> type-index;
+    in-out property <int> sort-index;
+    callback filters-changed();
+    callback restore(string);
+    callback purge-requested(string);
+}
+
+export global EntryForm {
+    in property <bool> editing;
+    in property <bool> loaded;
+    in-out property <bool> type-dialog-open;
+    in property <string> entry-type;
+    in-out property <string> name;
+    in-out property <[FormField]> fields;
+    in-out property <[CustomFieldItem]> custom-fields;
+    in-out property <string> notes;
+    in-out property <[LabelItem]> labels;
+    in-out property <string> error;
+    in-out property <string> qr-error;
+    in property <bool> scanning-qr;
+    in property <bool> saving;
+    // パスワード生成パネルを開いている入力欄（"typed:<key>" / "custom:<id>"）
+    in-out property <string> active-generator;
+    in-out property <bool> picking-field-type;
+    in-out property <bool> creating-label;
+    callback select-type(string);
+    callback save();
+    callback cancel();
+    callback add-custom-field(string);
+    callback remove-custom-field(int);
+    callback move-custom-field(int, int);
+    callback scan-totp-qr(int);
+    callback create-label(string);
+}
+
+export global PwGen {
+    in-out property <string> password;
+    in-out property <float> length: 16;
+    in-out property <bool> lowercase: true;
+    in-out property <bool> uppercase: true;
+    in-out property <bool> numbers: true;
+    in-out property <bool> symbols1: true;
+    in-out property <bool> symbols2: true;
+    in-out property <bool> symbols3: true;
+    callback generate();
+}
+
+export global Labels {
+    in property <[LabelItem]> items;
+    in property <bool> loading;
+    in-out property <string> error;
+    in-out property <string> new-name;
+    in property <bool> creating;
+    in-out property <string> editing-id;
+    in-out property <string> editing-name;
+    callback create();
+    callback save-rename();
+    callback delete-requested(string);
+}
+
+export global Settings {
+    in-out property <int> autolock-index;
+    in-out property <int> clipboard-index;
+    in property <bool> has-storage;
+    in property <string> bucket;
+    in property <string> region;
+    in property <string> key;
+    in property <string> endpoint;
+    in property <string> version;
+    in property <bool> exporting;
+    // 開いているダイアログ: "" / change-password / rotate-dek / regenerate-recovery / transfer / reauth / recovery-key / import
+    in-out property <string> dialog;
+    in-out property <string> pw-old;
+    in-out property <string> pw-new;
+    in-out property <string> pw-confirm;
+    in-out property <string> dialog-error;
+    in property <bool> dialog-loading;
+    in property <string> transfer-code;
+    in property <image> transfer-qr;
+    in property <string> new-recovery-key;
+    callback settings-changed();
+    callback change-password();
+    callback rotate-dek();
+    callback regenerate-recovery();
+    callback generate-transfer();
+    // 再認証が必要な操作（"export" / "transfer"）
+    callback reauth-requested(string);
+    callback reauth-submit();
+    callback close-dialog();
+}
+
+export global Import {
+    // idle / loading / preview / executing / result
+    in property <string> step;
+    in property <string> error;
+    in property <string> subtitle;
+    in property <[FilterChip]> chips;
+    in property <[ImportRow]> rows;
+    in-out property <string> search;
+    in property <int> import-count;
+    in property <[FilterChip]> result-chips;
+    in property <string> labels-created;
+    in property <[string]> result-errors;
+    callback select-file();
+    callback chip-clicked(string);
+    callback search-changed();
+    callback set-action(string, int);
+    callback bulk(bool);
+    callback execute();
+    callback close();
+}

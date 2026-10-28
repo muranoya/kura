@@ -1,0 +1,146 @@
+import { Theme } from "theme.slint";
+import { AppButton, Dialog, DialogFooter } from "widgets.slint";
+import { Confirm, LargeText, Nav, Onboarding, Page, EntryForm, Settings } from "state.slint";
+import { MasterPasswordScreen, RecoveryKeyScreen, StorageSetupScreen, TermsDialog, UnlockExistingScreen, WelcomeScreen } from "screens/onboarding.slint";
+import { LockScreen, RecoveryScreen } from "screens/auth.slint";
+import { ErrorBar, Sidebar } from "screens/layout.slint";
+import { EntryListScreen, TrashScreen } from "screens/entries.slint";
+import { EntryFormScreen, TypeSelectDialog } from "screens/form.slint";
+import { PasswordGeneratorScreen } from "screens/generator.slint";
+import { LabelManagerScreen } from "screens/labels.slint";
+import { SettingsDialogs, SettingsScreen } from "screens/settings.slint";
+
+import "../fonts/JetBrainsMono-Regular.ttf";
+
+export { Auth, Confirm, EntryForm, EntryList, Errors, Import, Labels, LargeText, Nav, Onboarding, PwGen, Settings, SyncState, Trash, Util } from "state.slint";
+export { Page, LabelItem, EntryRowItem, DetailRow, FormField, CustomFieldItem, ImportRow, FilterChip } from "state.slint";
+export { MdBlock } from "widgets.slint";
+
+// ロック状態を示すトレイアイコン。メニューはアプリの終了のみ
+export component AppTray inherits SystemTrayIcon {
+    in property <bool> locked: true;
+    callback quit();
+    icon: locked ? @image-url("../icons/locked.png") : @image-url("../icons/unlocked.png");
+    tooltip: "kura";
+    Menu {
+        MenuItem {
+            title: "終了";
+            activated => {
+                root.quit();
+            }
+        }
+    }
+}
+
+component ConfirmDialog inherits Dialog {
+    title: Confirm.title;
+    description: Confirm.description;
+    dangerous: Confirm.dangerous;
+    dismissable: !Confirm.processing;
+    dismissed => {
+        Confirm.open = false;
+    }
+    DialogFooter {
+        AppButton {
+            text: "キャンセル";
+            variant: "secondary";
+            enabled: !Confirm.processing;
+            clicked => {
+                Confirm.open = false;
+            }
+        }
+
+        AppButton {
+            text: Confirm.processing ? "処理中..." : Confirm.confirm-text;
+            variant: Confirm.dangerous ? "destructive" : "primary";
+            enabled: !Confirm.processing;
+            clicked => {
+                Confirm.confirmed(Confirm.action);
+            }
+        }
+    }
+}
+
+// 値を大きな等幅フォントで表示する（旧 LargeTextDialog）
+component LargeTextDialog inherits Dialog {
+    title: LargeText.label;
+    dialog-width: 672px;
+    dismissed => {
+        LargeText.open = false;
+    }
+    Text {
+        text: LargeText.value;
+        font-family: Theme.mono;
+        font-size: 30px;
+        letter-spacing: 4px;
+        color: Theme.text-primary;
+        horizontal-alignment: center;
+        wrap: char-wrap;
+    }
+
+    Rectangle {
+        height: 16px;
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "kura";
+    icon: @image-url("../icons/locked.png");
+    preferred-width: 1024px;
+    preferred-height: 768px;
+    min-width: 800px;
+    min-height: 600px;
+    background: Theme.bg-base;
+    default-font-size: 14px;
+
+    private property <bool> main-area: Nav.page == Page.entries || Nav.page == Page.favorites || Nav.page == Page.label-entries
+        || Nav.page == Page.entry-create || Nav.page == Page.entry-edit || Nav.page == Page.password-generator
+        || Nav.page == Page.trash || Nav.page == Page.labels || Nav.page == Page.settings;
+
+    if Nav.page == Page.loading: Text {
+        text: "読み込み中...";
+        font-size: Theme.text-lg;
+        color: Theme.text-primary;
+    }
+    if Nav.page == Page.welcome: WelcomeScreen { }
+    if Nav.page == Page.storage-setup: StorageSetupScreen { }
+    if Nav.page == Page.master-password: MasterPasswordScreen { }
+    if Nav.page == Page.recovery-key: RecoveryKeyScreen { }
+    if Nav.page == Page.unlock-existing: UnlockExistingScreen { }
+    if Nav.page == Page.lock: LockScreen { }
+    if Nav.page == Page.recovery: RecoveryScreen { }
+    if root.main-area: HorizontalLayout {
+        Sidebar { }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            ErrorBar { }
+
+            if Nav.page == Page.entries || Nav.page == Page.favorites || Nav.page == Page.label-entries: EntryListScreen {
+                vertical-stretch: 1;
+            }
+            if Nav.page == Page.entry-create || Nav.page == Page.entry-edit: EntryFormScreen {
+                vertical-stretch: 1;
+            }
+            if Nav.page == Page.password-generator: PasswordGeneratorScreen {
+                vertical-stretch: 1;
+            }
+            if Nav.page == Page.trash: TrashScreen {
+                vertical-stretch: 1;
+            }
+            if Nav.page == Page.labels: LabelManagerScreen {
+                vertical-stretch: 1;
+            }
+            if Nav.page == Page.settings: SettingsScreen {
+                vertical-stretch: 1;
+            }
+        }
+    }
+
+    // モーダル（ウィンドウ全体を覆う）
+    if Nav.page == Page.settings && Settings.dialog != "": SettingsDialogs { }
+    if Onboarding.terms-open: TermsDialog { }
+    if Nav.page == Page.entry-create && EntryForm.type-dialog-open: TypeSelectDialog { }
+    if LargeText.open: LargeTextDialog { }
+    if Confirm.open: ConfirmDialog { }
+}
