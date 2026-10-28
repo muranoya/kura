@@ -53,7 +53,7 @@ interface EntryCardTrashProps {
 type EntryCardProps = EntryCardNormalProps | EntryCardTrashProps
 
 export default function EntryCard(props: EntryCardProps) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
 
   if (props.variant === 'normal') {
     const isSelected = props.isSelected || false
@@ -98,7 +98,7 @@ export default function EntryCard(props: EntryCardProps) {
           <p className="text-sm text-text-muted mt-1">
             {t('entries.deletedAt')}:{' '}
             {props.entry.deletedAt
-              ? new Date(props.entry.deletedAt * 1000).toLocaleString(i18n.language)
+              ? new Date(props.entry.deletedAt * 1000).toLocaleString('ja-JP')
               : '-'}
           </p>
         </div>
