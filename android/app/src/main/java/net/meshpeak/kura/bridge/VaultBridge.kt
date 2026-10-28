@@ -83,8 +83,6 @@ object VaultBridge {
         symbols3: Boolean
     ): String
 
-    external fun generateTotp(secret: String, digits: Int, period: Int): String
-    external fun generateTotpDefault(secret: String): String
     external fun generateTotpFromValue(value: String): String
     external fun parseTotpPeriod(value: String): Long
     external fun isValidWebauthnRpId(originHost: String, claimedRpId: String): Boolean

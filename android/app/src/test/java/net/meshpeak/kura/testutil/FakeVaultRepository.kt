@@ -141,8 +141,6 @@ class FakeVaultRepository : IVaultRepository {
         symbols3: Boolean
     ): String = "generated-password"
 
-    override suspend fun generateTotp(secret: String, digits: Int, period: Int): String = "123456"
-    override suspend fun generateTotpDefault(secret: String): String = "123456"
     override suspend fun generateTotpFromValue(value: String): String = "123456"
     override suspend fun parseTotpPeriod(value: String): Long = 30L
 

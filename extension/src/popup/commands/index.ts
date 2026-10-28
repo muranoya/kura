@@ -181,12 +181,6 @@ export async function generatePassword(
   return field<'password', string>(res, 'password') ?? ''
 }
 
-export async function generateTotp(secret: string): Promise<string> {
-  const res = await sendMessage({ type: 'GENERATE_TOTP', secret })
-  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
-  return field<'totp', string>(res, 'totp') ?? ''
-}
-
 export async function generateTotpFromValue(
   value: string,
 ): Promise<{ totp: string; period: number }> {

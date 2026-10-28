@@ -87,8 +87,6 @@ interface IVaultRepository {
         symbols2: Boolean = true,
         symbols3: Boolean = true
     ): String
-    suspend fun generateTotp(secret: String, digits: Int = 6, period: Int = 30): String
-    suspend fun generateTotpDefault(secret: String): String
     suspend fun generateTotpFromValue(value: String): String
     suspend fun parseTotpPeriod(value: String): Long
 
@@ -322,14 +320,6 @@ class VaultRepository(private val context: Context) : IVaultRepository {
         symbols3: Boolean
     ): String = withContext(Dispatchers.IO) {
         VaultBridge.generatePassword(length, lowercase, uppercase, numbers, symbols1, symbols2, symbols3)
-    }
-
-    override suspend fun generateTotp(secret: String, digits: Int, period: Int): String = withContext(Dispatchers.IO) {
-        VaultBridge.generateTotp(secret, digits, period)
-    }
-
-    override suspend fun generateTotpDefault(secret: String): String = withContext(Dispatchers.IO) {
-        VaultBridge.generateTotpDefault(secret)
     }
 
     override suspend fun generateTotpFromValue(value: String): String = withContext(Dispatchers.IO) {

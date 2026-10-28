@@ -393,16 +393,6 @@ pub fn api_generate_password(
 }
 
 #[wasm_bindgen]
-pub fn api_generate_totp(secret: String, digits: u32, period: u32) -> Result<String, JsValue> {
-    vault_core::api::api_generate_totp(secret, digits, period).map_err(to_js_err)
-}
-
-#[wasm_bindgen]
-pub fn api_generate_totp_default(secret: String) -> Result<String, JsValue> {
-    vault_core::api::api_generate_totp_default(secret).map_err(to_js_err)
-}
-
-#[wasm_bindgen]
 pub fn api_generate_totp_from_value(value: String) -> Result<String, JsValue> {
     vault_core::api::api_generate_totp_from_value(value).map_err(to_js_err)
 }

@@ -89,7 +89,6 @@ interface WasmApi {
     includeSymbols2: boolean,
     includeSymbols3: boolean,
   ): string
-  api_generate_totp_default(secret: string): string
   api_generate_totp_from_value(value: string): string
   api_parse_totp_period(value: string): number
   api_verify_password(vaultId: string, password: string): void
@@ -1153,16 +1152,6 @@ async function handleMessage(
             message.includeSymbols3 ?? true,
           )
           sendResponse({ success: true, password })
-        } catch (err) {
-          sendResponse({ success: false, error: String(err) })
-        }
-        break
-      }
-
-      case 'GENERATE_TOTP': {
-        try {
-          const totp = vault.api_generate_totp_default(message.secret)
-          sendResponse({ success: true, totp })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }

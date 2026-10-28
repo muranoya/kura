@@ -1,9 +1,7 @@
 use crate::domain_match::is_valid_webauthn_rp_id;
 use crate::password_gen::{generate_password, PasswordOptions};
 use crate::secret::TotpSecretInput;
-use crate::totp::{
-    generate_totp, generate_totp_default, generate_totp_from_value, parse_totp_period,
-};
+use crate::totp::{generate_totp_from_value, parse_totp_period};
 
 /// パスワード生成
 pub fn api_generate_password(
@@ -30,19 +28,6 @@ pub fn api_generate_password(
     };
 
     generate_password(&options).map_err(|e| format!("Failed to generate password: {}", e))
-}
-
-/// TOTP生成
-pub fn api_generate_totp(secret: String, digits: u32, period: u32) -> Result<String, String> {
-    let secret = TotpSecretInput::from_string(secret);
-    generate_totp(secret.as_str(), digits, period as u64)
-        .map_err(|e| format!("Failed to generate TOTP: {}", e))
-}
-
-/// TOTP生成（デフォルト）
-pub fn api_generate_totp_default(secret: String) -> Result<String, String> {
-    let secret = TotpSecretInput::from_string(secret);
-    generate_totp_default(secret.as_str()).map_err(|e| format!("Failed to generate TOTP: {}", e))
 }
 
 /// TOTP生成（otpauth URI または生シークレットから）

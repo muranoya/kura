@@ -661,36 +661,6 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_isValidWebauthn
 }
 
 #[no_mangle]
-pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_generateTotp(
-    mut env: JNIEnv,
-    _class: JClass,
-    secret: JString,
-    digits: jint,
-    period: jint,
-) -> jstring {
-    jni_catch(&mut env, |env| {
-        let s = get_string(env, &secret)?;
-        let code = api_generate_totp(s, digits as u32, period as u32)
-            .map_err(|e| format!("Failed to generate TOTP: {}", e))?;
-        new_jstring(env, &code)
-    })
-}
-
-#[no_mangle]
-pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_generateTotpDefault(
-    mut env: JNIEnv,
-    _class: JClass,
-    secret: JString,
-) -> jstring {
-    jni_catch(&mut env, |env| {
-        let s = get_string(env, &secret)?;
-        let code =
-            api_generate_totp_default(s).map_err(|e| format!("Failed to generate TOTP: {}", e))?;
-        new_jstring(env, &code)
-    })
-}
-
-#[no_mangle]
 pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_generateTotpFromValue(
     mut env: JNIEnv,
     _class: JClass,

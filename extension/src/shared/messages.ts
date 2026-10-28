@@ -70,7 +70,6 @@ export type Message =
       includeSymbols2: boolean
       includeSymbols3: boolean
     }
-  | { type: 'GENERATE_TOTP'; secret: string }
   | { type: 'GENERATE_TOTP_FROM_VALUE'; value: string }
 
   // Security
