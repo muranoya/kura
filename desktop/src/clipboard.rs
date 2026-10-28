@@ -27,7 +27,7 @@ fn with_clipboard<T>(
 /// クリップボードにコピーし、設定に応じて自動クリアタイマーを開始する。
 /// クリア前にクリップボードの内容を確認し、コピーした値と同じ場合のみクリアする
 pub fn copy_sensitive(text: &str) -> Result<(), String> {
-    with_clipboard(|c| c.set_text(text.to_string()))?;
+    with_clipboard(|c| set_text_excluded_from_history(c, text))?;
     LAST_COPIED.with_borrow_mut(|last| *last = Some(zeroize::Zeroizing::new(text.to_string())));
 
     let clear_seconds = shared().store.app_settings().clipboard_clear_seconds;
@@ -42,6 +42,27 @@ pub fn copy_sensitive(text: &str) -> Result<(), String> {
         }
     });
     Ok(())
+}
+
+/// OS やクリップボードマネージャーの履歴（自動クリアでは消せない）に残らないようにしてコピーする
+fn set_text_excluded_from_history(
+    clipboard: &mut arboard::Clipboard,
+    text: &str,
+) -> Result<(), arboard::Error> {
+    #[cfg(all(
+        unix,
+        not(any(target_os = "macos", target_os = "android", target_os = "emscripten"))
+    ))]
+    use arboard::SetExtLinux;
+    #[cfg(target_os = "macos")]
+    use arboard::SetExtApple;
+    #[cfg(windows)]
+    use arboard::SetExtWindows;
+
+    clipboard
+        .set()
+        .exclude_from_history()
+        .text(text.to_string())
 }
 
 fn clear_if_unchanged() {
