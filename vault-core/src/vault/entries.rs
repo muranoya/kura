@@ -92,7 +92,8 @@ impl UnlockedVault {
     }
 
     /// Create entry
-    /// エントリ数（ゴミ箱を含み、完全削除済みは除く）が `MAX_ENTRIES` に達していれば作らない
+    /// エントリ数（ゴミ箱を含み、完全削除済みは除く）が `MAX_ENTRIES` に達していれば作らない。
+    /// 存在しない・削除済みのラベル ID が含まれていれば作らない
     pub fn create_entry(
         &mut self,
         name: String,
@@ -100,6 +101,8 @@ impl UnlockedVault {
         data: EntryData,
         label_ids: Vec<String>,
     ) -> Result<Entry> {
+        self.validate_label_ids(&label_ids)?;
+
         let count = self
             .index
             .entries
@@ -445,6 +448,24 @@ mod tests {
         assert!(!entry.is_favorite);
         assert!(entry.deleted_at.is_none());
         assert!(vault.index.entries.contains_key(&entry.id));
+    }
+
+    #[test]
+    fn test_create_entry_rejects_unknown_or_deleted_label() {
+        let mut vault = make_vault();
+        let deleted = vault.create_label("Deleted".into()).unwrap();
+        vault.delete_label(&deleted.id).unwrap();
+
+        for label_id in ["nonexistent".to_string(), deleted.id] {
+            let result = vault.create_entry(
+                "Test".into(),
+                "login".into(),
+                make_login_data(),
+                vec![label_id],
+            );
+            assert!(matches!(result, Err(VaultError::LabelNotFound(_))));
+        }
+        assert!(vault.index.entries.is_empty());
     }
 
     #[test]
