@@ -1,8 +1,8 @@
-import { ComboBox, LineEdit, ListView } from "std-widgets.slint";
+import { ComboBox } from "std-widgets.slint";
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { AppButton, Badge, Card, CodeBlock, Dialog, DialogFooter, ErrorBanner, FieldLabel, Icon, PasswordInput, ScrollPage } from "../widgets.slint";
-import { Confirm, Import, Settings, Util } from "../state.slint";
+import { AppButton, Card, CodeBlock, Dialog, DialogFooter, ErrorBanner, FieldLabel, Icon, PasswordInput, ScrollPage } from "../widgets.slint";
+import { Confirm, Settings, Util } from "../state.slint";
 import { HorizontalDivider, ScreenHeader } from "layout.slint";
 
 component SettingRow inherits HorizontalLayout {
@@ -138,14 +138,6 @@ export component SettingsScreen inherits Rectangle {
             Card {
                 title: "データ";
                 AppButton {
-                    text: "1Passwordからインポート";
-                    variant: "secondary";
-                    clicked => {
-                        Settings.dialog = "import";
-                    }
-                }
-
-                AppButton {
                     text: Settings.exporting ? "エクスポート中..." : "Bitwarden形式でエクスポート";
                     variant: "secondary";
                     enabled: !Settings.exporting;
@@ -276,228 +268,6 @@ component PasswordField inherits VerticalLayout {
         enabled: !Settings.dialog-loading;
         accepted => {
             root.accepted();
-        }
-    }
-}
-
-component ImportDialog inherits Dialog {
-    dialog-width: 672px;
-    dismissable: Import.step != "loading" && Import.step != "executing";
-    title: Import.step == "idle" || Import.step == "loading" ? "1Passwordからインポート"
-        : Import.step == "preview" ? "インポートプレビュー"
-        : Import.step == "executing" ? "インポート実行中" : "インポート完了";
-    description: Import.step == "idle" ? "1Passwordからエクスポートした .1pux ファイルを選択してください。" : Import.step == "preview" ? Import.subtitle : "";
-    dismissed => {
-        Import.close();
-    }
-    if Import.step == "idle": VerticalLayout {
-        alignment: center;
-        spacing: 16px;
-        padding-top: 24px;
-        padding-bottom: 24px;
-        HorizontalLayout {
-            alignment: center;
-            Icon {
-                source: Icons.file-up;
-                size: 48px;
-                color: Theme.text-secondary;
-            }
-        }
-
-        HorizontalLayout {
-            alignment: center;
-            AppButton {
-                text: "ファイルを選択";
-                clicked => {
-                    Import.select-file();
-                }
-            }
-        }
-    }
-    if Import.step == "loading" || Import.step == "executing": VerticalLayout {
-        alignment: center;
-        spacing: 16px;
-        padding-top: 24px;
-        padding-bottom: 24px;
-        Text {
-            text: Import.step == "loading" ? "ファイルを解析中..." : "エントリを作成しています...";
-            font-size: Theme.text-sm;
-            color: Theme.text-secondary;
-            horizontal-alignment: center;
-        }
-    }
-    if Import.error != "": Text {
-        text: Import.error;
-        font-size: Theme.text-sm;
-        color: Theme.danger;
-        wrap: word-wrap;
-    }
-    if Import.step == "preview": VerticalLayout {
-        spacing: 10px;
-        // 統計 / フィルター
-        HorizontalLayout {
-            spacing: 6px;
-            alignment: start;
-            for chip in Import.chips: Badge {
-                text: chip.text;
-                variant: chip.variant;
-                clickable: chip.clickable;
-                clicked => {
-                    Import.chip-clicked(chip.key);
-                }
-            }
-        }
-
-        LineEdit {
-            text <=> Import.search;
-            placeholder-text: "名前で検索...";
-            edited => {
-                Import.search-changed();
-            }
-        }
-
-        HorizontalLayout {
-            spacing: 8px;
-            alignment: start;
-            Text {
-                text: "一括操作:";
-                font-size: Theme.text-sm;
-                color: Theme.text-secondary;
-                vertical-alignment: center;
-            }
-
-            AppButton {
-                text: "全て取り込む";
-                variant: "ghost";
-                size: "sm";
-                clicked => {
-                    Import.bulk(true);
-                }
-            }
-
-            AppButton {
-                text: "全てスキップ";
-                variant: "ghost";
-                size: "sm";
-                clicked => {
-                    Import.bulk(false);
-                }
-            }
-        }
-
-        ListView {
-            min-height: 120px;
-            preferred-height: 320px;
-            for row in Import.rows: HorizontalLayout {
-                padding: 4px;
-                padding-left: 8px;
-                spacing: 12px;
-                VerticalLayout {
-                    horizontal-stretch: 1;
-                    alignment: center;
-                    spacing: 2px;
-                    HorizontalLayout {
-                        spacing: 6px;
-                        Text {
-                            text: row.name;
-                            font-size: Theme.text-sm;
-                            font-weight: 500;
-                            color: Theme.text-primary;
-                            overflow: elide;
-                        }
-
-                        if row.archived: Badge {
-                            text: "アーカイブ済み";
-                            variant: "muted";
-                        }
-                        if row.category != "": Badge {
-                            text: row.category;
-                            variant: "muted";
-                        }
-                        if row.has-attachments: Icon {
-                            source: Icons.alert-triangle;
-                            size: 12px;
-                            color: Theme.warning;
-                        }
-                    }
-
-                    HorizontalLayout {
-                        spacing: 8px;
-                        alignment: start;
-                        Text {
-                            text: row.type-label;
-                            font-size: Theme.text-xs;
-                            color: Theme.text-secondary;
-                        }
-
-                        if row.duplicate != "": Text {
-                            text: row.duplicate;
-                            font-size: Theme.text-xs;
-                            color: Theme.warning;
-                            overflow: elide;
-                        }
-                    }
-                }
-
-                ComboBox {
-                    width: 160px;
-                    model: row.actions;
-                    current-index: row.action-index;
-                    selected => {
-                        Import.set-action(row.source-id, self.current-index);
-                    }
-                }
-            }
-        }
-
-        DialogFooter {
-            AppButton {
-                text: "キャンセル";
-                variant: "ghost";
-                clicked => {
-                    Import.close();
-                }
-            }
-
-            AppButton {
-                text: Import.import-count + " 件をインポート";
-                enabled: Import.import-count > 0;
-                clicked => {
-                    Import.execute();
-                }
-            }
-        }
-    }
-    if Import.step == "result": VerticalLayout {
-        spacing: 12px;
-        HorizontalLayout {
-            spacing: 6px;
-            alignment: start;
-            for chip in Import.result-chips: Badge {
-                text: chip.text;
-                variant: chip.variant;
-            }
-        }
-
-        if Import.labels-created != "": Text {
-            text: "新規作成ラベル: " + Import.labels-created;
-            font-size: Theme.text-sm;
-            color: Theme.text-secondary;
-            wrap: word-wrap;
-        }
-        for err in Import.result-errors: Text {
-            text: "× " + err;
-            font-size: Theme.text-sm;
-            color: Theme.danger;
-            wrap: word-wrap;
-        }
-        DialogFooter {
-            AppButton {
-                text: "閉じる";
-                clicked => {
-                    Import.close();
-                }
-            }
         }
     }
 }
@@ -733,7 +503,6 @@ export component SettingsDialogs inherits Rectangle {
             }
         }
     }
-    if Settings.dialog == "import": ImportDialog { }
     Timer {
         interval: 2s;
         running: root.copied;

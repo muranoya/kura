@@ -3,7 +3,6 @@
 mod auth;
 mod entries;
 mod form;
-mod import;
 mod labels;
 mod onboarding;
 mod settings;
@@ -52,7 +51,6 @@ pub fn setup(app: &AppWindow, tray: Option<AppTray>) {
     form::setup(app);
     labels::setup(app);
     settings::setup(app);
-    import::setup(app);
 
     initial_state(app);
 }
@@ -308,7 +306,6 @@ fn clear_sensitive_ui(app: &AppWindow) {
     entries::clear(app);
     form::clear(app);
     settings::clear(app);
-    import::clear(app);
     app.global::<PwGen>().set_password("".into());
     app.global::<crate::LargeText>().set_open(false);
     app.global::<crate::LargeText>().set_value("".into());

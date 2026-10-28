@@ -116,10 +116,6 @@ fn clear_dialog_fields(app: &AppWindow) {
 
 fn close_dialog(app: &AppWindow) {
     let settings = app.global::<Settings>();
-    if settings.get_dialog() == "import" {
-        super::import::close(app);
-        return;
-    }
     clear_dialog_fields(app);
     settings.set_new_recovery_key("".into());
     settings.set_dialog("".into());

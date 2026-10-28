@@ -28,7 +28,6 @@ sha2 = { version = "0.11", features = ["zeroize"] }
 hmac = "0.12"
 totp-rs = "5"
 getrandom = { version = "0.2", features = ["js"] }  # WASM-compatible random
-zip = { version = "2", default-features = false, features = ["deflate"] }
 p256 = "0.13"
 ciborium = "0.2"
 

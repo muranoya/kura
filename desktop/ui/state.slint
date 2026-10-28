@@ -82,26 +82,6 @@ export struct CustomFieldItem {
     expanded: bool,
 }
 
-export struct ImportRow {
-    source-id: string,
-    name: string,
-    type-label: string,
-    archived: bool,
-    category: string,
-    has-attachments: bool,
-    duplicate: string,
-    // 選択肢（取り込む / スキップ / 上書き: ...）と現在の選択
-    actions: [string],
-    action-index: int,
-}
-
-export struct FilterChip {
-    key: string,
-    text: string,
-    variant: string,
-    clickable: bool,
-}
-
 export global Nav {
     in-out property <Page> page: Page.loading;
     in property <[LabelItem]> labels;
@@ -294,7 +274,7 @@ export global Settings {
     in property <string> endpoint;
     in property <string> version;
     in property <bool> exporting;
-    // 開いているダイアログ: "" / change-password / rotate-dek / regenerate-recovery / transfer / reauth / recovery-key / import
+    // 開いているダイアログ: "" / change-password / rotate-dek / regenerate-recovery / transfer / reauth / recovery-key
     in-out property <string> dialog;
     in-out property <string> pw-old;
     in-out property <string> pw-new;
@@ -315,23 +295,3 @@ export global Settings {
     callback close-dialog();
 }
 
-export global Import {
-    // idle / loading / preview / executing / result
-    in property <string> step;
-    in property <string> error;
-    in property <string> subtitle;
-    in property <[FilterChip]> chips;
-    in property <[ImportRow]> rows;
-    in-out property <string> search;
-    in property <int> import-count;
-    in property <[FilterChip]> result-chips;
-    in property <string> labels-created;
-    in property <[string]> result-errors;
-    callback select-file();
-    callback chip-clicked(string);
-    callback search-changed();
-    callback set-action(string, int);
-    callback bulk(bool);
-    callback execute();
-    callback close();
-}
