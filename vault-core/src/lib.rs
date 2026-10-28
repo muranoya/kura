@@ -16,11 +16,6 @@ pub mod webauthn;
 #[cfg(any(feature = "desktop", feature = "android", feature = "wasm"))]
 pub mod api;
 
-#[cfg(any(feature = "desktop", feature = "android"))]
-pub mod import;
-
-pub mod export;
-
 pub use config::{S3Config, VaultConfig};
 pub use crypto::{Dek, Kek, RecoveryKey};
 pub use error::{Result, VaultError};

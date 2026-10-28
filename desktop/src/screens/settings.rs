@@ -1,4 +1,4 @@
-//! 設定画面（一般設定・セキュリティ操作・エクスポート・設定の転送）
+//! 設定画面（一般設定・セキュリティ操作・設定の転送）
 
 use std::cell::RefCell;
 
@@ -14,7 +14,7 @@ const AUTOLOCK_MINUTES: [u64; 8] = [0, 1, 3, 5, 10, 15, 30, 60];
 const CLIPBOARD_SECONDS: [u64; 4] = [0, 30, 60, 120];
 
 thread_local! {
-    /// 再認証後に行う操作（"export" / "transfer"）
+    /// 再認証後に行う操作（"transfer"）
     static REAUTH_NEXT: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
@@ -116,10 +116,6 @@ fn clear_dialog_fields(app: &AppWindow) {
 
 fn close_dialog(app: &AppWindow) {
     let settings = app.global::<Settings>();
-    if settings.get_dialog() == "import" {
-        super::import::close(app);
-        return;
-    }
     clear_dialog_fields(app);
     settings.set_new_recovery_key("".into());
     settings.set_dialog("".into());
@@ -318,50 +314,8 @@ fn reauth_submit(app: &AppWindow) {
                 return;
             }
             close_dialog(&app);
-            match REAUTH_NEXT.with_borrow_mut(Option::take).as_deref() {
-                Some("export") => super::open_confirm(
-                    &app,
-                    "export",
-                    "データをエクスポート",
-                    "Bitwarden JSON形式でエクスポートします。エクスポートされたファイルにはパスワードが平文で含まれます。取り扱いにご注意ください。",
-                    "エクスポート",
-                    false,
-                ),
-                Some("transfer") => open_dialog(&app, "transfer"),
-                _ => {}
-            }
-        },
-    );
-}
-
-pub fn export_confirmed(app: &AppWindow) {
-    super::close_confirm(app);
-    app.global::<Settings>().set_exporting(true);
-    let today = chrono::Local::now().format("%Y-%m-%d");
-    let file_name = format!("kura-export-{today}.json");
-    ctx::run_async(
-        async move {
-            let Some(file) = rfd::AsyncFileDialog::new()
-                .set_file_name(file_name)
-                .add_filter("JSON", &["json"])
-                .save_file()
-                .await
-            else {
-                return Ok(());
-            };
-            let path = file.path().to_path_buf();
-            tokio::task::spawn_blocking(move || {
-                let json = Zeroizing::new(shared().vault.api_export_bitwarden_json()?);
-                std::fs::write(&path, json.as_bytes())
-                    .map_err(|e| format!("Failed to write file: {e}"))
-            })
-            .await
-            .map_err(|e| e.to_string())?
-        },
-        |app, result| {
-            app.global::<Settings>().set_exporting(false);
-            if let Err(e) = result {
-                ctx::push_error(&app, format!("エクスポートに失敗しました: {e}"), None);
+            if REAUTH_NEXT.with_borrow_mut(Option::take).as_deref() == Some("transfer") {
+                open_dialog(&app, "transfer");
             }
         },
     );

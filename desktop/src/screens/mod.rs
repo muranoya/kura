@@ -3,7 +3,6 @@
 mod auth;
 mod entries;
 mod form;
-mod import;
 mod labels;
 mod onboarding;
 mod settings;
@@ -52,7 +51,6 @@ pub fn setup(app: &AppWindow, tray: Option<AppTray>) {
     form::setup(app);
     labels::setup(app);
     settings::setup(app);
-    import::setup(app);
 
     initial_state(app);
 }
@@ -194,7 +192,6 @@ fn setup_confirm(app: &AppWindow) {
             "delete-entry" => entries::delete_confirmed(&app),
             "purge-entry" => entries::purge_confirmed(&app),
             "delete-label" => labels::delete_confirmed(&app),
-            "export" => settings::export_confirmed(&app),
             "logout-lock" | "logout-settings" => logout(&app),
             other => eprintln!("Unknown confirm action: {other}"),
         }
@@ -308,7 +305,6 @@ fn clear_sensitive_ui(app: &AppWindow) {
     entries::clear(app);
     form::clear(app);
     settings::clear(app);
-    import::clear(app);
     app.global::<PwGen>().set_password("".into());
     app.global::<crate::LargeText>().set_open(false);
     app.global::<crate::LargeText>().set_value("".into());

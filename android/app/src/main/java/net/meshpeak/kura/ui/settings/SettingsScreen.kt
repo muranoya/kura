@@ -10,8 +10,6 @@ import android.view.autofill.AutofillManager
 import android.widget.Toast
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -63,28 +61,9 @@ fun SettingsScreen(
     var showPasscodeSetupDialog by remember { mutableStateOf(false) }
     var showTransferDialog by remember { mutableStateOf(false) }
     var showTransferPasswordConfirm by remember { mutableStateOf(false) }
-    var showExportDialog by remember { mutableStateOf(false) }
-    var showExportPasswordConfirm by remember { mutableStateOf(false) }
-    var exportJson by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-
-    val exportFileLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
-        if (uri != null && exportJson != null) {
-            try {
-                context.contentResolver.openOutputStream(uri)?.use { output ->
-                    output.write(exportJson!!.toByteArray())
-                }
-                Toast.makeText(context, context.getString(R.string.export_success), Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Toast.makeText(context, context.getString(R.string.export_failed, e.message ?: ""), Toast.LENGTH_SHORT).show()
-            }
-            exportJson = null
-        }
-    }
 
     val autolockMinutes by appViewModel.preferences.autolockMinutesFlow
         .collectAsState(initial = 5)
@@ -438,23 +417,6 @@ fun SettingsScreen(
             HorizontalDivider()
             Spacer(modifier = Modifier.height(8.dp))
 
-            // データセクション
-            Text(stringResource(R.string.settings_section_data), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Card(onClick = { showExportPasswordConfirm = true }, modifier = Modifier.fillMaxWidth()) {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_export_bitwarden)) },
-                    supportingContent = { Text(stringResource(R.string.settings_export_bitwarden_description)) },
-                    leadingContent = { Icon(Icons.Default.FileDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider()
-            Spacer(modifier = Modifier.height(8.dp))
-
             // Transfer section
             Text(stringResource(R.string.settings_section_transfer), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(4.dp))
@@ -665,20 +627,6 @@ fun SettingsScreen(
         )
     }
 
-    // Export reauth dialog
-    if (showExportPasswordConfirm) {
-        SinglePasswordDialog(
-            title = stringResource(R.string.reauth_master_password_title),
-            description = stringResource(R.string.reauth_master_password_description),
-            onConfirm = { password ->
-                appViewModel.repository.verifyPassword(password)
-                showExportPasswordConfirm = false
-                showExportDialog = true
-            },
-            onDismiss = { showExportPasswordConfirm = false }
-        )
-    }
-
     // Transfer reauth dialog
     if (showTransferPasswordConfirm) {
         SinglePasswordDialog(
@@ -699,29 +647,6 @@ fun SettingsScreen(
             appViewModel = appViewModel,
             clipboardClearSeconds = clipboardClearSeconds,
             onDismiss = { showTransferDialog = false }
-        )
-    }
-
-    // Export dialog
-    if (showExportDialog) {
-        ConfirmDialog(
-            title = stringResource(R.string.export_dialog_title),
-            description = stringResource(R.string.export_dialog_description),
-            confirmText = stringResource(R.string.action_export),
-            onConfirm = {
-                showExportDialog = false
-                scope.launch {
-                    try {
-                        val json = appViewModel.repository.exportBitwardenJson()
-                        exportJson = json
-                        val today = java.time.LocalDate.now().toString()
-                        exportFileLauncher.launch("kura-export-$today.json")
-                    } catch (e: Exception) {
-                        Toast.makeText(context, context.getString(R.string.export_failed, e.message ?: ""), Toast.LENGTH_SHORT).show()
-                    }
-                }
-            },
-            onCancel = { showExportDialog = false }
         )
     }
 

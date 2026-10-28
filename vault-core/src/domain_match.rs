@@ -141,8 +141,6 @@ pub fn is_valid_webauthn_rp_id(origin_host: &str, claimed_rp_id: &str) -> bool {
 }
 
 /// URLからホスト部分を抽出する（scheme/path/portを除去、www除去や小文字化は行わない）。
-///
-/// `vault-core::import::duplicate::extract_domain` と共有する下位ユーティリティ。
 pub(crate) fn extract_host(url: &str) -> Option<&str> {
     let url = url.trim();
     if url.is_empty() {

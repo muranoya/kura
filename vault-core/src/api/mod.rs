@@ -1,5 +1,4 @@
 mod entries;
-mod export;
 mod labels;
 mod security;
 mod session;
@@ -7,9 +6,6 @@ mod sync;
 mod transfer;
 mod utils;
 mod webauthn;
-
-#[cfg(any(feature = "desktop", feature = "android"))]
-mod import;
 
 pub use security::api_config_needs_upgrade;
 pub use sync::parse_s3_config;

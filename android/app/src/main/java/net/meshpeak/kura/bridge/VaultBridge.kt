@@ -90,9 +90,6 @@ object VaultBridge {
     external fun parseTotpPeriod(value: String): Long
     external fun isValidWebauthnRpId(originHost: String, claimedRpId: String): Boolean
 
-    // Export
-    external fun exportBitwardenJson(vaultId: String): String
-
     // Sync
     external fun mergeRemoteVault(vaultId: String, remoteBytes: ByteArray, remoteEtag: String)
     external fun updateEtag(vaultId: String, etag: String)

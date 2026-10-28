@@ -107,7 +107,6 @@ interface WasmApi {
   api_config_needs_upgrade(encryptedB64: string): boolean
   api_encrypt_transfer_config(password: string, configJson: string): string
   api_decrypt_transfer_config(password: string, transferString: string): string
-  api_export_bitwarden_json(vaultId: string): string
   api_webauthn_find_credentials(vaultId: string, rpId: string, allowCredentialIds: string[]): string
   api_webauthn_create_credential(
     vaultId: string,
@@ -1442,20 +1441,6 @@ async function handleMessage(
             message.configJson,
           )
           sendResponse({ success: true, transferString })
-        } catch (err) {
-          sendResponse({ success: false, error: String(err) })
-        }
-        break
-      }
-
-      case 'EXPORT_BITWARDEN_JSON': {
-        if (!unlocked) {
-          sendResponse({ success: false, error: 'Vault not unlocked' })
-          break
-        }
-        try {
-          const json = vault.api_export_bitwarden_json(DEFAULT_VAULT_ID)
-          sendResponse({ success: true, json })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
         }
