@@ -57,13 +57,13 @@ fn set_text_excluded_from_history(
     clipboard: &mut arboard::Clipboard,
     text: &str,
 ) -> Result<(), arboard::Error> {
+    #[cfg(target_os = "macos")]
+    use arboard::SetExtApple;
     #[cfg(all(
         unix,
         not(any(target_os = "macos", target_os = "android", target_os = "emscripten"))
     ))]
     use arboard::SetExtLinux;
-    #[cfg(target_os = "macos")]
-    use arboard::SetExtApple;
     #[cfg(windows)]
     use arboard::SetExtWindows;
 
