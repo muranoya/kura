@@ -42,7 +42,6 @@ fun HomeScreen(
     var allEntries by remember { mutableStateOf<List<EntryRow>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var lastSyncTime by remember { mutableStateOf<Long?>(null) }
-    var isSyncing by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var showFavoritesOnly by remember { mutableStateOf(false) }
     var selectedType by remember { mutableStateOf<String?>(null) }
@@ -93,19 +92,6 @@ fun HomeScreen(
                 if (ts > 0) lastSyncTime = ts
             } catch (_: Exception) { }
             loading = false
-        }
-    }
-
-    fun performSync() {
-        scope.launch {
-            isSyncing = true
-            try {
-                appViewModel.backgroundSync()
-                val ts = appViewModel.repository.getLastSyncTime()
-                if (ts > 0) lastSyncTime = ts
-            } catch (_: Exception) { }
-            isSyncing = false
-            loadData()
         }
     }
 
