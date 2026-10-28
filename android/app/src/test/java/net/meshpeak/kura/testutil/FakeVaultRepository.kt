@@ -146,7 +146,6 @@ class FakeVaultRepository : IVaultRepository {
 
     override suspend fun syncVault(configJson: String): SyncResult = syncVaultResult
 
-    override suspend fun pushVault(configJson: String) {}
 
     override suspend fun downloadVault(configJson: String): Boolean {
         downloadVaultCalledWith = configJson
@@ -155,7 +154,6 @@ class FakeVaultRepository : IVaultRepository {
     }
 
     override suspend fun getLastSyncTime(): Long = lastSyncTimeResult
-    override suspend fun restoreLastSyncTime(ts: Long) {}
 
     override suspend fun saveLocally() {
         saveLocallyCalled = true

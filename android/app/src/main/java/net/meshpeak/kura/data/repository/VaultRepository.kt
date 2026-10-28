@@ -92,10 +92,8 @@ interface IVaultRepository {
 
     // Sync
     suspend fun syncVault(configJson: String): SyncResult
-    suspend fun pushVault(configJson: String)
     suspend fun downloadVault(configJson: String): Boolean
     suspend fun getLastSyncTime(): Long
-    suspend fun restoreLastSyncTime(ts: Long)
 
     // Combined helpers
     suspend fun saveLocally()
@@ -393,7 +391,7 @@ class VaultRepository(private val context: Context) : IVaultRepository {
         throw RuntimeException("Sync failed after maximum retries")
     }
 
-    override suspend fun pushVault(configJson: String): Unit = withContext(Dispatchers.IO) {
+    private suspend fun pushVault(configJson: String): Unit = withContext(Dispatchers.IO) {
         val s3Config = parseS3Config(configJson)
         val client = VaultS3Client(s3Config)
         val vaultBytes = getVaultBytes()
@@ -419,7 +417,7 @@ class VaultRepository(private val context: Context) : IVaultRepository {
         VaultBridge.getLastSyncTime(DEFAULT_VAULT_ID)
     }
 
-    override suspend fun restoreLastSyncTime(ts: Long) = withContext(Dispatchers.IO) {
+    private suspend fun restoreLastSyncTime(ts: Long) = withContext(Dispatchers.IO) {
         VaultBridge.restoreLastSyncTime(DEFAULT_VAULT_ID, ts)
     }
 
