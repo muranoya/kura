@@ -85,6 +85,15 @@ fn find_etld_length(labels: &[&str]) -> usize {
     1
 }
 
+/// IPアドレス（IPv4、または角括弧の有無を問わないIPv6）かどうか。
+fn is_ip_address(host: &str) -> bool {
+    let unbracketed = host
+        .strip_prefix('[')
+        .and_then(|h| h.strip_suffix(']'))
+        .unwrap_or(host);
+    unbracketed.parse::<std::net::IpAddr>().is_ok()
+}
+
 /// ホスト名から eTLD+1（登録可能ドメイン）を抽出する。
 ///
 /// 例:
@@ -92,8 +101,15 @@ fn find_etld_length(labels: &[&str]) -> usize {
 ///   "www.example.co.jp"  -> "example.co.jp"
 ///   "sub.blogspot.com"   -> "sub.blogspot.com"（blogspot.comはワイルドカード公開サフィックス）
 ///   "example.com"        -> "example.com"
+///   "192.168.1.10"       -> "192.168.1.10"（IPアドレスはラベル分割せずそのまま）
+///
+/// IPアドレスをドメイン名として扱うと末尾2オクテットがeTLD+1になり、
+/// "192.168.1.10" と "203.0.1.10" が同一サイト扱いになるため、完全一致のみとする。
 pub fn extract_etld_plus1(hostname: &str) -> String {
     let hostname_lower = hostname.to_lowercase();
+    if is_ip_address(&hostname_lower) {
+        return hostname_lower;
+    }
     let labels: Vec<&str> = hostname_lower.split('.').collect();
     if labels.len() <= 1 {
         return hostname_lower;
@@ -135,6 +151,10 @@ pub fn is_valid_webauthn_rp_id(origin_host: &str, claimed_rp_id: &str) -> bool {
     }
     let origin_host = origin_host.to_lowercase();
     let claimed_rp_id = claimed_rp_id.to_lowercase();
+    // IPアドレスには祖先ドメインが存在しないため、rp.idは完全一致のみ
+    if is_ip_address(&origin_host) || is_ip_address(&claimed_rp_id) {
+        return origin_host == claimed_rp_id;
+    }
     let is_ancestor_or_self =
         origin_host == claimed_rp_id || origin_host.ends_with(&format!(".{}", claimed_rp_id));
     is_ancestor_or_self && same_etld_plus1(&origin_host, &claimed_rp_id)
@@ -215,6 +235,27 @@ mod tests {
     #[test]
     fn case_insensitive() {
         assert!(same_etld_plus1("WWW.Example.COM", "m.example.com"));
+    }
+
+    #[test]
+    fn ipv4_is_not_split_into_labels() {
+        assert_eq!(extract_etld_plus1("192.168.1.10"), "192.168.1.10");
+        assert!(!same_etld_plus1("192.168.1.10", "203.0.1.10"));
+        assert!(same_etld_plus1("192.168.1.10", "192.168.1.10"));
+    }
+
+    #[test]
+    fn ipv6_is_not_split_into_labels() {
+        assert_eq!(extract_etld_plus1("[::1]"), "[::1]");
+        assert_eq!(extract_etld_plus1("fe80::1"), "fe80::1");
+        assert!(!same_etld_plus1("[2001:db8::1]", "[2001:db9::1]"));
+    }
+
+    #[test]
+    fn rp_id_ip_address_requires_exact_match() {
+        assert!(is_valid_webauthn_rp_id("192.168.1.10", "192.168.1.10"));
+        assert!(!is_valid_webauthn_rp_id("192.168.1.10", "1.10"));
+        assert!(!is_valid_webauthn_rp_id("192.168.1.10", "168.1.10"));
     }
 
     #[test]
