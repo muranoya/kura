@@ -544,6 +544,25 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_changeMasterPas
 }
 
 #[no_mangle]
+pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_resetMasterPasswordWithRecoveryKey(
+    mut env: JNIEnv,
+    _class: JClass,
+    vault_id: JString,
+    recovery_key: JString,
+    new_password: JString,
+) {
+    jni_catch_void(&mut env, |env| {
+        let vid = get_string(env, &vault_id)?;
+        let rk = get_string(env, &recovery_key)?;
+        let np = get_string(env, &new_password)?;
+        with_manager(&vid, |m| {
+            m.api_reset_master_password_with_recovery_key(rk, np)
+        })
+        .map_err(|e| format!("Failed to reset master password: {}", e))
+    });
+}
+
+#[no_mangle]
 pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_rotateDek(
     mut env: JNIEnv,
     _class: JClass,

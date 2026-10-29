@@ -65,6 +65,7 @@ object VaultBridge {
     // Security
     external fun verifyPassword(vaultId: String, password: String)
     external fun changeMasterPassword(vaultId: String, oldPassword: String, newPassword: String)
+    external fun resetMasterPasswordWithRecoveryKey(vaultId: String, recoveryKey: String, newPassword: String)
     external fun rotateDek(vaultId: String, password: String): String
     external fun regenerateRecoveryKey(vaultId: String, password: String): String
 

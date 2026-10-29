@@ -51,7 +51,7 @@ impl UnlockedVault {
         // Verify recovery key
         let recovery_kek = crate::crypto::RecoveryKey::derive_kek_from_input(
             recovery_key,
-            &self.meta.argon2_params,
+            self.meta.recovery_argon2_params(),
         )?;
         let engine = base64::engine::general_purpose::STANDARD;
         let encrypted_dek_bytes = engine
@@ -66,8 +66,9 @@ impl UnlockedVault {
         )?;
         let encrypted_dek_master = self.dek.wrap(&new_kek)?;
 
-        // Update vault_meta
-        self.meta.encrypted_dek_master = engine.encode(&encrypted_dek_master);
+        // Update vault_meta（更新時刻を進めないと、同期で古いスロットに負けることがある）
+        let params = self.meta.argon2_params.clone();
+        self.set_master_slot(engine.encode(&encrypted_dek_master), params);
 
         Ok(())
     }
@@ -517,6 +518,65 @@ mod tests {
             .unlock_with_recovery_key(&recovery_key_input(recovery_str))
             .is_ok());
         let _unlocked = locked.unlock(&mp(new_password)).unwrap();
+    }
+
+    #[test]
+    fn test_merge_keeps_password_reset_with_recovery_key() {
+        // リカバリーキーで再設定したパスワードは、古いスロットのままのリモートとマージしても残る
+        let password = mp(PASSWORD);
+        let (locked, recovery_key) = LockedVault::create_new(&password).unwrap();
+        let mut a = locked.unlock(&password).unwrap();
+        a.meta.master_updated_at = 0;
+        a.meta.recovery_updated_at = 0;
+        let mut b = LockedVault {
+            vault_file: v2(&a),
+            etag: None,
+        }
+        .unlock(&password)
+        .unwrap();
+        let b_file = v2(&b);
+
+        a.reset_master_password_with_recovery_key(
+            &recovery_key_input(recovery_key.to_display_string()),
+            &mp("new-password"),
+        )
+        .unwrap();
+        a.merge_remote(&b_file).unwrap();
+        b.merge_remote(&v2(&a)).unwrap();
+
+        for vault in [a, b] {
+            let locked = lock_vault(vault);
+            assert!(locked.clone().unlock(&mp(PASSWORD)).is_err());
+            assert!(locked.unlock(&mp("new-password")).is_ok());
+        }
+    }
+
+    #[test]
+    fn test_reset_master_password_uses_recovery_argon2_params() {
+        // recovery スロットの KDF パラメータが master と異なっていても、リカバリーキーを検証できる
+        use base64::Engine;
+        let mut vault = create_unlocked_vault();
+        let recovery_key = crate::crypto::RecoveryKey::generate();
+        let recovery_params = Argon2Params::default();
+        let kek = recovery_key.derive_kek(&recovery_params).unwrap();
+        let encrypted = vault.dek.wrap(&kek).unwrap();
+        vault.set_recovery_slot(
+            base64::engine::general_purpose::STANDARD.encode(&encrypted),
+            recovery_params,
+        );
+        assert_ne!(
+            vault.meta.recovery_argon2_params().salt,
+            vault.meta.argon2_params.salt
+        );
+
+        vault
+            .reset_master_password_with_recovery_key(
+                &recovery_key_input(recovery_key.to_display_string()),
+                &mp("new-password"),
+            )
+            .unwrap();
+
+        assert!(lock_vault(vault).unlock(&mp("new-password")).is_ok());
     }
 
     #[test]

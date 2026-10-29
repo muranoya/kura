@@ -113,6 +113,34 @@ class AppViewModel(
     }
 
     /**
+     * マスターパスワードを忘れた場合の復旧。リカバリーキーでアンロックしてマスターパスワードを
+     * 再設定し、ローカルに保存する。同期はアンロック後の画面に入ったときの自動同期で行う
+     * （再設定したスロットは更新時刻が新しいので、リモートの古いスロットに負けない）。
+     * 再設定できなかった場合はロックし直して例外を投げる。
+     */
+    suspend fun recoverWithRecoveryKey(recoveryKey: String, newPassword: String) {
+        repository.unlockWithRecoveryKey(recoveryKey)
+        withContext(NonCancellable) {
+            try {
+                repository.resetMasterPasswordWithRecoveryKey(recoveryKey, newPassword)
+                repository.saveLocally()
+            } catch (e: Exception) {
+                // 再設定できていないのにアンロックしたままにすると、次のロックで締め出されたと気付くことになる
+                try {
+                    repository.lock()
+                } catch (_: Exception) {
+                }
+                throw e
+            }
+            // 生体認証・パスコードは古いパスワードを保存しているので無効にする
+            biometricHelper.clearAll()
+            preferences.setBiometricEnabled(false)
+            passcodeHelper.clearAll()
+            preferences.setPasscodeEnabled(false)
+        }
+    }
+
+    /**
      * ログアウト。メモリ上のDEKを破棄し、端末上のvault・S3認証情報・生体認証/パスコードの鍵と
      * データ・設定・オートフィルログをすべて削除する。S3上のvaultには触れない。
      */

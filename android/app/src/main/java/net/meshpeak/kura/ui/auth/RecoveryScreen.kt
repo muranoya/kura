@@ -29,6 +29,8 @@ fun RecoveryScreen(
 ) {
     var recoveryKey by remember { mutableStateOf("") }
     var recoveryKeyVisible by remember { mutableStateOf(false) }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -82,26 +84,51 @@ fun RecoveryScreen(
                 }
             )
 
+            OutlinedTextField(
+                value = newPassword,
+                onValueChange = { newPassword = it; error = "" },
+                label = { Text(stringResource(R.string.recovery_new_password_label)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = SecretKeyboardOptions,
+                visualTransformation = PasswordVisualTransformation()
+            )
+
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = { confirmPassword = it; error = "" },
+                label = { Text(stringResource(R.string.recovery_confirm_password_label)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = SecretKeyboardOptions,
+                visualTransformation = PasswordVisualTransformation()
+            )
+
             Spacer(modifier = Modifier.weight(1f))
 
             Button(
                 onClick = {
-                    if (recoveryKey.isBlank()) { error = context.getString(R.string.recovery_key_required); return@Button }
-                    scope.launch {
-                        isLoading = true
-                        try {
-                            appViewModel.repository.unlockWithRecoveryKey(recoveryKey.trim())
-                            onUnlocked()
-                        } catch (e: Exception) {
-                            error = context.getString(R.string.recovery_unlock_failed, e.message ?: "")
-                        } finally { isLoading = false }
+                    when {
+                        recoveryKey.isBlank() || newPassword.isBlank() || confirmPassword.isBlank() ->
+                            error = context.getString(R.string.recovery_all_required)
+                        newPassword != confirmPassword ->
+                            error = context.getString(R.string.recovery_password_mismatch)
+                        else -> scope.launch {
+                            isLoading = true
+                            try {
+                                appViewModel.recoverWithRecoveryKey(recoveryKey.trim(), newPassword)
+                                onUnlocked()
+                            } catch (e: Exception) {
+                                error = context.getString(R.string.recovery_failed, e.message ?: "")
+                            } finally { isLoading = false }
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isLoading
             ) {
                 if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Text(stringResource(R.string.action_unlock))
+                else Text(stringResource(R.string.recovery_submit))
             }
         }
     }
