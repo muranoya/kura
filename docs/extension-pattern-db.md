@@ -141,6 +141,8 @@ extension/patterns/
 | `cc_cvc` | セキュリティコード |
 | `cc_name` | カード名義 |
 
+`credit_card` フォームと `cc_*` フィールドは、カード欄を username/TOTP 欄と誤認しないための分類にのみ使う。クレジットカードの自動入力は提供しない（[extension-autofill.md](extension-autofill.md) 1-1参照）。
+
 **`forms`の省略：** `forms` を省略または空配列にした場合、フォーム検出はヒューリスティックにフォールバックする。`match` と `strict_subdomain` は `forms` の有無に関わらず評価されるため、フォーム検出はヒューリスティックで十分だがクレデンシャル照合ルールだけ変更したい場合に、`forms` を省略してマッチルールのみを定義できる。
 
 **conditionの評価ロジック：** 指定された全条件をANDで評価する。`url_path`、`element_exists`、`element_not_exists` のいずれも省略可能で、省略された条件は常に真として扱う。全て省略した場合（`condition` 自体の省略を含む）はmatchさえすれば常に適用される。

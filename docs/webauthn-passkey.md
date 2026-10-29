@@ -139,7 +139,7 @@ attestationObject（`{fmt: "none", attStmt: {}, authData: <bytes>}`）とauthent
 
 **責務分割:**
 
-- **TypeScript（Service Worker）**: `clientDataJSON`の組み立てのみ（`{type, challenge, origin, crossOrigin}`）。Service Worker自体はDOMを持たないため、`origin`はISOLATED world（`webauthn-bridge.ts`）が自身の`window.location.origin`から読み取り、メッセージ経由でService Workerに渡した値を使う。
+- **TypeScript（Service Worker）**: `clientDataJSON`の組み立てのみ（`{type, challenge, origin, crossOrigin}`）。`origin`はメッセージの送信元（ブラウザが付与する`sender.origin`、Firefoxでは`sender.url`のorigin）から導出する。
 - **Rust（vault-core）**: `clientDataJSON`のSHA-256ハッシュ計算、authenticatorData/attestationObjectのCBOR構築、COSE_Key構築、ECDSA署名。対象`login`エントリの`custom_fields`への読み書きはが担当し、暗号処理本体とは責務を分離した。
 
 ## 3-5. ドメイン検証
@@ -148,8 +148,8 @@ attestationObject（`{fmt: "none", attStmt: {}, authData: <bytes>}`）とauthent
 
 **検証の多段防御:**
 
-1. ISOLATED world content script（`webauthn-bridge.ts`）が、自身の（ページに汚染されていない）`window.location`から独立してorigin/hostnameを読み取る。MAIN world側から転送された値は信用の起点にしない。
-2. Service Workerが、ISOLATED由来のoriginと、ページが要求した`rp.id`を突き合わせ、`etld.ts`のsuffix判定ロジックで検証してから初めてvault-core問い合わせ・UI表示に進む。不一致は即座にreject。
+1. Service Workerが、メッセージの送信元からorigin/hostnameを導出する（Chromeは`sender.origin`、Firefoxは`sender.url`のorigin）。ブラウザが付与する値なので、MAIN world・ISOLATED worldはもちろん、侵害されたレンダラーでも偽装できない。メッセージ本文にorigin/hostnameは含めない。opaque origin（sandbox属性付きiframe等で`sender.origin`が`"null"`）からの要求は拒否する。secure contextでないorigin（https以外。ただし`localhost`等のループバックは許可）からの要求も`SecurityError`で拒否する。ネイティブのWebAuthnはsecure contextでしか使えず、http:ページには`navigator.credentials`自体が存在しないが、ページはbridgeへ直接postMessageできるため、`webauthn-bridge.ts`でも`window.isSecureContext`を確認して拒否する。
+2. Service Workerが、送信元由来のoriginと、ページが要求した`rp.id`を突き合わせ、`etld.ts`のsuffix判定ロジックで検証してから初めてvault-core問い合わせ・UI表示に進む。不一致は即座にreject。
 
 ## 3-6. メッセージフロー
 
@@ -165,10 +165,10 @@ Webページ (page realm)
   │ postMessage({ source: 'kura-webauthn-main', requestId, kind: 'get', ... }, origin)
   ▼
 [ISOLATED world] webauthn-bridge.ts
-  │ 自前のwindow.locationからorigin/hostnameを独立取得
-  │ chrome.runtime.sendMessage({ type: 'WEBAUTHN_GET_REQUEST', ..., origin, hostname })
+  │ chrome.runtime.sendMessage({ type: 'WEBAUTHN_GET_REQUEST', ... })（origin/hostnameは送らない）
   ▼
 Service Worker background/webauthn.ts
+  │ sender（sender.origin / sender.url）からorigin/hostnameを導出
   │ 設定トグルOFF・vaultApi未初期化ならpassthrough
   │ etld.ts (isValidRpId) でrp.id vs origin のsuffix検証 → 不一致ならreject
   │
@@ -188,7 +188,7 @@ Service Worker background/webauthn.ts
         │ アンロック成功後、候補0件ならウィンドウ内に理由を表示した上でpassthrough、
         │ 候補1件以上ならそのまま儀式ウィンドウ（kind=get）へ進む
         ▼
-ポップアップウィンドウ（chrome.windows.create、webauthn.html?kind=get&requestId=...）
+ポップアップウィンドウ（chrome.windows.create、webauthn.html?kind=get&requestId=<Service Workerが生成した儀式ID>）
   │ WEBAUTHN_RITUAL_GET_CONTEXTで候補一覧を取得し表示
   │ ユーザーがカードを選択（カードは「loginエントリ名 + user表示名」で表示）
   │ WEBAUTHN_RITUAL_DECISIONでcredentialIdを送信、儀式ウィンドウclose
@@ -204,13 +204,15 @@ status: 'ok', { credentialId, authenticatorData, signature, userHandle, clientDa
 Webページ側のget()呼び出しがresolveされる
 ```
 
+**儀式IDとウィンドウの紐付け：** 儀式ウィンドウのURLに載せる`requestId`は、ページ（MAIN world）が発行したIDではなく、Service Workerが`crypto.randomUUID()`で生成した儀式IDである。ページのIDは、ページへの応答を対応付けるためにMAIN world/ISOLATED world内でのみ使う。`WEBAUTHN_RITUAL_GET_CONTEXT`/`WEBAUTHN_RITUAL_DECISION`は、送信元が拡張機能の`webauthn.html`であり、かつ`sender.tab.windowId`がその儀式のために開いたウィンドウと一致する場合のみ受け付ける。これにより、ページがIDを使い回して同時実行数の上限をすり抜けたり、別ページ（Content Script）が儀式の決定を送ってユーザー操作なしに署名させたりすることを防ぐ。同時に開ける儀式ウィンドウは全体で3件、同じタブからは1件までとする。
+
 ポップアップウィンドウとService Workerの間は、「専用port維持」ではなく、ポップアップウィンドウ自身が`chrome.runtime.sendMessage`でService Workerに問い合わせる方式にした。Service Workerがポップアップウィンドウとの通信・ページからのリクエストへの応答を両方抱えている間は生きたままになるため、追加のport維持は行っていない。ウィンドウが閉じられた場合は`chrome.windows.onRemoved`で検知しcancelled扱いにする。
 
 ### `navigator.credentials.create()`（登録）
 
 基本構造は同じだが、以下が異なる:
 
-- Service Workerは`excludeCredentials`と既存`credential_id`の一致をUIを開く**前**にチェックし、一致すれば即座に（UIを一切開かず）`InvalidStateError`でreject。**ただし、これはリクエスト受信時点でvaultがアンロック済みの場合に限る**（後述）。
+- Service Workerは`excludeCredentials`と既存`credential_id`の一致をチェックし、一致した場合は儀式ウィンドウに「既に登録済み」のエラー画面（`{kind:'error', reason:'already_registered'}`）を表示し、ユーザーが閉じてから`InvalidStateError`でrejectする（ネイティブ認証器も同意を得てからエラーを返す）。即座に無言でrejectすると、ページが`excludeCredentials`に候補IDを並べて「このユーザーがどのクレデンシャルを持っているか」を無言で照合でき、また一致なし（ウィンドウが開く）との区別もついてしまうため。vaultがロック中の場合は後述のとおりアンロック後に同じエラー画面へ遷移する。
 - ポップアップウィンドウ（`kind=create`）は、`api_list_login_candidates`（オートフィルと同じeTLD+1マッチング）で見つかった既存`login`エントリの一覧 + 「新しいアイテムを作成」を選択肢として表示し、ユーザーが紐付け先を選ぶ。
 
 ### vaultがロック中に`create()`/`get()`が呼ばれた場合
@@ -244,9 +246,10 @@ Webページ側のget()呼び出しがresolveされる
 
 1. **秘密鍵はFFI境界を一切越えない**。越境するのはattestationObject/signatureという公開して構わない署名結果のみ。
 2. **rp_id/origin検証の多段防御**。ページやMAIN world側が主張する値を最終判断には使わない。
-3. **既存クレデンシャルの存在有無を推測させるサイドチャネルの防止**: **vaultがアンロック済みの状態でリクエストを受けた場合**、`get()`で候補0件、または`create()`で`excludeCredentials`が一致した場合は、儀式ウィンドウを一切開かない（開いて即閉じることも含む）。ウィンドウの生成・フォーカス移動はページ側から`visibilitychange`/`blur`イベント等で観測されうるため、それ自体が「このユーザーはこのサイトのPasskeyを持っているか」を推測させるサイドチャネルになりうる。UIを見せるかどうかの分岐は、儀式ウィンドウを開く**前**に完全に確定させる。
+3. **既存クレデンシャルの存在有無を推測させるサイドチャネルの防止**: **vaultがアンロック済みの状態でリクエストを受けた場合**、`get()`で候補0件の場合は、儀式ウィンドウを一切開かない（開いて即閉じることも含む）。`create()`で`excludeCredentials`が一致した場合は、逆に一致なしの場合と同じく儀式ウィンドウを開き、エラー画面を経てからrejectする（一致なしでも確認画面が開くため、ウィンドウの有無では区別できない）。さらに、ユーザー操作（transient activation）の確認をMAIN worldだけでなくISOLATED world（`webauthn-bridge.ts`）でも行う。ページはbridgeへ直接postMessageしてMAIN worldの確認を迂回できるため、これがないとクリックなしで`allowCredentials`/`excludeCredentials`による照合をループ実行できてしまう。ウィンドウの生成・フォーカス移動はページ側から`visibilitychange`/`blur`イベント等で観測されうるため、それ自体が「このユーザーはこのサイトのPasskeyを持っているか」を推測させるサイドチャネルになりうる。UIを見せるかどうかの分岐は、儀式ウィンドウを開く**前**に完全に確定させる。
    **vaultがロック中の場合はこの限りではない**:  候補の有無は復号しないと分からないため、`create()`/`get()`いずれも候補の有無に関わらず`{kind:'locked'}`で儀式ウィンドウを先に開き、アンロック後に初めて候補0件/`excludeCredentials`一致が判明した場合は、ウィンドウ内にその旨を表示してから終了する。これにより「vaultが現在ロックされているか」はウィンドウの有無から推測されうる（アンロック済みなら候補0件で無反応、ロック中なら常にウィンドウが開くため）が、「ロック中のvaultがこのサイト用のPasskeyを持っているか」はアンロックしない限り最後まで秘匿される。前者の情報漏洩（ロック状態の推測可否）は許容する——vaultのロック状態自体は既存のオートフィル機能でも同様に外部から観測しうる情報であり、Passkey機能固有の新規リスクではないため。
 4. **エラーメッセージの無害化**: vault-core由来の内部エラー文字列をページJSに直接渡さない。ページに返す拒否理由は必ずWebAuthn仕様が定める汎用的な`DOMException`（`NotAllowedError`等）に正規化する。
 5. **タイムアウト/ウィンドウクローズの必達処理**: 横取りによりブラウザネイティブの`options.publicKey.timeout`強制が働かなくなるため、MAIN world側で独自タイムアウトを実装する。儀式ウィンドウが閉じられた場合・Service Worker再起動でport切断された場合を含め、必ずページのPromiseを解決（`NotAllowedError`相当でreject）させ、ハングしたままにしない。
-6. **常時ユーザー操作を必須にする**。
+6. **常時ユーザー操作を必須にする**。MAIN world（`webauthn-main-injected.js`）とISOLATED world（`webauthn-bridge.ts`）の両方で`navigator.userActivation.isActive`を確認する。
 7. **`isUserVerifyingPlatformAuthenticatorAvailable()`を`true`に上書きする判断とトレードオフ**: 上書きしないと、プラットフォーム認証器を持たない環境（Linuxデスクトップ等）で多くのサイトが「Passkeyでサインイン」ボタン自体を出さず、kuraのPasskey機能が実質使えなくなる。したがって`true`固定を推奨するが、これは「kuraが常にPasskey対応を主張する」ことを意味し、実際にはvaultがロック中・該当Passkeyを持っていない場合は上記3項のパススルー/静音拒否と組み合わせて初めて安全に成立する。
+8. **UV（User Verified）フラグは実際にユーザー検証した場合のみ立てる**: authenticatorDataのフラグは、UP（User Present）は常に立てるが、UVは儀式の最中にマスターパスワードが入力された場合のみ立てる（vault-coreの`create_credential`/`get_assertion`の`user_verified`引数）。具体的には、(a) ロック中に開始した儀式でアンロックした場合、(b) RPが`userVerification: "required"`を指定し、確認画面でマスターパスワードを再入力した場合（Service Workerが`api_verify_password`で検証し、誤りなら儀式を継続して再入力させる）。アンロック済みのvaultでクリックしただけの場合はUVを立てない。常にUVを立てると、`userVerification: "required"`で本人確認を期待するRPに対し、離席中の端末でクリックしただけの第三者が認証できてしまうため。MAIN worldは`publicKey.userVerification`（get）/`authenticatorSelection.userVerification`（create）を転送する。Android版（`android/rust-jni`）は従来どおり常にUVを立てる（未対応）。

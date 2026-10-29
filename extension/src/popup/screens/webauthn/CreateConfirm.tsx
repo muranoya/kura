@@ -3,20 +3,47 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { WebauthnRitualContext } from '../../../shared/webauthn-messages'
 import { Button } from '../../components/ui/button'
+import UserVerificationField from './UserVerificationField'
 
 interface CreateConfirmProps {
   context: Extract<WebauthnRitualContext, { kind: 'create' }>
-  onConfirm: (entryId: string | undefined) => void
+  /** masterPassword is set when context.requireUserVerification */
+  onConfirm: (entryId: string | undefined, masterPassword?: string) => void
   onCancel: () => void
+  /** Error from the previous confirmation attempt (e.g. wrong master password) */
+  error: string | null
+  busy: boolean
 }
 
 const NEW_ENTRY_OPTION = '__new__'
 
-export default function CreateConfirm({ context, onConfirm, onCancel }: CreateConfirmProps) {
+export default function CreateConfirm({
+  context,
+  onConfirm,
+  onCancel,
+  error,
+  busy,
+}: CreateConfirmProps) {
   const { t } = useTranslation()
   const [selected, setSelected] = useState<string>(
     context.matchingEntries.length > 0 ? context.matchingEntries[0].id : NEW_ENTRY_OPTION,
   )
+  const [password, setPassword] = useState('')
+  const [localError, setLocalError] = useState<string | null>(null)
+
+  const confirm = () => {
+    const entryId = selected === NEW_ENTRY_OPTION ? undefined : selected
+    if (!context.requireUserVerification) {
+      onConfirm(entryId)
+      return
+    }
+    if (!password) {
+      setLocalError(t('settings.security.passwordRequired'))
+      return
+    }
+    setLocalError(null)
+    onConfirm(entryId, password)
+  }
 
   return (
     <div className="min-h-screen bg-bg-base flex flex-col p-4 gap-3">
@@ -75,15 +102,23 @@ export default function CreateConfirm({ context, onConfirm, onCancel }: CreateCo
         </label>
       </div>
 
+      {context.requireUserVerification && (
+        <UserVerificationField
+          password={password}
+          onChange={(value) => {
+            setPassword(value)
+            setLocalError(null)
+          }}
+          error={localError ?? error}
+          disabled={busy}
+        />
+      )}
+
       <div className="flex gap-2">
         <Button variant="secondary" size="sm" className="flex-1" onClick={onCancel}>
           {t('common.cancel')}
         </Button>
-        <Button
-          size="sm"
-          className="flex-1"
-          onClick={() => onConfirm(selected === NEW_ENTRY_OPTION ? undefined : selected)}
-        >
+        <Button size="sm" className="flex-1" onClick={confirm} disabled={busy}>
           {t('webauthn.ritual.confirm')}
         </Button>
       </div>

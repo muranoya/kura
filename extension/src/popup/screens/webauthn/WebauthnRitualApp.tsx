@@ -20,11 +20,28 @@ function sendDecision(decision: WebauthnRitualDecision) {
   })
 }
 
+/** Send a confirming decision and wait: the SW rejects it if the re-entered password is wrong. */
+function confirmDecision(
+  decision: WebauthnRitualDecision,
+): Promise<{ success: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(decision, (response?: { success: boolean; error?: string }) => {
+      if (chrome.runtime.lastError || !response) {
+        resolve({ success: false, error: chrome.runtime.lastError?.message })
+        return
+      }
+      resolve(response)
+    })
+  })
+}
+
 export default function WebauthnRitualApp() {
   const { t } = useTranslation()
   const [requestId] = useState(getRequestId)
   const [context, setContext] = useState<WebauthnRitualContext | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [confirmError, setConfirmError] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
 
   const fetchContext = useCallback(() => {
     if (!requestId) {
@@ -57,6 +74,28 @@ export default function WebauthnRitualApp() {
     chrome.runtime.onMessage.addListener(listener)
     return () => chrome.runtime.onMessage.removeListener(listener)
   }, [requestId, fetchContext])
+
+  const confirm = async (fields: Partial<WebauthnRitualDecision>) => {
+    if (!requestId) return
+    setConfirming(true)
+    setConfirmError(null)
+    const response = await confirmDecision({
+      type: 'WEBAUTHN_RITUAL_DECISION',
+      requestId,
+      cancelled: false,
+      ...fields,
+    })
+    setConfirming(false)
+    if (response.success) {
+      window.close()
+      return
+    }
+    setConfirmError(
+      response.error === 'invalid_password'
+        ? t('webauthn.ritual.invalidPassword')
+        : response.error || t('webauthn.ritual.errorInternal'),
+    )
+  }
 
   const cancel = () => {
     if (!requestId) return
@@ -109,16 +148,10 @@ export default function WebauthnRitualApp() {
     return (
       <SelectCredential
         context={context}
-        onConfirm={(credentialId) => {
-          sendDecision({
-            type: 'WEBAUTHN_RITUAL_DECISION',
-            requestId,
-            cancelled: false,
-            credentialId,
-          })
-          window.close()
-        }}
+        onConfirm={(credentialId, masterPassword) => confirm({ credentialId, masterPassword })}
         onCancel={cancel}
+        error={confirmError}
+        busy={confirming}
       />
     )
   }
@@ -126,11 +159,10 @@ export default function WebauthnRitualApp() {
   return (
     <CreateConfirm
       context={context}
-      onConfirm={(entryId) => {
-        sendDecision({ type: 'WEBAUTHN_RITUAL_DECISION', requestId, cancelled: false, entryId })
-        window.close()
-      }}
+      onConfirm={(entryId, masterPassword) => confirm({ entryId, masterPassword })}
       onCancel={cancel}
+      error={confirmError}
+      busy={confirming}
     />
   )
 }

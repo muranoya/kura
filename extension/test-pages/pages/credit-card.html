@@ -24,14 +24,14 @@
 <body>
   <nav><a href="/">&larr; Test Pages Index</a></nav>
   <h1>Credit Card Form</h1>
-  <p>Should be detected as <code>CREDIT_CARD</code>. All 4 fields should be filled (with 30ms delay).</p>
+  <p>Should be detected as <code>CREDIT_CARD</code>, but credit card autofill is intentionally unsupported: no dropdown should appear.</p>
 
   <details class="expected" open>
     <summary>Expected Behavior</summary>
     <ul>
       <li>Form type: <code>CREDIT_CARD</code></li>
-      <li>Focus any credit card field → dropdown appears with credit card entries</li>
-      <li>Select entry → all 4 fields filled: cc-name, cc-number, cc-exp, cc-csc (30ms delay between fields)</li>
+      <li>Focus any credit card field → no dropdown and no inline icon appear (even if credit card entries exist in the vault)</li>
+      <li>Card fields are not mistaken for username / TOTP fields</li>
     </ul>
   </details>
 

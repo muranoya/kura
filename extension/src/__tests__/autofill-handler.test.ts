@@ -22,7 +22,6 @@ interface MockEntry {
     value: string
     autofill_selector?: { tag?: string; name?: string; id?: string; type?: string } | null
   }>
-  subtitle?: string | null
 }
 
 function createMockVaultApi(entries: MockEntry[]): VaultApi {
@@ -64,23 +63,6 @@ function createMockVaultApi(entries: MockEntry[]): VaultApi {
       if (!entry) throw new Error('Entry not found')
       return JSON.stringify(entry)
     }),
-    api_list_entries: vi.fn(
-      (
-        _vaultId: string,
-        _searchQuery: string | null,
-        type: string | null,
-        _labelId: string | null,
-        _includeTrash: boolean,
-        _onlyFavorites: boolean,
-        _sortField: string | null,
-        _sortOrder: string | null,
-      ) => {
-        const filtered = entries
-          .filter((e) => !type || e.entry_type === type)
-          .map((e) => ({ id: e.id, name: e.name, subtitle: e.subtitle ?? null }))
-        return JSON.stringify(filtered)
-      },
-    ),
     api_get_totp_code: vi.fn((_vaultId: string, id: string) => {
       const entry = entries.find((e) => e.id === id)
       const hasTotp = entry?.custom_fields?.some((f) => f.field_type === 'totp')
@@ -107,9 +89,26 @@ function createMockVaultApi(entries: MockEntry[]): VaultApi {
   }
 }
 
+/**
+ * For brevity, tests write the page URL as `message.url`. The handler never
+ * reads the URL from the payload; it is moved to `sender.url`, which is where
+ * the browser puts the URL of the frame that sent the message.
+ */
 function callHandler(
   message: Record<string, unknown>,
   sender: chrome.runtime.MessageSender = {},
+): Promise<unknown> {
+  const { url, ...payload } = message
+  const effectiveSender = typeof url === 'string' ? { ...sender, url } : sender
+  return new Promise((resolve) => {
+    handleAutofillMessage(payload, effectiveSender, resolve)
+  })
+}
+
+/** Send a message with an explicit payload and sender, without any rewriting. */
+function callHandlerRaw(
+  message: Record<string, unknown>,
+  sender: chrome.runtime.MessageSender,
 ): Promise<unknown> {
   return new Promise((resolve) => {
     handleAutofillMessage(message, sender, resolve)
@@ -171,7 +170,6 @@ describe('handleAutofillMessage', () => {
         cvv: '123',
         cardholder: 'John Doe',
       },
-      subtitle: '•••• 1111',
     },
   ]
 
@@ -223,6 +221,16 @@ describe('handleAutofillMessage', () => {
       expect(ids).not.toContain('entry-3')
       // entry-cc (credit_card) should NOT appear
       expect(ids).not.toContain('entry-cc')
+    })
+
+    it('uses the sender URL, not a URL claimed in the payload', async () => {
+      const result = (await callHandlerRaw(
+        { type: 'AUTOFILL_GET_CREDENTIALS', url: 'https://example.com' },
+        { url: 'https://other.com/login', tab: { id: 1 } as chrome.tabs.Tab },
+      )) as { success: boolean; credentials: Array<{ entryId: string }> }
+
+      expect(result.success).toBe(true)
+      expect(result.credentials.map((c) => c.entryId)).toEqual(['entry-3'])
     })
 
     it('returns empty array when no entries match', async () => {
@@ -326,6 +334,7 @@ describe('handleAutofillMessage', () => {
       unlocked = false
       const result = await callHandler({
         type: 'AUTOFILL_FILL_REQUEST',
+        url: 'https://example.com',
         entryId: 'entry-1',
       })
       expect(result).toEqual({ success: false, error: 'Vault not unlocked' })
@@ -339,6 +348,7 @@ describe('handleAutofillMessage', () => {
     it('returns fill data for login entry', async () => {
       const result = (await callHandler({
         type: 'AUTOFILL_FILL_REQUEST',
+        url: 'https://example.com',
         entryId: 'entry-1',
       })) as { success: boolean; fillData: Record<string, unknown> }
 
@@ -347,22 +357,19 @@ describe('handleAutofillMessage', () => {
       expect(result.fillData.password).toBe('secret123')
     })
 
-    it('returns fill data for credit card entry', async () => {
-      const result = (await callHandler({
+    it('does not return fill data for credit card entry', async () => {
+      const result = await callHandler({
         type: 'AUTOFILL_FILL_REQUEST',
+        url: 'https://example.com',
         entryId: 'entry-cc',
-      })) as { success: boolean; fillData: Record<string, unknown> }
-
-      expect(result.success).toBe(true)
-      expect(result.fillData.ccNumber).toBe('4111111111111111')
-      expect(result.fillData.ccExp).toBe('12/28')
-      expect(result.fillData.ccCvc).toBe('123')
-      expect(result.fillData.ccName).toBe('John Doe')
+      })
+      expect(result).toEqual({ success: false, error: 'Entry not found' })
     })
 
     it('returns error for non-existent entry', async () => {
       const result = await callHandler({
         type: 'AUTOFILL_FILL_REQUEST',
+        url: 'https://example.com',
         entryId: 'non-existent',
       })
       expect(result).toEqual({ success: false, error: 'Entry not found' })
@@ -374,6 +381,7 @@ describe('handleAutofillMessage', () => {
           id: 'with-selector',
           name: 'AWS Login',
           entry_type: 'login',
+          url: 'https://example.com',
           typed_value: { username: 'user', password: 'pass' },
           custom_fields: [
             {
@@ -396,6 +404,7 @@ describe('handleAutofillMessage', () => {
 
       const result = (await callHandler({
         type: 'AUTOFILL_FILL_REQUEST',
+        url: 'https://example.com',
         entryId: 'with-selector',
       })) as { success: boolean; fillData: { customFields?: Array<Record<string, unknown>> } }
 
@@ -414,6 +423,7 @@ describe('handleAutofillMessage', () => {
           id: 'no-selector',
           name: 'Plain Login',
           entry_type: 'login',
+          url: 'https://example.com',
           typed_value: { username: 'user', password: 'pass' },
           custom_fields: [{ id: 'cf1', field_type: 'text', value: 'note' }],
         },
@@ -427,11 +437,30 @@ describe('handleAutofillMessage', () => {
 
       const result = (await callHandler({
         type: 'AUTOFILL_FILL_REQUEST',
+        url: 'https://example.com',
         entryId: 'no-selector',
       })) as { success: boolean; fillData: { customFields?: unknown } }
 
       expect(result.success).toBe(true)
       expect(result.fillData.customFields).toBeUndefined()
+    })
+
+    it('rejects entries that are not candidates for the sender page', async () => {
+      // entry-3 belongs to other.com; a page on example.com must not receive it
+      const result = await callHandler({
+        type: 'AUTOFILL_FILL_REQUEST',
+        url: 'https://example.com',
+        entryId: 'entry-3',
+      })
+      expect(result).toEqual({ success: false, error: 'Entry not found' })
+    })
+
+    it('ignores a page URL claimed in the payload', async () => {
+      const result = await callHandlerRaw(
+        { type: 'AUTOFILL_FILL_REQUEST', url: 'https://other.com', entryId: 'entry-3' },
+        { url: 'https://evil.example/login', tab: { id: 1 } as chrome.tabs.Tab },
+      )
+      expect(result).toEqual({ success: false, error: 'Entry not found' })
     })
 
     it('handles typed_value as JSON string (double-parse)', async () => {
@@ -440,6 +469,7 @@ describe('handleAutofillMessage', () => {
           id: 'json-string',
           name: 'JSON String Entry',
           entry_type: 'login',
+          url: 'https://example.com',
           typed_value: '{"username":"jsonuser","password":"jsonpwd"}' as unknown as Record<
             string,
             unknown
@@ -455,6 +485,7 @@ describe('handleAutofillMessage', () => {
 
       const result = (await callHandler({
         type: 'AUTOFILL_FILL_REQUEST',
+        url: 'https://example.com',
         entryId: 'json-string',
       })) as { success: boolean; fillData: Record<string, unknown> }
 
@@ -486,6 +517,17 @@ describe('handleAutofillMessage', () => {
 
       expect(result.success).toBe(true)
       expect(result.totpCode).toBe('123456')
+    })
+
+    it('returns null for an entry of another site', async () => {
+      const result = (await callHandler({
+        type: 'AUTOFILL_GET_TOTP',
+        url: 'https://other.com',
+        entryId: 'entry-totp',
+      })) as { success: boolean; totpCode: string | null }
+
+      expect(result.success).toBe(true)
+      expect(result.totpCode).toBeNull()
     })
 
     it('returns null when entry has no TOTP field', async () => {
@@ -549,34 +591,13 @@ describe('handleAutofillMessage', () => {
     })
   })
 
-  // ========== AUTOFILL_GET_CREDIT_CARDS ==========
-
-  describe('AUTOFILL_GET_CREDIT_CARDS', () => {
-    it('returns error when vault is locked', async () => {
-      unlocked = false
-      const result = await callHandler({ type: 'AUTOFILL_GET_CREDIT_CARDS' })
-      expect(result).toEqual({ success: false, error: 'Vault not unlocked' })
-    })
-
-    it('returns credit card entries', async () => {
-      const result = (await callHandler({
-        type: 'AUTOFILL_GET_CREDIT_CARDS',
-      })) as { success: boolean; creditCards: Array<{ entryId: string; name: string }> }
-
-      expect(result.success).toBe(true)
-      expect(result.creditCards).toHaveLength(1)
-      expect(result.creditCards[0].entryId).toBe('entry-cc')
-      expect(result.creditCards[0].name).toBe('My Credit Card')
-    })
-  })
-
   // ========== Pending flow (split login) ==========
 
   describe('pending flow', () => {
-    const sender = (tabId: number): chrome.runtime.MessageSender =>
-      ({ tab: { id: tabId } }) as chrome.runtime.MessageSender
+    const sender = (tabId: number, frameId = 0): chrome.runtime.MessageSender =>
+      ({ tab: { id: tabId }, frameId }) as chrome.runtime.MessageSender
 
-    it('stores and queries pending flow', async () => {
+    it('stores and queries pending flow without exposing the password', async () => {
       // Store
       const storeResult = await callHandler(
         {
@@ -589,23 +610,70 @@ describe('handleAutofillMessage', () => {
       )
       expect(storeResult).toEqual({ success: true })
 
-      // Query
+      // Query from the next page of the same origin
       const queryResult = (await callHandler(
         {
           type: 'AUTOFILL_PENDING_FLOW_QUERY',
-          url: 'https://www.example.com/password',
+          url: 'https://login.example.com/password',
         },
         sender(100),
-      )) as {
-        success: boolean
-        pendingFlow: { entryId: string; username: string; password: string }
-      }
+      )) as { success: boolean; pendingFlow: Record<string, unknown> }
 
-      expect(queryResult.success).toBe(true)
-      expect(queryResult.pendingFlow).not.toBeNull()
-      expect(queryResult.pendingFlow.entryId).toBe('entry-1')
-      expect(queryResult.pendingFlow.username).toBe('user@example.com')
-      expect(queryResult.pendingFlow.password).toBe('secret123')
+      expect(queryResult).toEqual({
+        success: true,
+        pendingFlow: { entryId: 'entry-1', username: 'user@example.com' },
+      })
+    })
+
+    it('returns null for another origin of the same site', async () => {
+      await callHandler(
+        {
+          type: 'AUTOFILL_PENDING_FLOW_STORE',
+          url: 'https://login.example.com/username',
+          entryId: 'entry-1',
+          username: 'user@example.com',
+        },
+        sender(110),
+      )
+
+      const result = (await callHandler(
+        { type: 'AUTOFILL_PENDING_FLOW_QUERY', url: 'https://user-content.example.com/' },
+        sender(110),
+      )) as { success: boolean; pendingFlow: null }
+
+      expect(result).toEqual({ success: true, pendingFlow: null })
+    })
+
+    it('returns null for another frame in the same tab', async () => {
+      await callHandler(
+        {
+          type: 'AUTOFILL_PENDING_FLOW_STORE',
+          url: 'https://example.com/username',
+          entryId: 'entry-1',
+          username: 'user@example.com',
+        },
+        sender(120, 0),
+      )
+
+      const result = (await callHandler(
+        { type: 'AUTOFILL_PENDING_FLOW_QUERY', url: 'https://example.com/password' },
+        sender(120, 3),
+      )) as { success: boolean; pendingFlow: null }
+
+      expect(result).toEqual({ success: true, pendingFlow: null })
+    })
+
+    it('refuses to store an entry that is not a candidate for the page', async () => {
+      const result = await callHandler(
+        {
+          type: 'AUTOFILL_PENDING_FLOW_STORE',
+          url: 'https://example.com/username',
+          entryId: 'entry-3', // other.com
+          username: 'other@other.com',
+        },
+        sender(130),
+      )
+      expect(result).toEqual({ success: false, error: 'Entry not found' })
     })
 
     it('pending flow is non-destructive (available for TOTP step after password step)', async () => {

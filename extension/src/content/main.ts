@@ -9,8 +9,8 @@ import { fillField, fillFields } from './filler'
 import { type DetectedForm, detectForm, isVisible } from './form-detector'
 import {
   getCredentials,
+  type PendingFlowResult,
   queryPendingFlow,
-  requestCreditCards,
   requestFillData,
   requestOpenSidebar,
   requestTotp,
@@ -109,6 +109,8 @@ function onVaultMessage(
 let focusDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 function onFocus(e: Event) {
+  // Ignore synthetic focus events dispatched by page scripts (and by our own filler)
+  if (!e.isTrusted) return
   if (isCaptureActive() || isTotpQrScanActive() || isPickerActive()) return
 
   // Use composedPath to get the actual target across shadow DOM boundaries
@@ -169,25 +171,15 @@ async function handleInputFocus(input: HTMLInputElement) {
     return
   }
 
-  const url = window.location.href
+  // Split login: the entry picked on the username step is suggested first
+  // (and preselected) on the password / TOTP step. It is still only filled
+  // after the user confirms it — never automatically on focus.
+  const pending =
+    form.formType === 'TOTP' || form.formType === 'LOGIN_PASSWORD' ? await queryPendingFlow() : null
 
-  // === TOTP: dropdown selection (or auto-fill if pending flow exists) ===
+  // === TOTP: dropdown selection ===
   if (form.formType === 'TOTP') {
-    // Check pending flow first (split login: use the same entry selected in username step)
-    const pending = await queryPendingFlow(url)
-    if (pending) {
-      const totpResult = await requestTotp(url, pending.entryId)
-      if (totpResult) {
-        const totpField = form.fields.find((f) => f.type === 'totp')
-        if (totpField && isVisible(totpField.element)) {
-          fillField(totpField.element, totpResult.totpCode)
-        }
-      }
-      return
-    }
-
-    // No pending flow — show dropdown for candidate selection
-    const candidates = await requestTotpCandidates(url)
+    const candidates = prioritizePending(await requestTotpCandidates(), pending)
     if (candidates.length === 0) {
       hideDropdown()
       return
@@ -199,7 +191,7 @@ async function handleInputFocus(input: HTMLInputElement) {
         candidates,
         async (candidate) => {
           hideDropdown()
-          const totpResult = await requestTotp(url, candidate.entryId)
+          const totpResult = await requestTotp(candidate.entryId)
           if (totpResult) {
             const totpField = form.fields.find((f) => f.type === 'totp')
             if (totpField && isVisible(totpField.element)) {
@@ -208,6 +200,7 @@ async function handleInputFocus(input: HTMLInputElement) {
           }
         },
         window.location.protocol,
+        pending !== null && candidates[0]?.entryId === pending.entryId,
       )
     }
     showInlineIcon(input, showTotpDropdown)
@@ -217,47 +210,16 @@ async function handleInputFocus(input: HTMLInputElement) {
     return
   }
 
-  // === Split login: check for pending flow on LOGIN_PASSWORD ===
-  if (form.formType === 'LOGIN_PASSWORD') {
-    const pending = await queryPendingFlow(url)
-    if (pending?.password) {
-      const passwordField = form.fields.find((f) => f.type === 'password')
-      if (passwordField && isVisible(passwordField.element)) {
-        fillField(passwordField.element, pending.password)
-        return
-      }
-    }
-    // Fall through to normal dropdown flow
-  }
-
-  // === Credit card: fetch credit card entries instead of login entries ===
+  // === Credit card: autofill is intentionally not supported ===
+  // Card fields are still classified (so they are never mistaken for
+  // username/TOTP fields), but no candidates are offered for them.
   if (form.formType === 'CREDIT_CARD') {
-    const creditCards = await requestCreditCards()
-
-    if (creditCards.length === 0) {
-      hideDropdown()
-      return
-    }
-
-    const showCreditCardDropdown = () => {
-      showDropdown(
-        input,
-        creditCards,
-        (candidate) => {
-          onCandidateSelected(candidate, form)
-        },
-        window.location.protocol,
-      )
-    }
-    showInlineIcon(input, showCreditCardDropdown)
-    if (!input.value.trim()) {
-      showCreditCardDropdown()
-    }
+    hideDropdown()
     return
   }
 
   // === Login, Registration, Password Change, Login_Username, Login_Password ===
-  const result = await getCredentials(url, strictSubdomain)
+  const result = await getCredentials(strictSubdomain)
 
   if (result.status === 'locked') {
     const showLocked = () => {
@@ -273,7 +235,7 @@ async function handleInputFocus(input: HTMLInputElement) {
     return
   }
 
-  const candidates = result.credentials
+  const candidates = prioritizePending(result.credentials, pending)
 
   if (candidates.length === 0) {
     hideDropdown()
@@ -288,12 +250,28 @@ async function handleInputFocus(input: HTMLInputElement) {
         onCandidateSelected(candidate, form)
       },
       window.location.protocol,
+      pending !== null && candidates[0]?.entryId === pending.entryId,
     )
   }
   showInlineIcon(input, showLoginDropdown)
   if (!input.value.trim()) {
     showLoginDropdown()
   }
+}
+
+/**
+ * Move the split-login pending entry to the front of the candidate list.
+ * Returns the list unchanged when there is no pending flow or the pending
+ * entry is not among the candidates.
+ */
+function prioritizePending(
+  candidates: AutofillCredentialCandidate[],
+  pending: PendingFlowResult | null,
+): AutofillCredentialCandidate[] {
+  if (!pending) return candidates
+  const index = candidates.findIndex((c) => c.entryId === pending.entryId)
+  if (index <= 0) return candidates
+  return [candidates[index], ...candidates.slice(0, index), ...candidates.slice(index + 1)]
 }
 
 /**
@@ -335,7 +313,7 @@ async function onCandidateSelected(candidate: AutofillCredentialCandidate, form:
   if (form.formType === 'LOGIN_USERNAME') {
     if (usernameField && fillData.username && isVisible(usernameField.element)) {
       fillField(usernameField.element, fillData.username)
-      await storePendingFlow(candidate.entryId, fillData.username, window.location.href)
+      await storePendingFlow(candidate.entryId, fillData.username)
     }
     // Account ID欄のようなカスタムフィールドがusername欄と同一画面上にあるケースを
     // 想定し、このタイミングでも充填する（3-4節3.）
@@ -354,38 +332,6 @@ async function onCandidateSelected(candidate: AutofillCredentialCandidate, form:
     const customFills = collectCustomFieldFills(fillData, form.container)
     if (customFills.length > 0) {
       await fillFields(customFills)
-    }
-    return
-  }
-
-  // For CREDIT_CARD forms, fill all credit card fields
-  if (form.formType === 'CREDIT_CARD') {
-    const ccFields: Array<{ element: HTMLInputElement; value: string }> = []
-
-    const ccNumber = form.fields.find((f) => f.type === 'cc_number')
-    if (ccNumber && fillData.ccNumber && isVisible(ccNumber.element)) {
-      ccFields.push({ element: ccNumber.element, value: fillData.ccNumber })
-    }
-
-    const ccExp = form.fields.find((f) => f.type === 'cc_exp')
-    if (ccExp && fillData.ccExp && isVisible(ccExp.element)) {
-      ccFields.push({ element: ccExp.element, value: fillData.ccExp })
-    }
-
-    const ccCvc = form.fields.find((f) => f.type === 'cc_cvc')
-    if (ccCvc && fillData.ccCvc && isVisible(ccCvc.element)) {
-      ccFields.push({ element: ccCvc.element, value: fillData.ccCvc })
-    }
-
-    const ccName = form.fields.find((f) => f.type === 'cc_name')
-    if (ccName && fillData.ccName && isVisible(ccName.element)) {
-      ccFields.push({ element: ccName.element, value: fillData.ccName })
-    }
-
-    ccFields.push(...collectCustomFieldFills(fillData, form.container))
-
-    if (ccFields.length > 0) {
-      await fillFields(ccFields)
     }
     return
   }

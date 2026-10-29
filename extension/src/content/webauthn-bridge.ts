@@ -1,9 +1,7 @@
 // ISOLATED world relay between src/main-world/webauthn-main-injected.js (MAIN world)
-// and the Service Worker. Runs in a separate JS realm from the page, so
-// `window.location` here is the browser's real, unmodifiable Location object
-// — this is the only origin/hostname value the Service Worker's rp_id
-// validation trusts (see docs/webauthn-passkey.md 3-5). Values arriving from
-// MAIN world are never used for that check.
+// and the Service Worker. The requesting origin is not sent: the Service
+// Worker derives it from the message sender (see docs/webauthn-passkey.md 3-5),
+// so values arriving from MAIN world are never used for rp_id validation.
 import { STORAGE_KEYS } from '../shared/constants'
 import { getFromStorage } from '../shared/storage'
 import {
@@ -48,11 +46,39 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 })
 
 async function handleRequest(request: WebauthnMainRequest) {
+  // WebAuthn is only available in secure contexts. navigator.credentials does
+  // not even exist on http: pages, but a page can still post a request to this
+  // bridge directly, so refuse here as well (the Service Worker re-checks).
+  if (!window.isSecureContext) {
+    postToMain({
+      source: KURA_WEBAUTHN_BRIDGE_SOURCE,
+      requestId: request.requestId,
+      status: 'error',
+      errorName: 'SecurityError',
+      errorMessage: 'WebAuthn requires a secure context',
+    })
+    return
+  }
+
+  // The MAIN world script checks for a user gesture too, but a page can post
+  // to this bridge directly and skip it. Without this check, a page could
+  // silently probe which credential ids exist (excludeCredentials /
+  // allowCredentials) in a loop. User activation is per-frame state, so it is
+  // visible from this ISOLATED world as well.
+  if (navigator.userActivation && !navigator.userActivation.isActive) {
+    postToMain({
+      source: KURA_WEBAUTHN_BRIDGE_SOURCE,
+      requestId: request.requestId,
+      status: 'error',
+      errorName: 'NotAllowedError',
+      errorMessage: 'A user gesture is required to use a passkey.',
+    })
+    return
+  }
+
   const swRequest: WebauthnSwRequest = {
     type: request.kind === 'create' ? 'WEBAUTHN_CREATE_REQUEST' : 'WEBAUTHN_GET_REQUEST',
     requestId: request.requestId,
-    origin: window.location.origin,
-    hostname: window.location.hostname,
     challenge: request.challenge,
     rpId: request.rpId,
     rpName: request.rpName,
@@ -61,6 +87,7 @@ async function handleRequest(request: WebauthnMainRequest) {
     userDisplayName: request.userDisplayName,
     excludeCredentialIds: request.excludeCredentialIds,
     allowCredentialIds: request.allowCredentialIds,
+    userVerification: request.userVerification,
   }
 
   let swResponse: WebauthnSwResponse

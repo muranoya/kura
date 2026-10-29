@@ -7,7 +7,7 @@
 
 ## 1-1. 概要
 
-ブラウザ拡張機能において、表示中のウェブページ上のフォーム（ログイン、クレジットカード等）を検出し、vaultに保存されたクレデンシャルの入力候補を表示・自動入力する機能。
+ブラウザ拡張機能において、表示中のウェブページ上のフォーム（ログイン、TOTP等）を検出し、vaultに保存されたクレデンシャルの入力候補を表示・自動入力する機能。
 
 ### 対応範囲
 
@@ -25,6 +25,7 @@
 - 自動サブミット — フォームの送信（submitボタンのクリック等）は行わない。入力までを担い、送信はユーザーの意思で行う操作とする
 - 新規クレデンシャルの自動保存 — フォーム送信を検知して「このパスワードを保存しますか？」と提案する機能は提供しない
 - パスワード変更検知 — パスワード変更フォームの検出・既存エントリの更新提案は行わない
+- クレジットカードの自動入力 — カード情報はサイトに紐付かず、悪性サイトや不可視フィールドから窃取されるリスクが大きいため提供しない。カード欄は`CREDIT_CARD`として分類はする（username/TOTP欄と誤認しないため）が、候補は一切表示しない
 
 ## 1-2. 対応フォームタイプ
 
@@ -34,7 +35,7 @@
 | LOGIN_USERNAME | 分割ログインの1画面目（usernameのみ） | Google, Microsoft, Apple |
 | LOGIN_PASSWORD | 分割ログインの2画面目（passwordのみ） | Google, Microsoft, Apple |
 | TOTP | 6桁コード入力フィールド | 2FA認証画面 |
-| CREDIT_CARD | カード番号/有効期限/CVV | 決済フォーム |
+| CREDIT_CARD | カード番号/有効期限/CVV | 決済フォーム（検出のみ。候補は表示しない） |
 
 ## 1-3. URL/ドメインマッチング
 
@@ -114,15 +115,16 @@ Service Worker
 
 **Content Script → Service Worker（`chrome.runtime.sendMessage` + `sendResponse`コールバック）：**
 
+ページのURLはペイロードに含めない。Service Workerはブラウザが付与する`sender.url`（メッセージを送ったフレームのURL）を使う。ペイロードのURLを信用すると、侵害されたレンダラーが任意のサイトを名乗ってそのサイトのクレデンシャルを取得できてしまうため。
+
 | タイプ | ペイロード | レスポンス | 説明 |
 |--------|----------|----------|------|
-| `AUTOFILL_GET_CREDENTIALS` | `{ url: string, strictSubdomain?: boolean }` | `{ credentials: AutofillCredentialCandidate[] }` | 指定URLに一致するクレデンシャル候補のリストを要求 |
-| `AUTOFILL_FILL_REQUEST` | `{ entryId: string }` | `{ fillData: AutofillFillData }` | 選択されたエントリの完全なクレデンシャルを要求 |
-| `AUTOFILL_GET_TOTP` | `{ url: string, entryId?: string }` | `{ totpCode: string \| null, totpEntryName: string }` | TOTP コードを要求。`entryId`指定時はそのエントリから取得、未指定時はURLマッチで検索 |
-| `AUTOFILL_GET_CREDIT_CARDS` | `{}` | `{ creditCards: AutofillCredentialCandidate[] }` | 全クレジットカードエントリのリストを要求 |
-| `AUTOFILL_PENDING_FLOW_STORE` | `{ url: string, entryId: string, username: string }` | `{ success: boolean }` | 分割ログインフローの状態をService Workerに保存（Section 3-5参照） |
-| `AUTOFILL_PENDING_FLOW_QUERY` | `{ url: string }` | `{ pendingFlow: { entryId, username, password } \| null }` | 分割ログインフローの保存状態を問い合わせ。非破壊（TOTPステップでも再利用可能） |
-| `AUTOFILL_SAVE_CAPTURED` | `{ url: string, name: string \| null, username: string \| null, password: string }` | `{ success: boolean, entryId: string }` | 手動キャプチャしたクレデンシャルを新規エントリとしてvaultに保存（Section 1-6参照） |
+| `AUTOFILL_GET_CREDENTIALS` | `{ strictSubdomain?: boolean }` | `{ credentials: AutofillCredentialCandidate[] }` | 送信元フレームのURLに一致するクレデンシャル候補のリストを要求 |
+| `AUTOFILL_FILL_REQUEST` | `{ entryId: string }` | `{ fillData: AutofillFillData }` | 選択されたエントリの完全なクレデンシャルを要求。`entryId`が送信元フレームのURLの候補に含まれない場合は拒否 |
+| `AUTOFILL_GET_TOTP` | `{ entryId: string }` | `{ totpCode: string \| null }` | 指定エントリのTOTPコードを要求。`entryId`が送信元フレームのURLの候補に含まれない場合は`null` |
+| `AUTOFILL_PENDING_FLOW_STORE` | `{ entryId: string, username: string }` | `{ success: boolean }` | 分割ログインフローの状態をService Workerに保存（Section 3-5参照）。`entryId`が送信元フレームのURLの候補に含まれない場合は拒否 |
+| `AUTOFILL_PENDING_FLOW_QUERY` | `{}` | `{ pendingFlow: { entryId, username } \| null }` | 分割ログインフローの保存状態を問い合わせ。パスワードは返さない。非破壊（TOTPステップでも再利用可能） |
+| `AUTOFILL_SAVE_CAPTURED` | `{ name: string \| null, username: string \| null, password: string }` | `{ success: boolean, entryId: string }` | 手動キャプチャしたクレデンシャルを新規エントリとしてvaultに保存（Section 1-6参照） |
 | `AUTOFILL_OPEN_SIDEBAR` | `{}` | `{ success: boolean }` | サイドバーを開く（ロック状態のドロップダウンから使用）。ユーザー操作の文脈を保つため、Service Worker は他の処理より先に同期的に処理する |
 
 **サイドバー → Service Worker（`chrome.runtime.sendMessage`）：**
@@ -158,7 +160,7 @@ Content Scriptはvault全体やDEKにアクセスしない。クレデンシャ�
 Content Script                          Service Worker
   │                                         │
   ├── AUTOFILL_GET_CREDENTIALS ──────────►  │
-  │   { url: "https://example.com" }        │
+  │   (URLはsender.urlから取得)              │
   │                                         ├── URL/ドメインマッチング
   │                                         ├── 一致するエントリを検索
   │  ◄─────── AUTOFILL_CREDENTIALS_LIST ──  │
@@ -171,6 +173,7 @@ Content Script                          Service Worker
   │                                         │
   ├── AUTOFILL_FILL_REQUEST ─────────────►  │
   │   { entryId: "uuid" }                  │
+  │                                         ├── entryIdがsender.urlの候補か検証
   │                                         ├── vault復号
   │  ◄──────── AUTOFILL_FILL_DATA ────────  │
   │   { username, password }                │
@@ -186,9 +189,33 @@ Content ScriptはISOLATED world（ページスクリプトとは分離された�
 - ページスクリプトが`HTMLInputElement.prototype`のsetterを上書きしても、Content Script側のprototypeは常にネイティブの状態が保たれる
 - 悪意ある第三者スクリプト（広告タグ等）がクレデンシャルを横取りすることを防ぐ
 
-### 2-3.3 不可視フォームへの入力防止
+### 2-3.3 候補選択はユーザーの実操作に限定
+
+ドロップダウンのキーボードリスナーはページ側の`<input>`に登録されるため、ページスクリプトは合成`keydown`（ArrowDown→Enter）を送って候補を選択させ、入力された値を読み取れてしまう。これを防ぐため、候補の選択・インラインアイコン・ロック中項目のクリック、キャプチャ/ピッカーのフィールドクリック、フォーカス検知はいずれも`event.isTrusted === true`の場合のみ処理する。
+
+なお`element.focus()`で発火するfocusイベントは`isTrusted === true`になるため、ページはドロップダウンを「表示」させることはできる。入力が行われるのは、ユーザーが実際にキー操作またはクリックで候補を選んだ場合に限られる。
+
+### 2-3.4 ドロップダウンへのクリックジャッキング対策
+
+ドロップダウンのShadow hostはページのDOM内（`document.body`直下）に置かれるため、ページはhostや祖先を透明化したり、`pointer-events: none`の囮要素を上に重ねたりして、ユーザーに意図しない候補をクリックさせうる。これに対し`dropdown.ts`で以下を行う。
+
+- hostを`popover="manual"`にして`showPopover()`でtop layerに置く。表示のたびに出し直して最前面へ移動するため、z-index最大の囮要素やそれ以前に開かれたモーダルより上に描画される
+- hostの属性（`style`等）がページに書き換えられたら、MutationObserverで検知してUIを破棄する
+- 候補・インラインアイコン・ロック中項目の選択（クリック／Enter）は、次をすべて満たす場合のみ受け付ける
+  - 表示から300ms以上経過している（カーソル下にUIを出現させる攻撃の防止）
+  - hostが接続されたままで、host・`body`・`html`の`opacity`が1かつ`filter`に`opacity()`を含まない
+  - IntersectionObserver v2（`trackVisibility`、Chromeのみ）が対象要素を遮蔽・変形されていると報告していない
+
+### 2-3.5 不可視フォームへの入力防止
 
 フィールドへの入力前に対象要素の視認性をチェックし、不可視のフォーム（invisible form攻撃）へのクレデンシャル書き込みを防ぐ。正規サイトのページ内に広告等でinvisible formが埋め込まれている場合の攻撃を無効化する。
+
+### 2-3.6 Service Workerでの送信元検証
+
+Content Scriptは全サイト・全フレームのレンダラープロセス内で動作するため、最も信頼度の低い送信元として扱う（レンダラーが侵害されると、Content Scriptになりすまして任意のメッセージを送れる）。Service Workerの`runtime.onMessage`は、処理の前に`background/sender.ts`の`isMessageAllowed`で送信元を検証する。
+
+- 拡張機能自身のページ（サイドバー、WebAuthn儀式ウィンドウ等）: `sender.url`が`chrome.runtime.getURL('')`で始まるもの。全メッセージを受け付ける。儀式ウィンドウやFirefoxのフォールバックポップアップはタブとして開かれ`sender.tab`を持つため、`sender.tab`の有無では判定しない
+- Content Script: オートフィル・キャプチャ・TOTP QR・ピッカー・WebAuthnリクエスト等、Content Scriptが実際に送る種別のみを許可リストで受け付ける。`LIST_ENTRIES`・`GET_DECRYPTED_S3_CONFIG`・`CREATE_VAULT`・`SAVE_SETTINGS`等は拒否する
 
 # Part 3: 個別設計
 
@@ -222,7 +249,7 @@ username候補 1つ + password 1つ          → LOGIN
 username候補 1つ + password 0            → LOGIN_USERNAME
 password 1つ + username候補 0            → LOGIN_PASSWORD
 短い数値入力 1つ (4-8桁, maxlength制限)   → TOTP
-cc-number + cc-exp + cc-cvc              → CREDIT_CARD
+cc-number + cc-exp + cc-cvc              → CREDIT_CARD（オートフィル対象外）
 ```
 
 ### 3-1.3 フォームレスフィールドへの対応
@@ -299,7 +326,7 @@ SPA遷移後に新しいフォームが出現した場合も、ユーザーが�
 
 **マッチ対象となるURLは エントリの `typed_value.url`（ログインURL）に加え、URL型カスタムフィールド（`field_type == "url"`）の値も含まれる。** これにより、1つのログインエントリに複数のサイトURLを紐付けることができる（例: メインURLとは別に、リカバリ用URLや関連サービスのURLをカスタムフィールドに登録すれば、それらのサイトでも同じエントリが候補に出る）。マッチング処理は`vault-core/src/api/entries.rs`の`api_list_login_candidates`で一元化されている。
 
-**TypeScript版（`extension/src/shared/etld.ts`）は分割ログインフロー（Section 3-5）のpending-flowドメインキー比較にのみ使用し、vaultエントリのマッチングには使用しない。** ビルド時処理は以下の通り:
+**TypeScript版（`extension/src/shared/etld.ts`）はWebAuthnのrp_id検証（`isValidRpId`、[`docs/webauthn-passkey.md`](webauthn-passkey.md) 3-5節）に使用し、vaultエントリのマッチングには使用しない。** ビルド時処理は以下の通り:
 
 1. `extension/scripts/generate-etld.ts`が`assets/public_suffix_list.dat`を読み込む
 2. コメント行・空行を除去し、通常ルール・ワイルドカード・例外をパースする
@@ -316,7 +343,8 @@ Service WorkerのインメモリMapでフロー状態を管理する。Content S
 ```typescript
 // Service Worker
 const pendingLoginFlows = new Map<number, {
-  domain: string;
+  origin: string;   // 保存したフレームの厳密なorigin（scheme + host + port）
+  frameId: number;  // 保存したフレームのframeId
   entryId: string;
   username: string;
   timestamp: number;
@@ -329,10 +357,13 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 **検知フロー：**
 
-1. LOGIN_USERNAMEフォームを検出し、kuraがusernameを入力（またはユーザーが手動入力）
-2. Service WorkerのメモリにtabIdをキーとして `pendingLoginFlows.set(tabId, { domain, entryId, username, timestamp })` を保存
-3. 次のページ/DOM状態でLOGIN_PASSWORDフォームを検出した場合、`pendingLoginFlows`を参照して同一フローとして扱う
-4. タイムアウト（5分）経過後、またはタブクローズ時（`chrome.tabs.onRemoved`）に`pendingLoginFlows`から削除する
+1. LOGIN_USERNAMEフォームを検出し、ユーザーが候補を選択してkuraがusernameを入力
+2. Service WorkerのメモリにtabIdをキーとして `pendingLoginFlows.set(tabId, { origin, frameId, entryId, username, timestamp })` を保存。`origin`/`frameId`は`sender`から取る
+3. 次のページ/DOM状態でLOGIN_PASSWORD/TOTPフォームを検出した場合、`pendingLoginFlows`を参照する。`origin`と`frameId`が保存時と一致する場合のみ同一フローとして扱う
+4. 同一フローなら、引き継いだエントリを候補の先頭に置き、選択済みの状態でドロップダウンを表示する。入力はユーザーがクリックまたはEnterで確定した場合のみ行う（フォーカスだけで自動入力はしない）
+5. タイムアウト（5分）経過後、またはタブクローズ時（`chrome.tabs.onRemoved`）に`pendingLoginFlows`から削除する
+
+**セキュリティ上の判断：** 以前はeTLD+1単位で照合し、パスワード欄へのフォーカスだけでパスワードを自動入力していた。この方式では、同じタブで同一eTLD+1の別サブドメイン（ユーザー投稿コンテンツを置くサブドメインやXSSのあるページ）に遷移した場合や、同一サイトのiframeから、スクリプトが`focus()`を呼ぶだけでパスワードを取得できた。そのため照合を厳密なoriginとframeIdに絞り、問い合わせ結果にパスワードを含めず、入力にはユーザーの確定操作を必須にした。
 
 **Service Worker再起動時の挙動：** `pendingLoginFlows`はインメモリMapに保持されるため、Service Workerが予期せず再起動した場合（ブラウザによるアイドル停止等）、保持中のデータは消失する。これは想定された動作であり、ユーザーは分割ログインの2画面目で手動でクレデンシャルを選択し直す必要がある。
 
@@ -340,7 +371,13 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 ### 3-6.1 フィールドの視認性チェック
 
-フィールドへの入力前に、対象要素が実際にユーザーから見える状態にあることを確認する。
+フィールドへの入力前に、対象要素が実際にユーザーから見える状態にあることを確認する（`form-detector.ts`の`isVisible`）。以下のいずれかに該当する要素は不可視とみなす。
+
+- 幅・高さが8px未満
+- `visibility`が`visible`以外、または`display: none`
+- ドキュメントのスクロール範囲外（`left: -9999px`等で左/上方向に追い出されている）
+- 自身と全祖先（Shadow DOMのホストを含む）の`opacity`の積が0.1未満（`opacity`は継承されないため、祖先に`opacity: 0.01`を付けた隠しフィールドは自身の計算値だけでは検出できない）
+- 中心点がビューポート内にあるのに、`elementFromPoint`で得た最前面要素が自身・子孫・自身の`<label>`のいずれでもない（他要素で覆い隠されている）。ビューポート外（スクロールしないと見えない位置）の要素はヒットテストできないため、この条件では除外しない
 
 ### 3-6.2 フレームワーク対応のイベントディスパッチ
 

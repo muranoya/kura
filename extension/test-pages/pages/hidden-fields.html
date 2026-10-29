@@ -33,7 +33,9 @@
       <li>Form type: <code>LOGIN</code> (visible fields only)</li>
       <li>Only username and password (visible) fields detected</li>
       <li>5 hidden fields should all be <strong>IGNORED</strong>: display:none, visibility:hidden, opacity:0, zero-size, type="hidden"</li>
+      <li>4 disguised password fields should also be <strong>IGNORED</strong> and stay empty after autofill: transparent ancestor (opacity 0.01), 1px size, off-screen (left:-9999px), covered by another element</li>
       <li>Dropdown appears only on the two visible fields</li>
+      <li>Submit shows the disguised fields' values — all must be empty</li>
     </ul>
   </details>
 
@@ -63,6 +65,21 @@
 
       <div class="hidden-note">type="hidden"</div>
       <input type="hidden" name="csrf-token" value="abc123">
+
+      <div class="hidden-note">password inside an ancestor with opacity: 0.01</div>
+      <div style="opacity: 0.01"><input type="password" id="disguised-opacity" name="pass-opacity" autocomplete="current-password"></div>
+
+      <div class="hidden-note">password with 1px size</div>
+      <input type="password" id="disguised-tiny" name="pass-tiny" autocomplete="current-password" style="width: 1px; height: 1px; padding: 0; border: 0;">
+
+      <div class="hidden-note">password positioned off-screen (left: -9999px)</div>
+      <input type="password" id="disguised-offscreen" name="pass-offscreen" autocomplete="current-password" style="position: absolute; left: -9999px;">
+
+      <div class="hidden-note">password covered by another element</div>
+      <div style="position: relative;">
+        <input type="password" id="disguised-covered" name="pass-covered" autocomplete="current-password">
+        <div style="position: absolute; inset: 0; background: #fef2f2;"></div>
+      </div>
     </div>
 
     <button type="submit" style="margin-top: 16px;">Log in</button>
@@ -75,7 +92,9 @@
       e.preventDefault();
       const result = document.getElementById('result');
       result.style.display = 'block';
-      result.textContent = 'Submitted:\n  username: ' + document.getElementById('username').value + '\n  password: ' + document.getElementById('password').value;
+      result.textContent = 'Submitted:\n  username: ' + document.getElementById('username').value + '\n  password: ' + document.getElementById('password').value +
+        ['disguised-opacity', 'disguised-tiny', 'disguised-offscreen', 'disguised-covered']
+          .map(function(id) { return '\n  ' + id + ': "' + document.getElementById(id).value + '"'; }).join('');
     });
   </script>
 </body>

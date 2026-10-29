@@ -168,7 +168,7 @@ export interface AutofillFillData {
 
 - `raw.custom_fields`（JSON文字列）をパースし、`autofill_selector` が非nullの要素だけを抽出する。
 - 各要素を `{ selector: { tag, name, id, type }, value }` に変換し、`AutofillFillData.customFields` として追加する。
-- `entryType === 'credit_card'` の分岐、それ以外（login/password）の分岐の**両方**に `customFields` を付与する（クレジットカードエントリにもカスタムフィールドは存在しうるため）。
+- `customFields` は login エントリの充填データに付与する（クレジットカードの自動入力は提供しないため、`credit_card` エントリは充填データを返さない）。
 
 ## 3-4. content/main.ts: onCandidateSelected()の変更
 
@@ -221,7 +221,7 @@ export function matchSelector(
 
 - **最小露出（2-3.1）**: 3-1節で述べた通り、セレクタ付きの値はステップ2（候補選択後）でのみContent Scriptに渡る。新たな露出経路は生じない。
 - **ISOLATED worldによる隔離（2-3.2）**: 属性比較ベースのマッチングもISOLATED world内で行われるため、ページスクリプトによる `Element.prototype` の改ざんの影響を受けない。
-- **不可視フォームへの入力防止（2-3.3）**: 3-5節で述べた `isVisible()` の必須チェックに加え、マッチ範囲を検出済みフォームコンテナ内に限定すること自体も、invisible form攻撃や意図しない離れた要素への書き込みを防ぐ追加の防御層として機能する。
+- **不可視フォームへの入力防止（2-3.5）**: 3-5節で述べた `isVisible()` の必須チェックに加え、マッチ範囲を検出済みフォームコンテナ内に限定すること自体も、invisible form攻撃や意図しない離れた要素への書き込みを防ぐ追加の防御層として機能する。
 
 # Part 4: ピッカーUI設計（ブラウザ拡張）
 

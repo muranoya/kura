@@ -12,6 +12,7 @@ import type {
   WebauthnRitualDecision,
   WebauthnSwRequest,
 } from '../shared/webauthn-messages'
+import { isExtensionPage } from './sender'
 
 const LOG_PREFIX = '[kura:webauthn:sw]'
 const RITUAL_TIMEOUT_MS = 85_000
@@ -34,14 +35,18 @@ export interface WebauthnVaultApi {
     userName: string,
     userDisplayName: string,
     excludeCredentialIds: string[],
+    userVerified: boolean,
   ): string
   api_webauthn_get_assertion(
     vaultId: string,
     entryId: string,
     customFieldId: string,
     clientDataJson: string,
+    userVerified: boolean,
   ): string
   api_list_login_candidates(vaultId: string, pageHostname: string, strictSubdomain: boolean): string
+  /** Throws if the password is wrong */
+  api_verify_password(vaultId: string, password: string): void
 }
 
 let vaultApi: WebauthnVaultApi | null = null
@@ -77,16 +82,70 @@ function buildClientDataJson(
 
 // ========== Ritual window management ==========
 
+/** The user's decision, plus whether they were verified (master password) during the ritual */
+type RitualOutcome = Omit<WebauthnRitualDecision, 'masterPassword'> & { userVerified: boolean }
+
 interface PendingRitual {
-  resolve: (decision: WebauthnRitualDecision) => void
+  resolve: (outcome: RitualOutcome) => void
+  /**
+   * The master password was entered while this ritual was pending (unlock in
+   * the ritual window or elsewhere, or re-entry for userVerification:"required").
+   * Only then may the authenticator data claim UV.
+   */
+  userVerified: boolean
   context: WebauthnRitualContext
+  /** Tab of the page that made the create()/get() request */
+  tabId: number
   windowId?: number
+  /** Resolves with the ritual window's id once chrome.windows.create has returned */
+  windowReady: Promise<number | undefined>
   timeoutId: ReturnType<typeof setTimeout>
   /** context.kind === 'locked' の場合のみ設定。アンロック成功時に一度だけ呼ばれ、続きのcontextを返す */
   onUnlock?: () => Promise<WebauthnRitualContext>
 }
 
 const pendingRituals = new Map<string, PendingRitual>()
+
+/** A create()/get() request together with the origin/tab of the frame that sent it. */
+type VerifiedRequest = WebauthnSwRequest & { origin: string; hostname: string; tabId: number }
+
+/**
+ * Derive the requesting origin from the browser-attested sender. Chrome sets
+ * `sender.origin` ("null" for opaque origins such as sandboxed frames);
+ * Firefox only provides `sender.url`. Returns null for opaque or insecure
+ * (non-https, non-loopback) origins.
+ */
+function originFromSender(
+  sender: chrome.runtime.MessageSender,
+): { origin: string; hostname: string } | null {
+  if (!sender.url) return null
+  let url: URL
+  try {
+    url = new URL(sender.url)
+  } catch {
+    return null
+  }
+  const origin = sender.origin ?? url.origin
+  if (origin === 'null' || origin !== url.origin) return null
+  if (!isPotentiallyTrustworthy(url)) return null
+  return { origin, hostname: url.hostname }
+}
+
+/**
+ * Secure-context origins as browsers define them for WebAuthn: https, or
+ * loopback hosts (used during local development).
+ */
+function isPotentiallyTrustworthy(url: URL): boolean {
+  if (url.protocol === 'https:') return true
+  if (url.protocol !== 'http:') return false
+  const host = url.hostname
+  return (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host === '[::1]' ||
+    /^127(\.\d{1,3}){3}$/.test(host)
+  )
+}
 
 function finishRitual(requestId: string, decision: WebauthnRitualDecision) {
   const pending = pendingRituals.get(requestId)
@@ -96,7 +155,8 @@ function finishRitual(requestId: string, decision: WebauthnRitualDecision) {
   if (pending.windowId !== undefined) {
     chrome.windows.remove(pending.windowId).catch(() => {})
   }
-  pending.resolve(decision)
+  const { masterPassword: _discard, ...rest } = decision
+  pending.resolve({ ...rest, userVerified: pending.userVerified })
 }
 
 chrome.windows.onRemoved.addListener((windowId) => {
@@ -104,7 +164,12 @@ chrome.windows.onRemoved.addListener((windowId) => {
     if (pending.windowId === windowId) {
       pendingRituals.delete(requestId)
       clearTimeout(pending.timeoutId)
-      pending.resolve({ type: 'WEBAUTHN_RITUAL_DECISION', requestId, cancelled: true })
+      pending.resolve({
+        type: 'WEBAUTHN_RITUAL_DECISION',
+        requestId,
+        cancelled: true,
+        userVerified: false,
+      })
       break
     }
   }
@@ -113,33 +178,63 @@ chrome.windows.onRemoved.addListener((windowId) => {
 /**
  * 儀式ウィンドウを開き、ユーザーの決定（確認/選択、またはキャンセル）を待つ。
  * ウィンドウが閉じられた場合・タイムアウトした場合はcancelled:trueで解決する。
+ *
+ * 儀式のIDはページが決めたrequestIdではなくここで生成する。ページが同じIDを
+ * 使い回して同時実行数の上限をすり抜けたり、別リクエストの決定を横取りしたり
+ * できないようにするため。同じタブからの儀式は同時に1件まで。
  */
 function runRitual(
-  requestId: string,
+  tabId: number,
   context: WebauthnRitualContext,
   onUnlock?: () => Promise<WebauthnRitualContext>,
-): Promise<WebauthnRitualDecision> {
+): Promise<RitualOutcome> {
+  const ritualId = crypto.randomUUID()
   return new Promise((resolve) => {
-    if (pendingRituals.size >= MAX_CONCURRENT_RITUALS) {
-      resolve({ type: 'WEBAUTHN_RITUAL_DECISION', requestId, cancelled: true })
+    const busy =
+      pendingRituals.size >= MAX_CONCURRENT_RITUALS ||
+      [...pendingRituals.values()].some((p) => p.tabId === tabId)
+    if (busy) {
+      resolve({
+        type: 'WEBAUTHN_RITUAL_DECISION',
+        requestId: ritualId,
+        cancelled: true,
+        userVerified: false,
+      })
       return
     }
 
     const timeoutMs = context.kind === 'locked' ? RITUAL_UNLOCK_TIMEOUT_MS : RITUAL_TIMEOUT_MS
     const timeoutId = setTimeout(() => {
-      finishRitual(requestId, { type: 'WEBAUTHN_RITUAL_DECISION', requestId, cancelled: true })
+      finishRitual(ritualId, {
+        type: 'WEBAUTHN_RITUAL_DECISION',
+        requestId: ritualId,
+        cancelled: true,
+      })
     }, timeoutMs)
 
-    pendingRituals.set(requestId, { resolve, context, timeoutId, onUnlock })
+    let markWindowReady: (windowId: number | undefined) => void = () => {}
+    const windowReady = new Promise<number | undefined>((r) => {
+      markWindowReady = r
+    })
+    pendingRituals.set(ritualId, {
+      resolve,
+      context,
+      tabId,
+      timeoutId,
+      onUnlock,
+      windowReady,
+      userVerified: false,
+    })
 
     const url = chrome.runtime.getURL(
-      `src/popup/webauthn.html?requestId=${encodeURIComponent(requestId)}&kind=${context.kind}`,
+      `src/popup/webauthn.html?requestId=${encodeURIComponent(ritualId)}&kind=${context.kind}`,
     )
     chrome.windows.create({ url, type: 'popup', width: 420, height: 560, focused: true }, (win) => {
-      const pending = pendingRituals.get(requestId)
+      const pending = pendingRituals.get(ritualId)
       if (pending && win?.id !== undefined) {
         pending.windowId = win.id
       }
+      markWindowReady(win?.id)
     })
   })
 }
@@ -158,6 +253,8 @@ export async function resumeLockedWebauthnRituals(): Promise<void> {
       const newContext = await onUnlock()
       const stillPending = pendingRituals.get(requestId)
       if (!stillPending) continue // その間にウィンドウが閉じられた/タイムアウトした
+      // アンロック＝この儀式の最中にマスターパスワードが入力された
+      stillPending.userVerified = true
       stillPending.context = newContext
       clearTimeout(stillPending.timeoutId)
       stillPending.timeoutId = setTimeout(() => {
@@ -198,7 +295,11 @@ type GetContextResult =
  * get() のcontext計算本体。呼び出し時点でvaultがアンロック済みであることが前提。
  * ロック中に開始したリチュアルでは、アンロック成功後にこの関数を呼んで続きを計算する。
  */
-async function computeGetContext(req: WebauthnSwRequest, rpId: string): Promise<GetContextResult> {
+async function computeGetContext(
+  req: VerifiedRequest,
+  rpId: string,
+  requireUserVerification: boolean,
+): Promise<GetContextResult> {
   if (!vaultApi) return { kind: 'error', message: 'Vault API not initialized' }
 
   let candidates: RawCredentialCandidate[]
@@ -227,6 +328,7 @@ async function computeGetContext(req: WebauthnSwRequest, rpId: string): Promise<
     context: {
       kind: 'get',
       rpId,
+      requireUserVerification,
       candidates: candidates.map((c) => ({
         entryId: c.entry_id,
         entryName: c.entry_name,
@@ -240,7 +342,7 @@ async function computeGetContext(req: WebauthnSwRequest, rpId: string): Promise<
 }
 
 async function handleGetRequest(
-  req: WebauthnSwRequest,
+  req: VerifiedRequest,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies by outcome
   sendResponse: (response?: any) => void,
 ) {
@@ -265,8 +367,11 @@ async function handleGetRequest(
   let postUnlockPassthrough = false
   let abortReason: { errorName: string; error: string } | null = null
 
+  // Unlocking in the ritual already verifies the user, so no re-entry is needed then
+  const requireUserVerification = req.userVerification === 'required'
+
   async function resumeAfterUnlock(): Promise<WebauthnRitualContext> {
-    const computed = await computeGetContext(req, rpId)
+    const computed = await computeGetContext(req, rpId, false)
     if (computed.kind === 'passthrough') {
       postUnlockPassthrough = true
       return { kind: 'error', reason: 'no_credentials' }
@@ -281,7 +386,7 @@ async function handleGetRequest(
 
   let initialContext: WebauthnRitualContext
   if (isUnlocked()) {
-    const computed = await computeGetContext(req, rpId)
+    const computed = await computeGetContext(req, rpId, requireUserVerification)
     if (computed.kind === 'passthrough') {
       sendResponse({ success: true, status: 'passthrough' })
       return
@@ -299,7 +404,7 @@ async function handleGetRequest(
 
   try {
     const decision = await runRitual(
-      req.requestId,
+      req.tabId,
       initialContext,
       initialContext.kind === 'locked' ? resumeAfterUnlock : undefined,
     )
@@ -333,6 +438,7 @@ async function handleGetRequest(
       chosen.entry_id,
       chosen.custom_field_id,
       clientDataJSON,
+      decision.userVerified,
     )
     const assertion = JSON.parse(assertionJson)
 
@@ -368,12 +474,13 @@ type CreateContextResult =
  * ロック中に開始したリチュアルでは、アンロック成功後にこの関数を呼んで続きを計算する。
  */
 async function computeCreateContext(
-  req: WebauthnSwRequest,
+  req: VerifiedRequest,
   rpId: string,
+  requireUserVerification: boolean,
 ): Promise<CreateContextResult> {
   if (!vaultApi) return { kind: 'error', message: 'Vault API not initialized' }
 
-  // excludeCredentialsチェックはUIを開く前に行う（一致すれば即座にreject、Part 3-6参照）
+  // excludeCredentialsチェック（一致すればエラー表示の儀式を経てreject、Part 3-6参照）
   if (req.excludeCredentialIds && req.excludeCredentialIds.length > 0) {
     try {
       const json = vaultApi.api_webauthn_find_credentials(
@@ -401,12 +508,18 @@ async function computeCreateContext(
 
   return {
     kind: 'ok',
-    context: { kind: 'create', rpId, rpName: req.rpName ?? null, matchingEntries },
+    context: {
+      kind: 'create',
+      rpId,
+      rpName: req.rpName ?? null,
+      matchingEntries,
+      requireUserVerification,
+    },
   }
 }
 
 async function handleCreateRequest(
-  req: WebauthnSwRequest,
+  req: VerifiedRequest,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies by outcome
   sendResponse: (response?: any) => void,
 ) {
@@ -428,9 +541,13 @@ async function handleCreateRequest(
   // ロック中に判明したエラー（既に登録済み等）はここに積む。儀式の解決結果からは
   // cancelled:trueとしか分からないため、正確なエラー名を後段のsendResponseへ橋渡しする。
   let abortReason: { errorName: string; error: string } | null = null
+  // Entries shown on the confirmation screen; the passkey may only be attached to one of these
+  let offeredEntryIds = new Set<string>()
+
+  const requireUserVerification = req.userVerification === 'required'
 
   async function resumeAfterUnlock(): Promise<WebauthnRitualContext> {
-    const computed = await computeCreateContext(req, rpId)
+    const computed = await computeCreateContext(req, rpId, false)
     if (computed.kind === 'already_registered') {
       abortReason = {
         errorName: 'InvalidStateError',
@@ -442,25 +559,30 @@ async function handleCreateRequest(
       abortReason = { errorName: 'NotAllowedError', error: computed.message }
       return { kind: 'error', reason: 'internal', message: computed.message }
     }
+    offeredEntryIds = new Set(computed.context.matchingEntries.map((e) => e.id))
     return computed.context
   }
 
   let initialContext: WebauthnRitualContext
   if (isUnlocked()) {
-    const computed = await computeCreateContext(req, rpId)
+    const computed = await computeCreateContext(req, rpId, requireUserVerification)
     if (computed.kind === 'already_registered') {
-      sendResponse({
-        success: false,
+      // Show the ritual window before rejecting, as native authenticators ask
+      // for consent first. An immediate silent InvalidStateError would let a
+      // page probe which credential ids this user has (excludeCredentials),
+      // and would be distinguishable from the no-match case, which opens a window.
+      abortReason = {
         errorName: 'InvalidStateError',
         error: 'Credential already registered for this relying party',
-      })
-      return
-    }
-    if (computed.kind === 'error') {
+      }
+      initialContext = { kind: 'error', reason: 'already_registered' }
+    } else if (computed.kind === 'error') {
       sendResponse({ success: false, errorName: 'NotAllowedError', error: computed.message })
       return
+    } else {
+      initialContext = computed.context
+      offeredEntryIds = new Set(computed.context.matchingEntries.map((e) => e.id))
     }
-    initialContext = computed.context
   } else {
     // vaultがロック中: まずアンロック画面を挟み、成功後に同じウィンドウでcreate確認へ進む
     initialContext = { kind: 'locked' }
@@ -468,16 +590,22 @@ async function handleCreateRequest(
 
   try {
     const decision = await runRitual(
-      req.requestId,
+      req.tabId,
       initialContext,
       initialContext.kind === 'locked' ? resumeAfterUnlock : undefined,
     )
 
-    if (decision.cancelled) {
+    // An error screen (e.g. already registered) can only end the ritual, never confirm it
+    if (decision.cancelled || abortReason) {
       sendResponse({
         success: false,
         ...(abortReason ?? { errorName: 'NotAllowedError', error: 'User cancelled' }),
       })
+      return
+    }
+
+    if (decision.entryId && !offeredEntryIds.has(decision.entryId)) {
+      sendResponse({ success: false, errorName: 'NotAllowedError', error: 'Invalid selection' })
       return
     }
 
@@ -490,6 +618,7 @@ async function handleCreateRequest(
       req.userName ?? '',
       req.userDisplayName ?? '',
       req.excludeCredentialIds ?? [],
+      decision.userVerified,
     )
     const result = JSON.parse(resultJson)
 
@@ -521,12 +650,44 @@ async function handleCreateRequest(
 
 // ========== Ritual window ↔ Service Worker messages ==========
 
-function handleRitualGetContext(
+const RITUAL_PAGE_URL = chrome.runtime.getURL('src/popup/webauthn.html')
+
+function verifyMasterPassword(password: string): boolean {
+  if (!vaultApi || !isUnlocked()) return false
+  try {
+    vaultApi.api_verify_password(DEFAULT_VAULT_ID, password)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The ritual messages decide which credential gets used, so they are only
+ * accepted from the ritual window that was opened for that very request
+ * (not from other extension pages, and never from content scripts).
+ */
+async function getRitualForSender(
+  requestId: unknown,
+  sender: chrome.runtime.MessageSender,
+): Promise<PendingRitual | null> {
+  if (typeof requestId !== 'string') return null
+  if (!isExtensionPage(sender) || !sender.url?.startsWith(RITUAL_PAGE_URL)) return null
+  const pending = pendingRituals.get(requestId)
+  if (!pending) return null
+  const windowId = pending.windowId ?? (await pending.windowReady)
+  if (windowId === undefined || sender.tab?.windowId !== windowId) return null
+  // The ritual may have finished while waiting for the window id
+  return pendingRituals.get(requestId) === pending ? pending : null
+}
+
+async function handleRitualGetContext(
   message: { requestId: string },
+  sender: chrome.runtime.MessageSender,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies
   sendResponse: (response?: any) => void,
 ) {
-  const pending = pendingRituals.get(message.requestId)
+  const pending = await getRitualForSender(message.requestId, sender)
   if (!pending) {
     sendResponse({ success: false, error: 'Request not found or expired' })
     return
@@ -534,11 +695,31 @@ function handleRitualGetContext(
   sendResponse({ success: true, context: pending.context })
 }
 
-function handleRitualDecision(
+async function handleRitualDecision(
   message: WebauthnRitualDecision,
+  sender: chrome.runtime.MessageSender,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies
   sendResponse: (response?: any) => void,
 ) {
+  const pending = await getRitualForSender(message.requestId, sender)
+  if (!pending) {
+    sendResponse({ success: false, error: 'Request not found or expired' })
+    return
+  }
+  const context = pending.context
+  const needsVerification =
+    !message.cancelled &&
+    (context.kind === 'get' || context.kind === 'create') &&
+    context.requireUserVerification &&
+    !pending.userVerified
+  if (needsVerification) {
+    // Keep the ritual open on a wrong password so the user can retry
+    if (!message.masterPassword || !verifyMasterPassword(message.masterPassword)) {
+      sendResponse({ success: false, error: 'invalid_password' })
+      return
+    }
+    pending.userVerified = true
+  }
   finishRitual(message.requestId, message)
   sendResponse({ success: true })
 }
@@ -548,19 +729,33 @@ function handleRitualDecision(
 export async function handleWebauthnMessage(
   // biome-ignore lint/suspicious/noExplicitAny: message shape varies by type
   message: Record<string, any>,
-  _sender: chrome.runtime.MessageSender,
+  sender: chrome.runtime.MessageSender,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies by handler
   sendResponse: (response?: any) => void,
 ) {
   switch (message.type) {
     case 'WEBAUTHN_CREATE_REQUEST':
-      return handleCreateRequest(message as WebauthnSwRequest, sendResponse)
-    case 'WEBAUTHN_GET_REQUEST':
-      return handleGetRequest(message as WebauthnSwRequest, sendResponse)
+    case 'WEBAUTHN_GET_REQUEST': {
+      const requester = originFromSender(sender)
+      if (!requester) {
+        sendResponse({ success: false, errorName: 'SecurityError', error: 'Invalid origin' })
+        return
+      }
+      const tabId = sender.tab?.id
+      if (tabId === undefined) {
+        sendResponse({ success: false, errorName: 'NotAllowedError', error: 'No tab' })
+        return
+      }
+      // Spread first so that origin/hostname in the payload can never win
+      const req: VerifiedRequest = { ...(message as WebauthnSwRequest), ...requester, tabId }
+      return message.type === 'WEBAUTHN_CREATE_REQUEST'
+        ? handleCreateRequest(req, sendResponse)
+        : handleGetRequest(req, sendResponse)
+    }
     case 'WEBAUTHN_RITUAL_GET_CONTEXT':
-      return handleRitualGetContext(message as { requestId: string }, sendResponse)
+      return handleRitualGetContext(message as { requestId: string }, sender, sendResponse)
     case 'WEBAUTHN_RITUAL_DECISION':
-      return handleRitualDecision(message as WebauthnRitualDecision, sendResponse)
+      return handleRitualDecision(message as WebauthnRitualDecision, sender, sendResponse)
     default:
       sendResponse({ success: false, error: `Unknown webauthn message: ${message.type}` })
   }

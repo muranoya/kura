@@ -58,6 +58,7 @@ const sendMessageMock = vi.fn(
 
 globalThis.chrome = {
   runtime: {
+    id: 'test-id',
     sendMessage: sendMessageMock,
     onMessage: {
       addListener: vi.fn(noop),
@@ -71,6 +72,13 @@ globalThis.chrome = {
       callback([])
     }),
     sendMessage: vi.fn(() => Promise.resolve()),
+    onRemoved: {
+      addListener: vi.fn(noop),
+    },
+  },
+  windows: {
+    create: vi.fn(),
+    remove: vi.fn(() => Promise.resolve()),
     onRemoved: {
       addListener: vi.fn(noop),
     },

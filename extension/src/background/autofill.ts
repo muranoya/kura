@@ -1,7 +1,6 @@
 // Autofill message handler and content script injection management
 
 import { DEFAULT_VAULT_ID } from '../shared/constants'
-import { extractETldPlus1 } from '../shared/etld'
 import { broadcastToExtensionPages } from '../shared/messages'
 import { queryActiveBrowserTab } from '../shared/tabs'
 import type {
@@ -19,16 +18,6 @@ let isUnlocked: () => boolean = () => false
 export interface VaultApi {
   api_list_login_candidates(vaultId: string, pageHostname: string, strictSubdomain: boolean): string
   api_get_entry(vaultId: string, id: string): string
-  api_list_entries(
-    vaultId: string,
-    searchQuery: string | null,
-    type: string | null,
-    labelId: string | null,
-    includeTrash: boolean,
-    onlyFavorites: boolean,
-    sortField: string | null,
-    sortOrder: string | null,
-  ): string
   api_get_totp_code(vaultId: string, id: string): string | null
   api_list_totp_periods(vaultId: string, ids: string[]): string
   api_create_entry(
@@ -177,17 +166,8 @@ function getFillData(entryId: string): AutofillFillData | null {
     const entryType = raw.entry_type as string | undefined
     const customFields = extractSelectorFillEntries(raw.custom_fields)
 
-    if (entryType === 'credit_card') {
-      return {
-        username: null,
-        password: null,
-        ccNumber: (tv.number as string) ?? null,
-        ccExp: (tv.expiry as string) ?? null,
-        ccCvc: (tv.cvv as string) ?? null,
-        ccName: (tv.cardholder as string) ?? null,
-        customFields,
-      }
-    }
+    // Only login entries are autofilled (credit card autofill is intentionally unsupported)
+    if (entryType !== 'login') return null
 
     return {
       username: (tv.username as string) ?? null,
@@ -247,38 +227,15 @@ function getTotpForEntry(entryId: string): TotpResult | null {
   }
 }
 
-// ========== Credit card matching ==========
-
-function getCreditCards(): AutofillCredentialCandidate[] {
-  if (!vaultApi || !isUnlocked()) return []
-
-  try {
-    const result = vaultApi.api_list_entries(
-      DEFAULT_VAULT_ID,
-      null,
-      'credit_card',
-      null,
-      false,
-      false,
-      null,
-      null,
-    )
-    const entries: Array<{ id: string; name: string; subtitle: string | null }> = JSON.parse(result)
-    return entries.map((e) => ({
-      entryId: e.id,
-      name: e.name,
-      username: e.subtitle,
-    }))
-  } catch (e) {
-    console.error(LOG_PREFIX, 'getCreditCards: error:', e)
-    return []
-  }
-}
-
 // ========== Pending login flow (split login) ==========
 
+// Remembers which entry the user picked on the username step so the password
+// / TOTP step can suggest it first. It never carries the password itself:
+// the next step still fills only after the user confirms the suggestion.
 interface PendingLoginFlow {
-  domain: string
+  /** Exact origin (scheme + host + port) of the frame that picked the entry */
+  origin: string
+  frameId: number
   entryId: string
   username: string
   timestamp: number
@@ -287,13 +244,14 @@ interface PendingLoginFlow {
 const pendingLoginFlows = new Map<number, PendingLoginFlow>()
 const PENDING_FLOW_TIMEOUT_MS = 5 * 60 * 1000
 
-function storePendingLoginFlow(tabId: number, domain: string, entryId: string, username: string) {
-  pendingLoginFlows.set(tabId, { domain, entryId, username, timestamp: Date.now() })
+function storePendingLoginFlow(tabId: number, flow: Omit<PendingLoginFlow, 'timestamp'>) {
+  pendingLoginFlows.set(tabId, { ...flow, timestamp: Date.now() })
 }
 
 function queryPendingLoginFlow(
   tabId: number,
-  domain: string,
+  origin: string,
+  frameId: number,
 ): { entryId: string; username: string } | null {
   const flow = pendingLoginFlows.get(tabId)
   if (!flow) return null
@@ -303,7 +261,7 @@ function queryPendingLoginFlow(
     return null
   }
 
-  if (flow.domain !== domain) {
+  if (flow.origin !== origin || flow.frameId !== frameId) {
     return null
   }
 
@@ -348,25 +306,46 @@ export function onVaultLocked() {
 
 // ========== Message handler ==========
 
+function originOf(url: string): string | null {
+  try {
+    const origin = new URL(url).origin
+    return origin === 'null' ? null : origin
+  } catch {
+    return null
+  }
+}
+
+/** Whether `entryId` is one of the login candidates offered to the page at `pageUrl`. */
+function isCandidateForUrl(entryId: string, pageUrl: string): boolean {
+  // strictSubdomain=false yields the widest (eTLD+1) candidate set, which is a
+  // superset of what a site pattern with strict_subdomain would offer
+  return getCredentialsForUrl(pageUrl).some((c) => c.entryId === entryId)
+}
+
 export async function handleAutofillMessage(
   message: Record<string, unknown>,
-  _sender: chrome.runtime.MessageSender,
+  sender: chrome.runtime.MessageSender,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies
   sendResponse: (response?: any) => void,
 ) {
+  // The page URL always comes from the browser-attested sender (the URL of the
+  // frame the content script runs in), never from the message payload: a
+  // compromised renderer could otherwise claim to be any site and request
+  // that site's credentials.
+  const pageUrl = sender.url ?? ''
+
   switch (message.type) {
     case 'AUTOFILL_GET_CREDENTIALS': {
       if (!isUnlocked()) {
         sendResponse({ success: false, error: 'Vault not unlocked' })
         break
       }
-      const url = message.url as string
-      if (!url) {
+      if (!pageUrl) {
         sendResponse({ success: false, error: 'URL required' })
         break
       }
       const strictSubdomain = message.strictSubdomain as boolean | undefined
-      const credentials = getCredentialsForUrl(url, strictSubdomain)
+      const credentials = getCredentialsForUrl(pageUrl, strictSubdomain)
       sendResponse({ success: true, credentials })
       break
     }
@@ -381,7 +360,7 @@ export async function handleAutofillMessage(
         sendResponse({ success: false, error: 'Entry ID required' })
         break
       }
-      const fillData = getFillData(entryId)
+      const fillData = isCandidateForUrl(entryId, pageUrl) ? getFillData(entryId) : null
       if (!fillData) {
         sendResponse({ success: false, error: 'Entry not found' })
         break
@@ -396,7 +375,8 @@ export async function handleAutofillMessage(
         break
       }
       const totpEntryId = message.entryId as string
-      const totpResult = getTotpForEntry(totpEntryId)
+      const totpResult =
+        totpEntryId && isCandidateForUrl(totpEntryId, pageUrl) ? getTotpForEntry(totpEntryId) : null
 
       if (totpResult) {
         sendResponse({ success: true, ...totpResult })
@@ -411,58 +391,45 @@ export async function handleAutofillMessage(
         sendResponse({ success: false, error: 'Vault not unlocked' })
         break
       }
-      const totpCandidateUrl = message.url as string
-      const totpCandidates = getTotpCandidatesForUrl(totpCandidateUrl)
+      const totpCandidates = getTotpCandidatesForUrl(pageUrl)
       sendResponse({ success: true, totpCandidates })
       break
     }
 
-    case 'AUTOFILL_GET_CREDIT_CARDS': {
-      if (!isUnlocked()) {
-        sendResponse({ success: false, error: 'Vault not unlocked' })
-        break
-      }
-      const creditCards = getCreditCards()
-      sendResponse({ success: true, creditCards })
-      break
-    }
-
     case 'AUTOFILL_PENDING_FLOW_STORE': {
-      const storeTabId = _sender.tab?.id
+      const storeTabId = sender.tab?.id
       if (!storeTabId) {
         sendResponse({ success: false, error: 'No tab ID' })
         break
       }
-      const storeUrl = message.url as string
-      if (!storeUrl) {
+      const storeOrigin = originOf(pageUrl)
+      if (!storeOrigin) {
         sendResponse({ success: false, error: 'URL required' })
         break
       }
-      let storeDomain: string
-      try {
-        storeDomain = extractETldPlus1(new URL(storeUrl).hostname)
-      } catch {
-        sendResponse({ success: false, error: 'Invalid URL' })
+      const storeEntryId = message.entryId as string
+      if (!storeEntryId || !isCandidateForUrl(storeEntryId, pageUrl)) {
+        sendResponse({ success: false, error: 'Entry not found' })
         break
       }
-      storePendingLoginFlow(
-        storeTabId,
-        storeDomain,
-        message.entryId as string,
-        (message.username as string) || '',
-      )
+      storePendingLoginFlow(storeTabId, {
+        origin: storeOrigin,
+        frameId: sender.frameId ?? 0,
+        entryId: storeEntryId,
+        username: (message.username as string) || '',
+      })
       sendResponse({ success: true })
       break
     }
 
     case 'AUTOFILL_PENDING_FLOW_QUERY': {
-      const queryTabId = _sender.tab?.id
+      const queryTabId = sender.tab?.id
       if (!queryTabId) {
         sendResponse({ success: false, error: 'No tab ID' })
         break
       }
-      const queryUrl = message.url as string
-      if (!queryUrl) {
+      const queryOrigin = originOf(pageUrl)
+      if (!queryOrigin) {
         sendResponse({ success: false, error: 'URL required' })
         break
       }
@@ -470,27 +437,8 @@ export async function handleAutofillMessage(
         sendResponse({ success: true, pendingFlow: null })
         break
       }
-      let queryDomain: string
-      try {
-        queryDomain = extractETldPlus1(new URL(queryUrl).hostname)
-      } catch {
-        sendResponse({ success: true, pendingFlow: null })
-        break
-      }
-      const flow = queryPendingLoginFlow(queryTabId, queryDomain)
-      if (flow) {
-        const flowFillData = getFillData(flow.entryId)
-        sendResponse({
-          success: true,
-          pendingFlow: {
-            entryId: flow.entryId,
-            username: flow.username,
-            password: flowFillData?.password || '',
-          },
-        })
-      } else {
-        sendResponse({ success: true, pendingFlow: null })
-      }
+      const flow = queryPendingLoginFlow(queryTabId, queryOrigin, sender.frameId ?? 0)
+      sendResponse({ success: true, pendingFlow: flow })
       break
     }
 
@@ -519,7 +467,7 @@ export async function handleAutofillMessage(
         break
       }
       const syncFn = autoSyncFn
-      const captureUrl = message.url as string
+      const captureUrl = pageUrl
       const captureName = (message.name as string | null) ?? null
       const captureUsername = (message.username as string | null) ?? null
       const capturePassword = message.password as string
