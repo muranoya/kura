@@ -12,16 +12,76 @@ export interface DetectedForm {
 
 // ========== Visibility check (Section 10.1) ==========
 
+// Fields smaller than this (in CSS px) are treated as hidden: a real input
+// the user can see and type into is never this small.
+const MIN_VISIBLE_SIZE = 8
+// Cumulative opacity (element × all ancestors) below which a field is hidden.
+const MIN_EFFECTIVE_OPACITY = 0.1
+
+/** Parent element, crossing shadow root boundaries (ShadowRoot → host). */
+function composedParent(el: Element): Element | null {
+  if (el.parentElement) return el.parentElement
+  const root = el.getRootNode()
+  return root instanceof ShadowRoot ? root.host : null
+}
+
+/**
+ * Opacity is not inherited in computed style, so a field inside an
+ * `opacity: 0` (or 0.01) container still reports its own opacity as 1.
+ * Multiply along the ancestor chain to get what the user actually sees.
+ */
+function effectiveOpacity(el: HTMLElement): number {
+  let opacity = 1
+  for (let node: Element | null = el; node; node = composedParent(node)) {
+    const value = Number.parseFloat(getComputedStyle(node).opacity)
+    if (!Number.isNaN(value)) opacity *= value
+    if (opacity < MIN_EFFECTIVE_OPACITY) break
+  }
+  return opacity
+}
+
+/**
+ * When the field's center is inside the viewport, check that the topmost
+ * element there is the field itself (or its descendant / its <label>).
+ * Catches fields hidden underneath other elements. Fields outside the
+ * viewport (e.g. below the fold) cannot be hit-tested and are not rejected.
+ */
+function isNotCovered(el: HTMLElement, rect: DOMRect): boolean {
+  const x = rect.left + rect.width / 2
+  const y = rect.top + rect.height / 2
+  if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) return true
+
+  const root = el.getRootNode() as Document | ShadowRoot
+  if (typeof root.elementFromPoint !== 'function') return true
+  const hit = root.elementFromPoint(x, y)
+  if (!hit) return true
+  if (hit === el || el.contains(hit)) return true
+
+  const label = hit.closest('label')
+  if (label && el instanceof HTMLInputElement && el.labels) {
+    return Array.from(el.labels).includes(label)
+  }
+  return false
+}
+
+/**
+ * Whether the user can actually see the field. Used before showing
+ * suggestions and before every fill, so that credentials are never written
+ * into fields an attacker has hidden (invisible form attack).
+ */
 export function isVisible(el: HTMLElement): boolean {
   const rect = el.getBoundingClientRect()
+  if (rect.width < MIN_VISIBLE_SIZE || rect.height < MIN_VISIBLE_SIZE) return false
+
   const style = getComputedStyle(el)
-  return (
-    rect.width > 0 &&
-    rect.height > 0 &&
-    style.visibility !== 'hidden' &&
-    style.display !== 'none' &&
-    style.opacity !== '0'
-  )
+  if (style.visibility !== 'visible' || style.display === 'none') return false
+
+  // Positioned entirely outside the document's scrollable area (e.g. left: -9999px)
+  if (rect.right + window.scrollX <= 0 || rect.bottom + window.scrollY <= 0) return false
+
+  if (effectiveOpacity(el) < MIN_EFFECTIVE_OPACITY) return false
+
+  return isNotCovered(el, rect)
 }
 
 // ========== Form container discovery ==========
