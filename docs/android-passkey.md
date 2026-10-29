@@ -387,6 +387,7 @@ Query（Begin）フェーズで`CredentialEntry`を複数返している場合�
 
 - `BiometricHelper`（`Context`非依存で`Cipher`取得可能）と`FragmentActivity`ベースの`BiometricPrompt`表示は`AutofillUnlockActivity`と全く同じ形で再利用する
 - **UV（User Verified）フラグ**: authenticatorDataのUVは、その操作のためにユーザーを実際に認証した場合だけ立てる。ロック画面でアンロックした場合は認証済みとする。vaultがアンロック済みだった場合は、`AutofillAuthScreen`（`verifyUserWhenUnlocked = true`）が`UserVerificationPrompt`で生体認証または端末の画面ロック（`BIOMETRIC_STRONG or DEVICE_CREDENTIAL`）による本人確認を求め、成功した場合だけ立てる。端末に生体認証も画面ロックも設定されていない場合はUVを立てずに続行し、UVを要求するRPの判断に委ねる。以前は常にUVを立てていたため、アンロック済みの端末を手にした第三者がタップだけでUV付きの署名を得られた。ロック中のGet要求ではアンロック後にシステムの候補選択に戻ってから再度起動されるため、ロック画面での認証から60秒以内は認証済みとみなして二重に求めない（`VaultSession.wasUserVerifiedRecently()`）。拡張機能の扱いは`docs/webauthn-passkey.md`を参照
+- **署名直前の候補照合**: `PasskeyGetActivity`は、Query時にPendingIntentへ埋めた`PasskeyGetSelection`（entry_id/custom_field_id/credential_id）をそのまま署名に使わず、`ProviderGetCredentialRequest`から解決し直したrp_id群（`findCredentialsAcrossDomains`、Query時と同じ条件）の候補に含まれることを確かめてから署名する。現状PendingIntentのextraに改ざんの経路はないが、別のrp_idのPasskeyで署名してしまう事故を防ぐ多層防御
 - `PasskeyField`（`EntryDetailScreen.kt`の読み取り専用表示コンポーネント）はそのまま維持し、Create完了後の遷移先やGet候補選択の見た目の参考にする（`private_key`を画面に一切出さない設計方針、`docs/webauthn-passkey.md`と同じ思想）
 
 # Part 7: 設定画面統合

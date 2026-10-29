@@ -120,7 +120,35 @@ class PasskeyGetActivity : SecureActivity() {
             return
         }
         resolvedOrigin = resolved
+        if (!isSelectionAllowedFor(request, resolved, selection)) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "proceedWithSelection: selected credential does not belong to resolved rp_ids -> cancel")
+            finishCanceled()
+            return
+        }
         finishWithAssertion(selection)
+    }
+
+    /**
+     * 選択された認証情報が、呼び出し元から解決したrp_idのPasskeyであることを署名の直前に確かめる。
+     * selectionはQuery時に自分で作ったPendingIntentのextraで、現状は改ざんの経路がないが、
+     * 別のrp_idのPasskeyで署名してしまう事故を防ぐ最後の砦として、Query時と同じ条件で検索し直す。
+     */
+    private suspend fun isSelectionAllowedFor(
+        request: ProviderGetCredentialRequest,
+        resolved: OriginResolver.Resolved,
+        selection: PasskeyGetSelection
+    ): Boolean {
+        val pkOption = request.credentialOptions.filterIsInstance<GetPublicKeyCredentialOption>().firstOrNull()
+            ?: return false
+        val claimedRpId = ClientDataJsonBuilder.extractRpId(pkOption.requestJson)
+        val extraRpId = resolved.validateClaimedRpId(appViewModel.repository, claimedRpId)
+        val allowIds = ClientDataJsonBuilder.parseCredentialIds(pkOption.requestJson, "allowCredentials")
+        return resolved.findCredentialsAcrossDomains(appViewModel.repository, allowIds, extraRpId)
+            .any {
+                it.entryId == selection.entryId &&
+                    it.customFieldId == selection.customFieldId &&
+                    it.credentialId == selection.credentialId
+            }
     }
 
     /**
