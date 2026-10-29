@@ -226,7 +226,13 @@ fun SettingsScreen(
             Card(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.settings_autolock)) },
-                    supportingContent = { Text(stringResource(R.string.settings_autolock_description_background)) },
+                    supportingContent = {
+                        if (autolockMinutes == 0) {
+                            Text(stringResource(R.string.settings_autolock_disabled_warning), color = MaterialTheme.colorScheme.error)
+                        } else {
+                            Text(stringResource(R.string.settings_autolock_description_background))
+                        }
+                    },
                     leadingContent = {
                         Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     },

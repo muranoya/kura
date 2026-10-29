@@ -48,6 +48,7 @@
     <string name="nav_label_manager">ラベル管理</string>
     <string name="nav_trash">ゴミ箱</string>
     <string name="nav_settings">設定</string>
+    <string name="nav_lock_now">今すぐロック</string>
 
     <!-- Welcome screen -->
     <string name="welcome_title">kura</string>
@@ -304,6 +305,7 @@
     <string name="settings_autolock">自動ロック</string>
     <string name="settings_autolock_description_background">バックグラウンド移行後の自動ロック時間</string>
     <string name="settings_autolock_disabled">無効</string>
+    <string name="settings_autolock_disabled_warning">無効にすると、アプリのプロセスが終了するまでロックされず、その間はオートフィルやパスキーも認証なしで使えます</string>
     <string name="settings_autolock_minutes_format">%1$d分</string>
     <string name="settings_clipboard_clear">クリップボード自動クリア</string>
     <string name="settings_clipboard_clear_description">コピー後に自動でクリップボードをクリア</string>

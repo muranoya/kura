@@ -13,15 +13,12 @@ import net.meshpeak.kura.data.preferences.PreferencesManager
 import net.meshpeak.kura.data.preferences.SecureStorage
 import net.meshpeak.kura.data.repository.IVaultRepository
 import net.meshpeak.kura.data.repository.VaultRepository
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import net.meshpeak.kura.data.session.VaultSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 enum class AppState {
     LOADING, ONBOARDING, LOCKED, UNLOCKED
@@ -48,8 +45,6 @@ class AppViewModel(
     private val _appState = MutableStateFlow(AppState.LOADING)
     val appState: StateFlow<AppState> = _appState
 
-    private var autolockJob: Job? = null
-
     private val _syncVersion = MutableStateFlow(0)
     val syncVersion: StateFlow<Int> = _syncVersion.asStateFlow()
 
@@ -57,6 +52,12 @@ class AppViewModel(
     var pendingRecoveryKey: String? = null
 
     init {
+        viewModelScope.launch {
+            // 自動ロック・手動ロックはプロセス単位のVaultSessionが行うので、その結果を画面に反映する
+            VaultSession.lockEvents.collect {
+                if (_appState.value == AppState.UNLOCKED) _appState.value = AppState.LOCKED
+            }
+        }
         initializeApp()
     }
 
@@ -69,6 +70,7 @@ class AppViewModel(
                     return@launch
                 }
 
+                VaultSession.lockIfExpired()
                 val alreadyUnlocked = try { repository.isUnlocked() } catch (_: Exception) { false }
                 if (alreadyUnlocked) {
                     _appState.value = AppState.UNLOCKED
@@ -106,40 +108,9 @@ class AppViewModel(
         return result.synced
     }
 
-    fun onAppBackgrounded() {
-        if (_appState.value != AppState.UNLOCKED) return
-        autolockJob?.cancel()
-        autolockJob = viewModelScope.launch {
-            val minutes = preferences.autolockMinutesFlow.first()
-            if (minutes == 0) return@launch
-            delay(minutes * 60 * 1000L)
-            performAutoLock()
-        }
-    }
-
-    fun onAppForegrounded() {
-        autolockJob?.cancel()
-        autolockJob = null
-        if (_appState.value == AppState.UNLOCKED) {
-            viewModelScope.launch {
-                val unlocked = try { repository.isUnlocked() } catch (_: Exception) { false }
-                if (!unlocked) {
-                    _appState.value = AppState.LOCKED
-                }
-            }
-        }
-    }
-
-    private suspend fun performAutoLock() {
-        withContext(NonCancellable) {
-            try {
-                val encryptedBytes = repository.lock()
-                repository.writeVaultFile(encryptedBytes)
-                _appState.value = AppState.LOCKED
-            } catch (_: Exception) {
-                // Lock failed - vault remains in current state
-            }
-        }
+    /** 「今すぐロック」。ロック後の画面切り替えは[VaultSession.lockEvents]経由で行われる */
+    fun lockNow() {
+        viewModelScope.launch { VaultSession.lockNow() }
     }
 
 }

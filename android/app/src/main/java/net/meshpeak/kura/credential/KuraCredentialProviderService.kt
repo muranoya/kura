@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.meshpeak.kura.data.repository.IVaultRepository
 import net.meshpeak.kura.data.repository.VaultRepository
+import net.meshpeak.kura.data.session.VaultSession
 
 /**
  * ブラウザ・ネイティブアプリからのPasskey create/getリクエストに応答する
@@ -52,6 +53,7 @@ class KuraCredentialProviderService : CredentialProviderService() {
     ) {
         val job = serviceScope.launch {
             val response = try {
+                VaultSession.lockIfExpired()
                 GetCredentialQueryBuilder.build(applicationContext, repository, request)
             } catch (_: Exception) {
                 BeginGetCredentialResponse()

@@ -178,6 +178,8 @@ Autofillフレームワークから呼び出される`AutofillService`実装と�
 
 vault IDは既存実装同様、固定値を用いる。複数vault対応は現状スコープ外。
 
+アンロック状態はプロセス全体で共有されるため、自動ロックも特定のActivityではなくプロセス単位の`VaultSession`（`data/session/VaultSession.kt`）が管理する。`ProcessLifecycleOwner`でプロセスがバックグラウンドに移った時刻を記録し、設定時間後にロックする。MainActivityを経由せず、オートフィルやPasskeyの認証画面でアンロックした場合も、その画面が閉じた時点から計測が始まる。タイマーは端末のディープスリープ中に進まないため、`onFillRequest`・Passkeyの`onBeginGetCredentialRequest`・アプリの表示といった入口でも、バックグラウンドに移ってからの実経過時間（`SystemClock.elapsedRealtime()`）を見て、期限切れならロックしてから処理する。ロック時は自動クリア待ちのクリップボードも即座にクリアする。ドロワーの「今すぐロック」からも同じ処理でロックできる。
+
 ## 2-2. 認証フロー
 
 `onFillRequest`の冒頭でvaultのロック状態を確認する。
