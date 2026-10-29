@@ -207,6 +207,13 @@ Content ScriptはISOLATED world（ページスクリプトとは分離された�
 
 フィールドへの入力前に対象要素の視認性をチェックし、不可視のフォーム（invisible form攻撃）へのクレデンシャル書き込みを防ぐ。正規サイトのページ内に広告等でinvisible formが埋め込まれている場合の攻撃を無効化する。
 
+### 2-3.6 Service Workerでの送信元検証
+
+Content Scriptは全サイト・全フレームのレンダラープロセス内で動作するため、最も信頼度の低い送信元として扱う（レンダラーが侵害されると、Content Scriptになりすまして任意のメッセージを送れる）。Service Workerの`runtime.onMessage`は、処理の前に`background/sender.ts`の`isMessageAllowed`で送信元を検証する。
+
+- 拡張機能自身のページ（サイドバー、WebAuthn儀式ウィンドウ等）: `sender.url`が`chrome.runtime.getURL('')`で始まるもの。全メッセージを受け付ける。儀式ウィンドウやFirefoxのフォールバックポップアップはタブとして開かれ`sender.tab`を持つため、`sender.tab`の有無では判定しない
+- Content Script: オートフィル・キャプチャ・TOTP QR・ピッカー・WebAuthnリクエスト等、Content Scriptが実際に送る種別のみを許可リストで受け付ける。`LIST_ENTRIES`・`GET_DECRYPTED_S3_CONFIG`・`CREATE_VAULT`・`SAVE_SETTINGS`等は拒否する
+
 # Part 3: 個別設計
 
 ## 3-1. フォーム検出ヒューリスティック

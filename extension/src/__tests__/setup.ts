@@ -58,6 +58,7 @@ const sendMessageMock = vi.fn(
 
 globalThis.chrome = {
   runtime: {
+    id: 'test-id',
     sendMessage: sendMessageMock,
     onMessage: {
       addListener: vi.fn(noop),

@@ -23,6 +23,7 @@ import {
   onVaultUnlocked,
 } from './autofill'
 import { clearPickerContext, handlePickerMessage, initPicker } from './picker'
+import { isMessageAllowed } from './sender'
 import { initSidebar, openSidebar } from './sidebar'
 import { clearTotpQrScanContext, handleTotpQrMessage, initTotpQrScan } from './totp-qr-scan'
 import { initWasmManual } from './wasm-init'
@@ -164,6 +165,15 @@ function initWasm(): Promise<void> {
 
 function setupMessageHandlers() {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // Content Script（Webページのレンダラー内で動作）からは、許可リストにある
+    // メッセージだけを受け付ける。Vault全体の閲覧・S3認証情報の取得・設定変更等は
+    // 拡張機能自身のページからのみ実行可能にする（background/sender.ts参照）
+    if (!isMessageAllowed(message?.type, sender)) {
+      console.warn('[SW] Rejected message from untrusted sender:', message?.type, sender.url)
+      sendResponse({ success: false, error: 'Forbidden' })
+      return false
+    }
+
     // サイドバーの表示はユーザー操作の文脈内で同期的に呼ぶ必要があるため、
     // await を含む handleMessage より前に処理する
     if (message?.type === 'AUTOFILL_OPEN_SIDEBAR') {
