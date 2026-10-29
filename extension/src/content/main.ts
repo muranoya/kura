@@ -9,6 +9,7 @@ import { fillField, fillFields } from './filler'
 import { type DetectedForm, detectForm, isVisible } from './form-detector'
 import {
   getCredentials,
+  type PendingFlowResult,
   queryPendingFlow,
   requestFillData,
   requestOpenSidebar,
@@ -170,23 +171,15 @@ async function handleInputFocus(input: HTMLInputElement) {
     return
   }
 
-  // === TOTP: dropdown selection (or auto-fill if pending flow exists) ===
-  if (form.formType === 'TOTP') {
-    // Check pending flow first (split login: use the same entry selected in username step)
-    const pending = await queryPendingFlow()
-    if (pending) {
-      const totpResult = await requestTotp(pending.entryId)
-      if (totpResult) {
-        const totpField = form.fields.find((f) => f.type === 'totp')
-        if (totpField && isVisible(totpField.element)) {
-          fillField(totpField.element, totpResult.totpCode)
-        }
-      }
-      return
-    }
+  // Split login: the entry picked on the username step is suggested first
+  // (and preselected) on the password / TOTP step. It is still only filled
+  // after the user confirms it — never automatically on focus.
+  const pending =
+    form.formType === 'TOTP' || form.formType === 'LOGIN_PASSWORD' ? await queryPendingFlow() : null
 
-    // No pending flow — show dropdown for candidate selection
-    const candidates = await requestTotpCandidates()
+  // === TOTP: dropdown selection ===
+  if (form.formType === 'TOTP') {
+    const candidates = prioritizePending(await requestTotpCandidates(), pending)
     if (candidates.length === 0) {
       hideDropdown()
       return
@@ -207,6 +200,7 @@ async function handleInputFocus(input: HTMLInputElement) {
           }
         },
         window.location.protocol,
+        pending !== null && candidates[0]?.entryId === pending.entryId,
       )
     }
     showInlineIcon(input, showTotpDropdown)
@@ -214,19 +208,6 @@ async function handleInputFocus(input: HTMLInputElement) {
       showTotpDropdown()
     }
     return
-  }
-
-  // === Split login: check for pending flow on LOGIN_PASSWORD ===
-  if (form.formType === 'LOGIN_PASSWORD') {
-    const pending = await queryPendingFlow()
-    if (pending?.password) {
-      const passwordField = form.fields.find((f) => f.type === 'password')
-      if (passwordField && isVisible(passwordField.element)) {
-        fillField(passwordField.element, pending.password)
-        return
-      }
-    }
-    // Fall through to normal dropdown flow
   }
 
   // === Credit card: autofill is intentionally not supported ===
@@ -254,7 +235,7 @@ async function handleInputFocus(input: HTMLInputElement) {
     return
   }
 
-  const candidates = result.credentials
+  const candidates = prioritizePending(result.credentials, pending)
 
   if (candidates.length === 0) {
     hideDropdown()
@@ -269,12 +250,28 @@ async function handleInputFocus(input: HTMLInputElement) {
         onCandidateSelected(candidate, form)
       },
       window.location.protocol,
+      pending !== null && candidates[0]?.entryId === pending.entryId,
     )
   }
   showInlineIcon(input, showLoginDropdown)
   if (!input.value.trim()) {
     showLoginDropdown()
   }
+}
+
+/**
+ * Move the split-login pending entry to the front of the candidate list.
+ * Returns the list unchanged when there is no pending flow or the pending
+ * entry is not among the candidates.
+ */
+function prioritizePending(
+  candidates: AutofillCredentialCandidate[],
+  pending: PendingFlowResult | null,
+): AutofillCredentialCandidate[] {
+  if (!pending) return candidates
+  const index = candidates.findIndex((c) => c.entryId === pending.entryId)
+  if (index <= 0) return candidates
+  return [candidates[index], ...candidates.slice(0, index), ...candidates.slice(index + 1)]
 }
 
 /**

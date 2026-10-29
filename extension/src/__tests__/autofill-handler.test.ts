@@ -594,10 +594,10 @@ describe('handleAutofillMessage', () => {
   // ========== Pending flow (split login) ==========
 
   describe('pending flow', () => {
-    const sender = (tabId: number): chrome.runtime.MessageSender =>
-      ({ tab: { id: tabId } }) as chrome.runtime.MessageSender
+    const sender = (tabId: number, frameId = 0): chrome.runtime.MessageSender =>
+      ({ tab: { id: tabId }, frameId }) as chrome.runtime.MessageSender
 
-    it('stores and queries pending flow', async () => {
+    it('stores and queries pending flow without exposing the password', async () => {
       // Store
       const storeResult = await callHandler(
         {
@@ -610,23 +610,70 @@ describe('handleAutofillMessage', () => {
       )
       expect(storeResult).toEqual({ success: true })
 
-      // Query
+      // Query from the next page of the same origin
       const queryResult = (await callHandler(
         {
           type: 'AUTOFILL_PENDING_FLOW_QUERY',
-          url: 'https://www.example.com/password',
+          url: 'https://login.example.com/password',
         },
         sender(100),
-      )) as {
-        success: boolean
-        pendingFlow: { entryId: string; username: string; password: string }
-      }
+      )) as { success: boolean; pendingFlow: Record<string, unknown> }
 
-      expect(queryResult.success).toBe(true)
-      expect(queryResult.pendingFlow).not.toBeNull()
-      expect(queryResult.pendingFlow.entryId).toBe('entry-1')
-      expect(queryResult.pendingFlow.username).toBe('user@example.com')
-      expect(queryResult.pendingFlow.password).toBe('secret123')
+      expect(queryResult).toEqual({
+        success: true,
+        pendingFlow: { entryId: 'entry-1', username: 'user@example.com' },
+      })
+    })
+
+    it('returns null for another origin of the same site', async () => {
+      await callHandler(
+        {
+          type: 'AUTOFILL_PENDING_FLOW_STORE',
+          url: 'https://login.example.com/username',
+          entryId: 'entry-1',
+          username: 'user@example.com',
+        },
+        sender(110),
+      )
+
+      const result = (await callHandler(
+        { type: 'AUTOFILL_PENDING_FLOW_QUERY', url: 'https://user-content.example.com/' },
+        sender(110),
+      )) as { success: boolean; pendingFlow: null }
+
+      expect(result).toEqual({ success: true, pendingFlow: null })
+    })
+
+    it('returns null for another frame in the same tab', async () => {
+      await callHandler(
+        {
+          type: 'AUTOFILL_PENDING_FLOW_STORE',
+          url: 'https://example.com/username',
+          entryId: 'entry-1',
+          username: 'user@example.com',
+        },
+        sender(120, 0),
+      )
+
+      const result = (await callHandler(
+        { type: 'AUTOFILL_PENDING_FLOW_QUERY', url: 'https://example.com/password' },
+        sender(120, 3),
+      )) as { success: boolean; pendingFlow: null }
+
+      expect(result).toEqual({ success: true, pendingFlow: null })
+    })
+
+    it('refuses to store an entry that is not a candidate for the page', async () => {
+      const result = await callHandler(
+        {
+          type: 'AUTOFILL_PENDING_FLOW_STORE',
+          url: 'https://example.com/username',
+          entryId: 'entry-3', // other.com
+          username: 'other@other.com',
+        },
+        sender(130),
+      )
+      expect(result).toEqual({ success: false, error: 'Entry not found' })
     })
 
     it('pending flow is non-destructive (available for TOTP step after password step)', async () => {

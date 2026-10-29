@@ -122,8 +122,8 @@ Service Worker
 | `AUTOFILL_GET_CREDENTIALS` | `{ strictSubdomain?: boolean }` | `{ credentials: AutofillCredentialCandidate[] }` | 送信元フレームのURLに一致するクレデンシャル候補のリストを要求 |
 | `AUTOFILL_FILL_REQUEST` | `{ entryId: string }` | `{ fillData: AutofillFillData }` | 選択されたエントリの完全なクレデンシャルを要求。`entryId`が送信元フレームのURLの候補に含まれない場合は拒否 |
 | `AUTOFILL_GET_TOTP` | `{ entryId: string }` | `{ totpCode: string \| null }` | 指定エントリのTOTPコードを要求。`entryId`が送信元フレームのURLの候補に含まれない場合は`null` |
-| `AUTOFILL_PENDING_FLOW_STORE` | `{ entryId: string, username: string }` | `{ success: boolean }` | 分割ログインフローの状態をService Workerに保存（Section 3-5参照） |
-| `AUTOFILL_PENDING_FLOW_QUERY` | `{}` | `{ pendingFlow: { entryId, username, password } \| null }` | 分割ログインフローの保存状態を問い合わせ。非破壊（TOTPステップでも再利用可能） |
+| `AUTOFILL_PENDING_FLOW_STORE` | `{ entryId: string, username: string }` | `{ success: boolean }` | 分割ログインフローの状態をService Workerに保存（Section 3-5参照）。`entryId`が送信元フレームのURLの候補に含まれない場合は拒否 |
+| `AUTOFILL_PENDING_FLOW_QUERY` | `{}` | `{ pendingFlow: { entryId, username } \| null }` | 分割ログインフローの保存状態を問い合わせ。パスワードは返さない。非破壊（TOTPステップでも再利用可能） |
 | `AUTOFILL_SAVE_CAPTURED` | `{ name: string \| null, username: string \| null, password: string }` | `{ success: boolean, entryId: string }` | 手動キャプチャしたクレデンシャルを新規エントリとしてvaultに保存（Section 1-6参照） |
 | `AUTOFILL_OPEN_SIDEBAR` | `{}` | `{ success: boolean }` | サイドバーを開く（ロック状態のドロップダウンから使用）。ユーザー操作の文脈を保つため、Service Worker は他の処理より先に同期的に処理する |
 
@@ -326,7 +326,7 @@ SPA遷移後に新しいフォームが出現した場合も、ユーザーが�
 
 **マッチ対象となるURLは エントリの `typed_value.url`（ログインURL）に加え、URL型カスタムフィールド（`field_type == "url"`）の値も含まれる。** これにより、1つのログインエントリに複数のサイトURLを紐付けることができる（例: メインURLとは別に、リカバリ用URLや関連サービスのURLをカスタムフィールドに登録すれば、それらのサイトでも同じエントリが候補に出る）。マッチング処理は`vault-core/src/api/entries.rs`の`api_list_login_candidates`で一元化されている。
 
-**TypeScript版（`extension/src/shared/etld.ts`）は分割ログインフロー（Section 3-5）のpending-flowドメインキー比較にのみ使用し、vaultエントリのマッチングには使用しない。** ビルド時処理は以下の通り:
+**TypeScript版（`extension/src/shared/etld.ts`）はWebAuthnのrp_id検証（`isValidRpId`、[`docs/webauthn-passkey.md`](webauthn-passkey.md) 3-5節）に使用し、vaultエントリのマッチングには使用しない。** ビルド時処理は以下の通り:
 
 1. `extension/scripts/generate-etld.ts`が`assets/public_suffix_list.dat`を読み込む
 2. コメント行・空行を除去し、通常ルール・ワイルドカード・例外をパースする
@@ -343,7 +343,8 @@ Service WorkerのインメモリMapでフロー状態を管理する。Content S
 ```typescript
 // Service Worker
 const pendingLoginFlows = new Map<number, {
-  domain: string;
+  origin: string;   // 保存したフレームの厳密なorigin（scheme + host + port）
+  frameId: number;  // 保存したフレームのframeId
   entryId: string;
   username: string;
   timestamp: number;
@@ -356,10 +357,13 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 **検知フロー：**
 
-1. LOGIN_USERNAMEフォームを検出し、kuraがusernameを入力（またはユーザーが手動入力）
-2. Service WorkerのメモリにtabIdをキーとして `pendingLoginFlows.set(tabId, { domain, entryId, username, timestamp })` を保存
-3. 次のページ/DOM状態でLOGIN_PASSWORDフォームを検出した場合、`pendingLoginFlows`を参照して同一フローとして扱う
-4. タイムアウト（5分）経過後、またはタブクローズ時（`chrome.tabs.onRemoved`）に`pendingLoginFlows`から削除する
+1. LOGIN_USERNAMEフォームを検出し、ユーザーが候補を選択してkuraがusernameを入力
+2. Service WorkerのメモリにtabIdをキーとして `pendingLoginFlows.set(tabId, { origin, frameId, entryId, username, timestamp })` を保存。`origin`/`frameId`は`sender`から取る
+3. 次のページ/DOM状態でLOGIN_PASSWORD/TOTPフォームを検出した場合、`pendingLoginFlows`を参照する。`origin`と`frameId`が保存時と一致する場合のみ同一フローとして扱う
+4. 同一フローなら、引き継いだエントリを候補の先頭に置き、選択済みの状態でドロップダウンを表示する。入力はユーザーがクリックまたはEnterで確定した場合のみ行う（フォーカスだけで自動入力はしない）
+5. タイムアウト（5分）経過後、またはタブクローズ時（`chrome.tabs.onRemoved`）に`pendingLoginFlows`から削除する
+
+**セキュリティ上の判断：** 以前はeTLD+1単位で照合し、パスワード欄へのフォーカスだけでパスワードを自動入力していた。この方式では、同じタブで同一eTLD+1の別サブドメイン（ユーザー投稿コンテンツを置くサブドメインやXSSのあるページ）に遷移した場合や、同一サイトのiframeから、スクリプトが`focus()`を呼ぶだけでパスワードを取得できた。そのため照合を厳密なoriginとframeIdに絞り、問い合わせ結果にパスワードを含めず、入力にはユーザーの確定操作を必須にした。
 
 **Service Worker再起動時の挙動：** `pendingLoginFlows`はインメモリMapに保持されるため、Service Workerが予期せず再起動した場合（ブラウザによるアイドル停止等）、保持中のデータは消失する。これは想定された動作であり、ユーザーは分割ログインの2画面目で手動でクレデンシャルを選択し直す必要がある。
 

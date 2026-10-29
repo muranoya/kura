@@ -455,6 +455,7 @@ export function showDropdown(
   candidates: AutofillCredentialCandidate[],
   onSelect: (candidate: AutofillCredentialCandidate) => void,
   pageProtocol?: string,
+  preselectFirst = false,
 ) {
   if (candidates.length === 0) {
     hideDropdown()
@@ -464,7 +465,7 @@ export function showDropdown(
   const root = ensureShadowHost()
   currentAnchor = anchor
   currentCandidates = candidates
-  selectedIndex = -1
+  selectedIndex = preselectFirst ? 0 : -1
   onSelectCallback = onSelect
   currentPageProtocol = pageProtocol || null
 

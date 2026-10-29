@@ -92,7 +92,6 @@ export async function storePendingFlow(entryId: string, username: string): Promi
 export interface PendingFlowResult {
   entryId: string
   username: string
-  password: string
 }
 
 export async function queryPendingFlow(): Promise<PendingFlowResult | null> {

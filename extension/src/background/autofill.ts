@@ -1,7 +1,6 @@
 // Autofill message handler and content script injection management
 
 import { DEFAULT_VAULT_ID } from '../shared/constants'
-import { extractETldPlus1 } from '../shared/etld'
 import { broadcastToExtensionPages } from '../shared/messages'
 import { queryActiveBrowserTab } from '../shared/tabs'
 import type {
@@ -230,8 +229,13 @@ function getTotpForEntry(entryId: string): TotpResult | null {
 
 // ========== Pending login flow (split login) ==========
 
+// Remembers which entry the user picked on the username step so the password
+// / TOTP step can suggest it first. It never carries the password itself:
+// the next step still fills only after the user confirms the suggestion.
 interface PendingLoginFlow {
-  domain: string
+  /** Exact origin (scheme + host + port) of the frame that picked the entry */
+  origin: string
+  frameId: number
   entryId: string
   username: string
   timestamp: number
@@ -240,13 +244,14 @@ interface PendingLoginFlow {
 const pendingLoginFlows = new Map<number, PendingLoginFlow>()
 const PENDING_FLOW_TIMEOUT_MS = 5 * 60 * 1000
 
-function storePendingLoginFlow(tabId: number, domain: string, entryId: string, username: string) {
-  pendingLoginFlows.set(tabId, { domain, entryId, username, timestamp: Date.now() })
+function storePendingLoginFlow(tabId: number, flow: Omit<PendingLoginFlow, 'timestamp'>) {
+  pendingLoginFlows.set(tabId, { ...flow, timestamp: Date.now() })
 }
 
 function queryPendingLoginFlow(
   tabId: number,
-  domain: string,
+  origin: string,
+  frameId: number,
 ): { entryId: string; username: string } | null {
   const flow = pendingLoginFlows.get(tabId)
   if (!flow) return null
@@ -256,7 +261,7 @@ function queryPendingLoginFlow(
     return null
   }
 
-  if (flow.domain !== domain) {
+  if (flow.origin !== origin || flow.frameId !== frameId) {
     return null
   }
 
@@ -300,6 +305,15 @@ export function onVaultLocked() {
 }
 
 // ========== Message handler ==========
+
+function originOf(url: string): string | null {
+  try {
+    const origin = new URL(url).origin
+    return origin === 'null' ? null : origin
+  } catch {
+    return null
+  }
+}
 
 /** Whether `entryId` is one of the login candidates offered to the page at `pageUrl`. */
 function isCandidateForUrl(entryId: string, pageUrl: string): boolean {
@@ -388,15 +402,9 @@ export async function handleAutofillMessage(
         sendResponse({ success: false, error: 'No tab ID' })
         break
       }
-      if (!pageUrl) {
+      const storeOrigin = originOf(pageUrl)
+      if (!storeOrigin) {
         sendResponse({ success: false, error: 'URL required' })
-        break
-      }
-      let storeDomain: string
-      try {
-        storeDomain = extractETldPlus1(new URL(pageUrl).hostname)
-      } catch {
-        sendResponse({ success: false, error: 'Invalid URL' })
         break
       }
       const storeEntryId = message.entryId as string
@@ -404,12 +412,12 @@ export async function handleAutofillMessage(
         sendResponse({ success: false, error: 'Entry not found' })
         break
       }
-      storePendingLoginFlow(
-        storeTabId,
-        storeDomain,
-        storeEntryId,
-        (message.username as string) || '',
-      )
+      storePendingLoginFlow(storeTabId, {
+        origin: storeOrigin,
+        frameId: sender.frameId ?? 0,
+        entryId: storeEntryId,
+        username: (message.username as string) || '',
+      })
       sendResponse({ success: true })
       break
     }
@@ -420,7 +428,8 @@ export async function handleAutofillMessage(
         sendResponse({ success: false, error: 'No tab ID' })
         break
       }
-      if (!pageUrl) {
+      const queryOrigin = originOf(pageUrl)
+      if (!queryOrigin) {
         sendResponse({ success: false, error: 'URL required' })
         break
       }
@@ -428,27 +437,8 @@ export async function handleAutofillMessage(
         sendResponse({ success: true, pendingFlow: null })
         break
       }
-      let queryDomain: string
-      try {
-        queryDomain = extractETldPlus1(new URL(pageUrl).hostname)
-      } catch {
-        sendResponse({ success: true, pendingFlow: null })
-        break
-      }
-      const flow = queryPendingLoginFlow(queryTabId, queryDomain)
-      if (flow) {
-        const flowFillData = getFillData(flow.entryId)
-        sendResponse({
-          success: true,
-          pendingFlow: {
-            entryId: flow.entryId,
-            username: flow.username,
-            password: flowFillData?.password || '',
-          },
-        })
-      } else {
-        sendResponse({ success: true, pendingFlow: null })
-      }
+      const flow = queryPendingLoginFlow(queryTabId, queryOrigin, sender.frameId ?? 0)
+      sendResponse({ success: true, pendingFlow: flow })
       break
     }
 
