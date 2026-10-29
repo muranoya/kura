@@ -848,9 +848,10 @@ async function handleMessage(
             message.recoveryKey,
             message.newPassword,
           )
-          const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
-          await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
-          await saveToStorage(STORAGE_KEYS.VAULT_ETAG, null)
+          // ETag は最後に同期したリモートの版を指したままにする（次の同期でマージする）
+          await saveLocally()
+          // S3設定は DEK 由来の鍵で暗号化しているので、新しいパスワードでも復号できる
+          await loadS3Config(message.newPassword)
           unlocked = true
           updateExtensionIcon(true)
           await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.newPassword)
@@ -860,6 +861,8 @@ async function handleMessage(
           await resumeLockedWebauthnRituals()
           sendResponse({ success: true })
           onVaultUnlocked()
+          // 再設定したスロットは更新時刻が新しいので、同期でリモートの古いスロットに負けない
+          autoSync().catch((e) => console.error('[SW] Post-recovery sync failed:', e))
         } catch (err) {
           // SW側はロック状態のままなので、WASMセッションだけアンロック済みで残さない
           if (!unlocked && vault.api_is_unlocked(DEFAULT_VAULT_ID)) {
