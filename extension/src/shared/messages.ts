@@ -95,18 +95,17 @@ export type Message =
   | { type: 'CLIPBOARD_COPIED' }
 
   // Autofill (Content Script → Service Worker)
-  | { type: 'AUTOFILL_GET_CREDENTIALS'; url: string; strictSubdomain?: boolean }
+  | { type: 'AUTOFILL_GET_CREDENTIALS'; strictSubdomain?: boolean }
   | { type: 'AUTOFILL_FILL_REQUEST'; entryId: string }
-  | { type: 'AUTOFILL_GET_TOTP'; url: string; entryId: string }
-  | { type: 'AUTOFILL_GET_TOTP_CANDIDATES'; url: string }
-  | { type: 'AUTOFILL_PENDING_FLOW_STORE'; entryId: string; username: string; url: string }
-  | { type: 'AUTOFILL_PENDING_FLOW_QUERY'; url: string }
+  | { type: 'AUTOFILL_GET_TOTP'; entryId: string }
+  | { type: 'AUTOFILL_GET_TOTP_CANDIDATES' }
+  | { type: 'AUTOFILL_PENDING_FLOW_STORE'; entryId: string; username: string }
+  | { type: 'AUTOFILL_PENDING_FLOW_QUERY' }
 
   // Autofill: Credential Capture
   | { type: 'AUTOFILL_START_CAPTURE' }
   | {
       type: 'AUTOFILL_SAVE_CAPTURED'
-      url: string
       name: string | null
       username: string | null
       password: string

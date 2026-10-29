@@ -301,25 +301,37 @@ export function onVaultLocked() {
 
 // ========== Message handler ==========
 
+/** Whether `entryId` is one of the login candidates offered to the page at `pageUrl`. */
+function isCandidateForUrl(entryId: string, pageUrl: string): boolean {
+  // strictSubdomain=false yields the widest (eTLD+1) candidate set, which is a
+  // superset of what a site pattern with strict_subdomain would offer
+  return getCredentialsForUrl(pageUrl).some((c) => c.entryId === entryId)
+}
+
 export async function handleAutofillMessage(
   message: Record<string, unknown>,
-  _sender: chrome.runtime.MessageSender,
+  sender: chrome.runtime.MessageSender,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies
   sendResponse: (response?: any) => void,
 ) {
+  // The page URL always comes from the browser-attested sender (the URL of the
+  // frame the content script runs in), never from the message payload: a
+  // compromised renderer could otherwise claim to be any site and request
+  // that site's credentials.
+  const pageUrl = sender.url ?? ''
+
   switch (message.type) {
     case 'AUTOFILL_GET_CREDENTIALS': {
       if (!isUnlocked()) {
         sendResponse({ success: false, error: 'Vault not unlocked' })
         break
       }
-      const url = message.url as string
-      if (!url) {
+      if (!pageUrl) {
         sendResponse({ success: false, error: 'URL required' })
         break
       }
       const strictSubdomain = message.strictSubdomain as boolean | undefined
-      const credentials = getCredentialsForUrl(url, strictSubdomain)
+      const credentials = getCredentialsForUrl(pageUrl, strictSubdomain)
       sendResponse({ success: true, credentials })
       break
     }
@@ -334,7 +346,7 @@ export async function handleAutofillMessage(
         sendResponse({ success: false, error: 'Entry ID required' })
         break
       }
-      const fillData = getFillData(entryId)
+      const fillData = isCandidateForUrl(entryId, pageUrl) ? getFillData(entryId) : null
       if (!fillData) {
         sendResponse({ success: false, error: 'Entry not found' })
         break
@@ -349,7 +361,8 @@ export async function handleAutofillMessage(
         break
       }
       const totpEntryId = message.entryId as string
-      const totpResult = getTotpForEntry(totpEntryId)
+      const totpResult =
+        totpEntryId && isCandidateForUrl(totpEntryId, pageUrl) ? getTotpForEntry(totpEntryId) : null
 
       if (totpResult) {
         sendResponse({ success: true, ...totpResult })
@@ -364,34 +377,37 @@ export async function handleAutofillMessage(
         sendResponse({ success: false, error: 'Vault not unlocked' })
         break
       }
-      const totpCandidateUrl = message.url as string
-      const totpCandidates = getTotpCandidatesForUrl(totpCandidateUrl)
+      const totpCandidates = getTotpCandidatesForUrl(pageUrl)
       sendResponse({ success: true, totpCandidates })
       break
     }
 
     case 'AUTOFILL_PENDING_FLOW_STORE': {
-      const storeTabId = _sender.tab?.id
+      const storeTabId = sender.tab?.id
       if (!storeTabId) {
         sendResponse({ success: false, error: 'No tab ID' })
         break
       }
-      const storeUrl = message.url as string
-      if (!storeUrl) {
+      if (!pageUrl) {
         sendResponse({ success: false, error: 'URL required' })
         break
       }
       let storeDomain: string
       try {
-        storeDomain = extractETldPlus1(new URL(storeUrl).hostname)
+        storeDomain = extractETldPlus1(new URL(pageUrl).hostname)
       } catch {
         sendResponse({ success: false, error: 'Invalid URL' })
+        break
+      }
+      const storeEntryId = message.entryId as string
+      if (!storeEntryId || !isCandidateForUrl(storeEntryId, pageUrl)) {
+        sendResponse({ success: false, error: 'Entry not found' })
         break
       }
       storePendingLoginFlow(
         storeTabId,
         storeDomain,
-        message.entryId as string,
+        storeEntryId,
         (message.username as string) || '',
       )
       sendResponse({ success: true })
@@ -399,13 +415,12 @@ export async function handleAutofillMessage(
     }
 
     case 'AUTOFILL_PENDING_FLOW_QUERY': {
-      const queryTabId = _sender.tab?.id
+      const queryTabId = sender.tab?.id
       if (!queryTabId) {
         sendResponse({ success: false, error: 'No tab ID' })
         break
       }
-      const queryUrl = message.url as string
-      if (!queryUrl) {
+      if (!pageUrl) {
         sendResponse({ success: false, error: 'URL required' })
         break
       }
@@ -415,7 +430,7 @@ export async function handleAutofillMessage(
       }
       let queryDomain: string
       try {
-        queryDomain = extractETldPlus1(new URL(queryUrl).hostname)
+        queryDomain = extractETldPlus1(new URL(pageUrl).hostname)
       } catch {
         sendResponse({ success: true, pendingFlow: null })
         break
@@ -462,7 +477,7 @@ export async function handleAutofillMessage(
         break
       }
       const syncFn = autoSyncFn
-      const captureUrl = message.url as string
+      const captureUrl = pageUrl
       const captureName = (message.name as string | null) ?? null
       const captureUsername = (message.username as string | null) ?? null
       const capturePassword = message.password as string

@@ -37,11 +37,11 @@ function sendMessage(message: Record<string, unknown>): Promise<Response> {
   })
 }
 
-export async function getCredentials(
-  url: string,
-  strictSubdomain?: boolean,
-): Promise<GetCredentialsResult> {
-  const response = await sendMessage({ type: 'AUTOFILL_GET_CREDENTIALS', url, strictSubdomain })
+// The page URL is not sent: the Service Worker derives it from the message
+// sender (the frame this content script runs in), which the page cannot forge.
+
+export async function getCredentials(strictSubdomain?: boolean): Promise<GetCredentialsResult> {
+  const response = await sendMessage({ type: 'AUTOFILL_GET_CREDENTIALS', strictSubdomain })
   if (response.success && 'credentials' in response) {
     return { status: 'ok', credentials: response.credentials || [] }
   }
@@ -64,35 +64,27 @@ export async function requestOpenSidebar(): Promise<boolean> {
   return response.success
 }
 
-export async function requestTotp(
-  url: string,
-  entryId: string,
-): Promise<{ totpCode: string } | null> {
-  const response = await sendMessage({ type: 'AUTOFILL_GET_TOTP', url, entryId })
+export async function requestTotp(entryId: string): Promise<{ totpCode: string } | null> {
+  const response = await sendMessage({ type: 'AUTOFILL_GET_TOTP', entryId })
   if (response.success && 'totpCode' in response && response.totpCode) {
     return { totpCode: response.totpCode as string }
   }
   return null
 }
 
-export async function requestTotpCandidates(url: string): Promise<AutofillCredentialCandidate[]> {
-  const response = await sendMessage({ type: 'AUTOFILL_GET_TOTP_CANDIDATES', url })
+export async function requestTotpCandidates(): Promise<AutofillCredentialCandidate[]> {
+  const response = await sendMessage({ type: 'AUTOFILL_GET_TOTP_CANDIDATES' })
   if (response.success && 'totpCandidates' in response) {
     return (response.totpCandidates as AutofillCredentialCandidate[]) || []
   }
   return []
 }
 
-export async function storePendingFlow(
-  entryId: string,
-  username: string,
-  url: string,
-): Promise<boolean> {
+export async function storePendingFlow(entryId: string, username: string): Promise<boolean> {
   const response = await sendMessage({
     type: 'AUTOFILL_PENDING_FLOW_STORE',
     entryId,
     username,
-    url,
   })
   return response.success
 }
@@ -103,8 +95,8 @@ export interface PendingFlowResult {
   password: string
 }
 
-export async function queryPendingFlow(url: string): Promise<PendingFlowResult | null> {
-  const response = await sendMessage({ type: 'AUTOFILL_PENDING_FLOW_QUERY', url })
+export async function queryPendingFlow(): Promise<PendingFlowResult | null> {
+  const response = await sendMessage({ type: 'AUTOFILL_PENDING_FLOW_QUERY' })
   if (response.success && 'pendingFlow' in response && response.pendingFlow) {
     return response.pendingFlow as PendingFlowResult
   }
@@ -137,14 +129,12 @@ export async function generatePassword(
 }
 
 export async function saveCapturedCredential(
-  url: string,
   name: string | null,
   username: string | null,
   password: string,
 ): Promise<{ success: boolean; error?: string; entryId?: string }> {
   const response = await sendMessage({
     type: 'AUTOFILL_SAVE_CAPTURED',
-    url,
     name,
     username,
     password,

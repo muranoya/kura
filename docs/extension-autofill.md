@@ -115,14 +115,16 @@ Service Worker
 
 **Content Script → Service Worker（`chrome.runtime.sendMessage` + `sendResponse`コールバック）：**
 
+ページのURLはペイロードに含めない。Service Workerはブラウザが付与する`sender.url`（メッセージを送ったフレームのURL）を使う。ペイロードのURLを信用すると、侵害されたレンダラーが任意のサイトを名乗ってそのサイトのクレデンシャルを取得できてしまうため。
+
 | タイプ | ペイロード | レスポンス | 説明 |
 |--------|----------|----------|------|
-| `AUTOFILL_GET_CREDENTIALS` | `{ url: string, strictSubdomain?: boolean }` | `{ credentials: AutofillCredentialCandidate[] }` | 指定URLに一致するクレデンシャル候補のリストを要求 |
-| `AUTOFILL_FILL_REQUEST` | `{ entryId: string }` | `{ fillData: AutofillFillData }` | 選択されたエントリの完全なクレデンシャルを要求 |
-| `AUTOFILL_GET_TOTP` | `{ url: string, entryId?: string }` | `{ totpCode: string \| null, totpEntryName: string }` | TOTP コードを要求。`entryId`指定時はそのエントリから取得、未指定時はURLマッチで検索 |
-| `AUTOFILL_PENDING_FLOW_STORE` | `{ url: string, entryId: string, username: string }` | `{ success: boolean }` | 分割ログインフローの状態をService Workerに保存（Section 3-5参照） |
-| `AUTOFILL_PENDING_FLOW_QUERY` | `{ url: string }` | `{ pendingFlow: { entryId, username, password } \| null }` | 分割ログインフローの保存状態を問い合わせ。非破壊（TOTPステップでも再利用可能） |
-| `AUTOFILL_SAVE_CAPTURED` | `{ url: string, name: string \| null, username: string \| null, password: string }` | `{ success: boolean, entryId: string }` | 手動キャプチャしたクレデンシャルを新規エントリとしてvaultに保存（Section 1-6参照） |
+| `AUTOFILL_GET_CREDENTIALS` | `{ strictSubdomain?: boolean }` | `{ credentials: AutofillCredentialCandidate[] }` | 送信元フレームのURLに一致するクレデンシャル候補のリストを要求 |
+| `AUTOFILL_FILL_REQUEST` | `{ entryId: string }` | `{ fillData: AutofillFillData }` | 選択されたエントリの完全なクレデンシャルを要求。`entryId`が送信元フレームのURLの候補に含まれない場合は拒否 |
+| `AUTOFILL_GET_TOTP` | `{ entryId: string }` | `{ totpCode: string \| null }` | 指定エントリのTOTPコードを要求。`entryId`が送信元フレームのURLの候補に含まれない場合は`null` |
+| `AUTOFILL_PENDING_FLOW_STORE` | `{ entryId: string, username: string }` | `{ success: boolean }` | 分割ログインフローの状態をService Workerに保存（Section 3-5参照） |
+| `AUTOFILL_PENDING_FLOW_QUERY` | `{}` | `{ pendingFlow: { entryId, username, password } \| null }` | 分割ログインフローの保存状態を問い合わせ。非破壊（TOTPステップでも再利用可能） |
+| `AUTOFILL_SAVE_CAPTURED` | `{ name: string \| null, username: string \| null, password: string }` | `{ success: boolean, entryId: string }` | 手動キャプチャしたクレデンシャルを新規エントリとしてvaultに保存（Section 1-6参照） |
 | `AUTOFILL_OPEN_SIDEBAR` | `{}` | `{ success: boolean }` | サイドバーを開く（ロック状態のドロップダウンから使用）。ユーザー操作の文脈を保つため、Service Worker は他の処理より先に同期的に処理する |
 
 **サイドバー → Service Worker（`chrome.runtime.sendMessage`）：**
@@ -158,7 +160,7 @@ Content Scriptはvault全体やDEKにアクセスしない。クレデンシャ�
 Content Script                          Service Worker
   │                                         │
   ├── AUTOFILL_GET_CREDENTIALS ──────────►  │
-  │   { url: "https://example.com" }        │
+  │   (URLはsender.urlから取得)              │
   │                                         ├── URL/ドメインマッチング
   │                                         ├── 一致するエントリを検索
   │  ◄─────── AUTOFILL_CREDENTIALS_LIST ──  │
@@ -171,6 +173,7 @@ Content Script                          Service Worker
   │                                         │
   ├── AUTOFILL_FILL_REQUEST ─────────────►  │
   │   { entryId: "uuid" }                  │
+  │                                         ├── entryIdがsender.urlの候補か検証
   │                                         ├── vault復号
   │  ◄──────── AUTOFILL_FILL_DATA ────────  │
   │   { username, password }                │

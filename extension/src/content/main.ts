@@ -170,14 +170,12 @@ async function handleInputFocus(input: HTMLInputElement) {
     return
   }
 
-  const url = window.location.href
-
   // === TOTP: dropdown selection (or auto-fill if pending flow exists) ===
   if (form.formType === 'TOTP') {
     // Check pending flow first (split login: use the same entry selected in username step)
-    const pending = await queryPendingFlow(url)
+    const pending = await queryPendingFlow()
     if (pending) {
-      const totpResult = await requestTotp(url, pending.entryId)
+      const totpResult = await requestTotp(pending.entryId)
       if (totpResult) {
         const totpField = form.fields.find((f) => f.type === 'totp')
         if (totpField && isVisible(totpField.element)) {
@@ -188,7 +186,7 @@ async function handleInputFocus(input: HTMLInputElement) {
     }
 
     // No pending flow — show dropdown for candidate selection
-    const candidates = await requestTotpCandidates(url)
+    const candidates = await requestTotpCandidates()
     if (candidates.length === 0) {
       hideDropdown()
       return
@@ -200,7 +198,7 @@ async function handleInputFocus(input: HTMLInputElement) {
         candidates,
         async (candidate) => {
           hideDropdown()
-          const totpResult = await requestTotp(url, candidate.entryId)
+          const totpResult = await requestTotp(candidate.entryId)
           if (totpResult) {
             const totpField = form.fields.find((f) => f.type === 'totp')
             if (totpField && isVisible(totpField.element)) {
@@ -220,7 +218,7 @@ async function handleInputFocus(input: HTMLInputElement) {
 
   // === Split login: check for pending flow on LOGIN_PASSWORD ===
   if (form.formType === 'LOGIN_PASSWORD') {
-    const pending = await queryPendingFlow(url)
+    const pending = await queryPendingFlow()
     if (pending?.password) {
       const passwordField = form.fields.find((f) => f.type === 'password')
       if (passwordField && isVisible(passwordField.element)) {
@@ -240,7 +238,7 @@ async function handleInputFocus(input: HTMLInputElement) {
   }
 
   // === Login, Registration, Password Change, Login_Username, Login_Password ===
-  const result = await getCredentials(url, strictSubdomain)
+  const result = await getCredentials(strictSubdomain)
 
   if (result.status === 'locked') {
     const showLocked = () => {
@@ -318,7 +316,7 @@ async function onCandidateSelected(candidate: AutofillCredentialCandidate, form:
   if (form.formType === 'LOGIN_USERNAME') {
     if (usernameField && fillData.username && isVisible(usernameField.element)) {
       fillField(usernameField.element, fillData.username)
-      await storePendingFlow(candidate.entryId, fillData.username, window.location.href)
+      await storePendingFlow(candidate.entryId, fillData.username)
     }
     // Account ID欄のようなカスタムフィールドがusername欄と同一画面上にあるケースを
     // 想定し、このタイミングでも充填する（3-4節3.）

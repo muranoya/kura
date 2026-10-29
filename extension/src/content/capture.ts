@@ -670,7 +670,6 @@ function removeAllBadges() {
 async function onSave() {
   if (!passwordField) return
 
-  const url = window.location.href
   const name = nameInput?.value?.trim() || null
   const username = usernameField?.value || null
   const password = passwordField.value
@@ -681,7 +680,7 @@ async function onSave() {
   }
 
   try {
-    const result = await saveCapturedCredential(url, name, username, password)
+    const result = await saveCapturedCredential(name, username, password)
     if (result.success) {
       showToast('クレデンシャルを保存しました', true)
     } else {
