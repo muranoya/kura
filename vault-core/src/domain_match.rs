@@ -5,7 +5,7 @@
 //! アルゴリズムは `extension/src/shared/etld.ts` の実装を移植したもの。
 //!
 //! PSLデータはリポジトリ直下 `assets/public_suffix_list.dat`
-//! （`extension/scripts/update-psl.ts` が定期更新する共有ファイル）をビルド時に
+//! （`scripts/update-assets.mjs` が定期更新する共有ファイル）をビルド時に
 //! 埋め込み、初回呼び出し時に一度だけパースしてキャッシュする。
 
 use std::collections::HashSet;
