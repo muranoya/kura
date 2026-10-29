@@ -305,3 +305,49 @@ describe('excludeCredentials match', () => {
     expect(api.api_webauthn_create_credential).not.toHaveBeenCalled()
   })
 })
+
+describe('create() target entry', () => {
+  it('refuses to attach the passkey to an entry that was not offered', async () => {
+    const api = createMockVaultApi()
+    vi.mocked(api.api_list_login_candidates).mockReturnValue(
+      JSON.stringify([
+        { id: 'bank-entry', name: 'Bank', url: 'https://bank.example', username: 'a' },
+      ]),
+    )
+    initWebauthn(
+      api,
+      () => true,
+      async () => {},
+      async () => {},
+    )
+    await saveToStorage(STORAGE_KEYS.APP_SETTINGS, { passkeyEnabled: true })
+
+    const urls: string[] = []
+    vi.mocked(chrome.windows.create).mockImplementation(((
+      options: chrome.windows.CreateData,
+      callback?: (win: chrome.windows.Window) => void,
+    ) => {
+      urls.push(options.url as string)
+      callback?.({ id: 400 } as chrome.windows.Window)
+    }) as unknown as typeof chrome.windows.create)
+
+    const pending = call(
+      { type: 'WEBAUTHN_CREATE_REQUEST', requestId: 'r', challenge: 'abc', rpId: 'bank.example' },
+      { id: 'test-id', url: 'https://bank.example/register', tab: { id: 30 } as chrome.tabs.Tab },
+    )
+    await vi.waitFor(() => expect(urls).toHaveLength(1))
+    const ritualId = new URL(urls[0]).searchParams.get('requestId') as string
+
+    await call(
+      {
+        type: 'WEBAUTHN_RITUAL_DECISION',
+        requestId: ritualId,
+        cancelled: false,
+        entryId: 'unrelated-entry',
+      },
+      { id: 'test-id', url: urls[0], tab: { id: 999, windowId: 400 } as chrome.tabs.Tab },
+    )
+    expect(await pending).toMatchObject({ success: false, errorName: 'NotAllowedError' })
+    expect(api.api_webauthn_create_credential).not.toHaveBeenCalled()
+  })
+})

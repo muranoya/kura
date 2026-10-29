@@ -491,6 +491,8 @@ async function handleCreateRequest(
   // ロック中に判明したエラー（既に登録済み等）はここに積む。儀式の解決結果からは
   // cancelled:trueとしか分からないため、正確なエラー名を後段のsendResponseへ橋渡しする。
   let abortReason: { errorName: string; error: string } | null = null
+  // Entries shown on the confirmation screen; the passkey may only be attached to one of these
+  let offeredEntryIds = new Set<string>()
 
   async function resumeAfterUnlock(): Promise<WebauthnRitualContext> {
     const computed = await computeCreateContext(req, rpId)
@@ -505,6 +507,7 @@ async function handleCreateRequest(
       abortReason = { errorName: 'NotAllowedError', error: computed.message }
       return { kind: 'error', reason: 'internal', message: computed.message }
     }
+    offeredEntryIds = new Set(computed.context.matchingEntries.map((e) => e.id))
     return computed.context
   }
 
@@ -526,6 +529,7 @@ async function handleCreateRequest(
       return
     } else {
       initialContext = computed.context
+      offeredEntryIds = new Set(computed.context.matchingEntries.map((e) => e.id))
     }
   } else {
     // vaultがロック中: まずアンロック画面を挟み、成功後に同じウィンドウでcreate確認へ進む
@@ -545,6 +549,11 @@ async function handleCreateRequest(
         success: false,
         ...(abortReason ?? { errorName: 'NotAllowedError', error: 'User cancelled' }),
       })
+      return
+    }
+
+    if (decision.entryId && !offeredEntryIds.has(decision.entryId)) {
+      sendResponse({ success: false, errorName: 'NotAllowedError', error: 'Invalid selection' })
       return
     }
 
