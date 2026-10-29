@@ -4,7 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
+import net.meshpeak.kura.SecureActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -38,7 +38,7 @@ private sealed interface CreateActivityState {
  * →ユーザー確認→`webauthnCreateCredential`呼び出し、という一連の流れをここで行う
  * （docs/android-passkey.md 3-1、6-1）。
  */
-class PasskeyCreateActivity : AppCompatActivity() {
+class PasskeyCreateActivity : SecureActivity() {
 
     private val appViewModel: AppViewModel by viewModels { AppViewModel.Factory }
     private var uiState by mutableStateOf<CreateActivityState>(CreateActivityState.Auth)
@@ -51,6 +51,8 @@ class PasskeyCreateActivity : AppCompatActivity() {
 
     /** createPasskey()の多重起動防止用（Loading状態はproceed()内部からも一時的に経由するためuiStateでは判定できない）。 */
     private var creationInProgress = false
+    /** この操作のためにユーザーを認証したか。authenticatorDataのUVフラグになる */
+    private var userVerified = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,8 +63,12 @@ class PasskeyCreateActivity : AppCompatActivity() {
                 // 二重にラップしない（AutofillUnlockActivityと同じ呼び出し方に揃える）。
                 CreateActivityState.Auth -> AutofillAuthScreen(
                     appViewModel = appViewModel,
-                    onUnlocked = { proceed() },
-                    onLogout = { finishCanceled() }
+                    onUnlocked = { verified ->
+                        userVerified = verified
+                        proceed()
+                    },
+                    onLogout = { finishCanceled() },
+                    verifyUserWhenUnlocked = true
                 )
                 is CreateActivityState.Confirm -> KuraTheme {
                     PasskeyCreateConfirmScreen(
@@ -202,7 +208,8 @@ class PasskeyCreateActivity : AppCompatActivity() {
                     info.userHandle,
                     info.userName,
                     info.userDisplayName,
-                    info.excludeCredentialIds
+                    info.excludeCredentialIds,
+                    userVerified
                 )
             } catch (_: Exception) {
                 null

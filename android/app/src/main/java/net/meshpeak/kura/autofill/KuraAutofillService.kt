@@ -19,6 +19,7 @@ import net.meshpeak.kura.autofill.log.AutofillLogOutcome
 import net.meshpeak.kura.autofill.log.AutofillLogStore
 import net.meshpeak.kura.data.repository.IVaultRepository
 import net.meshpeak.kura.data.repository.VaultRepository
+import net.meshpeak.kura.data.session.VaultSession
 
 private const val TAG = "KuraAutofill"
 
@@ -87,6 +88,7 @@ class KuraAutofillService : AutofillService() {
 
         val job = serviceScope.launch {
             val response = try {
+                VaultSession.lockIfExpired()
                 val unlocked = repository.isUnlocked()
                 if (BuildConfig.DEBUG) Log.d(TAG, "vault isUnlocked=$unlocked, packageName=${parsed.packageName}")
                 if (unlocked) {

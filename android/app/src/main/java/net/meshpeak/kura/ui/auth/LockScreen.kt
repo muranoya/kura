@@ -26,7 +26,11 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import net.meshpeak.kura.R
+import net.meshpeak.kura.data.auth.PasscodeHelper
+import net.meshpeak.kura.data.auth.PasscodeLockedOutException
+import net.meshpeak.kura.data.auth.WrongPasscodeException
 import net.meshpeak.kura.ui.components.ConfirmDialog
+import net.meshpeak.kura.ui.components.SecretKeyboardOptions
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -173,7 +177,7 @@ fun LockScreen(
             label = { Text(if (usePasscode) stringResource(R.string.lock_passcode_label) else stringResource(R.string.lock_password_label)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            keyboardOptions = if (usePasscode) KeyboardOptions(keyboardType = KeyboardType.NumberPassword) else KeyboardOptions.Default,
+            keyboardOptions = if (usePasscode) KeyboardOptions(keyboardType = KeyboardType.NumberPassword) else SecretKeyboardOptions,
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -210,6 +214,13 @@ fun LockScreen(
                             return@launch
                         }
                         onUnlocked()
+                    } catch (e: WrongPasscodeException) {
+                        password = ""
+                        error = context.getString(R.string.lock_passcode_wrong, e.remainingAttempts)
+                    } catch (_: PasscodeLockedOutException) {
+                        appViewModel.preferences.setPasscodeEnabled(false)
+                        password = ""
+                        error = context.getString(R.string.lock_passcode_locked_out, PasscodeHelper.MAX_FAILED_ATTEMPTS)
                     } catch (e: Exception) {
                         error = context.getString(if (usePasscode) R.string.lock_passcode_unlock_failed else R.string.lock_unlock_failed)
                     } finally { isLoading = false }
@@ -266,8 +277,7 @@ fun LockScreen(
             isDangerous = true,
             onConfirm = {
                 scope.launch {
-                    appViewModel.preferences.clearAll()
-                    appViewModel.repository.deleteVaultFile()
+                    appViewModel.logout()
                     onLogout()
                 }
             },

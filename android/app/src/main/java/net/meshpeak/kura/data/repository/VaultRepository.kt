@@ -27,6 +27,8 @@ interface IVaultRepository {
     suspend fun lock(): ByteArray
     suspend fun getVaultBytes(): ByteArray
     suspend fun isUnlocked(): Boolean
+    /** メモリ上のvault（vault-coreのVaultManager）を破棄する。端末のファイルやS3には触れない */
+    suspend fun unloadVault()
 
     // Entry operations
     suspend fun listEntries(
@@ -112,10 +114,21 @@ interface IVaultRepository {
         userHandle: String,
         userName: String,
         userDisplayName: String,
-        excludeCredentialIds: List<String>
+        excludeCredentialIds: List<String>,
+        userVerified: Boolean
     ): WebAuthnAttestationResult
-    suspend fun webauthnGetAssertion(entryId: String, customFieldId: String, clientDataJson: String): WebAuthnAssertionResult
-    suspend fun webauthnGetAssertionWithHash(entryId: String, customFieldId: String, clientDataHash: ByteArray): WebAuthnAssertionResult
+    suspend fun webauthnGetAssertion(
+        entryId: String,
+        customFieldId: String,
+        clientDataJson: String,
+        userVerified: Boolean
+    ): WebAuthnAssertionResult
+    suspend fun webauthnGetAssertionWithHash(
+        entryId: String,
+        customFieldId: String,
+        clientDataHash: ByteArray,
+        userVerified: Boolean
+    ): WebAuthnAssertionResult
 }
 
 class VaultRepository(private val context: Context) : IVaultRepository {
@@ -180,6 +193,10 @@ class VaultRepository(private val context: Context) : IVaultRepository {
 
     override suspend fun isUnlocked(): Boolean = withContext(Dispatchers.IO) {
         VaultBridge.isUnlocked(DEFAULT_VAULT_ID)
+    }
+
+    override suspend fun unloadVault() = withContext(Dispatchers.IO) {
+        VaultBridge.destroyVault(DEFAULT_VAULT_ID)
     }
 
     // ========================================================================
@@ -476,11 +493,12 @@ class VaultRepository(private val context: Context) : IVaultRepository {
         userHandle: String,
         userName: String,
         userDisplayName: String,
-        excludeCredentialIds: List<String>
+        excludeCredentialIds: List<String>,
+        userVerified: Boolean
     ): WebAuthnAttestationResult = withContext(Dispatchers.IO) {
         val excludeIdsJson = json.encodeToString(ListSerializer(String.serializer()), excludeCredentialIds)
         val jsonStr = VaultBridge.webauthnCreateCredential(
-            DEFAULT_VAULT_ID, entryId, rpId, rpName, userHandle, userName, userDisplayName, excludeIdsJson
+            DEFAULT_VAULT_ID, entryId, rpId, rpName, userHandle, userName, userDisplayName, excludeIdsJson, userVerified
         )
         json.decodeFromString<WebAuthnAttestationResult>(jsonStr)
     }
@@ -488,18 +506,22 @@ class VaultRepository(private val context: Context) : IVaultRepository {
     override suspend fun webauthnGetAssertion(
         entryId: String,
         customFieldId: String,
-        clientDataJson: String
+        clientDataJson: String,
+        userVerified: Boolean
     ): WebAuthnAssertionResult = withContext(Dispatchers.IO) {
-        val jsonStr = VaultBridge.webauthnGetAssertion(DEFAULT_VAULT_ID, entryId, customFieldId, clientDataJson)
+        val jsonStr = VaultBridge.webauthnGetAssertion(DEFAULT_VAULT_ID, entryId, customFieldId, clientDataJson, userVerified)
         json.decodeFromString<WebAuthnAssertionResult>(jsonStr)
     }
 
     override suspend fun webauthnGetAssertionWithHash(
         entryId: String,
         customFieldId: String,
-        clientDataHash: ByteArray
+        clientDataHash: ByteArray,
+        userVerified: Boolean
     ): WebAuthnAssertionResult = withContext(Dispatchers.IO) {
-        val jsonStr = VaultBridge.webauthnGetAssertionWithHash(DEFAULT_VAULT_ID, entryId, customFieldId, clientDataHash)
+        val jsonStr = VaultBridge.webauthnGetAssertionWithHash(
+            DEFAULT_VAULT_ID, entryId, customFieldId, clientDataHash, userVerified
+        )
         json.decodeFromString<WebAuthnAssertionResult>(jsonStr)
     }
 }

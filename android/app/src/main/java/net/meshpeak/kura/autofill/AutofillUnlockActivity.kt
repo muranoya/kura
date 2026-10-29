@@ -5,7 +5,7 @@ import android.os.Bundle
 import android.view.autofill.AutofillManager
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
+import net.meshpeak.kura.SecureActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import net.meshpeak.kura.autofill.model.ParsedLoginForm
@@ -18,7 +18,7 @@ import net.meshpeak.kura.viewmodel.AppViewModel
  * （BiometricHelperはContext非依存、BiometricPromptにはFragmentActivityが必要
  * という既存の設計上、AppCompatActivityであれば問題なく動作するため）。
  */
-class AutofillUnlockActivity : AppCompatActivity() {
+class AutofillUnlockActivity : SecureActivity() {
 
     private val appViewModel: AppViewModel by viewModels { AppViewModel.Factory }
 

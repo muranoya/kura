@@ -801,6 +801,7 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_webauthnCreateC
     user_name: JString,
     user_display_name: JString,
     exclude_credential_ids_json: JString,
+    user_verified: jboolean,
 ) -> jstring {
     jni_catch(&mut env, |env| {
         let vid = get_string(env, &vault_id)?;
@@ -814,10 +815,17 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_webauthnCreateC
             serde_json::from_str(&get_string(env, &exclude_credential_ids_json)?)
                 .map_err(|e| format!("Invalid exclude_credential_ids JSON: {}", e))?;
 
-        // Android版は従来どおり常にUVを立てる（儀式中にユーザー検証したかどうかの
-        // 判定は未対応。拡張機能版はマスターパスワード入力時のみUVを立てる）
         let result = with_manager(&vid, |m| {
-            m.api_webauthn_create_credential(eid, rp_id, rp_name, uh, un, udn, exclude_ids, true)
+            m.api_webauthn_create_credential(
+                eid,
+                rp_id,
+                rp_name,
+                uh,
+                un,
+                udn,
+                exclude_ids,
+                user_verified != JNI_FALSE,
+            )
         })
         .map_err(|e| format!("Failed to create passkey credential: {}", e))?;
         let json = serde_json::to_string(&result)
@@ -834,6 +842,7 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_webauthnGetAsse
     entry_id: JString,
     custom_field_id: JString,
     client_data_json: JString,
+    user_verified: jboolean,
 ) -> jstring {
     jni_catch(&mut env, |env| {
         let vid = get_string(env, &vault_id)?;
@@ -841,8 +850,10 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_webauthnGetAsse
         let cfid = get_string(env, &custom_field_id)?;
         let cdj = get_string(env, &client_data_json)?;
 
-        let result = with_manager(&vid, |m| m.api_webauthn_get_assertion(eid, cfid, cdj, true))
-            .map_err(|e| format!("Failed to get passkey assertion: {}", e))?;
+        let result = with_manager(&vid, |m| {
+            m.api_webauthn_get_assertion(eid, cfid, cdj, user_verified != JNI_FALSE)
+        })
+        .map_err(|e| format!("Failed to get passkey assertion: {}", e))?;
         let json = serde_json::to_string(&result)
             .map_err(|e| format!("Failed to serialize result: {}", e))?;
         new_jstring(env, &json)
@@ -857,6 +868,7 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_webauthnGetAsse
     entry_id: JString,
     custom_field_id: JString,
     client_data_hash: JByteArray,
+    user_verified: jboolean,
 ) -> jstring {
     jni_catch(&mut env, |env| {
         let vid = get_string(env, &vault_id)?;
@@ -865,7 +877,7 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_webauthnGetAsse
         let hash = get_byte_array(env, &client_data_hash)?;
 
         let result = with_manager(&vid, |m| {
-            m.api_webauthn_get_assertion_with_hash(eid, cfid, hash, true)
+            m.api_webauthn_get_assertion_with_hash(eid, cfid, hash, user_verified != JNI_FALSE)
         })
         .map_err(|e| format!("Failed to get passkey assertion: {}", e))?;
         let json = serde_json::to_string(&result)

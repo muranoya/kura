@@ -17,6 +17,8 @@ class SecureStorage(context: Context) {
         private const val KEY_PASSCODE_ENCRYPTED_PW = "passcode_encrypted_password"
         private const val KEY_PASSCODE_IV = "passcode_iv"
         private const val KEY_PASSCODE_SALT = "passcode_salt"
+        private const val KEY_PASSCODE_VERSION = "passcode_version"
+        private const val KEY_PASSCODE_FAILED_ATTEMPTS = "passcode_failed_attempts"
     }
 
     private val masterKey = MasterKey.Builder(context)
@@ -66,12 +68,32 @@ class SecureStorage(context: Context) {
             .apply()
     }
 
-    fun savePasscodeData(encryptedPassword: String, iv: String, salt: String) {
+    fun savePasscodeData(encryptedPassword: String, iv: String, salt: String, version: Int) {
         prefs.edit()
             .putString(KEY_PASSCODE_ENCRYPTED_PW, encryptedPassword)
             .putString(KEY_PASSCODE_IV, iv)
             .putString(KEY_PASSCODE_SALT, salt)
+            .putInt(KEY_PASSCODE_VERSION, version)
+            .remove(KEY_PASSCODE_FAILED_ATTEMPTS)
             .apply()
+    }
+
+    /** 未保存（バージョン導入前に保存したデータ）ならnull */
+    fun getPasscodeVersion(): Int? =
+        if (prefs.contains(KEY_PASSCODE_VERSION)) prefs.getInt(KEY_PASSCODE_VERSION, 0) else null
+
+    /**
+     * 失敗回数を1加算して加算後の値を返す。試行の前に呼び、成功したら[resetPasscodeFailedAttempts]で戻す。
+     * 試行中にプロセスを終了されても回数が残るよう、同期書き込みする
+     */
+    fun incrementPasscodeFailedAttempts(): Int {
+        val next = prefs.getInt(KEY_PASSCODE_FAILED_ATTEMPTS, 0) + 1
+        prefs.edit().putInt(KEY_PASSCODE_FAILED_ATTEMPTS, next).commit()
+        return next
+    }
+
+    fun resetPasscodeFailedAttempts() {
+        prefs.edit().remove(KEY_PASSCODE_FAILED_ATTEMPTS).apply()
     }
 
     fun getPasscodeEncryptedPassword(): String? =
@@ -91,6 +113,8 @@ class SecureStorage(context: Context) {
             .remove(KEY_PASSCODE_ENCRYPTED_PW)
             .remove(KEY_PASSCODE_IV)
             .remove(KEY_PASSCODE_SALT)
+            .remove(KEY_PASSCODE_VERSION)
+            .remove(KEY_PASSCODE_FAILED_ATTEMPTS)
             .apply()
     }
 

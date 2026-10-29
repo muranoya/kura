@@ -333,6 +333,17 @@ fun MainNavHost(appViewModel: AppViewModel) {
                     },
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    label = { Text(stringResource(R.string.nav_lock_now)) },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        appViewModel.lockNow()
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
             }
         }
     ) {

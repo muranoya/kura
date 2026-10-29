@@ -6,7 +6,7 @@ import android.service.autofill.Dataset
 import android.view.autofill.AutofillManager
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
+import net.meshpeak.kura.SecureActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,7 +28,7 @@ import net.meshpeak.kura.viewmodel.AppViewModel
  * 選択したエントリにusername/passwordどちらも無くDataset構築に失敗した場合は、画面を
  * 閉じずにエラー表示のうえ選び直せるようにする（デッドエンドを避ける）。
  */
-class AutofillPickerActivity : AppCompatActivity() {
+class AutofillPickerActivity : SecureActivity() {
 
     private val appViewModel: AppViewModel by viewModels { AppViewModel.Factory }
 

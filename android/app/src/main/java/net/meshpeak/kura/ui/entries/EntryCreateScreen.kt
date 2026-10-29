@@ -152,7 +152,7 @@ fun EntryCreateScreen(
                         appViewModel.repository.generatePassword(len, lower, upper, num, sym1, sym2, sym3)
                     },
                     onCopyToClipboard = { text ->
-                        ClipboardUtil.copyToClipboard(context, "kura", text, clipboardClearSeconds, scope)
+                        ClipboardUtil.copyToClipboard(context, "kura", text, clipboardClearSeconds)
                     },
                     onCreateLabel = { name ->
                         val id = appViewModel.repository.createLabel(name)

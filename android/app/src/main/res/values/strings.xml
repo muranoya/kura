@@ -48,6 +48,7 @@
     <string name="nav_label_manager">ラベル管理</string>
     <string name="nav_trash">ゴミ箱</string>
     <string name="nav_settings">設定</string>
+    <string name="nav_lock_now">今すぐロック</string>
 
     <!-- Welcome screen -->
     <string name="welcome_title">kura</string>
@@ -117,11 +118,13 @@
     <string name="lock_biometric_disabled">生体認証が無効になりました。設定から再度有効にしてください</string>
     <string name="lock_unlock_with_recovery">リカバリーキーでアンロック</string>
     <string name="lock_logout_confirm_title">ログアウト</string>
-    <string name="lock_logout_confirm_description">次回起動時にマスターパスワードでアンロックが必要になります。続行しますか？</string>
+    <string name="lock_logout_confirm_description">この端末からvaultのデータ、S3の設定、生体認証とパスコードの設定を削除します。S3上のvaultは削除されません。再び使うにはS3の設定を入力し直す必要があります。</string>
     <string name="lock_password_required">パスワードを入力してください</string>
     <string name="lock_passcode_required">パスコードを入力してください</string>
     <string name="lock_unlock_failed">アンロックに失敗しました</string>
     <string name="lock_passcode_unlock_failed">パスコードでのアンロックに失敗しました</string>
+    <string name="lock_passcode_wrong">パスコードが違います。あと%1$d回間違えるとパスコードでのアンロックは無効になります</string>
+    <string name="lock_passcode_locked_out">パスコードを%1$d回間違えたため、パスコードでのアンロックを無効にしました。マスターパスワードでアンロックしてください</string>
     <string name="lock_quick_unlock_password_changed">別の端末でマスターパスワードが変更されたため、クイックアンロックを無効にしました。マスターパスワードでロックを解除し、設定から再度有効にしてください</string>
 
     <!-- Recovery screen -->
@@ -302,6 +305,7 @@
     <string name="settings_autolock">自動ロック</string>
     <string name="settings_autolock_description_background">バックグラウンド移行後の自動ロック時間</string>
     <string name="settings_autolock_disabled">無効</string>
+    <string name="settings_autolock_disabled_warning">無効にすると、アプリのプロセスが終了するまでロックされず、その間はオートフィルやパスキーも認証なしで使えます</string>
     <string name="settings_autolock_minutes_format">%1$d分</string>
     <string name="settings_clipboard_clear">クリップボード自動クリア</string>
     <string name="settings_clipboard_clear_description">コピー後に自動でクリップボードをクリア</string>
@@ -325,7 +329,7 @@
     <string name="settings_transfer_card_description">S3設定を暗号化した転送コードを生成</string>
     <string name="settings_about_version">バージョン</string>
     <string name="settings_logout_title">ログアウト</string>
-    <string name="settings_logout_description">ログアウトするとローカルキャッシュとS3設定がクリアされます。再度ログインには設定の再入力が必要になります。</string>
+    <string name="settings_logout_description">この端末からvaultのデータ、S3の設定、生体認証とパスコードの設定を削除します。S3上のvaultは削除されません。再び使うにはS3の設定を入力し直す必要があります。</string>
     <string name="settings_logout_description_short">ローカルキャッシュとS3設定をクリア</string>
 
     <!-- Password change dialog -->
@@ -372,7 +376,7 @@
     <string name="passcode_setup_passcode">パスコード</string>
     <string name="passcode_setup_confirm">パスコード（確認）</string>
     <string name="passcode_setup_all_required">すべてのフィールドを入力してください</string>
-    <string name="passcode_setup_format">パスコードは4桁以上で入力してください</string>
+    <string name="passcode_setup_format">パスコードは%1$d桁以上で入力してください</string>
     <string name="passcode_setup_mismatch">パスコードが一致しません</string>
     <string name="passcode_setup_failed">パスコードの有効化に失敗しました: %1$s</string>
 
@@ -433,6 +437,7 @@
     <!-- Passkey / Credential Provider -->
     <string name="credential_provider_settings_subtitle">kuraでパスキーを自動入力</string>
     <string name="passkey_unlock_prompt">パスキーを使うにはkuraのロックを解除してください</string>
+    <string name="passkey_user_verification_prompt">パスキーを使うために本人確認をしてください</string>
     <string name="passkey_create_proposal_title">パスキーを保存</string>
     <string name="passkey_create_proposal_message">%1$s用のパスキーを「%2$s」に追加しますか？</string>
     <string name="passkey_create_use_existing">このエントリを使う</string>

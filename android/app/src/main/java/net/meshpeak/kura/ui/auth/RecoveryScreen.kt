@@ -5,13 +5,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import net.meshpeak.kura.R
+import net.meshpeak.kura.ui.components.SecretKeyboardOptions
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.launch
 
@@ -23,6 +28,7 @@ fun RecoveryScreen(
     onBack: () -> Unit
 ) {
     var recoveryKey by remember { mutableStateOf("") }
+    var recoveryKeyVisible by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -66,7 +72,14 @@ fun RecoveryScreen(
                 onValueChange = { recoveryKey = it; error = "" },
                 label = { Text(stringResource(R.string.recovery_key_label)) },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(stringResource(R.string.recovery_key_placeholder)) }
+                placeholder = { Text(stringResource(R.string.recovery_key_placeholder)) },
+                keyboardOptions = SecretKeyboardOptions,
+                visualTransformation = if (recoveryKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { recoveryKeyVisible = !recoveryKeyVisible }) {
+                        Icon(if (recoveryKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = null)
+                    }
+                }
             )
 
             Spacer(modifier = Modifier.weight(1f))

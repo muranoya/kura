@@ -33,10 +33,12 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import net.meshpeak.kura.R
 import net.meshpeak.kura.bridge.VaultBridge
+import net.meshpeak.kura.data.auth.PasscodeHelper
 import net.meshpeak.kura.data.model.S3Config
 import net.meshpeak.kura.ui.components.ConfirmDialog
 import net.meshpeak.kura.util.ClipboardUtil
 import net.meshpeak.kura.viewmodel.AppViewModel
+import net.meshpeak.kura.ui.components.SecretKeyboardOptions
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -224,7 +226,13 @@ fun SettingsScreen(
             Card(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.settings_autolock)) },
-                    supportingContent = { Text(stringResource(R.string.settings_autolock_description_background)) },
+                    supportingContent = {
+                        if (autolockMinutes == 0) {
+                            Text(stringResource(R.string.settings_autolock_disabled_warning), color = MaterialTheme.colorScheme.error)
+                        } else {
+                            Text(stringResource(R.string.settings_autolock_description_background))
+                        }
+                    },
                     leadingContent = {
                         Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     },
@@ -554,7 +562,7 @@ fun SettingsScreen(
                     }
                     OutlinedButton(
                         onClick = {
-                            ClipboardUtil.copyToClipboard(context, "recovery_key", recoveryKeyValue, clipboardClearSeconds, scope)
+                            ClipboardUtil.copyToClipboard(context, "recovery_key", recoveryKeyValue, clipboardClearSeconds)
                             copied = true
                             scope.launch { delay(2000); copied = false }
                         },
@@ -659,8 +667,7 @@ fun SettingsScreen(
             isDangerous = true,
             onConfirm = {
                 scope.launch {
-                    appViewModel.preferences.clearAll()
-                    appViewModel.repository.deleteVaultFile()
+                    appViewModel.logout()
                     onLogout()
                 }
             },
@@ -698,17 +705,17 @@ fun PasswordChangeDialog(
                 OutlinedTextField(
                     value = oldPassword, onValueChange = { oldPassword = it; error = "" },
                     label = { Text(stringResource(R.string.password_change_current)) },
-                    singleLine = true, visualTransformation = PasswordVisualTransformation()
+                    singleLine = true, keyboardOptions = SecretKeyboardOptions, visualTransformation = PasswordVisualTransformation()
                 )
                 OutlinedTextField(
                     value = newPassword, onValueChange = { newPassword = it; error = "" },
                     label = { Text(stringResource(R.string.password_change_new)) },
-                    singleLine = true, visualTransformation = PasswordVisualTransformation()
+                    singleLine = true, keyboardOptions = SecretKeyboardOptions, visualTransformation = PasswordVisualTransformation()
                 )
                 OutlinedTextField(
                     value = confirmPassword, onValueChange = { confirmPassword = it; error = "" },
                     label = { Text(stringResource(R.string.password_change_confirm)) },
-                    singleLine = true, visualTransformation = PasswordVisualTransformation()
+                    singleLine = true, keyboardOptions = SecretKeyboardOptions, visualTransformation = PasswordVisualTransformation()
                 )
             }
         },
@@ -760,7 +767,7 @@ fun PasscodeSetupDialog(
     val context = LocalContext.current
 
     val allRequiredMsg = stringResource(R.string.passcode_setup_all_required)
-    val formatMsg = stringResource(R.string.passcode_setup_format)
+    val formatMsg = stringResource(R.string.passcode_setup_format, PasscodeHelper.MIN_PASSCODE_LENGTH)
     val mismatchMsg = stringResource(R.string.passcode_setup_mismatch)
 
     AlertDialog(
@@ -777,6 +784,7 @@ fun PasscodeSetupDialog(
                     onValueChange = { masterPassword = it; error = "" },
                     label = { Text(stringResource(R.string.single_password_label)) },
                     singleLine = true,
+                    keyboardOptions = SecretKeyboardOptions,
                     visualTransformation = PasswordVisualTransformation()
                 )
                 OutlinedTextField(
@@ -802,7 +810,7 @@ fun PasscodeSetupDialog(
                 onClick = {
                     when {
                         masterPassword.isBlank() || passcode.isBlank() || confirmPasscode.isBlank() -> error = allRequiredMsg
-                        passcode.length < 4 -> error = formatMsg
+                        passcode.length < PasscodeHelper.MIN_PASSCODE_LENGTH -> error = formatMsg
                         passcode != confirmPasscode -> error = mismatchMsg
                         else -> scope.launch {
                             isLoading = true
@@ -857,7 +865,7 @@ fun SinglePasswordDialog(
                 OutlinedTextField(
                     value = password, onValueChange = { password = it; error = "" },
                     label = { Text(stringResource(R.string.single_password_label)) },
-                    singleLine = true, visualTransformation = PasswordVisualTransformation()
+                    singleLine = true, keyboardOptions = SecretKeyboardOptions, visualTransformation = PasswordVisualTransformation()
                 )
             }
         },
@@ -916,7 +924,7 @@ fun TransferConfigDialog(
                     }
                     OutlinedButton(
                         onClick = {
-                            ClipboardUtil.copyToClipboard(context, "transfer_config", transferString, clipboardClearSeconds, scope)
+                            ClipboardUtil.copyToClipboard(context, "transfer_config", transferString, clipboardClearSeconds)
                             copied = true
                             scope.launch { delay(2000); copied = false }
                         },
@@ -938,7 +946,7 @@ fun TransferConfigDialog(
                         value = password, onValueChange = { password = it; error = "" },
                         label = { Text(stringResource(R.string.transfer_dialog_password)) },
                         placeholder = { Text(stringResource(R.string.transfer_config_password_placeholder)) },
-                        singleLine = true, visualTransformation = PasswordVisualTransformation()
+                        singleLine = true, keyboardOptions = SecretKeyboardOptions, visualTransformation = PasswordVisualTransformation()
                     )
                 }
             }

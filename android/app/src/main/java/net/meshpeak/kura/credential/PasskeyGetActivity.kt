@@ -5,7 +5,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
+import net.meshpeak.kura.SecureActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -56,12 +56,14 @@ private sealed interface GetUiState {
  *    システムは実際の候補一覧を含む選択UIを再表示し、ユーザーが選ぶと経路1として
  *    このActivityが改めて起動される。
  */
-class PasskeyGetActivity : AppCompatActivity() {
+class PasskeyGetActivity : SecureActivity() {
 
     private val appViewModel: AppViewModel by viewModels { AppViewModel.Factory }
     private var uiState by mutableStateOf<GetUiState>(GetUiState.Auth)
     private var providerRequest: ProviderGetCredentialRequest? = null
     private var resolvedOrigin: OriginResolver.Resolved? = null
+    /** この操作のためにユーザーを認証したか。authenticatorDataのUVフラグになる */
+    private var userVerified = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,8 +77,13 @@ class PasskeyGetActivity : AppCompatActivity() {
                 // 二重にラップしない（AutofillUnlockActivityと同じ呼び出し方に揃える）。
                 GetUiState.Auth -> AutofillAuthScreen(
                     appViewModel = appViewModel,
-                    onUnlocked = { proceed(selection) },
-                    onLogout = { finishCanceled() }
+                    onUnlocked = { verified ->
+                        userVerified = verified
+                        proceed(selection)
+                    },
+                    onLogout = { finishCanceled() },
+                    // AuthenticationAction経由（selectionなし）は候補を作り直すだけで署名しない
+                    verifyUserWhenUnlocked = selection != null
                 )
                 GetUiState.Loading -> KuraTheme { LoadingScreen() }
             }
@@ -199,7 +206,7 @@ class PasskeyGetActivity : AppCompatActivity() {
         val hash = pkOption.clientDataHash
         return if (hash != null) {
             val assertion = appViewModel.repository.webauthnGetAssertionWithHash(
-                selection.entryId, selection.customFieldId, hash
+                selection.entryId, selection.customFieldId, hash, userVerified
             )
             assertion to ""
         } else {
@@ -207,7 +214,7 @@ class PasskeyGetActivity : AppCompatActivity() {
                 ?: throw IllegalStateException("requestJson has no challenge")
             val clientDataJson = ClientDataJsonBuilder.buildForGet(challenge, resolved.rpId)
             val assertion = appViewModel.repository.webauthnGetAssertion(
-                selection.entryId, selection.customFieldId, clientDataJson
+                selection.entryId, selection.customFieldId, clientDataJson, userVerified
             )
             assertion to clientDataJson
         }
