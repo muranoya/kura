@@ -2,7 +2,7 @@ import { ComboBox } from "std-widgets.slint";
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { AppButton, Card, CodeBlock, Dialog, DialogFooter, ErrorBanner, FieldLabel, Icon, PasswordInput, ScrollPage } from "../widgets.slint";
-import { Confirm, Settings, Util } from "../state.slint";
+import { About, Confirm, Nav, Page, Settings, Util } from "../state.slint";
 import { HorizontalDivider, ScreenHeader } from "layout.slint";
 
 component SettingRow inherits HorizontalLayout {
@@ -177,48 +177,40 @@ export component SettingsScreen inherits Rectangle {
 
             Card {
                 title: "このアプリについて";
-                HorizontalLayout {
-                    Text {
-                        horizontal-stretch: 1;
-                        text: "バージョン";
-                        font-size: Theme.text-sm;
-                        color: Theme.text-muted;
-                    }
-
-                    Text {
-                        text: Settings.version;
-                        font-size: Theme.text-sm;
-                        color: Theme.text-primary;
-                    }
-                }
-
-                HorizontalLayout {
-                    Text {
-                        horizontal-stretch: 1;
-                        text: "リポジトリ";
-                        font-size: Theme.text-sm;
-                        color: Theme.text-muted;
-                    }
-
+                Rectangle {
+                    height: 36px;
+                    border-radius: Theme.radius;
+                    background: about-touch.has-hover ? Theme.bg-elevated : transparent;
                     HorizontalLayout {
-                        spacing: 4px;
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 8px;
                         Text {
-                            text: "GitHub";
+                            horizontal-stretch: 1;
+                            text: "バージョン・ライセンス情報";
                             font-size: Theme.text-sm;
-                            color: Theme.accent;
-                            gh-touch := TouchArea {
-                                mouse-cursor: pointer;
-                                clicked => {
-                                    Util.open-url("https://github.com/muranoya/kura");
-                                }
-                            }
+                            color: Theme.text-primary;
+                            vertical-alignment: center;
+                        }
+
+                        Text {
+                            text: About.version;
+                            font-size: Theme.text-sm;
+                            color: Theme.text-muted;
+                            vertical-alignment: center;
                         }
 
                         Icon {
                             y: (parent.height - self.height) / 2;
-                            source: Icons.external-link;
-                            size: 12px;
-                            color: Theme.accent;
+                            source: Icons.chevron-right;
+                            color: Theme.text-muted;
+                        }
+                    }
+
+                    about-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            Nav.navigate(Page.about);
                         }
                     }
                 }

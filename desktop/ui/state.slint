@@ -22,6 +22,7 @@ export enum Page {
     trash,
     labels,
     settings,
+    about,
 }
 
 export struct LabelItem {
@@ -80,6 +81,13 @@ export struct CustomFieldItem {
     selector-name: string,
     selector-id: string,
     expanded: bool,
+}
+
+// サードパーティライセンス一覧の1行
+export struct LicenseItem {
+    name: string,
+    version: string,
+    license: string,
 }
 
 export global Nav {
@@ -272,7 +280,6 @@ export global Settings {
     in property <string> region;
     in property <string> key;
     in property <string> endpoint;
-    in property <string> version;
     // 開いているダイアログ: "" / change-password / rotate-dek / regenerate-recovery / transfer / reauth / recovery-key
     in-out property <string> dialog;
     in-out property <string> pw-old;
@@ -294,3 +301,16 @@ export global Settings {
     callback close-dialog();
 }
 
+
+export global About {
+    in property <string> version;
+    in property <[LicenseItem]> items;
+    in-out property <string> search;
+    in-out property <bool> dialog-open;
+    in property <string> dialog-title;
+    in property <string> dialog-license;
+    in property <string> dialog-text;
+    callback search-changed();
+    // 表示中の一覧（検索で絞り込んだ後）のインデックス
+    callback open-license(int);
+}

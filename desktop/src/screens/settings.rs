@@ -37,8 +37,6 @@ fn index_of(options: &[u64], value: u64) -> i32 {
 
 pub fn setup(app: &AppWindow) {
     let settings = app.global::<Settings>();
-    settings.set_version(format!("v{}", env!("CARGO_PKG_VERSION")).into());
-
     let weak = app.as_weak();
     settings.on_settings_changed(move || {
         let Some(app) = weak.upgrade() else { return };
