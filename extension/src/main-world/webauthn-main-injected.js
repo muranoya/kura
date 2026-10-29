@@ -253,6 +253,9 @@
       excludeCredentialIds: (publicKey.excludeCredentials || []).map((c) =>
         bufferSourceToBase64Url(c.id),
       ),
+      userVerification: publicKey.authenticatorSelection
+        ? publicKey.authenticatorSelection.userVerification
+        : undefined,
     }).then((data) => {
       if (data.status === 'passthrough') return originalCreate(options)
       if (data.status !== 'ok') throw errorFromResponse(data)
@@ -310,6 +313,7 @@
       allowCredentialIds: (publicKey.allowCredentials || []).map((c) =>
         bufferSourceToBase64Url(c.id),
       ),
+      userVerification: publicKey.userVerification,
     }).then((data) => {
       if (data.status === 'passthrough') return originalGet(options)
       if (data.status !== 'ok') throw errorFromResponse(data)

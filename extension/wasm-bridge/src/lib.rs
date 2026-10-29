@@ -432,6 +432,7 @@ pub fn api_webauthn_create_credential(
     user_name: String,
     user_display_name: String,
     exclude_credential_ids: Vec<String>,
+    user_verified: bool,
 ) -> Result<String, JsValue> {
     let result = with_manager(&vault_id, |m| {
         m.api_webauthn_create_credential(
@@ -442,6 +443,7 @@ pub fn api_webauthn_create_credential(
             user_name,
             user_display_name,
             exclude_credential_ids,
+            user_verified,
         )
     })
     .map_err(to_js_err)?;
@@ -455,9 +457,10 @@ pub fn api_webauthn_get_assertion(
     entry_id: String,
     custom_field_id: String,
     client_data_json: String,
+    user_verified: bool,
 ) -> Result<String, JsValue> {
     let result = with_manager(&vault_id, |m| {
-        m.api_webauthn_get_assertion(entry_id, custom_field_id, client_data_json)
+        m.api_webauthn_get_assertion(entry_id, custom_field_id, client_data_json, user_verified)
     })
     .map_err(to_js_err)?;
     serde_json::to_string(&result).map_err(|e| to_js_err(format!("Serialization error: {}", e)))

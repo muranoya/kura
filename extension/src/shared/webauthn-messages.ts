@@ -22,7 +22,11 @@ export interface WebauthnMainRequest {
   userDisplayName?: string
   excludeCredentialIds?: string[]
   allowCredentialIds?: string[]
+  userVerification?: WebauthnUserVerification
 }
+
+/** `publicKey.userVerification` (get) / `authenticatorSelection.userVerification` (create) */
+export type WebauthnUserVerification = 'required' | 'preferred' | 'discouraged'
 
 export interface WebauthnBridgeResponse {
   source: typeof KURA_WEBAUTHN_BRIDGE_SOURCE
@@ -68,6 +72,7 @@ export interface WebauthnSwRequest {
   userDisplayName?: string
   excludeCredentialIds?: string[]
   allowCredentialIds?: string[]
+  userVerification?: WebauthnUserVerification
 }
 
 export type WebauthnSwResponse =
@@ -127,6 +132,8 @@ export type WebauthnRitualContext =
   | {
       kind: 'get'
       rpId: string
+      /** RPが userVerification:"required" を要求: 確定時にマスターパスワードの再入力が必要 */
+      requireUserVerification: boolean
       candidates: WebauthnRitualCandidate[]
     }
   | {
@@ -134,6 +141,8 @@ export type WebauthnRitualContext =
       rpId: string
       rpName: string | null
       matchingEntries: WebauthnRitualEntryOption[]
+      /** RPが userVerification:"required" を要求: 確定時にマスターパスワードの再入力が必要 */
+      requireUserVerification: boolean
     }
 
 export interface WebauthnRitualDecision {
@@ -144,4 +153,6 @@ export interface WebauthnRitualDecision {
   credentialId?: string
   /** kind === 'create': target entry id, or undefined/null to create a new login entry */
   entryId?: string | null
+  /** Re-entered master password, when the context has requireUserVerification */
+  masterPassword?: string
 }

@@ -115,6 +115,7 @@ impl UnlockedVault {
         user_name: String,
         user_display_name: String,
         exclude_credential_ids: &[String],
+        user_verified: bool,
     ) -> Result<PasskeyAttestation> {
         if !exclude_credential_ids.is_empty() {
             let existing = self.find_passkey_credentials(&rp_id, &[]);
@@ -128,7 +129,7 @@ impl UnlockedVault {
             }
         }
 
-        let attestation = crate::webauthn::create_credential(&rp_id)?;
+        let attestation = crate::webauthn::create_credential(&rp_id, user_verified)?;
 
         let display_name = rp_id.clone();
         let passkey_data = PasskeyFieldData {
@@ -193,12 +194,14 @@ impl UnlockedVault {
         entry_id: &str,
         custom_field_id: &str,
         client_data_json: &str,
+        user_verified: bool,
     ) -> Result<PasskeyAssertion> {
         let data = self.load_passkey(entry_id, custom_field_id)?;
         let assertion = crate::webauthn::get_assertion(
             &data.rp_id,
             data.private_key.as_str(),
             client_data_json,
+            user_verified,
         )?;
 
         Ok(PasskeyAssertion {
@@ -218,12 +221,14 @@ impl UnlockedVault {
         entry_id: &str,
         custom_field_id: &str,
         client_data_hash: &[u8; 32],
+        user_verified: bool,
     ) -> Result<PasskeyAssertion> {
         let data = self.load_passkey(entry_id, custom_field_id)?;
         let assertion = crate::webauthn::get_assertion_with_hash(
             &data.rp_id,
             data.private_key.as_str(),
             client_data_hash,
+            user_verified,
         )?;
 
         Ok(PasskeyAssertion {
@@ -309,6 +314,7 @@ mod tests {
                 "user".to_string(),
                 "User".to_string(),
                 &[],
+                true,
             )
             .unwrap();
 
@@ -336,6 +342,7 @@ mod tests {
                 "user".to_string(),
                 "User".to_string(),
                 &[],
+                true,
             )
             .unwrap();
 
@@ -349,6 +356,7 @@ mod tests {
                 &attestation.entry_id,
                 &attestation.custom_field_id,
                 r#"{"type":"webauthn.get"}"#,
+                true,
             ),
             Err(VaultError::CorruptedEntry(_))
         ));
@@ -369,6 +377,7 @@ mod tests {
                 "user@example.com".to_string(),
                 "Example User".to_string(),
                 &[],
+                true,
             )
             .unwrap();
 
@@ -389,6 +398,7 @@ mod tests {
                 "user@example.com".to_string(),
                 "Example User".to_string(),
                 &[],
+                true,
             )
             .unwrap();
 
@@ -430,6 +440,7 @@ mod tests {
                 "user".to_string(),
                 "User".to_string(),
                 &[],
+                true,
             )
             .unwrap();
 
@@ -450,6 +461,7 @@ mod tests {
                 "user".to_string(),
                 "User".to_string(),
                 &[],
+                true,
             )
             .unwrap();
 
@@ -461,6 +473,7 @@ mod tests {
             "user2".to_string(),
             "User2".to_string(),
             &[attestation.credential_id],
+            true,
         );
         assert!(result.is_err());
     }
@@ -477,6 +490,7 @@ mod tests {
                 "user".to_string(),
                 "User".to_string(),
                 &[],
+                true,
             )
             .unwrap();
 
@@ -492,6 +506,7 @@ mod tests {
                 &attestation.entry_id,
                 &attestation.custom_field_id,
                 r#"{"type":"webauthn.get"}"#,
+                true,
             )
             .is_err());
 
@@ -500,7 +515,8 @@ mod tests {
             .get_passkey_assertion_with_hash(
                 &attestation.entry_id,
                 &attestation.custom_field_id,
-                &hash
+                &hash,
+                true
             )
             .is_err());
     }
@@ -517,6 +533,7 @@ mod tests {
                 "user".to_string(),
                 "User".to_string(),
                 &[],
+                true,
             )
             .unwrap();
 
@@ -527,6 +544,7 @@ mod tests {
                 &attestation.entry_id,
                 &attestation.custom_field_id,
                 r#"{"type":"webauthn.get"}"#,
+                true,
             )
             .unwrap();
         assert_eq!(assertion.credential_id, attestation.credential_id);
@@ -547,6 +565,7 @@ mod tests {
                 "user".to_string(),
                 "User".to_string(),
                 &[],
+                true,
             )
             .unwrap();
 
@@ -561,6 +580,7 @@ mod tests {
                 &attestation.entry_id,
                 &attestation.custom_field_id,
                 client_data_json,
+                true,
             )
             .unwrap();
         let via_hash = vault
@@ -568,6 +588,7 @@ mod tests {
                 &attestation.entry_id,
                 &attestation.custom_field_id,
                 &hash,
+                true,
             )
             .unwrap();
 

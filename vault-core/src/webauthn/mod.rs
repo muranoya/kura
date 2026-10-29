@@ -154,13 +154,13 @@ fn sign(private_key_b64: &str, message: &[u8]) -> Result<Vec<u8>> {
 /// attestationObject for a `navigator.credentials.create()` response. The
 /// private key is returned so the caller can persist it as `PasskeyFieldData`;
 /// it is never written to storage by this module.
-pub fn create_credential(rp_id: &str) -> Result<AttestationResult> {
+pub fn create_credential(rp_id: &str, user_verified: bool) -> Result<AttestationResult> {
     let private_key_b64 = generate_private_key_b64();
     let credential_id = generate_credential_id();
     let cose_key = cose_public_key_bytes(&private_key_b64)?;
     let auth_data = build_authenticator_data(
         rp_id,
-        FLAG_UP | FLAG_UV | FLAG_AT,
+        presence_flags(user_verified) | FLAG_AT,
         Some((&credential_id, &cose_key)),
     );
     let attestation_object = build_attestation_object(&auth_data)?;
@@ -179,9 +179,10 @@ pub fn get_assertion(
     rp_id: &str,
     private_key_b64: &str,
     client_data_json: &str,
+    user_verified: bool,
 ) -> Result<AssertionResult> {
     let client_data_hash = sha256(client_data_json.as_bytes());
-    sign_assertion(rp_id, private_key_b64, &client_data_hash)
+    sign_assertion(rp_id, private_key_b64, &client_data_hash, user_verified)
 }
 
 /// Same as [`get_assertion`], but for callers that only have the SHA-256 hash
@@ -193,16 +194,31 @@ pub fn get_assertion_with_hash(
     rp_id: &str,
     private_key_b64: &str,
     client_data_hash: &[u8; 32],
+    user_verified: bool,
 ) -> Result<AssertionResult> {
-    sign_assertion(rp_id, private_key_b64, client_data_hash)
+    sign_assertion(rp_id, private_key_b64, client_data_hash, user_verified)
+}
+
+/// authenticatorData flags for a ceremony. UP is always set (the caller has
+/// obtained the user's explicit consent). UV may only be set when the user was
+/// actually verified during this ceremony (e.g. by entering the master
+/// password); claiming it otherwise would let RPs that require
+/// `userVerification: "required"` accept a mere click on an unlocked device.
+fn presence_flags(user_verified: bool) -> u8 {
+    if user_verified {
+        FLAG_UP | FLAG_UV
+    } else {
+        FLAG_UP
+    }
 }
 
 fn sign_assertion(
     rp_id: &str,
     private_key_b64: &str,
     client_data_hash: &[u8; 32],
+    user_verified: bool,
 ) -> Result<AssertionResult> {
-    let auth_data = build_authenticator_data(rp_id, FLAG_UP | FLAG_UV, None);
+    let auth_data = build_authenticator_data(rp_id, presence_flags(user_verified), None);
 
     let mut message = Vec::with_capacity(auth_data.len() + client_data_hash.len());
     message.extend_from_slice(&auth_data);
@@ -223,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_create_credential_produces_valid_cbor_attestation_object() {
-        let result = create_credential("example.com").unwrap();
+        let result = create_credential("example.com", true).unwrap();
 
         let attestation_bytes = URL_SAFE_NO_PAD
             .decode(&result.attestation_object_b64url)
@@ -255,12 +271,17 @@ mod tests {
 
     #[test]
     fn test_get_assertion_signature_verifies_against_derived_public_key() {
-        let created = create_credential("example.com").unwrap();
+        let created = create_credential("example.com", true).unwrap();
         let client_data_json =
             r#"{"type":"webauthn.get","challenge":"abc","origin":"https://example.com"}"#;
 
-        let assertion =
-            get_assertion("example.com", &created.private_key_b64, client_data_json).unwrap();
+        let assertion = get_assertion(
+            "example.com",
+            &created.private_key_b64,
+            client_data_json,
+            true,
+        )
+        .unwrap();
 
         let signing_key = signing_key_from_b64(&created.private_key_b64).unwrap();
         let verifying_key = VerifyingKey::from(&signing_key);
@@ -282,14 +303,55 @@ mod tests {
     }
 
     #[test]
+    fn test_user_verified_flag_follows_argument() {
+        let created = create_credential("example.com", false).unwrap();
+        let attestation = URL_SAFE_NO_PAD
+            .decode(&created.attestation_object_b64url)
+            .unwrap();
+        let value: CborValue = ciborium::de::from_reader(attestation.as_slice()).unwrap();
+        let CborValue::Map(entries) = value else {
+            panic!("expected CBOR map");
+        };
+        let auth_data = entries
+            .iter()
+            .find(|(k, _)| *k == CborValue::Text("authData".to_string()))
+            .and_then(|(_, v)| v.as_bytes().cloned())
+            .expect("authData bytes");
+        assert_eq!(auth_data[32], FLAG_UP | FLAG_AT);
+
+        let assertion =
+            get_assertion("example.com", &created.private_key_b64, "{}", false).unwrap();
+        let auth_data = URL_SAFE_NO_PAD
+            .decode(&assertion.authenticator_data_b64url)
+            .unwrap();
+        assert_eq!(auth_data[32], FLAG_UP);
+
+        let assertion = get_assertion("example.com", &created.private_key_b64, "{}", true).unwrap();
+        let auth_data = URL_SAFE_NO_PAD
+            .decode(&assertion.authenticator_data_b64url)
+            .unwrap();
+        assert_eq!(auth_data[32], FLAG_UP | FLAG_UV);
+    }
+
+    #[test]
     fn test_get_assertion_wrong_rp_id_hash_differs() {
-        let created = create_credential("example.com").unwrap();
+        let created = create_credential("example.com", true).unwrap();
         let client_data_json = r#"{"type":"webauthn.get"}"#;
 
-        let assertion_a =
-            get_assertion("example.com", &created.private_key_b64, client_data_json).unwrap();
-        let assertion_b =
-            get_assertion("other.example", &created.private_key_b64, client_data_json).unwrap();
+        let assertion_a = get_assertion(
+            "example.com",
+            &created.private_key_b64,
+            client_data_json,
+            true,
+        )
+        .unwrap();
+        let assertion_b = get_assertion(
+            "other.example",
+            &created.private_key_b64,
+            client_data_json,
+            true,
+        )
+        .unwrap();
 
         assert_ne!(
             assertion_a.authenticator_data_b64url,
@@ -299,21 +361,26 @@ mod tests {
 
     #[test]
     fn test_invalid_private_key_encoding_returns_error() {
-        let result = get_assertion("example.com", "not-base64!!", "{}");
+        let result = get_assertion("example.com", "not-base64!!", "{}", true);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_get_assertion_with_hash_matches_json_variant() {
-        let created = create_credential("example.com").unwrap();
+        let created = create_credential("example.com", true).unwrap();
         let client_data_json =
             r#"{"type":"webauthn.get","challenge":"abc","origin":"https://example.com"}"#;
         let hash = sha256(client_data_json.as_bytes());
 
-        let via_json =
-            get_assertion("example.com", &created.private_key_b64, client_data_json).unwrap();
+        let via_json = get_assertion(
+            "example.com",
+            &created.private_key_b64,
+            client_data_json,
+            true,
+        )
+        .unwrap();
         let via_hash =
-            get_assertion_with_hash("example.com", &created.private_key_b64, &hash).unwrap();
+            get_assertion_with_hash("example.com", &created.private_key_b64, &hash, true).unwrap();
 
         assert_eq!(
             via_json.authenticator_data_b64url,

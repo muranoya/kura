@@ -69,6 +69,7 @@ impl VaultManager {
         user_name: String,
         user_display_name: String,
         exclude_credential_ids: Vec<String>,
+        user_verified: bool,
     ) -> Result<WebAuthnAttestationResult, String> {
         self.with_unlocked_mut(|unlocked| {
             let result = unlocked
@@ -80,6 +81,7 @@ impl VaultManager {
                     user_name,
                     user_display_name,
                     &exclude_credential_ids,
+                    user_verified,
                 )
                 .map_err(|e| format!("Failed to create passkey credential: {}", e))?;
 
@@ -99,10 +101,16 @@ impl VaultManager {
         entry_id: String,
         custom_field_id: String,
         client_data_json: String,
+        user_verified: bool,
     ) -> Result<WebAuthnAssertionResult, String> {
         self.with_unlocked(|unlocked| {
             let result = unlocked
-                .get_passkey_assertion(&entry_id, &custom_field_id, &client_data_json)
+                .get_passkey_assertion(
+                    &entry_id,
+                    &custom_field_id,
+                    &client_data_json,
+                    user_verified,
+                )
                 .map_err(|e| format!("Failed to get passkey assertion: {}", e))?;
 
             Ok(WebAuthnAssertionResult {
@@ -123,6 +131,7 @@ impl VaultManager {
         entry_id: String,
         custom_field_id: String,
         client_data_hash: Vec<u8>,
+        user_verified: bool,
     ) -> Result<WebAuthnAssertionResult, String> {
         let hash: [u8; 32] = client_data_hash
             .try_into()
@@ -130,7 +139,7 @@ impl VaultManager {
 
         self.with_unlocked(|unlocked| {
             let result = unlocked
-                .get_passkey_assertion_with_hash(&entry_id, &custom_field_id, &hash)
+                .get_passkey_assertion_with_hash(&entry_id, &custom_field_id, &hash, user_verified)
                 .map_err(|e| format!("Failed to get passkey assertion: {}", e))?;
 
             Ok(WebAuthnAssertionResult {

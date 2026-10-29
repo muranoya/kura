@@ -35,14 +35,18 @@ export interface WebauthnVaultApi {
     userName: string,
     userDisplayName: string,
     excludeCredentialIds: string[],
+    userVerified: boolean,
   ): string
   api_webauthn_get_assertion(
     vaultId: string,
     entryId: string,
     customFieldId: string,
     clientDataJson: string,
+    userVerified: boolean,
   ): string
   api_list_login_candidates(vaultId: string, pageHostname: string, strictSubdomain: boolean): string
+  /** Throws if the password is wrong */
+  api_verify_password(vaultId: string, password: string): void
 }
 
 let vaultApi: WebauthnVaultApi | null = null
@@ -78,8 +82,17 @@ function buildClientDataJson(
 
 // ========== Ritual window management ==========
 
+/** The user's decision, plus whether they were verified (master password) during the ritual */
+type RitualOutcome = Omit<WebauthnRitualDecision, 'masterPassword'> & { userVerified: boolean }
+
 interface PendingRitual {
-  resolve: (decision: WebauthnRitualDecision) => void
+  resolve: (outcome: RitualOutcome) => void
+  /**
+   * The master password was entered while this ritual was pending (unlock in
+   * the ritual window or elsewhere, or re-entry for userVerification:"required").
+   * Only then may the authenticator data claim UV.
+   */
+  userVerified: boolean
   context: WebauthnRitualContext
   /** Tab of the page that made the create()/get() request */
   tabId: number
@@ -142,7 +155,8 @@ function finishRitual(requestId: string, decision: WebauthnRitualDecision) {
   if (pending.windowId !== undefined) {
     chrome.windows.remove(pending.windowId).catch(() => {})
   }
-  pending.resolve(decision)
+  const { masterPassword: _discard, ...rest } = decision
+  pending.resolve({ ...rest, userVerified: pending.userVerified })
 }
 
 chrome.windows.onRemoved.addListener((windowId) => {
@@ -150,7 +164,12 @@ chrome.windows.onRemoved.addListener((windowId) => {
     if (pending.windowId === windowId) {
       pendingRituals.delete(requestId)
       clearTimeout(pending.timeoutId)
-      pending.resolve({ type: 'WEBAUTHN_RITUAL_DECISION', requestId, cancelled: true })
+      pending.resolve({
+        type: 'WEBAUTHN_RITUAL_DECISION',
+        requestId,
+        cancelled: true,
+        userVerified: false,
+      })
       break
     }
   }
@@ -168,14 +187,19 @@ function runRitual(
   tabId: number,
   context: WebauthnRitualContext,
   onUnlock?: () => Promise<WebauthnRitualContext>,
-): Promise<WebauthnRitualDecision> {
+): Promise<RitualOutcome> {
   const ritualId = crypto.randomUUID()
   return new Promise((resolve) => {
     const busy =
       pendingRituals.size >= MAX_CONCURRENT_RITUALS ||
       [...pendingRituals.values()].some((p) => p.tabId === tabId)
     if (busy) {
-      resolve({ type: 'WEBAUTHN_RITUAL_DECISION', requestId: ritualId, cancelled: true })
+      resolve({
+        type: 'WEBAUTHN_RITUAL_DECISION',
+        requestId: ritualId,
+        cancelled: true,
+        userVerified: false,
+      })
       return
     }
 
@@ -192,7 +216,15 @@ function runRitual(
     const windowReady = new Promise<number | undefined>((r) => {
       markWindowReady = r
     })
-    pendingRituals.set(ritualId, { resolve, context, tabId, timeoutId, onUnlock, windowReady })
+    pendingRituals.set(ritualId, {
+      resolve,
+      context,
+      tabId,
+      timeoutId,
+      onUnlock,
+      windowReady,
+      userVerified: false,
+    })
 
     const url = chrome.runtime.getURL(
       `src/popup/webauthn.html?requestId=${encodeURIComponent(ritualId)}&kind=${context.kind}`,
@@ -221,6 +253,8 @@ export async function resumeLockedWebauthnRituals(): Promise<void> {
       const newContext = await onUnlock()
       const stillPending = pendingRituals.get(requestId)
       if (!stillPending) continue // その間にウィンドウが閉じられた/タイムアウトした
+      // アンロック＝この儀式の最中にマスターパスワードが入力された
+      stillPending.userVerified = true
       stillPending.context = newContext
       clearTimeout(stillPending.timeoutId)
       stillPending.timeoutId = setTimeout(() => {
@@ -261,7 +295,11 @@ type GetContextResult =
  * get() のcontext計算本体。呼び出し時点でvaultがアンロック済みであることが前提。
  * ロック中に開始したリチュアルでは、アンロック成功後にこの関数を呼んで続きを計算する。
  */
-async function computeGetContext(req: VerifiedRequest, rpId: string): Promise<GetContextResult> {
+async function computeGetContext(
+  req: VerifiedRequest,
+  rpId: string,
+  requireUserVerification: boolean,
+): Promise<GetContextResult> {
   if (!vaultApi) return { kind: 'error', message: 'Vault API not initialized' }
 
   let candidates: RawCredentialCandidate[]
@@ -290,6 +328,7 @@ async function computeGetContext(req: VerifiedRequest, rpId: string): Promise<Ge
     context: {
       kind: 'get',
       rpId,
+      requireUserVerification,
       candidates: candidates.map((c) => ({
         entryId: c.entry_id,
         entryName: c.entry_name,
@@ -328,8 +367,11 @@ async function handleGetRequest(
   let postUnlockPassthrough = false
   let abortReason: { errorName: string; error: string } | null = null
 
+  // Unlocking in the ritual already verifies the user, so no re-entry is needed then
+  const requireUserVerification = req.userVerification === 'required'
+
   async function resumeAfterUnlock(): Promise<WebauthnRitualContext> {
-    const computed = await computeGetContext(req, rpId)
+    const computed = await computeGetContext(req, rpId, false)
     if (computed.kind === 'passthrough') {
       postUnlockPassthrough = true
       return { kind: 'error', reason: 'no_credentials' }
@@ -344,7 +386,7 @@ async function handleGetRequest(
 
   let initialContext: WebauthnRitualContext
   if (isUnlocked()) {
-    const computed = await computeGetContext(req, rpId)
+    const computed = await computeGetContext(req, rpId, requireUserVerification)
     if (computed.kind === 'passthrough') {
       sendResponse({ success: true, status: 'passthrough' })
       return
@@ -396,6 +438,7 @@ async function handleGetRequest(
       chosen.entry_id,
       chosen.custom_field_id,
       clientDataJSON,
+      decision.userVerified,
     )
     const assertion = JSON.parse(assertionJson)
 
@@ -433,6 +476,7 @@ type CreateContextResult =
 async function computeCreateContext(
   req: VerifiedRequest,
   rpId: string,
+  requireUserVerification: boolean,
 ): Promise<CreateContextResult> {
   if (!vaultApi) return { kind: 'error', message: 'Vault API not initialized' }
 
@@ -464,7 +508,13 @@ async function computeCreateContext(
 
   return {
     kind: 'ok',
-    context: { kind: 'create', rpId, rpName: req.rpName ?? null, matchingEntries },
+    context: {
+      kind: 'create',
+      rpId,
+      rpName: req.rpName ?? null,
+      matchingEntries,
+      requireUserVerification,
+    },
   }
 }
 
@@ -494,8 +544,10 @@ async function handleCreateRequest(
   // Entries shown on the confirmation screen; the passkey may only be attached to one of these
   let offeredEntryIds = new Set<string>()
 
+  const requireUserVerification = req.userVerification === 'required'
+
   async function resumeAfterUnlock(): Promise<WebauthnRitualContext> {
-    const computed = await computeCreateContext(req, rpId)
+    const computed = await computeCreateContext(req, rpId, false)
     if (computed.kind === 'already_registered') {
       abortReason = {
         errorName: 'InvalidStateError',
@@ -513,7 +565,7 @@ async function handleCreateRequest(
 
   let initialContext: WebauthnRitualContext
   if (isUnlocked()) {
-    const computed = await computeCreateContext(req, rpId)
+    const computed = await computeCreateContext(req, rpId, requireUserVerification)
     if (computed.kind === 'already_registered') {
       // Show the ritual window before rejecting, as native authenticators ask
       // for consent first. An immediate silent InvalidStateError would let a
@@ -566,6 +618,7 @@ async function handleCreateRequest(
       req.userName ?? '',
       req.userDisplayName ?? '',
       req.excludeCredentialIds ?? [],
+      decision.userVerified,
     )
     const result = JSON.parse(resultJson)
 
@@ -598,6 +651,16 @@ async function handleCreateRequest(
 // ========== Ritual window ↔ Service Worker messages ==========
 
 const RITUAL_PAGE_URL = chrome.runtime.getURL('src/popup/webauthn.html')
+
+function verifyMasterPassword(password: string): boolean {
+  if (!vaultApi || !isUnlocked()) return false
+  try {
+    vaultApi.api_verify_password(DEFAULT_VAULT_ID, password)
+    return true
+  } catch {
+    return false
+  }
+}
 
 /**
  * The ritual messages decide which credential gets used, so they are only
@@ -638,9 +701,24 @@ async function handleRitualDecision(
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies
   sendResponse: (response?: any) => void,
 ) {
-  if (!(await getRitualForSender(message.requestId, sender))) {
+  const pending = await getRitualForSender(message.requestId, sender)
+  if (!pending) {
     sendResponse({ success: false, error: 'Request not found or expired' })
     return
+  }
+  const context = pending.context
+  const needsVerification =
+    !message.cancelled &&
+    (context.kind === 'get' || context.kind === 'create') &&
+    context.requireUserVerification &&
+    !pending.userVerified
+  if (needsVerification) {
+    // Keep the ritual open on a wrong password so the user can retry
+    if (!message.masterPassword || !verifyMasterPassword(message.masterPassword)) {
+      sendResponse({ success: false, error: 'invalid_password' })
+      return
+    }
+    pending.userVerified = true
   }
   finishRitual(message.requestId, message)
   sendResponse({ success: true })

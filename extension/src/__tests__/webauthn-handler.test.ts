@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { handleWebauthnMessage, initWebauthn, type WebauthnVaultApi } from '../background/webauthn'
+import {
+  handleWebauthnMessage,
+  initWebauthn,
+  resumeLockedWebauthnRituals,
+  type WebauthnVaultApi,
+} from '../background/webauthn'
 import { STORAGE_KEYS } from '../shared/constants'
 import { saveToStorage } from '../shared/storage'
 
@@ -9,6 +14,9 @@ function createMockVaultApi(): WebauthnVaultApi {
     api_webauthn_create_credential: vi.fn(() => '{}'),
     api_webauthn_get_assertion: vi.fn(() => '{}'),
     api_list_login_candidates: vi.fn(() => '[]'),
+    api_verify_password: vi.fn((_vaultId: string, password: string) => {
+      if (password !== 'correct horse') throw new Error('Invalid password')
+    }),
   }
 }
 
@@ -349,5 +357,115 @@ describe('create() target entry', () => {
     )
     expect(await pending).toMatchObject({ success: false, errorName: 'NotAllowedError' })
     expect(api.api_webauthn_create_credential).not.toHaveBeenCalled()
+  })
+})
+
+describe('user verification (UV flag)', () => {
+  const candidate = {
+    entry_id: 'e1',
+    entry_name: 'Bank',
+    custom_field_id: 'cf1',
+    credential_id: 'cred-1',
+    user_handle: 'uh',
+    user_name: 'alice',
+    user_display_name: 'Alice',
+  }
+  let api: WebauthnVaultApi
+  let unlocked: boolean
+  let urls: string[]
+
+  beforeEach(async () => {
+    api = createMockVaultApi()
+    vi.mocked(api.api_webauthn_find_credentials).mockReturnValue(JSON.stringify([candidate]))
+    vi.mocked(api.api_webauthn_get_assertion).mockReturnValue(
+      JSON.stringify({ credential_id: 'cred-1', authenticator_data: 'ad', signature: 'sig' }),
+    )
+    unlocked = true
+    initWebauthn(
+      api,
+      () => unlocked,
+      async () => {},
+      async () => {},
+    )
+    await saveToStorage(STORAGE_KEYS.APP_SETTINGS, { passkeyEnabled: true })
+    urls = []
+    vi.mocked(chrome.windows.create).mockImplementation(((
+      options: chrome.windows.CreateData,
+      callback?: (win: chrome.windows.Window) => void,
+    ) => {
+      urls.push(options.url as string)
+      callback?.({ id: 500 } as chrome.windows.Window)
+    }) as unknown as typeof chrome.windows.create)
+  })
+
+  async function startGet(tabId: number, userVerification?: string) {
+    const pending = call(
+      {
+        type: 'WEBAUTHN_GET_REQUEST',
+        requestId: 'r',
+        challenge: 'abc',
+        rpId: 'bank.example',
+        userVerification,
+      },
+      { id: 'test-id', url: 'https://bank.example/login', tab: { id: tabId } as chrome.tabs.Tab },
+    )
+    await vi.waitFor(() => expect(urls).toHaveLength(1))
+    const ritualId = new URL(urls[0]).searchParams.get('requestId') as string
+    const ritualSender = {
+      id: 'test-id',
+      url: urls[0],
+      tab: { id: 999, windowId: 500 } as chrome.tabs.Tab,
+    }
+    const decide = (extra: Record<string, unknown> = {}) =>
+      call(
+        {
+          type: 'WEBAUTHN_RITUAL_DECISION',
+          requestId: ritualId,
+          cancelled: false,
+          credentialId: 'cred-1',
+          ...extra,
+        },
+        ritualSender,
+      )
+    return { pending, ritualId, ritualSender, decide }
+  }
+
+  it('does not claim UV when the user only clicked on an unlocked vault', async () => {
+    const { pending, decide } = await startGet(40, 'preferred')
+    await decide()
+    expect(await pending).toMatchObject({ success: true, status: 'ok' })
+    expect(vi.mocked(api.api_webauthn_get_assertion).mock.calls[0][4]).toBe(false)
+  })
+
+  it('requires re-entering the master password for userVerification "required"', async () => {
+    const { pending, ritualId, ritualSender, decide } = await startGet(41, 'required')
+    expect(
+      await call({ type: 'WEBAUTHN_RITUAL_GET_CONTEXT', requestId: ritualId }, ritualSender),
+    ).toMatchObject({ context: { kind: 'get', requireUserVerification: true } })
+
+    expect(await decide()).toEqual({ success: false, error: 'invalid_password' })
+    expect(await decide({ masterPassword: 'wrong' })).toEqual({
+      success: false,
+      error: 'invalid_password',
+    })
+    expect(api.api_webauthn_get_assertion).not.toHaveBeenCalled()
+
+    expect(await decide({ masterPassword: 'correct horse' })).toEqual({ success: true })
+    expect(await pending).toMatchObject({ success: true, status: 'ok' })
+    expect(vi.mocked(api.api_webauthn_get_assertion).mock.calls[0][4]).toBe(true)
+  })
+
+  it('claims UV when the vault was unlocked during the ritual', async () => {
+    unlocked = false
+    const { pending, ritualId, ritualSender, decide } = await startGet(42, 'required')
+    unlocked = true
+    await resumeLockedWebauthnRituals()
+    // Unlocking already verified the user: no re-entry needed
+    expect(
+      await call({ type: 'WEBAUTHN_RITUAL_GET_CONTEXT', requestId: ritualId }, ritualSender),
+    ).toMatchObject({ context: { kind: 'get', requireUserVerification: false } })
+    await decide()
+    expect(await pending).toMatchObject({ success: true, status: 'ok' })
+    expect(vi.mocked(api.api_webauthn_get_assertion).mock.calls[0][4]).toBe(true)
   })
 })

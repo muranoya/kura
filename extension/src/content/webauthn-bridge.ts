@@ -87,6 +87,7 @@ async function handleRequest(request: WebauthnMainRequest) {
     userDisplayName: request.userDisplayName,
     excludeCredentialIds: request.excludeCredentialIds,
     allowCredentialIds: request.allowCredentialIds,
+    userVerification: request.userVerification,
   }
 
   let swResponse: WebauthnSwResponse

@@ -451,7 +451,9 @@
       "unlockButton": "アンロック",
       "errorAlreadyRegistered": "このサイトのパスキーは既に登録済みです。",
       "errorNoCredentials": "このサイト用に保存されているパスキーが見つかりませんでした。",
-      "errorInternal": "エラーが発生しました。"
+      "errorInternal": "エラーが発生しました。",
+      "verifyDescription": "このサイトは本人確認を求めています。続けるにはマスターパスワードを入力してください。",
+      "invalidPassword": "マスターパスワードが正しくありません。"
     }
   },
   "content": {

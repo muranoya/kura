@@ -1,16 +1,43 @@
 import { KeyRound } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { WebauthnRitualContext } from '../../../shared/webauthn-messages'
 import { Button } from '../../components/ui/button'
+import UserVerificationField from './UserVerificationField'
 
 interface SelectCredentialProps {
   context: Extract<WebauthnRitualContext, { kind: 'get' }>
-  onConfirm: (credentialId: string) => void
+  /** masterPassword is set when context.requireUserVerification */
+  onConfirm: (credentialId: string, masterPassword?: string) => void
   onCancel: () => void
+  /** Error from the previous confirmation attempt (e.g. wrong master password) */
+  error: string | null
+  busy: boolean
 }
 
-export default function SelectCredential({ context, onConfirm, onCancel }: SelectCredentialProps) {
+export default function SelectCredential({
+  context,
+  onConfirm,
+  onCancel,
+  error,
+  busy,
+}: SelectCredentialProps) {
   const { t } = useTranslation()
+  const [password, setPassword] = useState('')
+  const [localError, setLocalError] = useState<string | null>(null)
+
+  const confirm = (credentialId: string) => {
+    if (!context.requireUserVerification) {
+      onConfirm(credentialId)
+      return
+    }
+    if (!password) {
+      setLocalError(t('settings.security.passwordRequired'))
+      return
+    }
+    setLocalError(null)
+    onConfirm(credentialId, password)
+  }
 
   return (
     <div className="min-h-screen bg-bg-base flex flex-col p-4 gap-3">
@@ -19,12 +46,25 @@ export default function SelectCredential({ context, onConfirm, onCancel }: Selec
         <p className="text-xs text-text-muted mt-0.5">{context.rpId}</p>
       </div>
 
+      {context.requireUserVerification && (
+        <UserVerificationField
+          password={password}
+          onChange={(value) => {
+            setPassword(value)
+            setLocalError(null)
+          }}
+          error={localError ?? error}
+          disabled={busy}
+        />
+      )}
+
       <div className="flex-1 overflow-y-auto space-y-1.5">
         {context.candidates.map((candidate) => (
           <button
             key={candidate.customFieldId}
             type="button"
-            onClick={() => onConfirm(candidate.credentialId)}
+            disabled={busy}
+            onClick={() => confirm(candidate.credentialId)}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-bg-surface hover:border-accent hover:bg-accent-subtle transition-colors text-left"
           >
             <div className="w-7 h-7 rounded bg-accent/10 flex items-center justify-center text-accent shrink-0">
