@@ -62,6 +62,20 @@ fn restore_s3_config(password: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// アンロック後の画面に移り、S3 設定を復号できていれば同期する
+fn enter_unlocked(app: &AppWindow, config_error: Option<String>) {
+    reset(app);
+    super::enter_unlocked(app);
+    match config_error {
+        Some(e) => ctx::push_error(
+            app,
+            format!("S3 設定を復号できなかったため、同期を停止しています。同期するには、ログアウトして設定し直してください: {e}"),
+            None,
+        ),
+        None => ctx::sync_in_background(app),
+    }
+}
+
 fn unlock(app: &AppWindow) {
     let auth = app.global::<Auth>();
     if auth.get_loading() {
@@ -85,18 +99,7 @@ fn unlock(app: &AppWindow) {
             let auth = app.global::<Auth>();
             auth.set_loading(false);
             match result {
-                Ok(config_error) => {
-                    reset(&app);
-                    super::enter_unlocked(&app);
-                    match config_error {
-                        Some(e) => ctx::push_error(
-                            &app,
-                            format!("S3 設定を復号できなかったため、同期を停止しています。同期するには、ログアウトして設定し直してください: {e}"),
-                            None,
-                        ),
-                        None => ctx::sync_in_background(&app),
-                    }
-                }
+                Ok(config_error) => enter_unlocked(&app, config_error),
                 Err(e) => auth.set_error(format!("ロック解除失敗: {e}").into()),
             }
         },
@@ -110,13 +113,13 @@ fn recover(app: &AppWindow) {
         return;
     }
     let recovery_key = Zeroizing::new(auth.get_recovery_key().to_string());
-    let new_password = auth.get_new_password();
+    let new_password = Zeroizing::new(auth.get_new_password().to_string());
     let confirm = auth.get_confirm_password();
     if recovery_key.is_empty() || new_password.is_empty() || confirm.is_empty() {
         auth.set_error("すべてのフィールドを入力してください".into());
         return;
     }
-    if new_password != confirm {
+    if new_password.as_str() != confirm.as_str() {
         auth.set_error("パスワードが一致しません".into());
         return;
     }
@@ -125,16 +128,29 @@ fn recover(app: &AppWindow) {
         move || {
             shared()
                 .vault
-                .api_unlock_with_recovery_key(recovery_key.to_string())
+                .api_unlock_with_recovery_key(recovery_key.to_string())?;
+            let reset_result = shared()
+                .vault
+                .api_reset_master_password_with_recovery_key(
+                    recovery_key.to_string(),
+                    new_password.to_string(),
+                )
+                .and_then(|()| ctx::save_local());
+            if let Err(e) = reset_result {
+                // 再設定できていないのにアンロックしたままにすると、次のロックで締め出されたと
+                // 気付くことになる。ロックし直して、再設定の失敗として扱う
+                let _ = shared().vault.api_lock();
+                return Err(e);
+            }
+            // S3 設定は DEK 由来の鍵で暗号化しているので、新しいパスワードでも復号できる
+            Ok::<_, String>(restore_s3_config(&new_password).err())
         },
         |app, result| {
             let auth = app.global::<Auth>();
             auth.set_loading(false);
             match result {
-                Ok(()) => {
-                    reset(&app);
-                    super::enter_unlocked(&app);
-                }
+                // 再設定したスロットは更新時刻が新しいので、同期でリモートの古いスロットに負けない
+                Ok(config_error) => enter_unlocked(&app, config_error),
                 Err(e) => auth.set_error(format!("復旧失敗: {e}").into()),
             }
         },
