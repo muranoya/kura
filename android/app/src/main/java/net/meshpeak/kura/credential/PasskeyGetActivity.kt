@@ -69,7 +69,7 @@ class PasskeyGetActivity : SecureActivity() {
         super.onCreate(savedInstanceState)
 
         val selection = intent.getPasskeyGetSelection()
-        Log.d(TAG, "onCreate: hasSelection=${selection != null}")
+        if (BuildConfig.DEBUG) Log.d(TAG, "onCreate: hasSelection=${selection != null}")
 
         setContent {
             when (uiState) {
@@ -172,7 +172,7 @@ class PasskeyGetActivity : SecureActivity() {
             finishCanceled()
             return
         }
-        Log.d(TAG, "proceedFromAuthenticationAction: rebuilt ${response.credentialEntries.size} credentialEntries -> handing back to system")
+        if (BuildConfig.DEBUG) Log.d(TAG, "proceedFromAuthenticationAction: rebuilt ${response.credentialEntries.size} credentialEntries -> handing back to system")
         val resultIntent = Intent()
         PendingIntentHandler.setBeginGetCredentialResponse(resultIntent, response)
         setResult(RESULT_OK, resultIntent)
@@ -206,7 +206,7 @@ class PasskeyGetActivity : SecureActivity() {
                 finishCanceled()
                 return@launch
             }
-            Log.d(TAG, "finishWithAssertion: assertion built successfully -> RESULT_OK")
+            if (BuildConfig.DEBUG) Log.d(TAG, "finishWithAssertion: assertion built successfully -> RESULT_OK")
             val (assertion, clientDataJsonForResponse) = result
 
             val responseJson = buildAuthenticationResponseJson(
@@ -277,7 +277,7 @@ class PasskeyGetActivity : SecureActivity() {
     }.toString()
 
     private fun finishCanceled() {
-        Log.d(TAG, "finishCanceled: returning RESULT_CANCELED")
+        if (BuildConfig.DEBUG) Log.d(TAG, "finishCanceled: returning RESULT_CANCELED")
         setResult(RESULT_CANCELED)
         finish()
     }

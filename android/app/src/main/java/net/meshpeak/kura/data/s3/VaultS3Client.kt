@@ -10,6 +10,7 @@ import aws.sdk.kotlin.services.s3.model.S3Exception
 import aws.smithy.kotlin.runtime.content.ByteStream
 import aws.smithy.kotlin.runtime.content.toByteArray
 import aws.smithy.kotlin.runtime.net.url.Url
+import net.meshpeak.kura.BuildConfig
 import net.meshpeak.kura.data.model.S3Config
 
 class ConflictException : Exception("Remote vault was modified (412 Precondition Failed)")
@@ -38,7 +39,7 @@ class VaultS3Client(private val config: S3Config) {
     }
 
     suspend fun download(): Pair<ByteArray, String>? {
-        Log.d(TAG, "download: bucket=${config.bucket}, key=${config.key}, region=${config.region}")
+        if (BuildConfig.DEBUG) Log.d(TAG, "download: bucket=${config.bucket}, key=${config.key}, region=${config.region}")
         val client = buildClient()
         try {
             val request = GetObjectRequest {
@@ -54,21 +55,21 @@ class VaultS3Client(private val config: S3Config) {
                     ?.trim('"')
                     ?: ""
 
-                Log.d(TAG, "download: success, size=${data.size}, etag=$etag")
+                if (BuildConfig.DEBUG) Log.d(TAG, "download: success, size=${data.size}, etag=$etag")
                 Pair(data, etag)
             }
         } catch (_: NoSuchKey) {
-            Log.d(TAG, "download: NoSuchKey, returning null")
+            if (BuildConfig.DEBUG) Log.d(TAG, "download: NoSuchKey, returning null")
             return null
         } catch (e: S3Exception) {
             val code = e.sdkErrorMetadata.errorCode
-            Log.e(TAG, "download: S3Exception code=$code", e)
+            if (BuildConfig.DEBUG) Log.e(TAG, "download: S3Exception code=$code", e)
             if (code == "NoSuchKey" || code == "404") {
                 return null
             }
             throw RuntimeException("S3 download failed: [${code}] ${e.message ?: e.toString()}", e)
         } catch (e: Exception) {
-            Log.e(TAG, "download: Exception type=${e.javaClass.name}", e)
+            if (BuildConfig.DEBUG) Log.e(TAG, "download: Exception type=${e.javaClass.name}", e)
             throw RuntimeException("S3 download failed: ${e.message ?: e.toString()}", e)
         } finally {
             client.close()
