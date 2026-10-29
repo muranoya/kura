@@ -192,7 +192,18 @@ Content ScriptはISOLATED world（ページスクリプトとは分離された�
 
 なお`element.focus()`で発火するfocusイベントは`isTrusted === true`になるため、ページはドロップダウンを「表示」させることはできる。入力が行われるのは、ユーザーが実際にキー操作またはクリックで候補を選んだ場合に限られる。
 
-### 2-3.4 不可視フォームへの入力防止
+### 2-3.4 ドロップダウンへのクリックジャッキング対策
+
+ドロップダウンのShadow hostはページのDOM内（`document.body`直下）に置かれるため、ページはhostや祖先を透明化したり、`pointer-events: none`の囮要素を上に重ねたりして、ユーザーに意図しない候補をクリックさせうる。これに対し`dropdown.ts`で以下を行う。
+
+- hostを`popover="manual"`にして`showPopover()`でtop layerに置く。表示のたびに出し直して最前面へ移動するため、z-index最大の囮要素やそれ以前に開かれたモーダルより上に描画される
+- hostの属性（`style`等）がページに書き換えられたら、MutationObserverで検知してUIを破棄する
+- 候補・インラインアイコン・ロック中項目の選択（クリック／Enter）は、次をすべて満たす場合のみ受け付ける
+  - 表示から300ms以上経過している（カーソル下にUIを出現させる攻撃の防止）
+  - hostが接続されたままで、host・`body`・`html`の`opacity`が1かつ`filter`に`opacity()`を含まない
+  - IntersectionObserver v2（`trackVisibility`、Chromeのみ）が対象要素を遮蔽・変形されていると報告していない
+
+### 2-3.5 不可視フォームへの入力防止
 
 フィールドへの入力前に対象要素の視認性をチェックし、不可視のフォーム（invisible form攻撃）へのクレデンシャル書き込みを防ぐ。正規サイトのページ内に広告等でinvisible formが埋め込まれている場合の攻撃を無効化する。
 

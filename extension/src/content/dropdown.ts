@@ -21,15 +21,117 @@ let lastAnchorRect: { top: number; left: number } | null = null
 const SCROLL_HIDE_THRESHOLD = 100
 let totpTimerInterval: ReturnType<typeof setInterval> | null = null
 
+// ========== Clickjacking protection ==========
+//
+// The shadow host lives in the page's DOM, so the page can try to make the
+// dropdown invisible (opacity/filter on the host or its ancestors, or a
+// `pointer-events: none` decoy drawn on top of it) and trick the user into
+// clicking a candidate. Clicks are only honored when none of that applies.
+
+// Minimum time the UI must have been on screen before a click is accepted,
+// so a page cannot pop it up under a cursor that is already mid-click.
+const MIN_INTERACTION_DELAY_MS = 300
+const HOST_STYLE =
+  'all: initial !important; position: fixed !important; top: 0 !important; left: 0 !important; z-index: 2147483647 !important;'
+
+let interactiveSince = 0
+let hostObserver: MutationObserver | null = null
+let visibilityObserver: IntersectionObserver | null = null
+// Results of IntersectionObserver v2 occlusion tracking (Chrome only).
+// Missing entry = unsupported or not yet reported.
+let occlusion = new WeakMap<Element, boolean>()
+
+function markShown() {
+  interactiveSince = performance.now()
+}
+
+/**
+ * Move the host to the top of the top layer so that page content (including
+ * `pointer-events: none` overlays and modals opened earlier) cannot be drawn
+ * above it. No-op on browsers without the Popover API.
+ */
+function bringHostToFront() {
+  if (!shadowHost || typeof shadowHost.showPopover !== 'function') return
+  try {
+    if (shadowHost.matches(':popover-open')) shadowHost.hidePopover()
+    shadowHost.showPopover()
+  } catch {
+    // Not fatal: fall back to z-index stacking
+  }
+}
+
+/** Start occlusion tracking for an interactive element (dropdown / icon). */
+function trackVisibility(el: HTMLElement) {
+  if (!visibilityObserver) {
+    try {
+      visibilityObserver = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries as Array<
+            IntersectionObserverEntry & { isVisible?: boolean }
+          >) {
+            if (typeof entry.isVisible !== 'boolean') continue
+            // Restart the interaction delay whenever the UI becomes visible again
+            if (entry.isVisible && occlusion.get(entry.target) === false) markShown()
+            occlusion.set(entry.target, entry.isVisible)
+          }
+        },
+        // trackVisibility/delay are IntersectionObserver v2 options (not yet in lib.dom)
+        { threshold: 1, trackVisibility: true, delay: 100 } as IntersectionObserverInit,
+      )
+    } catch {
+      // trackVisibility unsupported (e.g. Firefox): rely on the other checks
+      return
+    }
+  }
+  visibilityObserver.observe(el)
+}
+
+function hasHidingEffect(el: Element): boolean {
+  const style = getComputedStyle(el)
+  return style.opacity !== '1' || style.filter.includes('opacity(')
+}
+
+/**
+ * Whether the UI element is plausibly what the user sees: shown long enough,
+ * not reported as occluded, and not made transparent by the page.
+ */
+function isUiTrustworthy(target: Element | null): boolean {
+  if (performance.now() - interactiveSince < MIN_INTERACTION_DELAY_MS) return false
+  if (!shadowHost?.isConnected) return false
+  if (target && occlusion.get(target) === false) return false
+  for (const el of [shadowHost, document.body, document.documentElement]) {
+    if (el && hasHidingEffect(el)) return false
+  }
+  return true
+}
+
+/** Whether a click on the dropdown/icon reflects a deliberate user action. */
+function isGenuineActivation(e: MouseEvent, target: Element | null): boolean {
+  if (!e.isTrusted || e.button !== 0) return false
+  return isUiTrustworthy(target)
+}
+
+function destroyHost() {
+  hostObserver?.disconnect()
+  hostObserver = null
+  visibilityObserver?.disconnect()
+  visibilityObserver = null
+  occlusion = new WeakMap()
+  if (shadowHost) {
+    shadowHost.remove()
+    shadowHost = null
+    shadowRoot = null
+  }
+}
+
 function ensureShadowHost(): ShadowRoot {
-  if (shadowRoot) return shadowRoot
+  if (shadowRoot && shadowHost?.isConnected) return shadowRoot
+  destroyHost()
 
   shadowHost = document.createElement('div')
   shadowHost.id = CONTAINER_ID
-  shadowHost.setAttribute(
-    'style',
-    'all: initial !important; position: fixed !important; top: 0 !important; left: 0 !important; z-index: 2147483647 !important;',
-  )
+  shadowHost.setAttribute('style', HOST_STYLE)
+  shadowHost.setAttribute('popover', 'manual')
   document.body.appendChild(shadowHost)
 
   shadowRoot = shadowHost.attachShadow({ mode: 'closed' })
@@ -39,6 +141,14 @@ function ensureShadowHost(): ShadowRoot {
   link.rel = 'stylesheet'
   link.href = chrome.runtime.getURL('src/content/dropdown.css')
   shadowRoot.appendChild(link)
+
+  // Any tampering with the host's attributes (style, popover, ...) by the
+  // page tears the UI down instead of letting a disguised dropdown stay usable.
+  const observedHost = shadowHost
+  hostObserver = new MutationObserver(() => {
+    if (shadowHost === observedHost) destroy()
+  })
+  hostObserver.observe(observedHost, { attributes: true })
 
   return shadowRoot
 }
@@ -188,7 +298,7 @@ function renderItems() {
     item.addEventListener('mousedown', (e) => {
       e.preventDefault() // Prevent blur on the input
       e.stopPropagation()
-      if (!e.isTrusted || e.button !== 0) return
+      if (!isGenuineActivation(e, dropdownEl)) return
       onSelectCallback?.(candidate)
     })
 
@@ -238,6 +348,7 @@ function handleKeydown(e: KeyboardEvent) {
   if (lockedMode) {
     switch (e.key) {
       case 'Enter':
+        if (!isUiTrustworthy(dropdownEl)) return
         e.preventDefault()
         onUnlockCallback?.()
         break
@@ -267,6 +378,8 @@ function handleKeydown(e: KeyboardEvent) {
       break
     case 'Enter':
       if (selectedIndex >= 0 && selectedIndex < currentCandidates.length) {
+        // A disguised dropdown can get an item selected by mere mouse hover
+        if (!isUiTrustworthy(dropdownEl)) return
         e.preventDefault()
         onSelectCallback?.(currentCandidates[selectedIndex])
       }
@@ -366,6 +479,9 @@ export function showDropdown(
 
   renderItems()
   positionDropdown(anchor)
+  bringHostToFront()
+  trackVisibility(dropdownEl)
+  markShown()
 
   // Track initial anchor position for scroll-hide detection
   const rect = anchor.getBoundingClientRect()
@@ -472,6 +588,9 @@ export function showInlineIcon(anchor: HTMLInputElement, onClick: () => void) {
   root.appendChild(iconEl)
 
   positionIcon(anchor)
+  bringHostToFront()
+  trackVisibility(iconEl)
+  markShown()
 
   const rect = anchor.getBoundingClientRect()
   lastAnchorRect = { top: rect.top, left: rect.left }
@@ -479,7 +598,7 @@ export function showInlineIcon(anchor: HTMLInputElement, onClick: () => void) {
   iconEl.addEventListener('mousedown', (e) => {
     e.preventDefault()
     e.stopPropagation()
-    if (!e.isTrusted || e.button !== 0) return
+    if (!isGenuineActivation(e, iconEl)) return
     if (blurTimeout) {
       clearTimeout(blurTimeout)
       blurTimeout = null
@@ -495,11 +614,7 @@ export function showInlineIcon(anchor: HTMLInputElement, onClick: () => void) {
 
 export function destroy() {
   hideDropdown()
-  if (shadowHost) {
-    shadowHost.remove()
-    shadowHost = null
-    shadowRoot = null
-  }
+  destroyHost()
 }
 
 export function showLockedDropdown(anchor: HTMLInputElement, onUnlockClick: () => void) {
@@ -548,7 +663,7 @@ export function showLockedDropdown(anchor: HTMLInputElement, onUnlockClick: () =
   item.addEventListener('mousedown', (e) => {
     e.preventDefault()
     e.stopPropagation()
-    if (!e.isTrusted || e.button !== 0) return
+    if (!isGenuineActivation(e, dropdownEl)) return
     onUnlockClick()
   })
 
@@ -561,6 +676,9 @@ export function showLockedDropdown(anchor: HTMLInputElement, onUnlockClick: () =
   dropdownEl.appendChild(footer)
 
   positionDropdown(anchor)
+  bringHostToFront()
+  trackVisibility(dropdownEl)
+  markShown()
 
   const rect = anchor.getBoundingClientRect()
   lastAnchorRect = { top: rect.top, left: rect.left }

@@ -20,4 +20,18 @@ describe('dropdown keyboard selection', () => {
 
     expect(onSelect).not.toHaveBeenCalled()
   })
+  it('tears down the UI when the page tampers with the host element', async () => {
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    showDropdown(input, [{ entryId: 'entry-1', name: 'Example', username: 'user' }], vi.fn())
+
+    const host = document.getElementById('kura-autofill-dropdown')
+    expect(host).not.toBeNull()
+
+    host?.setAttribute('style', 'opacity: 0')
+    // MutationObserver callbacks run as microtasks
+    await Promise.resolve()
+
+    expect(document.getElementById('kura-autofill-dropdown')).toBeNull()
+  })
 })

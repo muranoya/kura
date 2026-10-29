@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clickjacking - Autofill Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.25rem; }
+    nav { margin-bottom: 24px; }
+    nav a { color: #2563eb; }
+    label { display: block; margin-bottom: 4px; font-weight: 500; }
+    input { display: block; width: 100%; padding: 8px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .row { display: flex; gap: 12px; }
+    .row > div { flex: 1; }
+    #result { margin-top: 24px; padding: 12px; background: #f3f4f6; border-radius: 4px; white-space: pre-wrap; display: none; }
+    .expected { margin: 24px 0; padding: 12px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.9rem; }
+    .expected summary { font-weight: 600; cursor: pointer; }
+    .expected ul { margin: 8px 0 0; padding-left: 20px; }
+    .expected li { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <nav><a href="/">&larr; Test Pages Index</a></nav>
+  <h1>Clickjacking Defenses</h1>
+  <p>Simulates a page that tries to hide the kura dropdown and trick the user into clicking a candidate.</p>
+
+  <details class="expected" open>
+    <summary>Expected Behavior</summary>
+    <ul>
+      <li><strong>Host opacity attack</strong>: after clicking the button, focus Username → the dropdown is torn down as soon as the page rewrites the host's <code>style</code> (it does not stay invisible and clickable)</li>
+      <li><strong>Page filter attack</strong>: <code>html { filter: opacity(0.01) }</code> → clicking a candidate does nothing</li>
+      <li><strong>Overlay attack</strong>: a <code>pointer-events: none</code> decoy with max z-index → the dropdown is still drawn <em>above</em> the decoy (top layer); in Chrome, a click while occluded is also ignored</li>
+      <li>Clicking a candidate within 300ms of the dropdown appearing is ignored</li>
+      <li>"Reset" restores normal behavior: selecting a candidate fills the form</li>
+    </ul>
+  </details>
+
+  <p>
+    <button type="button" id="attack-host">Host opacity attack</button>
+    <button type="button" id="attack-filter">Page filter attack</button>
+    <button type="button" id="attack-overlay">Overlay attack</button>
+    <button type="button" id="reset">Reset</button>
+  </p>
+
+  <form id="form" method="POST" action="#">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" autocomplete="username">
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" autocomplete="current-password">
+
+    <button type="submit">Log in</button>
+  </form>
+
+  <div id="decoy" style="display: none; position: fixed; inset: 0; z-index: 2147483647; pointer-events: none; background: #fef3c7; padding: 40px; font-size: 1.5rem;">Click here to win a prize!</div>
+
+  <pre id="result"></pre>
+
+  <script>
+    let hostWatcher = null
+    document.getElementById('attack-host').addEventListener('click', function() {
+      hostWatcher = new MutationObserver(function() {
+        const host = document.getElementById('kura-autofill-dropdown')
+        if (host && host.style.opacity !== '0') host.style.opacity = '0'
+      })
+      hostWatcher.observe(document.body, { childList: true, subtree: true })
+    })
+    document.getElementById('attack-filter').addEventListener('click', function() {
+      document.documentElement.style.filter = 'opacity(0.01)'
+      setTimeout(function() { document.documentElement.style.filter = '' }, 8000)
+    })
+    document.getElementById('attack-overlay').addEventListener('click', function() {
+      document.getElementById('decoy').style.display = 'block'
+    })
+    document.getElementById('reset').addEventListener('click', function() {
+      if (hostWatcher) hostWatcher.disconnect()
+      hostWatcher = null
+      document.documentElement.style.filter = ''
+      document.getElementById('decoy').style.display = 'none'
+    })
+    document.getElementById('form').addEventListener('submit', function(e) {
+      e.preventDefault()
+      const result = document.getElementById('result')
+      result.style.display = 'block'
+      result.textContent = 'Submitted:\n  username: ' + document.getElementById('username').value + '\n  password: ' + document.getElementById('password').value
+    })
+  </script>
+</body>
+</html>
