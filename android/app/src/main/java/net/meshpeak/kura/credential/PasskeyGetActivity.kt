@@ -240,7 +240,7 @@ class PasskeyGetActivity : SecureActivity() {
         } else {
             val challenge = ClientDataJsonBuilder.extractChallenge(pkOption.requestJson)
                 ?: throw IllegalStateException("requestJson has no challenge")
-            val clientDataJson = ClientDataJsonBuilder.buildForGet(challenge, resolved.rpId)
+            val clientDataJson = ClientDataJsonBuilder.buildForGet(challenge, resolved.clientDataOrigin)
             val assertion = appViewModel.repository.webauthnGetAssertion(
                 selection.entryId, selection.customFieldId, clientDataJson, userVerified
             )

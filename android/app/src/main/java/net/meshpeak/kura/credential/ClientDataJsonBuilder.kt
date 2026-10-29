@@ -7,6 +7,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.security.MessageDigest
 
 /**
  * clientDataJSONの構築責務の分岐（docs/android-passkey.md 5-3）:
@@ -14,8 +15,9 @@ import kotlinx.serialization.json.put
  *   そのまま署名に使う（呼び出し側が`repository.webauthnGetAssertionWithHash`を
  *   直接呼ぶ。Kotlin側でJSON文字列は一切組み立てない）
  * - ネイティブアプリ発（`clientDataHash`がnull）: `requestJson`からchallengeを取り出し、
- *   [OriginResolver] で確定したrp_idベースの疑似origin（`https://{rp_id}`、ブラウザ発と
- *   同じorigin検証をRP側に期待する設計）から `{type, challenge, origin}` を組み立てる
+ *   [OriginResolver] で確定したorigin（[OriginResolver.Resolved.clientDataOrigin]）から
+ *   `{type, challenge, origin}` を組み立てる。ネイティブアプリのoriginは呼び出し元の署名証明書
+ *   から算出する`android:apk-key-hash:...`形式で、RPが自社アプリの署名と照合する
  */
 object ClientDataJsonBuilder {
 
@@ -37,10 +39,21 @@ object ClientDataJsonBuilder {
     }.getOrNull()
 
     /** ネイティブアプリ発（`clientDataHash`なし）経路専用のclientDataJSON組み立て（get） */
-    fun buildForGet(challenge: String, rpId: String): String = build("webauthn.get", challenge, rpId)
+    fun buildForGet(challenge: String, origin: String): String = build("webauthn.get", challenge, origin)
 
     /** ネイティブアプリ発（`clientDataHash`なし）経路専用のclientDataJSON組み立て（create） */
-    fun buildForCreate(challenge: String, rpId: String): String = build("webauthn.create", challenge, rpId)
+    fun buildForCreate(challenge: String, origin: String): String = build("webauthn.create", challenge, origin)
+
+    /**
+     * Androidアプリ発のWebAuthn origin（`android:apk-key-hash:<署名証明書SHA-256のbase64url>`）。
+     * `https://{rp_id}`を名乗らせると、同じパッケージ名を騙る別アプリの署名をRPがWebからの
+     * 正規の認証と区別できなくなるため、OSが検証した署名証明書から算出する。
+     */
+    fun apkKeyHashOrigin(signingCert: ByteArray): String {
+        val hash = MessageDigest.getInstance("SHA-256").digest(signingCert)
+        return "android:apk-key-hash:" +
+            Base64.encodeToString(hash, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+    }
 
     /**
      * WebAuthn Level 3の`allowCredentials`/`excludeCredentials`配列から`id`一覧を抽出する。
@@ -62,10 +75,10 @@ object ClientDataJsonBuilder {
     fun encodeBase64Url(text: String): String =
         Base64.encodeToString(text.toByteArray(Charsets.UTF_8), Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
 
-    private fun build(type: String, challenge: String, rpId: String): String =
+    private fun build(type: String, challenge: String, origin: String): String =
         buildJsonObject {
             put("type", type)
             put("challenge", challenge)
-            put("origin", "https://$rpId")
+            put("origin", origin)
         }.toString()
 }

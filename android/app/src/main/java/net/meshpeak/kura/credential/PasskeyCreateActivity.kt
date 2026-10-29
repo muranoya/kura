@@ -223,7 +223,7 @@ class PasskeyCreateActivity : SecureActivity() {
             val clientDataJson = if (request.clientDataHash != null) {
                 ""
             } else {
-                ClientDataJsonBuilder.encodeBase64Url(ClientDataJsonBuilder.buildForCreate(info.challenge, rpId))
+                ClientDataJsonBuilder.encodeBase64Url(ClientDataJsonBuilder.buildForCreate(info.challenge, resolved.clientDataOrigin))
             }
 
             val responseJson = buildRegistrationResponseJson(attestation, clientDataJson)
