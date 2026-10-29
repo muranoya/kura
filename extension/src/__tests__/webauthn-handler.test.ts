@@ -77,3 +77,143 @@ describe('handleWebauthnMessage origin handling', () => {
     expect(api.api_webauthn_find_credentials).toHaveBeenCalledWith('default', 'bank.example', [])
   })
 })
+
+describe('ritual window binding', () => {
+  const candidate = {
+    entry_id: 'e1',
+    entry_name: 'Bank',
+    custom_field_id: 'cf1',
+    credential_id: 'cred-1',
+    user_handle: 'uh',
+    user_name: 'alice',
+    user_display_name: 'Alice',
+  }
+  let api: WebauthnVaultApi
+  let createdUrls: string[]
+
+  beforeEach(async () => {
+    api = createMockVaultApi()
+    vi.mocked(api.api_webauthn_find_credentials).mockReturnValue(JSON.stringify([candidate]))
+    vi.mocked(api.api_webauthn_get_assertion).mockReturnValue(
+      JSON.stringify({
+        credential_id: 'cred-1',
+        authenticator_data: 'ad',
+        signature: 'sig',
+        user_handle: 'uh',
+      }),
+    )
+    initWebauthn(
+      api,
+      () => true,
+      async () => {},
+      async () => {},
+    )
+    await saveToStorage(STORAGE_KEYS.APP_SETTINGS, { passkeyEnabled: true })
+
+    createdUrls = []
+    let nextWindowId = 100
+    vi.mocked(chrome.windows.create).mockImplementation(((
+      options: chrome.windows.CreateData,
+      callback?: (win: chrome.windows.Window) => void,
+    ) => {
+      createdUrls.push(options.url as string)
+      callback?.({ id: nextWindowId++ } as chrome.windows.Window)
+    }) as unknown as typeof chrome.windows.create)
+  })
+
+  const pageSender = (tabId: number): chrome.runtime.MessageSender => ({
+    id: 'test-id',
+    url: 'https://bank.example/login',
+    tab: { id: tabId, windowId: 1 } as chrome.tabs.Tab,
+    frameId: 0,
+  })
+
+  const ritualSender = (ritualId: string, windowId: number): chrome.runtime.MessageSender => ({
+    id: 'test-id',
+    url: `chrome-extension://test-id/src/popup/webauthn.html?requestId=${ritualId}&kind=get`,
+    tab: { id: 999, windowId } as chrome.tabs.Tab,
+  })
+
+  function startGet(tabId: number, pageRequestId: string) {
+    return call(
+      {
+        type: 'WEBAUTHN_GET_REQUEST',
+        requestId: pageRequestId,
+        challenge: 'abc',
+        rpId: 'bank.example',
+      },
+      pageSender(tabId),
+    )
+  }
+
+  async function lastRitualId(): Promise<string> {
+    await vi.waitFor(() => expect(createdUrls.length).toBeGreaterThan(0))
+    const url = new URL(createdUrls[createdUrls.length - 1])
+    return url.searchParams.get('requestId') as string
+  }
+
+  it('uses a Service Worker generated ritual id, not the page request id', async () => {
+    void startGet(10, 'page-chosen-id')
+    const ritualId = await lastRitualId()
+    expect(ritualId).not.toBe('page-chosen-id')
+    await call(
+      { type: 'WEBAUTHN_RITUAL_DECISION', requestId: ritualId, cancelled: true },
+      ritualSender(ritualId, 100),
+    )
+  })
+
+  it('accepts ritual messages only from the window opened for that request', async () => {
+    const pending = startGet(11, 'r')
+    const ritualId = await lastRitualId()
+
+    // From a content script
+    expect(
+      await call({ type: 'WEBAUTHN_RITUAL_GET_CONTEXT', requestId: ritualId }, pageSender(11)),
+    ).toMatchObject({ success: false })
+    // From the ritual page but in another window
+    expect(
+      await call(
+        {
+          type: 'WEBAUTHN_RITUAL_DECISION',
+          requestId: ritualId,
+          cancelled: false,
+          credentialId: 'cred-1',
+        },
+        ritualSender(ritualId, 555),
+      ),
+    ).toMatchObject({ success: false })
+    expect(api.api_webauthn_get_assertion).not.toHaveBeenCalled()
+
+    // From the right window
+    expect(
+      await call(
+        { type: 'WEBAUTHN_RITUAL_GET_CONTEXT', requestId: ritualId },
+        ritualSender(ritualId, 100),
+      ),
+    ).toMatchObject({ success: true, context: { kind: 'get' } })
+    await call(
+      {
+        type: 'WEBAUTHN_RITUAL_DECISION',
+        requestId: ritualId,
+        cancelled: false,
+        credentialId: 'cred-1',
+      },
+      ritualSender(ritualId, 100),
+    )
+    expect(await pending).toMatchObject({ success: true, status: 'ok' })
+  })
+
+  it('allows only one pending ritual per tab', async () => {
+    void startGet(12, 'first')
+    const ritualId = await lastRitualId()
+
+    const second = await startGet(12, 'second')
+    expect(second).toMatchObject({ success: false, errorName: 'NotAllowedError' })
+    expect(createdUrls).toHaveLength(1)
+
+    await call(
+      { type: 'WEBAUTHN_RITUAL_DECISION', requestId: ritualId, cancelled: true },
+      ritualSender(ritualId, 100),
+    )
+  })
+})

@@ -188,7 +188,7 @@ Service Worker background/webauthn.ts
         │ アンロック成功後、候補0件ならウィンドウ内に理由を表示した上でpassthrough、
         │ 候補1件以上ならそのまま儀式ウィンドウ（kind=get）へ進む
         ▼
-ポップアップウィンドウ（chrome.windows.create、webauthn.html?kind=get&requestId=...）
+ポップアップウィンドウ（chrome.windows.create、webauthn.html?kind=get&requestId=<Service Workerが生成した儀式ID>）
   │ WEBAUTHN_RITUAL_GET_CONTEXTで候補一覧を取得し表示
   │ ユーザーがカードを選択（カードは「loginエントリ名 + user表示名」で表示）
   │ WEBAUTHN_RITUAL_DECISIONでcredentialIdを送信、儀式ウィンドウclose
@@ -203,6 +203,8 @@ status: 'ok', { credentialId, authenticatorData, signature, userHandle, clientDa
   ▼
 Webページ側のget()呼び出しがresolveされる
 ```
+
+**儀式IDとウィンドウの紐付け：** 儀式ウィンドウのURLに載せる`requestId`は、ページ（MAIN world）が発行したIDではなく、Service Workerが`crypto.randomUUID()`で生成した儀式IDである。ページのIDは、ページへの応答を対応付けるためにMAIN world/ISOLATED world内でのみ使う。`WEBAUTHN_RITUAL_GET_CONTEXT`/`WEBAUTHN_RITUAL_DECISION`は、送信元が拡張機能の`webauthn.html`であり、かつ`sender.tab.windowId`がその儀式のために開いたウィンドウと一致する場合のみ受け付ける。これにより、ページがIDを使い回して同時実行数の上限をすり抜けたり、別ページ（Content Script）が儀式の決定を送ってユーザー操作なしに署名させたりすることを防ぐ。同時に開ける儀式ウィンドウは全体で3件、同じタブからは1件までとする。
 
 ポップアップウィンドウとService Workerの間は、「専用port維持」ではなく、ポップアップウィンドウ自身が`chrome.runtime.sendMessage`でService Workerに問い合わせる方式にした。Service Workerがポップアップウィンドウとの通信・ページからのリクエストへの応答を両方抱えている間は生きたままになるため、追加のport維持は行っていない。ウィンドウが閉じられた場合は`chrome.windows.onRemoved`で検知しcancelled扱いにする。
 

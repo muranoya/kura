@@ -12,6 +12,7 @@ import type {
   WebauthnRitualDecision,
   WebauthnSwRequest,
 } from '../shared/webauthn-messages'
+import { isExtensionPage } from './sender'
 
 const LOG_PREFIX = '[kura:webauthn:sw]'
 const RITUAL_TIMEOUT_MS = 85_000
@@ -80,7 +81,11 @@ function buildClientDataJson(
 interface PendingRitual {
   resolve: (decision: WebauthnRitualDecision) => void
   context: WebauthnRitualContext
+  /** Tab of the page that made the create()/get() request */
+  tabId: number
   windowId?: number
+  /** Resolves with the ritual window's id once chrome.windows.create has returned */
+  windowReady: Promise<number | undefined>
   timeoutId: ReturnType<typeof setTimeout>
   /** context.kind === 'locked' の場合のみ設定。アンロック成功時に一度だけ呼ばれ、続きのcontextを返す */
   onUnlock?: () => Promise<WebauthnRitualContext>
@@ -88,8 +93,8 @@ interface PendingRitual {
 
 const pendingRituals = new Map<string, PendingRitual>()
 
-/** A create()/get() request together with the origin of the frame that sent it. */
-type VerifiedRequest = WebauthnSwRequest & { origin: string; hostname: string }
+/** A create()/get() request together with the origin/tab of the frame that sent it. */
+type VerifiedRequest = WebauthnSwRequest & { origin: string; hostname: string; tabId: number }
 
 /**
  * Derive the requesting origin from the browser-attested sender. Chrome sets
@@ -136,33 +141,50 @@ chrome.windows.onRemoved.addListener((windowId) => {
 /**
  * 儀式ウィンドウを開き、ユーザーの決定（確認/選択、またはキャンセル）を待つ。
  * ウィンドウが閉じられた場合・タイムアウトした場合はcancelled:trueで解決する。
+ *
+ * 儀式のIDはページが決めたrequestIdではなくここで生成する。ページが同じIDを
+ * 使い回して同時実行数の上限をすり抜けたり、別リクエストの決定を横取りしたり
+ * できないようにするため。同じタブからの儀式は同時に1件まで。
  */
 function runRitual(
-  requestId: string,
+  tabId: number,
   context: WebauthnRitualContext,
   onUnlock?: () => Promise<WebauthnRitualContext>,
 ): Promise<WebauthnRitualDecision> {
+  const ritualId = crypto.randomUUID()
   return new Promise((resolve) => {
-    if (pendingRituals.size >= MAX_CONCURRENT_RITUALS) {
-      resolve({ type: 'WEBAUTHN_RITUAL_DECISION', requestId, cancelled: true })
+    const busy =
+      pendingRituals.size >= MAX_CONCURRENT_RITUALS ||
+      [...pendingRituals.values()].some((p) => p.tabId === tabId)
+    if (busy) {
+      resolve({ type: 'WEBAUTHN_RITUAL_DECISION', requestId: ritualId, cancelled: true })
       return
     }
 
     const timeoutMs = context.kind === 'locked' ? RITUAL_UNLOCK_TIMEOUT_MS : RITUAL_TIMEOUT_MS
     const timeoutId = setTimeout(() => {
-      finishRitual(requestId, { type: 'WEBAUTHN_RITUAL_DECISION', requestId, cancelled: true })
+      finishRitual(ritualId, {
+        type: 'WEBAUTHN_RITUAL_DECISION',
+        requestId: ritualId,
+        cancelled: true,
+      })
     }, timeoutMs)
 
-    pendingRituals.set(requestId, { resolve, context, timeoutId, onUnlock })
+    let markWindowReady: (windowId: number | undefined) => void = () => {}
+    const windowReady = new Promise<number | undefined>((r) => {
+      markWindowReady = r
+    })
+    pendingRituals.set(ritualId, { resolve, context, tabId, timeoutId, onUnlock, windowReady })
 
     const url = chrome.runtime.getURL(
-      `src/popup/webauthn.html?requestId=${encodeURIComponent(requestId)}&kind=${context.kind}`,
+      `src/popup/webauthn.html?requestId=${encodeURIComponent(ritualId)}&kind=${context.kind}`,
     )
     chrome.windows.create({ url, type: 'popup', width: 420, height: 560, focused: true }, (win) => {
-      const pending = pendingRituals.get(requestId)
+      const pending = pendingRituals.get(ritualId)
       if (pending && win?.id !== undefined) {
         pending.windowId = win.id
       }
+      markWindowReady(win?.id)
     })
   })
 }
@@ -322,7 +344,7 @@ async function handleGetRequest(
 
   try {
     const decision = await runRitual(
-      req.requestId,
+      req.tabId,
       initialContext,
       initialContext.kind === 'locked' ? resumeAfterUnlock : undefined,
     )
@@ -491,7 +513,7 @@ async function handleCreateRequest(
 
   try {
     const decision = await runRitual(
-      req.requestId,
+      req.tabId,
       initialContext,
       initialContext.kind === 'locked' ? resumeAfterUnlock : undefined,
     )
@@ -544,12 +566,34 @@ async function handleCreateRequest(
 
 // ========== Ritual window ↔ Service Worker messages ==========
 
-function handleRitualGetContext(
+const RITUAL_PAGE_URL = chrome.runtime.getURL('src/popup/webauthn.html')
+
+/**
+ * The ritual messages decide which credential gets used, so they are only
+ * accepted from the ritual window that was opened for that very request
+ * (not from other extension pages, and never from content scripts).
+ */
+async function getRitualForSender(
+  requestId: unknown,
+  sender: chrome.runtime.MessageSender,
+): Promise<PendingRitual | null> {
+  if (typeof requestId !== 'string') return null
+  if (!isExtensionPage(sender) || !sender.url?.startsWith(RITUAL_PAGE_URL)) return null
+  const pending = pendingRituals.get(requestId)
+  if (!pending) return null
+  const windowId = pending.windowId ?? (await pending.windowReady)
+  if (windowId === undefined || sender.tab?.windowId !== windowId) return null
+  // The ritual may have finished while waiting for the window id
+  return pendingRituals.get(requestId) === pending ? pending : null
+}
+
+async function handleRitualGetContext(
   message: { requestId: string },
+  sender: chrome.runtime.MessageSender,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies
   sendResponse: (response?: any) => void,
 ) {
-  const pending = pendingRituals.get(message.requestId)
+  const pending = await getRitualForSender(message.requestId, sender)
   if (!pending) {
     sendResponse({ success: false, error: 'Request not found or expired' })
     return
@@ -557,11 +601,16 @@ function handleRitualGetContext(
   sendResponse({ success: true, context: pending.context })
 }
 
-function handleRitualDecision(
+async function handleRitualDecision(
   message: WebauthnRitualDecision,
+  sender: chrome.runtime.MessageSender,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies
   sendResponse: (response?: any) => void,
 ) {
+  if (!(await getRitualForSender(message.requestId, sender))) {
+    sendResponse({ success: false, error: 'Request not found or expired' })
+    return
+  }
   finishRitual(message.requestId, message)
   sendResponse({ success: true })
 }
@@ -583,16 +632,21 @@ export async function handleWebauthnMessage(
         sendResponse({ success: false, errorName: 'SecurityError', error: 'Invalid origin' })
         return
       }
+      const tabId = sender.tab?.id
+      if (tabId === undefined) {
+        sendResponse({ success: false, errorName: 'NotAllowedError', error: 'No tab' })
+        return
+      }
       // Spread first so that origin/hostname in the payload can never win
-      const req: VerifiedRequest = { ...(message as WebauthnSwRequest), ...requester }
+      const req: VerifiedRequest = { ...(message as WebauthnSwRequest), ...requester, tabId }
       return message.type === 'WEBAUTHN_CREATE_REQUEST'
         ? handleCreateRequest(req, sendResponse)
         : handleGetRequest(req, sendResponse)
     }
     case 'WEBAUTHN_RITUAL_GET_CONTEXT':
-      return handleRitualGetContext(message as { requestId: string }, sendResponse)
+      return handleRitualGetContext(message as { requestId: string }, sender, sendResponse)
     case 'WEBAUTHN_RITUAL_DECISION':
-      return handleRitualDecision(message as WebauthnRitualDecision, sendResponse)
+      return handleRitualDecision(message as WebauthnRitualDecision, sender, sendResponse)
     default:
       sendResponse({ success: false, error: `Unknown webauthn message: ${message.type}` })
   }
