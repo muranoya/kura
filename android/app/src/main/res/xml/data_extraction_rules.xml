@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- targetSdk 31以降ではallowBackup="false"だけでは端末間転送（D2D）が止まらないため、
+     クラウドバックアップ・端末間転送ともに全ドメインを除外する。
+     vaultファイル（マスターパスワードへのオフライン総当たり対象）やオートフィルログ（利用ドメインの平文）を
+     端末外に出さない -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>
