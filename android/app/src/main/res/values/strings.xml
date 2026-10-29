@@ -122,6 +122,8 @@
     <string name="lock_passcode_required">パスコードを入力してください</string>
     <string name="lock_unlock_failed">アンロックに失敗しました</string>
     <string name="lock_passcode_unlock_failed">パスコードでのアンロックに失敗しました</string>
+    <string name="lock_passcode_wrong">パスコードが違います。あと%1$d回間違えるとパスコードでのアンロックは無効になります</string>
+    <string name="lock_passcode_locked_out">パスコードを%1$d回間違えたため、パスコードでのアンロックを無効にしました。マスターパスワードでアンロックしてください</string>
     <string name="lock_quick_unlock_password_changed">別の端末でマスターパスワードが変更されたため、クイックアンロックを無効にしました。マスターパスワードでロックを解除し、設定から再度有効にしてください</string>
 
     <!-- Recovery screen -->
@@ -372,7 +374,7 @@
     <string name="passcode_setup_passcode">パスコード</string>
     <string name="passcode_setup_confirm">パスコード（確認）</string>
     <string name="passcode_setup_all_required">すべてのフィールドを入力してください</string>
-    <string name="passcode_setup_format">パスコードは4桁以上で入力してください</string>
+    <string name="passcode_setup_format">パスコードは%1$d桁以上で入力してください</string>
     <string name="passcode_setup_mismatch">パスコードが一致しません</string>
     <string name="passcode_setup_failed">パスコードの有効化に失敗しました: %1$s</string>
 

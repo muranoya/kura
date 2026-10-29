@@ -33,6 +33,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import net.meshpeak.kura.R
 import net.meshpeak.kura.bridge.VaultBridge
+import net.meshpeak.kura.data.auth.PasscodeHelper
 import net.meshpeak.kura.data.model.S3Config
 import net.meshpeak.kura.ui.components.ConfirmDialog
 import net.meshpeak.kura.util.ClipboardUtil
@@ -761,7 +762,7 @@ fun PasscodeSetupDialog(
     val context = LocalContext.current
 
     val allRequiredMsg = stringResource(R.string.passcode_setup_all_required)
-    val formatMsg = stringResource(R.string.passcode_setup_format)
+    val formatMsg = stringResource(R.string.passcode_setup_format, PasscodeHelper.MIN_PASSCODE_LENGTH)
     val mismatchMsg = stringResource(R.string.passcode_setup_mismatch)
 
     AlertDialog(
@@ -804,7 +805,7 @@ fun PasscodeSetupDialog(
                 onClick = {
                     when {
                         masterPassword.isBlank() || passcode.isBlank() || confirmPasscode.isBlank() -> error = allRequiredMsg
-                        passcode.length < 4 -> error = formatMsg
+                        passcode.length < PasscodeHelper.MIN_PASSCODE_LENGTH -> error = formatMsg
                         passcode != confirmPasscode -> error = mismatchMsg
                         else -> scope.launch {
                             isLoading = true

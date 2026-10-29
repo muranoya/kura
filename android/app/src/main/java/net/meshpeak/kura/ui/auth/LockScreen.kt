@@ -26,6 +26,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import net.meshpeak.kura.R
+import net.meshpeak.kura.data.auth.PasscodeHelper
+import net.meshpeak.kura.data.auth.PasscodeLockedOutException
+import net.meshpeak.kura.data.auth.WrongPasscodeException
 import net.meshpeak.kura.ui.components.ConfirmDialog
 import net.meshpeak.kura.ui.components.SecretKeyboardOptions
 import net.meshpeak.kura.viewmodel.AppViewModel
@@ -211,6 +214,13 @@ fun LockScreen(
                             return@launch
                         }
                         onUnlocked()
+                    } catch (e: WrongPasscodeException) {
+                        password = ""
+                        error = context.getString(R.string.lock_passcode_wrong, e.remainingAttempts)
+                    } catch (_: PasscodeLockedOutException) {
+                        appViewModel.preferences.setPasscodeEnabled(false)
+                        password = ""
+                        error = context.getString(R.string.lock_passcode_locked_out, PasscodeHelper.MAX_FAILED_ATTEMPTS)
                     } catch (e: Exception) {
                         error = context.getString(if (usePasscode) R.string.lock_passcode_unlock_failed else R.string.lock_unlock_failed)
                     } finally { isLoading = false }
