@@ -183,7 +183,7 @@ export component Sidebar inherits Rectangle {
             NavButton {
                 text: "設定";
                 icon: Icons.settings;
-                active: Nav.page == Page.settings;
+                active: Nav.page == Page.settings || Nav.page == Page.about;
                 clicked => {
                     Nav.navigate(Page.settings);
                 }
@@ -269,11 +269,23 @@ export component SyncHeaderActions inherits HorizontalLayout {
 // メイン画面上部の固定ヘッダー（タイトル + 同期ボタン）
 export component ScreenHeader inherits Rectangle {
     in property <string> title;
+    // 下層の画面で、タイトルの左に戻るボタンを出す
+    in property <bool> has-back: false;
+    callback back();
     height: 44px;
     background: Theme.bg-surface;
     HorizontalLayout {
         padding-left: 12px;
         padding-right: 12px;
+        spacing: 8px;
+        if root.has-back: IconButton {
+            y: (parent.height - self.height) / 2;
+            icon: Icons.arrow-left;
+            tooltip: "戻る";
+            clicked => {
+                root.back();
+            }
+        }
         Text {
             horizontal-stretch: 1;
             text: root.title;

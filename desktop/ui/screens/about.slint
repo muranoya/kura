@@ -1,0 +1,239 @@
+import { AboutSlint, LineEdit, ListView, ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { AppButton, Card, Dialog, DialogFooter, Icon, IconButton } from "../widgets.slint";
+import { About, LicenseItem, Nav, Page, Util } from "../state.slint";
+import { HorizontalDivider, ScreenHeader } from "layout.slint";
+
+component InfoRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+    Text {
+        horizontal-stretch: 1;
+        text: root.label;
+        font-size: Theme.text-sm;
+        color: Theme.text-muted;
+    }
+
+    Text {
+        text: root.value;
+        font-size: Theme.text-sm;
+        color: Theme.text-primary;
+    }
+
+    @children
+}
+
+component LicenseRow inherits Rectangle {
+    in property <LicenseItem> item;
+    callback clicked();
+    height: 36px;
+    border-radius: Theme.radius;
+    background: touch.has-hover ? Theme.bg-elevated : transparent;
+    HorizontalLayout {
+        padding-left: 8px;
+        // ListView のスクロールバーと重ならないようにする
+        padding-right: 16px;
+        spacing: 8px;
+        Text {
+            text: root.item.name;
+            font-size: Theme.text-sm;
+            color: Theme.text-primary;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+
+        Text {
+            horizontal-stretch: 1;
+            text: root.item.version;
+            font-family: Theme.mono;
+            font-size: Theme.text-xs;
+            color: Theme.text-muted;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: root.item.license;
+            font-size: Theme.text-xs;
+            color: Theme.text-secondary;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+
+        Icon {
+            y: (parent.height - self.height) / 2;
+            source: Icons.chevron-right;
+            size: 14px;
+            color: Theme.text-muted;
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export component AboutScreen inherits Rectangle {
+    background: Theme.bg-base;
+    VerticalLayout {
+        ScreenHeader {
+            title: "このアプリについて";
+            has-back: true;
+            back => {
+                Nav.navigate(Page.settings);
+            }
+        }
+
+        HorizontalDivider { }
+
+        VerticalLayout {
+            vertical-stretch: 1;
+            padding: 12px;
+            spacing: 12px;
+            HorizontalLayout {
+                spacing: 12px;
+                Card {
+                    horizontal-stretch: 1;
+                    VerticalLayout {
+                        spacing: 2px;
+                        Text {
+                            text: "kura";
+                            font-size: Theme.text-2xl;
+                            font-weight: 700;
+                            color: Theme.text-primary;
+                        }
+
+                        Text {
+                            text: "パスワードマネージャー";
+                            font-size: Theme.text-xs;
+                            color: Theme.text-muted;
+                        }
+                    }
+
+                    InfoRow {
+                        label: "バージョン";
+                        value: About.version;
+                    }
+
+                    InfoRow {
+                        label: "ライセンス";
+                        value: "Apache License 2.0";
+                    }
+
+                    InfoRow {
+                        label: "リポジトリ";
+                        HorizontalLayout {
+                            spacing: 4px;
+                            Text {
+                                text: "GitHub";
+                                font-size: Theme.text-sm;
+                                color: Theme.accent;
+                                TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        Util.open-url("https://github.com/muranoya/kura");
+                                    }
+                                }
+                            }
+
+                            Icon {
+                                y: (parent.height - self.height) / 2;
+                                source: Icons.external-link;
+                                size: 12px;
+                                color: Theme.accent;
+                            }
+                        }
+                    }
+                }
+
+                // Slint の Royalty-free ライセンスの表示義務を満たすためのウィジェット
+                Card {
+                    AboutSlint { }
+                }
+            }
+
+            Card {
+                vertical-stretch: 1;
+                title: "サードパーティライセンス";
+                Text {
+                    text: "このアプリは以下のオープンソースソフトウェアを使用しています。項目を選ぶとライセンス全文を表示します。";
+                    font-size: Theme.text-xs;
+                    color: Theme.text-muted;
+                    wrap: word-wrap;
+                }
+
+                Rectangle {
+                    LineEdit {
+                        width: 100%;
+                        text <=> About.search;
+                        placeholder-text: "名前で検索...";
+                        edited => {
+                            About.search-changed();
+                        }
+                    }
+
+                    if About.search != "": IconButton {
+                        x: parent.width - self.width - 8px;
+                        icon: Icons.x;
+                        tooltip: "検索をクリア";
+                        clicked => {
+                            About.search = "";
+                            About.search-changed();
+                        }
+                    }
+                }
+
+                if About.items.length == 0: Text {
+                    text: "該当するソフトウェアはありません";
+                    font-size: Theme.text-sm;
+                    color: Theme.text-muted;
+                }
+                ListView {
+                    vertical-stretch: 1;
+                    min-height: 120px;
+                    for item[i] in About.items: LicenseRow {
+                        item: item;
+                        clicked => {
+                            About.open-license(i);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component LicenseDialog inherits Dialog {
+    title: About.dialog-title;
+    description: About.dialog-license;
+    dialog-width: 672px;
+    dismissed => {
+        About.dialog-open = false;
+    }
+    ScrollView {
+        min-height: 200px;
+        preferred-height: 2000px;
+        content-height: body.preferred-height;
+        body := Text {
+            width: parent.visible-width - 12px;
+            text: About.dialog-text;
+            font-family: Theme.mono;
+            font-size: Theme.text-xs;
+            color: Theme.text-primary;
+            wrap: word-wrap;
+        }
+    }
+
+    DialogFooter {
+        AppButton {
+            text: "閉じる";
+            variant: "secondary";
+            clicked => {
+                About.dialog-open = false;
+            }
+        }
+    }
+}

@@ -1,6 +1,6 @@
 import { Theme } from "theme.slint";
 import { AppButton, Dialog, DialogFooter } from "widgets.slint";
-import { Confirm, LargeText, Nav, Onboarding, Page, EntryForm, Settings } from "state.slint";
+import { About, Confirm, LargeText, Nav, Onboarding, Page, EntryForm, Settings } from "state.slint";
 import { MasterPasswordScreen, RecoveryKeyScreen, StorageSetupScreen, TermsDialog, UnlockExistingScreen, WelcomeScreen } from "screens/onboarding.slint";
 import { LockScreen, RecoveryScreen } from "screens/auth.slint";
 import { ErrorBar, Sidebar } from "screens/layout.slint";
@@ -9,11 +9,12 @@ import { EntryFormScreen, TypeSelectDialog } from "screens/form.slint";
 import { PasswordGeneratorScreen } from "screens/generator.slint";
 import { LabelManagerScreen } from "screens/labels.slint";
 import { SettingsDialogs, SettingsScreen } from "screens/settings.slint";
+import { AboutScreen, LicenseDialog } from "screens/about.slint";
 
 import "../fonts/JetBrainsMono-Regular.ttf";
 
-export { Auth, Confirm, EntryForm, EntryList, Errors, Labels, LargeText, Nav, Onboarding, PwGen, Settings, SyncState, Trash, Util } from "state.slint";
-export { Page, LabelItem, EntryRowItem, DetailRow, FormField, CustomFieldItem } from "state.slint";
+export { About, Auth, Confirm, EntryForm, EntryList, Errors, Labels, LargeText, Nav, Onboarding, PwGen, Settings, SyncState, Trash, Util } from "state.slint";
+export { Page, LicenseItem, LabelItem, EntryRowItem, DetailRow, FormField, CustomFieldItem } from "state.slint";
 export { MdBlock } from "widgets.slint";
 
 // ロック状態を示すトレイアイコン。メニューはアプリの終了のみ
@@ -95,7 +96,7 @@ export component AppWindow inherits Window {
 
     private property <bool> main-area: Nav.page == Page.entries || Nav.page == Page.favorites || Nav.page == Page.label-entries
         || Nav.page == Page.entry-create || Nav.page == Page.entry-edit || Nav.page == Page.password-generator
-        || Nav.page == Page.trash || Nav.page == Page.labels || Nav.page == Page.settings;
+        || Nav.page == Page.trash || Nav.page == Page.labels || Nav.page == Page.settings || Nav.page == Page.about;
 
     if Nav.page == Page.loading: Text {
         text: "読み込み中...";
@@ -134,11 +135,15 @@ export component AppWindow inherits Window {
             if Nav.page == Page.settings: SettingsScreen {
                 vertical-stretch: 1;
             }
+            if Nav.page == Page.about: AboutScreen {
+                vertical-stretch: 1;
+            }
         }
     }
 
     // モーダル（ウィンドウ全体を覆う）
     if Nav.page == Page.settings && Settings.dialog != "": SettingsDialogs { }
+    if Nav.page == Page.about && About.dialog-open: LicenseDialog { }
     if Onboarding.terms-open: TermsDialog { }
     if Nav.page == Page.entry-create && EntryForm.type-dialog-open: TypeSelectDialog { }
     if LargeText.open: LargeTextDialog { }

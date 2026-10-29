@@ -1,5 +1,6 @@
 //! 画面遷移とアプリ全体の状態遷移（旧 App.tsx）
 
+mod about;
 mod auth;
 mod entries;
 mod form;
@@ -45,6 +46,7 @@ pub fn setup(app: &AppWindow, tray: Option<AppTray>) {
     setup_generator(app);
     setup_autolock(app);
 
+    about::setup(app);
     onboarding::setup(app);
     auth::setup(app);
     entries::setup(app);
@@ -146,6 +148,7 @@ pub fn navigate(app: &AppWindow, page: Page) {
         Page::EntryCreate => form::enter_create(app),
         Page::Labels => labels::enter(app),
         Page::Settings => settings::enter(app),
+        Page::About => about::enter(app),
         _ => {}
     }
     if UNLOCKED.get() {
