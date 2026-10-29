@@ -72,6 +72,7 @@ interface IVaultRepository {
     // Security
     suspend fun verifyPassword(password: String)
     suspend fun changeMasterPassword(oldPassword: String, newPassword: String)
+    suspend fun resetMasterPasswordWithRecoveryKey(recoveryKey: String, newPassword: String)
     suspend fun rotateDek(password: String): String
     suspend fun regenerateRecoveryKey(password: String): String
 
@@ -300,6 +301,11 @@ class VaultRepository(private val context: Context) : IVaultRepository {
     override suspend fun changeMasterPassword(oldPassword: String, newPassword: String) = withContext(Dispatchers.IO) {
         VaultBridge.changeMasterPassword(DEFAULT_VAULT_ID, oldPassword, newPassword)
     }
+
+    override suspend fun resetMasterPasswordWithRecoveryKey(recoveryKey: String, newPassword: String) =
+        withContext(Dispatchers.IO) {
+            VaultBridge.resetMasterPasswordWithRecoveryKey(DEFAULT_VAULT_ID, recoveryKey, newPassword)
+        }
 
     override suspend fun rotateDek(password: String): String = withContext(Dispatchers.IO) {
         VaultBridge.rotateDek(DEFAULT_VAULT_ID, password)

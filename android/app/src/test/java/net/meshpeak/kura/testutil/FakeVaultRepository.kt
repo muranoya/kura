@@ -122,6 +122,7 @@ class FakeVaultRepository : IVaultRepository {
 
     override suspend fun verifyPassword(password: String) {}
     override suspend fun changeMasterPassword(oldPassword: String, newPassword: String) {}
+    override suspend fun resetMasterPasswordWithRecoveryKey(recoveryKey: String, newPassword: String) {}
     override suspend fun rotateDek(password: String): String = ""
     override suspend fun regenerateRecoveryKey(password: String): String = ""
 

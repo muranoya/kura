@@ -116,7 +116,7 @@
     <string name="lock_use_passcode">パスコードを使用</string>
     <string name="lock_biometric_locked">生体認証がロックされました。しばらくしてからお試しください</string>
     <string name="lock_biometric_disabled">生体認証が無効になりました。設定から再度有効にしてください</string>
-    <string name="lock_unlock_with_recovery">リカバリーキーでアンロック</string>
+    <string name="lock_unlock_with_recovery">マスターパスワードを忘れた場合</string>
     <string name="lock_logout_confirm_title">ログアウト</string>
     <string name="lock_logout_confirm_description">この端末からvaultのデータ、S3の設定、生体認証とパスコードの設定を削除します。S3上のvaultは削除されません。再び使うにはS3の設定を入力し直す必要があります。</string>
     <string name="lock_password_required">パスワードを入力してください</string>
@@ -128,12 +128,16 @@
     <string name="lock_quick_unlock_password_changed">別の端末でマスターパスワードが変更されたため、クイックアンロックを無効にしました。マスターパスワードでロックを解除し、設定から再度有効にしてください</string>
 
     <!-- Recovery screen -->
-    <string name="recovery_title">リカバリーキーでアンロック</string>
-    <string name="recovery_description">リカバリーキーを入力してVaultをアンロックします。</string>
+    <string name="recovery_title">リカバリーキーで復旧</string>
+    <string name="recovery_description">リカバリーキーを入力し、新しいマスターパスワードを設定します。</string>
     <string name="recovery_key_label">リカバリーキー</string>
     <string name="recovery_key_placeholder">XXXX-XXXX-XXXX-XXXX</string>
-    <string name="recovery_key_required">リカバリーキーを入力してください</string>
-    <string name="recovery_unlock_failed">アンロックに失敗しました: %1$s</string>
+    <string name="recovery_new_password_label">新しいマスターパスワード</string>
+    <string name="recovery_confirm_password_label">新しいマスターパスワード（確認）</string>
+    <string name="recovery_all_required">すべてのフィールドを入力してください</string>
+    <string name="recovery_password_mismatch">パスワードが一致しません</string>
+    <string name="recovery_submit">復旧を実行</string>
+    <string name="recovery_failed">復旧に失敗しました: %1$s</string>
 
     <!-- Home / entry list -->
     <string name="home_search_placeholder">アイテムを検索…</string>
