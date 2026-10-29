@@ -9,7 +9,7 @@ mod onboarding;
 mod settings;
 
 use std::cell::{Cell, RefCell};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use slint::{ComponentHandle, ModelRc, VecModel};
 
@@ -24,6 +24,8 @@ thread_local! {
     static PERIODIC_SYNC: slint::Timer = slint::Timer::default();
     static CLOCK: slint::Timer = slint::Timer::default();
     static AUTOLOCK: slint::Timer = slint::Timer::default();
+    // 自動ロックの期限。slint::Timer の単調時計はスリープ中に進まない OS があるので、壁時計で持つ
+    static AUTOLOCK_DEADLINE: Cell<Option<SystemTime>> = const { Cell::new(None) };
     static UNLOCKED: Cell<bool> = const { Cell::new(false) };
 }
 
@@ -300,7 +302,7 @@ fn periodic_sync(_app: &AppWindow) {
 
 fn stop_unlocked_timers() {
     PERIODIC_SYNC.with(slint::Timer::stop);
-    AUTOLOCK.with(slint::Timer::stop);
+    stop_autolock();
 }
 
 /// 画面上に残っている機密情報（詳細・フォーム・生成パスワードなど）を消す
@@ -474,30 +476,50 @@ fn window_has_focus(app: &AppWindow) -> bool {
 }
 
 fn on_focus_changed(app: &AppWindow, focused: bool) {
+    // スリープから復帰してフォーカスが戻った場合など、期限を過ぎていればタイマーを止める前にロックする
+    if autolock_expired() {
+        lock(app);
+        return;
+    }
+    // 最初にフォーカスを失った時点から数える。隠れるたびに仕掛け直すと期限が延び続ける
+    if !focused && AUTOLOCK_DEADLINE.get().is_some() {
+        return;
+    }
+    stop_autolock();
+    if focused || !UNLOCKED.get() {
+        return;
+    }
+    let minutes = shared().store.app_settings().autolock_minutes;
+    if minutes == 0 {
+        return;
+    }
+    AUTOLOCK_DEADLINE.set(Some(SystemTime::now() + Duration::from_secs(minutes * 60)));
+    // 期限まで眠るタイマーだとスリープ中の時間を数えないので、短い間隔で壁時計と比べる
+    let weak = app.as_weak();
     AUTOLOCK.with(|timer| {
-        // 最初にフォーカスを失った時点から数える。隠れるたびに仕掛け直すと期限が延び続ける
-        if !focused && timer.running() {
-            return;
-        }
-        timer.stop();
-        if focused || !UNLOCKED.get() {
-            return;
-        }
-        let minutes = shared().store.app_settings().autolock_minutes;
-        if minutes == 0 {
-            return;
-        }
-        let weak = app.as_weak();
         timer.start(
-            slint::TimerMode::SingleShot,
-            Duration::from_secs(minutes * 60),
+            slint::TimerMode::Repeated,
+            Duration::from_secs(1),
             move || {
                 if let Some(app) = weak.upgrade() {
-                    lock(&app);
+                    if autolock_expired() {
+                        lock(&app);
+                    }
                 }
             },
         );
     });
+}
+
+fn autolock_expired() -> bool {
+    AUTOLOCK_DEADLINE
+        .get()
+        .is_some_and(|deadline| SystemTime::now() >= deadline)
+}
+
+fn stop_autolock() {
+    AUTOLOCK.with(slint::Timer::stop);
+    AUTOLOCK_DEADLINE.set(None);
 }
 
 #[cfg(test)]
