@@ -217,3 +217,31 @@ describe('ritual window binding', () => {
     )
   })
 })
+
+describe('secure context requirement', () => {
+  beforeEach(async () => {
+    initWebauthn(
+      createMockVaultApi(),
+      () => true,
+      async () => {},
+      async () => {},
+    )
+    await saveToStorage(STORAGE_KEYS.APP_SETTINGS, { passkeyEnabled: true })
+  })
+
+  it('rejects requests from http: origins', async () => {
+    const result = await call(
+      { type: 'WEBAUTHN_GET_REQUEST', requestId: 'r', challenge: 'abc', rpId: 'bank.example' },
+      { id: 'test-id', url: 'http://legacy.bank.example/', tab, frameId: 0 },
+    )
+    expect(result).toMatchObject({ success: false, errorName: 'SecurityError' })
+  })
+
+  it('accepts http://localhost for local development', async () => {
+    const result = await call(
+      { type: 'WEBAUTHN_GET_REQUEST', requestId: 'r', challenge: 'abc', rpId: 'localhost' },
+      { id: 'test-id', url: 'http://localhost:8080/', tab, frameId: 0 },
+    )
+    expect(result).toEqual({ success: true, status: 'passthrough' })
+  })
+})

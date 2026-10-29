@@ -46,6 +46,20 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 })
 
 async function handleRequest(request: WebauthnMainRequest) {
+  // WebAuthn is only available in secure contexts. navigator.credentials does
+  // not even exist on http: pages, but a page can still post a request to this
+  // bridge directly, so refuse here as well (the Service Worker re-checks).
+  if (!window.isSecureContext) {
+    postToMain({
+      source: KURA_WEBAUTHN_BRIDGE_SOURCE,
+      requestId: request.requestId,
+      status: 'error',
+      errorName: 'SecurityError',
+      errorMessage: 'WebAuthn requires a secure context',
+    })
+    return
+  }
+
   const swRequest: WebauthnSwRequest = {
     type: request.kind === 'create' ? 'WEBAUTHN_CREATE_REQUEST' : 'WEBAUTHN_GET_REQUEST',
     requestId: request.requestId,

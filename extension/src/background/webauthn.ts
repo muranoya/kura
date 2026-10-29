@@ -99,7 +99,8 @@ type VerifiedRequest = WebauthnSwRequest & { origin: string; hostname: string; t
 /**
  * Derive the requesting origin from the browser-attested sender. Chrome sets
  * `sender.origin` ("null" for opaque origins such as sandboxed frames);
- * Firefox only provides `sender.url`.
+ * Firefox only provides `sender.url`. Returns null for opaque or insecure
+ * (non-https, non-loopback) origins.
  */
 function originFromSender(
   sender: chrome.runtime.MessageSender,
@@ -113,7 +114,24 @@ function originFromSender(
   }
   const origin = sender.origin ?? url.origin
   if (origin === 'null' || origin !== url.origin) return null
+  if (!isPotentiallyTrustworthy(url)) return null
   return { origin, hostname: url.hostname }
+}
+
+/**
+ * Secure-context origins as browsers define them for WebAuthn: https, or
+ * loopback hosts (used during local development).
+ */
+function isPotentiallyTrustworthy(url: URL): boolean {
+  if (url.protocol === 'https:') return true
+  if (url.protocol !== 'http:') return false
+  const host = url.hostname
+  return (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host === '[::1]' ||
+    /^127(\.\d{1,3}){3}$/.test(host)
+  )
 }
 
 function finishRitual(requestId: string, decision: WebauthnRitualDecision) {

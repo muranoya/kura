@@ -148,7 +148,7 @@ attestationObject（`{fmt: "none", attStmt: {}, authData: <bytes>}`）とauthent
 
 **検証の多段防御:**
 
-1. Service Workerが、メッセージの送信元からorigin/hostnameを導出する（Chromeは`sender.origin`、Firefoxは`sender.url`のorigin）。ブラウザが付与する値なので、MAIN world・ISOLATED worldはもちろん、侵害されたレンダラーでも偽装できない。メッセージ本文にorigin/hostnameは含めない。opaque origin（sandbox属性付きiframe等で`sender.origin`が`"null"`）からの要求は拒否する。
+1. Service Workerが、メッセージの送信元からorigin/hostnameを導出する（Chromeは`sender.origin`、Firefoxは`sender.url`のorigin）。ブラウザが付与する値なので、MAIN world・ISOLATED worldはもちろん、侵害されたレンダラーでも偽装できない。メッセージ本文にorigin/hostnameは含めない。opaque origin（sandbox属性付きiframe等で`sender.origin`が`"null"`）からの要求は拒否する。secure contextでないorigin（https以外。ただし`localhost`等のループバックは許可）からの要求も`SecurityError`で拒否する。ネイティブのWebAuthnはsecure contextでしか使えず、http:ページには`navigator.credentials`自体が存在しないが、ページはbridgeへ直接postMessageできるため、`webauthn-bridge.ts`でも`window.isSecureContext`を確認して拒否する。
 2. Service Workerが、送信元由来のoriginと、ページが要求した`rp.id`を突き合わせ、`etld.ts`のsuffix判定ロジックで検証してから初めてvault-core問い合わせ・UI表示に進む。不一致は即座にreject。
 
 ## 3-6. メッセージフロー
