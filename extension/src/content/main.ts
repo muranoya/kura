@@ -108,6 +108,8 @@ function onVaultMessage(
 let focusDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 function onFocus(e: Event) {
+  // Ignore synthetic focus events dispatched by page scripts (and by our own filler)
+  if (!e.isTrusted) return
   if (isCaptureActive() || isTotpQrScanActive() || isPickerActive()) return
 
   // Use composedPath to get the actual target across shadow DOM boundaries

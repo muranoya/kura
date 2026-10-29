@@ -188,6 +188,7 @@ function renderItems() {
     item.addEventListener('mousedown', (e) => {
       e.preventDefault() // Prevent blur on the input
       e.stopPropagation()
+      if (!e.isTrusted || e.button !== 0) return
       onSelectCallback?.(candidate)
     })
 
@@ -228,6 +229,11 @@ function updateSelection() {
 
 function handleKeydown(e: KeyboardEvent) {
   if (!dropdownEl) return
+  // The listener is attached to the page's own <input>, so page scripts can
+  // dispatch synthetic keydown events to it. Only real key presses may select
+  // a candidate; otherwise a page could fill and read credentials without any
+  // user interaction.
+  if (!e.isTrusted) return
 
   if (lockedMode) {
     switch (e.key) {
@@ -473,6 +479,7 @@ export function showInlineIcon(anchor: HTMLInputElement, onClick: () => void) {
   iconEl.addEventListener('mousedown', (e) => {
     e.preventDefault()
     e.stopPropagation()
+    if (!e.isTrusted || e.button !== 0) return
     if (blurTimeout) {
       clearTimeout(blurTimeout)
       blurTimeout = null
@@ -541,6 +548,7 @@ export function showLockedDropdown(anchor: HTMLInputElement, onUnlockClick: () =
   item.addEventListener('mousedown', (e) => {
     e.preventDefault()
     e.stopPropagation()
+    if (!e.isTrusted || e.button !== 0) return
     onUnlockClick()
   })
 

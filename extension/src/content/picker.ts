@@ -149,6 +149,8 @@ function onMouseOut(e: Event) {
 
 function onFieldClick(e: Event) {
   if (!isActive) return
+  // Page scripts can dispatch synthetic clicks; only real user clicks select a field
+  if (!e.isTrusted) return
   const target = e.target
   if (!(target instanceof HTMLInputElement)) {
     // <input> 以外はV1では選択不可（クリックは無視するが、ページ本来の動作は
