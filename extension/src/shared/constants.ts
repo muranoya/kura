@@ -35,5 +35,6 @@ export const STORAGE_KEYS = {
   LABEL_FILTER: 'entryLabelFilter',
   SELECTED_ENTRY_ID: 'entrySelectedId',
   FAVORITES_FILTER: 'entryFavoritesFilter',
-  SESSION_PASSWORD: 'sessionPassword',
+  // アンロック中の DEK（base64）。SW 再起動時のセッション復元用（マスターパスワードは保存しない）
+  SESSION_DEK: 'sessionDek',
 }
