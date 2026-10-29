@@ -201,6 +201,8 @@ Autofillフレームワークの`Dataset`はフィールド値を`onFillRequest`
 
 `onFillRequest`で渡される`AssistStructure`を再帰的にトラバースし、`ViewNode`ごとにフィールドの役割を判定する。判定ロジックはAndroidアプリ内に閉じた実装とし、vault-core・拡張機能とのロジック共有は行わない（ネイティブアプリ向け判定ロジックには拡張機能側に対応する実装が元々存在しないため、共有の効能が薄い）。まずリクエスト元を判定し、ネイティブアプリ由来ならSection 3-1-1、ブラウザ由来ならSection 1-6-2のロジックに進む。
 
+ユーザーに見えない欄は入力対象から除外する。`visibility`が`VISIBLE`でないノードは配下ごと、幅か高さが0のノードと`<input type="hidden">`は単独で除外する。同じeTLD+1のページにHTMLを注入できる攻撃者が、ユーザー名欄だけを見せてCSSで隠したパスワード欄にも値を入れさせ、スクリプトで抜き取る手口への対策である。CSSの`opacity`や画面外配置で隠した欄は`AssistStructure`から判別できないため対象外。
+
 ### 3-1-1. 優先順位（ネイティブアプリ由来リクエスト）
 
 1. `ViewNode.getAutofillHints()`: `View.AUTOFILL_HINT_USERNAME` / `AUTOFILL_HINT_PASSWORD` / `AUTOFILL_HINT_EMAIL_ADDRESS`が設定されていれば最優先で採用する。Android開発者が明示的に付与したヒントであり信頼性が最も高い

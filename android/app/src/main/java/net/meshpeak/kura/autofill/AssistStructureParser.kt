@@ -49,19 +49,25 @@ object AssistStructureParser {
             if (webDomain == null && !node.webDomain.isNullOrEmpty()) {
                 webDomain = node.webDomain
             }
+            // 非表示のノード配下は入力対象にしない（ユーザーに見えない欄へパスワードを入れさせて
+            // 抜き取る手口への対策）
+            if (node.visibility != View.VISIBLE) return
 
             val autofillId = node.autofillId
             if (autofillId != null && node.autofillType == View.AUTOFILL_TYPE_TEXT) {
                 val htmlInfo = node.htmlInfo
-                candidates += CandidateNode(
-                    autofillId = autofillId,
-                    autofillHints = node.autofillHints?.toList() ?: emptyList(),
-                    hint = node.hint,
-                    idEntry = node.idEntry,
-                    inputType = node.inputType,
-                    htmlTag = htmlInfo?.tag,
-                    htmlAttributes = htmlInfo?.attributes?.associate { it.first to it.second } ?: emptyMap()
-                )
+                val htmlAttributes = htmlInfo?.attributes?.associate { it.first to it.second } ?: emptyMap()
+                if (isUserVisibleField(node.width, node.height, htmlAttributes)) {
+                    candidates += CandidateNode(
+                        autofillId = autofillId,
+                        autofillHints = node.autofillHints?.toList() ?: emptyList(),
+                        hint = node.hint,
+                        idEntry = node.idEntry,
+                        inputType = node.inputType,
+                        htmlTag = htmlInfo?.tag,
+                        htmlAttributes = htmlAttributes
+                    )
+                }
             }
 
             for (i in 0 until node.childCount) {
@@ -104,6 +110,12 @@ object AssistStructureParser {
         }
 
         return result
+    }
+
+    /** 大きさのない欄や`<input type="hidden">`はユーザーに見えないため入力対象にしない */
+    internal fun isUserVisibleField(width: Int, height: Int, htmlAttributes: Map<String, String>): Boolean {
+        if (width <= 0 || height <= 0) return false
+        return !htmlAttributes["type"].equals("hidden", ignoreCase = true)
     }
 
     private fun classifyNativeCandidates(candidates: List<CandidateNode>): ClassifiedFields {
