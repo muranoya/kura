@@ -212,7 +212,7 @@ Webページ側のget()呼び出しがresolveされる
 
 基本構造は同じだが、以下が異なる:
 
-- Service Workerは`excludeCredentials`と既存`credential_id`の一致をUIを開く**前**にチェックし、一致すれば即座に（UIを一切開かず）`InvalidStateError`でreject。**ただし、これはリクエスト受信時点でvaultがアンロック済みの場合に限る**（後述）。
+- Service Workerは`excludeCredentials`と既存`credential_id`の一致をチェックし、一致した場合は儀式ウィンドウに「既に登録済み」のエラー画面（`{kind:'error', reason:'already_registered'}`）を表示し、ユーザーが閉じてから`InvalidStateError`でrejectする（ネイティブ認証器も同意を得てからエラーを返す）。即座に無言でrejectすると、ページが`excludeCredentials`に候補IDを並べて「このユーザーがどのクレデンシャルを持っているか」を無言で照合でき、また一致なし（ウィンドウが開く）との区別もついてしまうため。vaultがロック中の場合は後述のとおりアンロック後に同じエラー画面へ遷移する。
 - ポップアップウィンドウ（`kind=create`）は、`api_list_login_candidates`（オートフィルと同じeTLD+1マッチング）で見つかった既存`login`エントリの一覧 + 「新しいアイテムを作成」を選択肢として表示し、ユーザーが紐付け先を選ぶ。
 
 ### vaultがロック中に`create()`/`get()`が呼ばれた場合
@@ -246,9 +246,9 @@ Webページ側のget()呼び出しがresolveされる
 
 1. **秘密鍵はFFI境界を一切越えない**。越境するのはattestationObject/signatureという公開して構わない署名結果のみ。
 2. **rp_id/origin検証の多段防御**。ページやMAIN world側が主張する値を最終判断には使わない。
-3. **既存クレデンシャルの存在有無を推測させるサイドチャネルの防止**: **vaultがアンロック済みの状態でリクエストを受けた場合**、`get()`で候補0件、または`create()`で`excludeCredentials`が一致した場合は、儀式ウィンドウを一切開かない（開いて即閉じることも含む）。ウィンドウの生成・フォーカス移動はページ側から`visibilitychange`/`blur`イベント等で観測されうるため、それ自体が「このユーザーはこのサイトのPasskeyを持っているか」を推測させるサイドチャネルになりうる。UIを見せるかどうかの分岐は、儀式ウィンドウを開く**前**に完全に確定させる。
+3. **既存クレデンシャルの存在有無を推測させるサイドチャネルの防止**: **vaultがアンロック済みの状態でリクエストを受けた場合**、`get()`で候補0件の場合は、儀式ウィンドウを一切開かない（開いて即閉じることも含む）。`create()`で`excludeCredentials`が一致した場合は、逆に一致なしの場合と同じく儀式ウィンドウを開き、エラー画面を経てからrejectする（一致なしでも確認画面が開くため、ウィンドウの有無では区別できない）。さらに、ユーザー操作（transient activation）の確認をMAIN worldだけでなくISOLATED world（`webauthn-bridge.ts`）でも行う。ページはbridgeへ直接postMessageしてMAIN worldの確認を迂回できるため、これがないとクリックなしで`allowCredentials`/`excludeCredentials`による照合をループ実行できてしまう。ウィンドウの生成・フォーカス移動はページ側から`visibilitychange`/`blur`イベント等で観測されうるため、それ自体が「このユーザーはこのサイトのPasskeyを持っているか」を推測させるサイドチャネルになりうる。UIを見せるかどうかの分岐は、儀式ウィンドウを開く**前**に完全に確定させる。
    **vaultがロック中の場合はこの限りではない**:  候補の有無は復号しないと分からないため、`create()`/`get()`いずれも候補の有無に関わらず`{kind:'locked'}`で儀式ウィンドウを先に開き、アンロック後に初めて候補0件/`excludeCredentials`一致が判明した場合は、ウィンドウ内にその旨を表示してから終了する。これにより「vaultが現在ロックされているか」はウィンドウの有無から推測されうる（アンロック済みなら候補0件で無反応、ロック中なら常にウィンドウが開くため）が、「ロック中のvaultがこのサイト用のPasskeyを持っているか」はアンロックしない限り最後まで秘匿される。前者の情報漏洩（ロック状態の推測可否）は許容する——vaultのロック状態自体は既存のオートフィル機能でも同様に外部から観測しうる情報であり、Passkey機能固有の新規リスクではないため。
 4. **エラーメッセージの無害化**: vault-core由来の内部エラー文字列をページJSに直接渡さない。ページに返す拒否理由は必ずWebAuthn仕様が定める汎用的な`DOMException`（`NotAllowedError`等）に正規化する。
 5. **タイムアウト/ウィンドウクローズの必達処理**: 横取りによりブラウザネイティブの`options.publicKey.timeout`強制が働かなくなるため、MAIN world側で独自タイムアウトを実装する。儀式ウィンドウが閉じられた場合・Service Worker再起動でport切断された場合を含め、必ずページのPromiseを解決（`NotAllowedError`相当でreject）させ、ハングしたままにしない。
-6. **常時ユーザー操作を必須にする**。
+6. **常時ユーザー操作を必須にする**。MAIN world（`webauthn-main-injected.js`）とISOLATED world（`webauthn-bridge.ts`）の両方で`navigator.userActivation.isActive`を確認する。
 7. **`isUserVerifyingPlatformAuthenticatorAvailable()`を`true`に上書きする判断とトレードオフ**: 上書きしないと、プラットフォーム認証器を持たない環境（Linuxデスクトップ等）で多くのサイトが「Passkeyでサインイン」ボタン自体を出さず、kuraのPasskey機能が実質使えなくなる。したがって`true`固定を推奨するが、これは「kuraが常にPasskey対応を主張する」ことを意味し、実際にはvaultがロック中・該当Passkeyを持っていない場合は上記3項のパススルー/静音拒否と組み合わせて初めて安全に成立する。

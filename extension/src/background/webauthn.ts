@@ -436,7 +436,7 @@ async function computeCreateContext(
 ): Promise<CreateContextResult> {
   if (!vaultApi) return { kind: 'error', message: 'Vault API not initialized' }
 
-  // excludeCredentialsチェックはUIを開く前に行う（一致すれば即座にreject、Part 3-6参照）
+  // excludeCredentialsチェック（一致すればエラー表示の儀式を経てreject、Part 3-6参照）
   if (req.excludeCredentialIds && req.excludeCredentialIds.length > 0) {
     try {
       const json = vaultApi.api_webauthn_find_credentials(
@@ -512,18 +512,21 @@ async function handleCreateRequest(
   if (isUnlocked()) {
     const computed = await computeCreateContext(req, rpId)
     if (computed.kind === 'already_registered') {
-      sendResponse({
-        success: false,
+      // Show the ritual window before rejecting, as native authenticators ask
+      // for consent first. An immediate silent InvalidStateError would let a
+      // page probe which credential ids this user has (excludeCredentials),
+      // and would be distinguishable from the no-match case, which opens a window.
+      abortReason = {
         errorName: 'InvalidStateError',
         error: 'Credential already registered for this relying party',
-      })
-      return
-    }
-    if (computed.kind === 'error') {
+      }
+      initialContext = { kind: 'error', reason: 'already_registered' }
+    } else if (computed.kind === 'error') {
       sendResponse({ success: false, errorName: 'NotAllowedError', error: computed.message })
       return
+    } else {
+      initialContext = computed.context
     }
-    initialContext = computed.context
   } else {
     // vaultがロック中: まずアンロック画面を挟み、成功後に同じウィンドウでcreate確認へ進む
     initialContext = { kind: 'locked' }
@@ -536,7 +539,8 @@ async function handleCreateRequest(
       initialContext.kind === 'locked' ? resumeAfterUnlock : undefined,
     )
 
-    if (decision.cancelled) {
+    // An error screen (e.g. already registered) can only end the ritual, never confirm it
+    if (decision.cancelled || abortReason) {
       sendResponse({
         success: false,
         ...(abortReason ?? { errorName: 'NotAllowedError', error: 'User cancelled' }),

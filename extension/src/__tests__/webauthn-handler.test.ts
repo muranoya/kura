@@ -245,3 +245,63 @@ describe('secure context requirement', () => {
     expect(result).toEqual({ success: true, status: 'passthrough' })
   })
 })
+
+describe('excludeCredentials match', () => {
+  it('opens the ritual window before rejecting with InvalidStateError', async () => {
+    const api = createMockVaultApi()
+    vi.mocked(api.api_webauthn_find_credentials).mockReturnValue(
+      JSON.stringify([{ entry_id: 'e1', credential_id: 'cred-1' }]),
+    )
+    initWebauthn(
+      api,
+      () => true,
+      async () => {},
+      async () => {},
+    )
+    await saveToStorage(STORAGE_KEYS.APP_SETTINGS, { passkeyEnabled: true })
+
+    const urls: string[] = []
+    vi.mocked(chrome.windows.create).mockImplementation(((
+      options: chrome.windows.CreateData,
+      callback?: (win: chrome.windows.Window) => void,
+    ) => {
+      urls.push(options.url as string)
+      callback?.({ id: 300 } as chrome.windows.Window)
+    }) as unknown as typeof chrome.windows.create)
+
+    let settled = false
+    const pending = call(
+      {
+        type: 'WEBAUTHN_CREATE_REQUEST',
+        requestId: 'r',
+        challenge: 'abc',
+        rpId: 'bank.example',
+        excludeCredentialIds: ['cred-1'],
+      },
+      { id: 'test-id', url: 'https://bank.example/register', tab: { id: 20 } as chrome.tabs.Tab },
+    ).then((r) => {
+      settled = true
+      return r
+    })
+
+    await vi.waitFor(() => expect(urls).toHaveLength(1))
+    expect(settled).toBe(false)
+
+    const ritualId = new URL(urls[0]).searchParams.get('requestId') as string
+    const ritualSender = {
+      id: 'test-id',
+      url: urls[0],
+      tab: { id: 999, windowId: 300 } as chrome.tabs.Tab,
+    }
+    expect(
+      await call({ type: 'WEBAUTHN_RITUAL_GET_CONTEXT', requestId: ritualId }, ritualSender),
+    ).toMatchObject({ context: { kind: 'error', reason: 'already_registered' } })
+    // Even a non-cancel decision cannot turn the error screen into a registration
+    await call(
+      { type: 'WEBAUTHN_RITUAL_DECISION', requestId: ritualId, cancelled: false },
+      ritualSender,
+    )
+    expect(await pending).toMatchObject({ success: false, errorName: 'InvalidStateError' })
+    expect(api.api_webauthn_create_credential).not.toHaveBeenCalled()
+  })
+})

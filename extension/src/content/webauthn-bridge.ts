@@ -60,6 +60,22 @@ async function handleRequest(request: WebauthnMainRequest) {
     return
   }
 
+  // The MAIN world script checks for a user gesture too, but a page can post
+  // to this bridge directly and skip it. Without this check, a page could
+  // silently probe which credential ids exist (excludeCredentials /
+  // allowCredentials) in a loop. User activation is per-frame state, so it is
+  // visible from this ISOLATED world as well.
+  if (navigator.userActivation && !navigator.userActivation.isActive) {
+    postToMain({
+      source: KURA_WEBAUTHN_BRIDGE_SOURCE,
+      requestId: request.requestId,
+      status: 'error',
+      errorName: 'NotAllowedError',
+      errorMessage: 'A user gesture is required to use a passkey.',
+    })
+    return
+  }
+
   const swRequest: WebauthnSwRequest = {
     type: request.kind === 'create' ? 'WEBAUTHN_CREATE_REQUEST' : 'WEBAUTHN_GET_REQUEST',
     requestId: request.requestId,
