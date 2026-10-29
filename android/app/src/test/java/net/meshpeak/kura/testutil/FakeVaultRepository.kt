@@ -183,18 +183,21 @@ class FakeVaultRepository : IVaultRepository {
         userHandle: String,
         userName: String,
         userDisplayName: String,
-        excludeCredentialIds: List<String>
+        excludeCredentialIds: List<String>,
+        userVerified: Boolean
     ): WebAuthnAttestationResult = webauthnCreateCredentialResult
 
     override suspend fun webauthnGetAssertion(
         entryId: String,
         customFieldId: String,
-        clientDataJson: String
+        clientDataJson: String,
+        userVerified: Boolean
     ): WebAuthnAssertionResult = webauthnGetAssertionResult
 
     override suspend fun webauthnGetAssertionWithHash(
         entryId: String,
         customFieldId: String,
-        clientDataHash: ByteArray
+        clientDataHash: ByteArray,
+        userVerified: Boolean
     ): WebAuthnAssertionResult = webauthnGetAssertionResult
 }

@@ -62,6 +62,8 @@ class PasskeyGetActivity : SecureActivity() {
     private var uiState by mutableStateOf<GetUiState>(GetUiState.Auth)
     private var providerRequest: ProviderGetCredentialRequest? = null
     private var resolvedOrigin: OriginResolver.Resolved? = null
+    /** この操作のためにユーザーを認証したか。authenticatorDataのUVフラグになる */
+    private var userVerified = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,8 +77,13 @@ class PasskeyGetActivity : SecureActivity() {
                 // 二重にラップしない（AutofillUnlockActivityと同じ呼び出し方に揃える）。
                 GetUiState.Auth -> AutofillAuthScreen(
                     appViewModel = appViewModel,
-                    onUnlocked = { proceed(selection) },
-                    onLogout = { finishCanceled() }
+                    onUnlocked = { verified ->
+                        userVerified = verified
+                        proceed(selection)
+                    },
+                    onLogout = { finishCanceled() },
+                    // AuthenticationAction経由（selectionなし）は候補を作り直すだけで署名しない
+                    verifyUserWhenUnlocked = selection != null
                 )
                 GetUiState.Loading -> KuraTheme { LoadingScreen() }
             }
@@ -199,7 +206,7 @@ class PasskeyGetActivity : SecureActivity() {
         val hash = pkOption.clientDataHash
         return if (hash != null) {
             val assertion = appViewModel.repository.webauthnGetAssertionWithHash(
-                selection.entryId, selection.customFieldId, hash
+                selection.entryId, selection.customFieldId, hash, userVerified
             )
             assertion to ""
         } else {
@@ -207,7 +214,7 @@ class PasskeyGetActivity : SecureActivity() {
                 ?: throw IllegalStateException("requestJson has no challenge")
             val clientDataJson = ClientDataJsonBuilder.buildForGet(challenge, resolved.rpId)
             val assertion = appViewModel.repository.webauthnGetAssertion(
-                selection.entryId, selection.customFieldId, clientDataJson
+                selection.entryId, selection.customFieldId, clientDataJson, userVerified
             )
             assertion to clientDataJson
         }

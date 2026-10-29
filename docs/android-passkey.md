@@ -316,23 +316,26 @@ external fun webauthnCreateCredential(
     userHandle: String,
     userName: String,
     userDisplayName: String,
-    excludeCredentialIdsJson: String
+    excludeCredentialIdsJson: String,
+    userVerified: Boolean
 ): String
 external fun webauthnGetAssertion(
     vaultId: String,
     entryId: String,
     customFieldId: String,
-    clientDataJson: String
+    clientDataJson: String,
+    userVerified: Boolean
 ): String
 external fun webauthnGetAssertionWithHash(
     vaultId: String,
     entryId: String,
     customFieldId: String,
-    clientDataHash: ByteArray
+    clientDataHash: ByteArray,
+    userVerified: Boolean
 ): String
 ```
 
-（`webauthnGetAssertionWithHash`は実装時に追加。Part 5-3参照）
+（`webauthnGetAssertionWithHash`は実装時に追加。Part 5-3参照。`userVerified`はPart 6-3参照）
 
 ## 5-3. clientDataJSON・attestationObjectの構築責務
 
@@ -383,6 +386,7 @@ Query（Begin）フェーズで`CredentialEntry`を複数返している場合�
 ## 6-3. 既存コンポーネントの再利用
 
 - `BiometricHelper`（`Context`非依存で`Cipher`取得可能）と`FragmentActivity`ベースの`BiometricPrompt`表示は`AutofillUnlockActivity`と全く同じ形で再利用する
+- **UV（User Verified）フラグ**: authenticatorDataのUVは、その操作のためにユーザーを実際に認証した場合だけ立てる。ロック画面でアンロックした場合は認証済みとする。vaultがアンロック済みだった場合は、`AutofillAuthScreen`（`verifyUserWhenUnlocked = true`）が`UserVerificationPrompt`で生体認証または端末の画面ロック（`BIOMETRIC_STRONG or DEVICE_CREDENTIAL`）による本人確認を求め、成功した場合だけ立てる。端末に生体認証も画面ロックも設定されていない場合はUVを立てずに続行し、UVを要求するRPの判断に委ねる。以前は常にUVを立てていたため、アンロック済みの端末を手にした第三者がタップだけでUV付きの署名を得られた。ロック中のGet要求ではアンロック後にシステムの候補選択に戻ってから再度起動されるため、ロック画面での認証から60秒以内は認証済みとみなして二重に求めない（`VaultSession.wasUserVerifiedRecently()`）。拡張機能の扱いは`docs/webauthn-passkey.md`を参照
 - `PasskeyField`（`EntryDetailScreen.kt`の読み取り専用表示コンポーネント）はそのまま維持し、Create完了後の遷移先やGet候補選択の見た目の参考にする（`private_key`を画面に一切出さない設計方針、`docs/webauthn-passkey.md`と同じ思想）
 
 # Part 7: 設定画面統合

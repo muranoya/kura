@@ -437,6 +437,7 @@
     <!-- Passkey / Credential Provider -->
     <string name="credential_provider_settings_subtitle">kuraでパスキーを自動入力</string>
     <string name="passkey_unlock_prompt">パスキーを使うにはkuraのロックを解除してください</string>
+    <string name="passkey_user_verification_prompt">パスキーを使うために本人確認をしてください</string>
     <string name="passkey_create_proposal_title">パスキーを保存</string>
     <string name="passkey_create_proposal_message">%1$s用のパスキーを「%2$s」に追加しますか？</string>
     <string name="passkey_create_use_existing">このエントリを使う</string>

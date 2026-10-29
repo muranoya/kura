@@ -51,6 +51,8 @@ class PasskeyCreateActivity : SecureActivity() {
 
     /** createPasskey()の多重起動防止用（Loading状態はproceed()内部からも一時的に経由するためuiStateでは判定できない）。 */
     private var creationInProgress = false
+    /** この操作のためにユーザーを認証したか。authenticatorDataのUVフラグになる */
+    private var userVerified = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,8 +63,12 @@ class PasskeyCreateActivity : SecureActivity() {
                 // 二重にラップしない（AutofillUnlockActivityと同じ呼び出し方に揃える）。
                 CreateActivityState.Auth -> AutofillAuthScreen(
                     appViewModel = appViewModel,
-                    onUnlocked = { proceed() },
-                    onLogout = { finishCanceled() }
+                    onUnlocked = { verified ->
+                        userVerified = verified
+                        proceed()
+                    },
+                    onLogout = { finishCanceled() },
+                    verifyUserWhenUnlocked = true
                 )
                 is CreateActivityState.Confirm -> KuraTheme {
                     PasskeyCreateConfirmScreen(
@@ -202,7 +208,8 @@ class PasskeyCreateActivity : SecureActivity() {
                     info.userHandle,
                     info.userName,
                     info.userDisplayName,
-                    info.excludeCredentialIds
+                    info.excludeCredentialIds,
+                    userVerified
                 )
             } catch (_: Exception) {
                 null

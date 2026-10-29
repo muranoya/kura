@@ -104,20 +104,23 @@ object VaultBridge {
         userHandle: String,
         userName: String,
         userDisplayName: String,
-        excludeCredentialIdsJson: String
+        excludeCredentialIdsJson: String,
+        userVerified: Boolean
     ): String
 
     external fun webauthnGetAssertion(
         vaultId: String,
         entryId: String,
         customFieldId: String,
-        clientDataJson: String
+        clientDataJson: String,
+        userVerified: Boolean
     ): String
 
     external fun webauthnGetAssertionWithHash(
         vaultId: String,
         entryId: String,
         customFieldId: String,
-        clientDataHash: ByteArray
+        clientDataHash: ByteArray,
+        userVerified: Boolean
     ): String
 }

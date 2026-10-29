@@ -50,6 +50,17 @@ object VaultSession {
     @Volatile
     private var backgroundedAt: Long? = null
 
+    /** ロック画面でユーザーを認証した時刻（elapsedRealtime） */
+    @Volatile
+    private var lastUserVerifiedAt: Long? = null
+
+    /**
+     * Passkeyの操作直前にロック画面で認証していれば、改めて本人確認を求めない猶予。
+     * ロック中のPasskey要求ではアンロック後にシステムの候補選択へ戻ってから再度起動されるため、
+     * 二重に認証を求めないようにする
+     */
+    private const val USER_VERIFICATION_REUSE_MS = 60_000L
+
     private val _lockEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     /** [lockNow]でロックするたびに流れる。画面側のAppStateをLOCKEDに切り替えるために購読する */
@@ -83,6 +94,15 @@ object VaultSession {
         }
     }
 
+    fun markUserVerified() {
+        lastUserVerifiedAt = SystemClock.elapsedRealtime()
+    }
+
+    fun wasUserVerifiedRecently(): Boolean {
+        val at = lastUserVerifiedAt ?: return false
+        return SystemClock.elapsedRealtime() - at < USER_VERIFICATION_REUSE_MS
+    }
+
     /**
      * バックグラウンドに移ってから自動ロック時間が過ぎていればロックする。
      * アンロック済みかどうかで処理を分ける入口（オートフィル・Passkey・アプリ起動）の先頭で呼ぶ。
@@ -108,6 +128,7 @@ object VaultSession {
             lockMutex.withLock {
                 val locked = try {
                     if (repository.isUnlocked()) {
+                        lastUserVerifiedAt = null
                         val encryptedBytes = repository.lock()
                         repository.writeVaultFile(encryptedBytes)
                         true
