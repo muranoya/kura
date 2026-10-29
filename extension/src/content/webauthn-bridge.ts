@@ -1,9 +1,7 @@
 // ISOLATED world relay between src/main-world/webauthn-main-injected.js (MAIN world)
-// and the Service Worker. Runs in a separate JS realm from the page, so
-// `window.location` here is the browser's real, unmodifiable Location object
-// — this is the only origin/hostname value the Service Worker's rp_id
-// validation trusts (see docs/webauthn-passkey.md 3-5). Values arriving from
-// MAIN world are never used for that check.
+// and the Service Worker. The requesting origin is not sent: the Service
+// Worker derives it from the message sender (see docs/webauthn-passkey.md 3-5),
+// so values arriving from MAIN world are never used for rp_id validation.
 import { STORAGE_KEYS } from '../shared/constants'
 import { getFromStorage } from '../shared/storage'
 import {
@@ -51,8 +49,6 @@ async function handleRequest(request: WebauthnMainRequest) {
   const swRequest: WebauthnSwRequest = {
     type: request.kind === 'create' ? 'WEBAUTHN_CREATE_REQUEST' : 'WEBAUTHN_GET_REQUEST',
     requestId: request.requestId,
-    origin: window.location.origin,
-    hostname: window.location.hostname,
     challenge: request.challenge,
     rpId: request.rpId,
     rpName: request.rpName,

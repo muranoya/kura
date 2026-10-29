@@ -88,6 +88,29 @@ interface PendingRitual {
 
 const pendingRituals = new Map<string, PendingRitual>()
 
+/** A create()/get() request together with the origin of the frame that sent it. */
+type VerifiedRequest = WebauthnSwRequest & { origin: string; hostname: string }
+
+/**
+ * Derive the requesting origin from the browser-attested sender. Chrome sets
+ * `sender.origin` ("null" for opaque origins such as sandboxed frames);
+ * Firefox only provides `sender.url`.
+ */
+function originFromSender(
+  sender: chrome.runtime.MessageSender,
+): { origin: string; hostname: string } | null {
+  if (!sender.url) return null
+  let url: URL
+  try {
+    url = new URL(sender.url)
+  } catch {
+    return null
+  }
+  const origin = sender.origin ?? url.origin
+  if (origin === 'null' || origin !== url.origin) return null
+  return { origin, hostname: url.hostname }
+}
+
 function finishRitual(requestId: string, decision: WebauthnRitualDecision) {
   const pending = pendingRituals.get(requestId)
   if (!pending) return
@@ -198,7 +221,7 @@ type GetContextResult =
  * get() のcontext計算本体。呼び出し時点でvaultがアンロック済みであることが前提。
  * ロック中に開始したリチュアルでは、アンロック成功後にこの関数を呼んで続きを計算する。
  */
-async function computeGetContext(req: WebauthnSwRequest, rpId: string): Promise<GetContextResult> {
+async function computeGetContext(req: VerifiedRequest, rpId: string): Promise<GetContextResult> {
   if (!vaultApi) return { kind: 'error', message: 'Vault API not initialized' }
 
   let candidates: RawCredentialCandidate[]
@@ -240,7 +263,7 @@ async function computeGetContext(req: WebauthnSwRequest, rpId: string): Promise<
 }
 
 async function handleGetRequest(
-  req: WebauthnSwRequest,
+  req: VerifiedRequest,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies by outcome
   sendResponse: (response?: any) => void,
 ) {
@@ -368,7 +391,7 @@ type CreateContextResult =
  * ロック中に開始したリチュアルでは、アンロック成功後にこの関数を呼んで続きを計算する。
  */
 async function computeCreateContext(
-  req: WebauthnSwRequest,
+  req: VerifiedRequest,
   rpId: string,
 ): Promise<CreateContextResult> {
   if (!vaultApi) return { kind: 'error', message: 'Vault API not initialized' }
@@ -406,7 +429,7 @@ async function computeCreateContext(
 }
 
 async function handleCreateRequest(
-  req: WebauthnSwRequest,
+  req: VerifiedRequest,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies by outcome
   sendResponse: (response?: any) => void,
 ) {
@@ -548,15 +571,24 @@ function handleRitualDecision(
 export async function handleWebauthnMessage(
   // biome-ignore lint/suspicious/noExplicitAny: message shape varies by type
   message: Record<string, any>,
-  _sender: chrome.runtime.MessageSender,
+  sender: chrome.runtime.MessageSender,
   // biome-ignore lint/suspicious/noExplicitAny: response shape varies by handler
   sendResponse: (response?: any) => void,
 ) {
   switch (message.type) {
     case 'WEBAUTHN_CREATE_REQUEST':
-      return handleCreateRequest(message as WebauthnSwRequest, sendResponse)
-    case 'WEBAUTHN_GET_REQUEST':
-      return handleGetRequest(message as WebauthnSwRequest, sendResponse)
+    case 'WEBAUTHN_GET_REQUEST': {
+      const requester = originFromSender(sender)
+      if (!requester) {
+        sendResponse({ success: false, errorName: 'SecurityError', error: 'Invalid origin' })
+        return
+      }
+      // Spread first so that origin/hostname in the payload can never win
+      const req: VerifiedRequest = { ...(message as WebauthnSwRequest), ...requester }
+      return message.type === 'WEBAUTHN_CREATE_REQUEST'
+        ? handleCreateRequest(req, sendResponse)
+        : handleGetRequest(req, sendResponse)
+    }
     case 'WEBAUTHN_RITUAL_GET_CONTEXT':
       return handleRitualGetContext(message as { requestId: string }, sendResponse)
     case 'WEBAUTHN_RITUAL_DECISION':

@@ -76,6 +76,13 @@ globalThis.chrome = {
       addListener: vi.fn(noop),
     },
   },
+  windows: {
+    create: vi.fn(),
+    remove: vi.fn(() => Promise.resolve()),
+    onRemoved: {
+      addListener: vi.fn(noop),
+    },
+  },
   storage: {
     local: chromeStorageLocal,
     onChanged: {

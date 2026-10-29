@@ -139,7 +139,7 @@ attestationObject（`{fmt: "none", attStmt: {}, authData: <bytes>}`）とauthent
 
 **責務分割:**
 
-- **TypeScript（Service Worker）**: `clientDataJSON`の組み立てのみ（`{type, challenge, origin, crossOrigin}`）。Service Worker自体はDOMを持たないため、`origin`はISOLATED world（`webauthn-bridge.ts`）が自身の`window.location.origin`から読み取り、メッセージ経由でService Workerに渡した値を使う。
+- **TypeScript（Service Worker）**: `clientDataJSON`の組み立てのみ（`{type, challenge, origin, crossOrigin}`）。`origin`はメッセージの送信元（ブラウザが付与する`sender.origin`、Firefoxでは`sender.url`のorigin）から導出する。
 - **Rust（vault-core）**: `clientDataJSON`のSHA-256ハッシュ計算、authenticatorData/attestationObjectのCBOR構築、COSE_Key構築、ECDSA署名。対象`login`エントリの`custom_fields`への読み書きはが担当し、暗号処理本体とは責務を分離した。
 
 ## 3-5. ドメイン検証
@@ -148,8 +148,8 @@ attestationObject（`{fmt: "none", attStmt: {}, authData: <bytes>}`）とauthent
 
 **検証の多段防御:**
 
-1. ISOLATED world content script（`webauthn-bridge.ts`）が、自身の（ページに汚染されていない）`window.location`から独立してorigin/hostnameを読み取る。MAIN world側から転送された値は信用の起点にしない。
-2. Service Workerが、ISOLATED由来のoriginと、ページが要求した`rp.id`を突き合わせ、`etld.ts`のsuffix判定ロジックで検証してから初めてvault-core問い合わせ・UI表示に進む。不一致は即座にreject。
+1. Service Workerが、メッセージの送信元からorigin/hostnameを導出する（Chromeは`sender.origin`、Firefoxは`sender.url`のorigin）。ブラウザが付与する値なので、MAIN world・ISOLATED worldはもちろん、侵害されたレンダラーでも偽装できない。メッセージ本文にorigin/hostnameは含めない。opaque origin（sandbox属性付きiframe等で`sender.origin`が`"null"`）からの要求は拒否する。
+2. Service Workerが、送信元由来のoriginと、ページが要求した`rp.id`を突き合わせ、`etld.ts`のsuffix判定ロジックで検証してから初めてvault-core問い合わせ・UI表示に進む。不一致は即座にreject。
 
 ## 3-6. メッセージフロー
 
@@ -165,10 +165,10 @@ Webページ (page realm)
   │ postMessage({ source: 'kura-webauthn-main', requestId, kind: 'get', ... }, origin)
   ▼
 [ISOLATED world] webauthn-bridge.ts
-  │ 自前のwindow.locationからorigin/hostnameを独立取得
-  │ chrome.runtime.sendMessage({ type: 'WEBAUTHN_GET_REQUEST', ..., origin, hostname })
+  │ chrome.runtime.sendMessage({ type: 'WEBAUTHN_GET_REQUEST', ... })（origin/hostnameは送らない）
   ▼
 Service Worker background/webauthn.ts
+  │ sender（sender.origin / sender.url）からorigin/hostnameを導出
   │ 設定トグルOFF・vaultApi未初期化ならpassthrough
   │ etld.ts (isValidRpId) でrp.id vs origin のsuffix検証 → 不一致ならreject
   │

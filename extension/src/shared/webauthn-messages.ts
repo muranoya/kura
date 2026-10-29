@@ -51,12 +51,15 @@ export interface WebauthnFeatureStateMessage {
   enabled: boolean
 }
 
-/** ISOLATED world → Service Worker (adds the bridge's own untainted origin/hostname) */
+/**
+ * ISOLATED world → Service Worker. Carries no origin/hostname: the Service
+ * Worker derives them from the message sender (the requesting frame's URL as
+ * attested by the browser), so not even a compromised renderer can claim
+ * another site's origin.
+ */
 export interface WebauthnSwRequest {
   type: 'WEBAUTHN_CREATE_REQUEST' | 'WEBAUTHN_GET_REQUEST'
   requestId: string
-  origin: string
-  hostname: string
   challenge: string
   rpId?: string
   rpName?: string
