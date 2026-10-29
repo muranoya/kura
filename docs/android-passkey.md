@@ -235,7 +235,7 @@ https://www.gstatic.com/gpm-passkeys-privileged-apps/apps.json
 
 （[Android公式ドキュメント](https://developer.android.com/identity/sign-in/credential-provider)「Obtain an allowlist of privileged apps」節で案内されているもの）
 
-既存方針（`feedback_external_assets`：外部データソースはassetsに配置しビルド時DLは避ける）に倣い、このJSONを`android/app/src/main/assets/gpm_privileged_allowlist.json`としてリポジトリにバンドルし、PSL（`assets/`）と同様に上記URLから手動で定期更新する運用とする。
+既存方針（`feedback_external_assets`：外部データソースはassetsに配置しビルド時DLは避ける）に倣い、このJSONを`android/app/src/main/assets/gpm_privileged_allowlist.json`としてリポジトリにバンドルし、PSL（`assets/`）と同様に上記URLから手動で定期更新する運用とする（`just update-assets`、`scripts/update-assets.mjs`）。
 
 **注意：kura自身をこのallowlistに載せる必要はない。** allowlistは「どのブラウザ／呼び出し元アプリを信頼してWebオリジンを代弁させるか」をシステム側が判断するためのものであり、kuraは受け取る側（Provider）であるため対象外。Digital Asset Links（`assetlinks.json`）もこの経路では不要。
 

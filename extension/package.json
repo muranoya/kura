@@ -20,7 +20,6 @@
     "build:firefox": "pnpm exec tsx scripts/generate-etld.ts && pnpm exec tsx scripts/generate-patterns.ts && vite build --config vite.config.firefox.ts",
     "generate-etld": "pnpm exec tsx scripts/generate-etld.ts",
     "generate-patterns": "pnpm exec tsx scripts/generate-patterns.ts",
-    "update-psl": "pnpm exec tsx scripts/update-psl.ts",
     "preview": "vite preview",
     "check": "biome check .",
     "fix": "biome check --write .",

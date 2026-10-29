@@ -38,6 +38,11 @@ default: help
 	echo "📜 Generating desktop third-party licenses..."
 	cargo about generate --format json -m {{DESKTOP_DIR}}/Cargo.toml -c {{DESKTOP_DIR}}/about.toml --locked --fail | node scripts/desktop-licenses.mjs
 
+# バンドルしている外部データ（PSL・Passkey の特権アプリ許可リスト）を配布元から取り直す
+@update-assets:
+	echo "🌐 Updating bundled external assets..."
+	node scripts/update-assets.mjs
+
 # Desktop app - Development
 @dev-desktop: _sync-version _desktop-icons
 	echo ""
@@ -513,4 +518,5 @@ test-manual-autofill:
 	echo ""
 	echo "  🔧 Utilities:"
 	echo "    just release-all          - Build all apps for release"
+	echo "    just update-assets        - Update bundled PSL & Passkey privileged allowlist"
 	echo "    just clean                - Clean build artifacts"

@@ -293,7 +293,7 @@ SPA遷移後に新しいフォームが出現した場合も、ユーザーが�
 
 ### 3-4.1 eTLD+1の判定
 
-[Public Suffix List](https://publicsuffix.org/list/public_suffix_list.dat)（PSL）を使用する。リポジトリの`assets/public_suffix_list.dat`にPSLを配置しておき、`extension/scripts/update-psl.ts`で手動更新する。最長一致で判定し、該当しない場合はデフォルト（最後のラベルがTLD）として処理する。
+[Public Suffix List](https://publicsuffix.org/list/public_suffix_list.dat)（PSL）を使用する。リポジトリの`assets/public_suffix_list.dat`にPSLを配置しておき、`just update-assets`（`scripts/update-assets.mjs`）で手動更新する。最長一致で判定し、該当しない場合はデフォルト（最後のラベルがTLD）として処理する。
 
 **ログイン候補（vaultエントリ）のマッチングはvault-core（Rust）側で行う。** `vault-core/src/domain_match.rs`が同じ`assets/public_suffix_list.dat`を`include_str!`でビルド時に埋め込み、実行時に一度だけパースしてeTLD+1判定を行う。`api_list_login_candidates(vault_id, page_hostname, strict_subdomain)`がマッチ済みの候補のみを返すため、拡張機能側（`extension/src/background/autofill.ts`の`getCredentialsForUrl`）はこのAPIの呼び出し結果をそのまま使うだけでよい。Android版も同一のvault-core関数を経由するため、両プラットフォームでマッチング挙動が一致する（詳細は[`docs/android-autofillservice.md`](android-autofillservice.md) 2-3節を参照）。
 
