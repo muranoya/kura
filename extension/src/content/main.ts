@@ -10,7 +10,6 @@ import { type DetectedForm, detectForm, isVisible } from './form-detector'
 import {
   getCredentials,
   queryPendingFlow,
-  requestCreditCards,
   requestFillData,
   requestOpenSidebar,
   requestTotp,
@@ -230,29 +229,11 @@ async function handleInputFocus(input: HTMLInputElement) {
     // Fall through to normal dropdown flow
   }
 
-  // === Credit card: fetch credit card entries instead of login entries ===
+  // === Credit card: autofill is intentionally not supported ===
+  // Card fields are still classified (so they are never mistaken for
+  // username/TOTP fields), but no candidates are offered for them.
   if (form.formType === 'CREDIT_CARD') {
-    const creditCards = await requestCreditCards()
-
-    if (creditCards.length === 0) {
-      hideDropdown()
-      return
-    }
-
-    const showCreditCardDropdown = () => {
-      showDropdown(
-        input,
-        creditCards,
-        (candidate) => {
-          onCandidateSelected(candidate, form)
-        },
-        window.location.protocol,
-      )
-    }
-    showInlineIcon(input, showCreditCardDropdown)
-    if (!input.value.trim()) {
-      showCreditCardDropdown()
-    }
+    hideDropdown()
     return
   }
 
@@ -354,38 +335,6 @@ async function onCandidateSelected(candidate: AutofillCredentialCandidate, form:
     const customFills = collectCustomFieldFills(fillData, form.container)
     if (customFills.length > 0) {
       await fillFields(customFills)
-    }
-    return
-  }
-
-  // For CREDIT_CARD forms, fill all credit card fields
-  if (form.formType === 'CREDIT_CARD') {
-    const ccFields: Array<{ element: HTMLInputElement; value: string }> = []
-
-    const ccNumber = form.fields.find((f) => f.type === 'cc_number')
-    if (ccNumber && fillData.ccNumber && isVisible(ccNumber.element)) {
-      ccFields.push({ element: ccNumber.element, value: fillData.ccNumber })
-    }
-
-    const ccExp = form.fields.find((f) => f.type === 'cc_exp')
-    if (ccExp && fillData.ccExp && isVisible(ccExp.element)) {
-      ccFields.push({ element: ccExp.element, value: fillData.ccExp })
-    }
-
-    const ccCvc = form.fields.find((f) => f.type === 'cc_cvc')
-    if (ccCvc && fillData.ccCvc && isVisible(ccCvc.element)) {
-      ccFields.push({ element: ccCvc.element, value: fillData.ccCvc })
-    }
-
-    const ccName = form.fields.find((f) => f.type === 'cc_name')
-    if (ccName && fillData.ccName && isVisible(ccName.element)) {
-      ccFields.push({ element: ccName.element, value: fillData.ccName })
-    }
-
-    ccFields.push(...collectCustomFieldFills(fillData, form.container))
-
-    if (ccFields.length > 0) {
-      await fillFields(ccFields)
     }
     return
   }

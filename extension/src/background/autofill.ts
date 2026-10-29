@@ -19,16 +19,6 @@ let isUnlocked: () => boolean = () => false
 export interface VaultApi {
   api_list_login_candidates(vaultId: string, pageHostname: string, strictSubdomain: boolean): string
   api_get_entry(vaultId: string, id: string): string
-  api_list_entries(
-    vaultId: string,
-    searchQuery: string | null,
-    type: string | null,
-    labelId: string | null,
-    includeTrash: boolean,
-    onlyFavorites: boolean,
-    sortField: string | null,
-    sortOrder: string | null,
-  ): string
   api_get_totp_code(vaultId: string, id: string): string | null
   api_list_totp_periods(vaultId: string, ids: string[]): string
   api_create_entry(
@@ -177,17 +167,8 @@ function getFillData(entryId: string): AutofillFillData | null {
     const entryType = raw.entry_type as string | undefined
     const customFields = extractSelectorFillEntries(raw.custom_fields)
 
-    if (entryType === 'credit_card') {
-      return {
-        username: null,
-        password: null,
-        ccNumber: (tv.number as string) ?? null,
-        ccExp: (tv.expiry as string) ?? null,
-        ccCvc: (tv.cvv as string) ?? null,
-        ccName: (tv.cardholder as string) ?? null,
-        customFields,
-      }
-    }
+    // Only login entries are autofilled (credit card autofill is intentionally unsupported)
+    if (entryType !== 'login') return null
 
     return {
       username: (tv.username as string) ?? null,
@@ -244,34 +225,6 @@ function getTotpForEntry(entryId: string): TotpResult | null {
   } catch (e) {
     console.error(LOG_PREFIX, `getTotpForEntry: error for entry ${entryId}:`, e)
     return null
-  }
-}
-
-// ========== Credit card matching ==========
-
-function getCreditCards(): AutofillCredentialCandidate[] {
-  if (!vaultApi || !isUnlocked()) return []
-
-  try {
-    const result = vaultApi.api_list_entries(
-      DEFAULT_VAULT_ID,
-      null,
-      'credit_card',
-      null,
-      false,
-      false,
-      null,
-      null,
-    )
-    const entries: Array<{ id: string; name: string; subtitle: string | null }> = JSON.parse(result)
-    return entries.map((e) => ({
-      entryId: e.id,
-      name: e.name,
-      username: e.subtitle,
-    }))
-  } catch (e) {
-    console.error(LOG_PREFIX, 'getCreditCards: error:', e)
-    return []
   }
 }
 
@@ -414,16 +367,6 @@ export async function handleAutofillMessage(
       const totpCandidateUrl = message.url as string
       const totpCandidates = getTotpCandidatesForUrl(totpCandidateUrl)
       sendResponse({ success: true, totpCandidates })
-      break
-    }
-
-    case 'AUTOFILL_GET_CREDIT_CARDS': {
-      if (!isUnlocked()) {
-        sendResponse({ success: false, error: 'Vault not unlocked' })
-        break
-      }
-      const creditCards = getCreditCards()
-      sendResponse({ success: true, creditCards })
       break
     }
 

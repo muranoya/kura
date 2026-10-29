@@ -7,7 +7,7 @@
 
 ## 1-1. 概要
 
-ブラウザ拡張機能において、表示中のウェブページ上のフォーム（ログイン、クレジットカード等）を検出し、vaultに保存されたクレデンシャルの入力候補を表示・自動入力する機能。
+ブラウザ拡張機能において、表示中のウェブページ上のフォーム（ログイン、TOTP等）を検出し、vaultに保存されたクレデンシャルの入力候補を表示・自動入力する機能。
 
 ### 対応範囲
 
@@ -25,6 +25,7 @@
 - 自動サブミット — フォームの送信（submitボタンのクリック等）は行わない。入力までを担い、送信はユーザーの意思で行う操作とする
 - 新規クレデンシャルの自動保存 — フォーム送信を検知して「このパスワードを保存しますか？」と提案する機能は提供しない
 - パスワード変更検知 — パスワード変更フォームの検出・既存エントリの更新提案は行わない
+- クレジットカードの自動入力 — カード情報はサイトに紐付かず、悪性サイトや不可視フィールドから窃取されるリスクが大きいため提供しない。カード欄は`CREDIT_CARD`として分類はする（username/TOTP欄と誤認しないため）が、候補は一切表示しない
 
 ## 1-2. 対応フォームタイプ
 
@@ -34,7 +35,7 @@
 | LOGIN_USERNAME | 分割ログインの1画面目（usernameのみ） | Google, Microsoft, Apple |
 | LOGIN_PASSWORD | 分割ログインの2画面目（passwordのみ） | Google, Microsoft, Apple |
 | TOTP | 6桁コード入力フィールド | 2FA認証画面 |
-| CREDIT_CARD | カード番号/有効期限/CVV | 決済フォーム |
+| CREDIT_CARD | カード番号/有効期限/CVV | 決済フォーム（検出のみ。候補は表示しない） |
 
 ## 1-3. URL/ドメインマッチング
 
@@ -119,7 +120,6 @@ Service Worker
 | `AUTOFILL_GET_CREDENTIALS` | `{ url: string, strictSubdomain?: boolean }` | `{ credentials: AutofillCredentialCandidate[] }` | 指定URLに一致するクレデンシャル候補のリストを要求 |
 | `AUTOFILL_FILL_REQUEST` | `{ entryId: string }` | `{ fillData: AutofillFillData }` | 選択されたエントリの完全なクレデンシャルを要求 |
 | `AUTOFILL_GET_TOTP` | `{ url: string, entryId?: string }` | `{ totpCode: string \| null, totpEntryName: string }` | TOTP コードを要求。`entryId`指定時はそのエントリから取得、未指定時はURLマッチで検索 |
-| `AUTOFILL_GET_CREDIT_CARDS` | `{}` | `{ creditCards: AutofillCredentialCandidate[] }` | 全クレジットカードエントリのリストを要求 |
 | `AUTOFILL_PENDING_FLOW_STORE` | `{ url: string, entryId: string, username: string }` | `{ success: boolean }` | 分割ログインフローの状態をService Workerに保存（Section 3-5参照） |
 | `AUTOFILL_PENDING_FLOW_QUERY` | `{ url: string }` | `{ pendingFlow: { entryId, username, password } \| null }` | 分割ログインフローの保存状態を問い合わせ。非破壊（TOTPステップでも再利用可能） |
 | `AUTOFILL_SAVE_CAPTURED` | `{ url: string, name: string \| null, username: string \| null, password: string }` | `{ success: boolean, entryId: string }` | 手動キャプチャしたクレデンシャルを新規エントリとしてvaultに保存（Section 1-6参照） |
@@ -222,7 +222,7 @@ username候補 1つ + password 1つ          → LOGIN
 username候補 1つ + password 0            → LOGIN_USERNAME
 password 1つ + username候補 0            → LOGIN_PASSWORD
 短い数値入力 1つ (4-8桁, maxlength制限)   → TOTP
-cc-number + cc-exp + cc-cvc              → CREDIT_CARD
+cc-number + cc-exp + cc-cvc              → CREDIT_CARD（オートフィル対象外）
 ```
 
 ### 3-1.3 フォームレスフィールドへの対応

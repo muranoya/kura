@@ -99,7 +99,6 @@ export type Message =
   | { type: 'AUTOFILL_FILL_REQUEST'; entryId: string }
   | { type: 'AUTOFILL_GET_TOTP'; url: string; entryId: string }
   | { type: 'AUTOFILL_GET_TOTP_CANDIDATES'; url: string }
-  | { type: 'AUTOFILL_GET_CREDIT_CARDS' }
   | { type: 'AUTOFILL_PENDING_FLOW_STORE'; entryId: string; username: string; url: string }
   | { type: 'AUTOFILL_PENDING_FLOW_QUERY'; url: string }
 

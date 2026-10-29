@@ -83,14 +83,6 @@ export async function requestTotpCandidates(url: string): Promise<AutofillCreden
   return []
 }
 
-export async function requestCreditCards(): Promise<AutofillCredentialCandidate[]> {
-  const response = await sendMessage({ type: 'AUTOFILL_GET_CREDIT_CARDS' })
-  if (response.success && 'creditCards' in response) {
-    return (response.creditCards as AutofillCredentialCandidate[]) || []
-  }
-  return []
-}
-
 export async function storePendingFlow(
   entryId: string,
   username: string,

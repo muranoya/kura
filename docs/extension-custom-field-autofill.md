@@ -168,7 +168,7 @@ export interface AutofillFillData {
 
 - `raw.custom_fields`（JSON文字列）をパースし、`autofill_selector` が非nullの要素だけを抽出する。
 - 各要素を `{ selector: { tag, name, id, type }, value }` に変換し、`AutofillFillData.customFields` として追加する。
-- `entryType === 'credit_card'` の分岐、それ以外（login/password）の分岐の**両方**に `customFields` を付与する（クレジットカードエントリにもカスタムフィールドは存在しうるため）。
+- `customFields` は login エントリの充填データに付与する（クレジットカードの自動入力は提供しないため、`credit_card` エントリは充填データを返さない）。
 
 ## 3-4. content/main.ts: onCandidateSelected()の変更
 

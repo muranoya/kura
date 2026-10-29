@@ -22,7 +22,6 @@ interface MockEntry {
     value: string
     autofill_selector?: { tag?: string; name?: string; id?: string; type?: string } | null
   }>
-  subtitle?: string | null
 }
 
 function createMockVaultApi(entries: MockEntry[]): VaultApi {
@@ -64,23 +63,6 @@ function createMockVaultApi(entries: MockEntry[]): VaultApi {
       if (!entry) throw new Error('Entry not found')
       return JSON.stringify(entry)
     }),
-    api_list_entries: vi.fn(
-      (
-        _vaultId: string,
-        _searchQuery: string | null,
-        type: string | null,
-        _labelId: string | null,
-        _includeTrash: boolean,
-        _onlyFavorites: boolean,
-        _sortField: string | null,
-        _sortOrder: string | null,
-      ) => {
-        const filtered = entries
-          .filter((e) => !type || e.entry_type === type)
-          .map((e) => ({ id: e.id, name: e.name, subtitle: e.subtitle ?? null }))
-        return JSON.stringify(filtered)
-      },
-    ),
     api_get_totp_code: vi.fn((_vaultId: string, id: string) => {
       const entry = entries.find((e) => e.id === id)
       const hasTotp = entry?.custom_fields?.some((f) => f.field_type === 'totp')
@@ -171,7 +153,6 @@ describe('handleAutofillMessage', () => {
         cvv: '123',
         cardholder: 'John Doe',
       },
-      subtitle: '•••• 1111',
     },
   ]
 
@@ -347,17 +328,12 @@ describe('handleAutofillMessage', () => {
       expect(result.fillData.password).toBe('secret123')
     })
 
-    it('returns fill data for credit card entry', async () => {
-      const result = (await callHandler({
+    it('does not return fill data for credit card entry', async () => {
+      const result = await callHandler({
         type: 'AUTOFILL_FILL_REQUEST',
         entryId: 'entry-cc',
-      })) as { success: boolean; fillData: Record<string, unknown> }
-
-      expect(result.success).toBe(true)
-      expect(result.fillData.ccNumber).toBe('4111111111111111')
-      expect(result.fillData.ccExp).toBe('12/28')
-      expect(result.fillData.ccCvc).toBe('123')
-      expect(result.fillData.ccName).toBe('John Doe')
+      })
+      expect(result).toEqual({ success: false, error: 'Entry not found' })
     })
 
     it('returns error for non-existent entry', async () => {
@@ -546,27 +522,6 @@ describe('handleAutofillMessage', () => {
 
       expect(result.success).toBe(true)
       expect(result.totpCandidates).toHaveLength(0)
-    })
-  })
-
-  // ========== AUTOFILL_GET_CREDIT_CARDS ==========
-
-  describe('AUTOFILL_GET_CREDIT_CARDS', () => {
-    it('returns error when vault is locked', async () => {
-      unlocked = false
-      const result = await callHandler({ type: 'AUTOFILL_GET_CREDIT_CARDS' })
-      expect(result).toEqual({ success: false, error: 'Vault not unlocked' })
-    })
-
-    it('returns credit card entries', async () => {
-      const result = (await callHandler({
-        type: 'AUTOFILL_GET_CREDIT_CARDS',
-      })) as { success: boolean; creditCards: Array<{ entryId: string; name: string }> }
-
-      expect(result.success).toBe(true)
-      expect(result.creditCards).toHaveLength(1)
-      expect(result.creditCards[0].entryId).toBe('entry-cc')
-      expect(result.creditCards[0].name).toBe('My Credit Card')
     })
   })
 
