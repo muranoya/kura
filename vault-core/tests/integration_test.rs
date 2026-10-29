@@ -633,6 +633,78 @@ mod vault_manager_api {
     }
 
     #[test]
+    fn test_unlock_with_exported_dek() {
+        let (m, _) = setup_unlocked_vault();
+        let id = m
+            .api_create_entry(
+                "login".to_string(),
+                "GitHub".to_string(),
+                None,
+                r#"{"url":"https://github.com","username":"octo","password":"pw"}"#.to_string(),
+                vec![],
+                None,
+            )
+            .expect("Failed to create entry");
+        let config = m
+            .api_encrypt_config(TEST_PASSWORD.to_string(), r#"{"bucket":"b"}"#.to_string())
+            .expect("Failed to encrypt config");
+        let dek = m.api_export_dek().expect("Failed to export DEK");
+
+        let vault_bytes = m.api_lock().expect("Failed to lock");
+        assert!(m.api_export_dek().is_err());
+
+        // Service Worker の再起動を想定し、新しい VaultManager で復元する
+        let restored = VaultManager::new();
+        restored
+            .api_load_vault(vault_bytes, String::new())
+            .expect("Failed to load vault");
+        restored
+            .api_unlock_with_dek(dek)
+            .expect("Failed to unlock with DEK");
+        assert!(restored.api_is_unlocked());
+        assert_eq!(restored.api_get_entry(id).unwrap().name, "GitHub");
+        assert_eq!(
+            restored.api_decrypt_config_with_dek(config).unwrap(),
+            r#"{"bucket":"b"}"#
+        );
+    }
+
+    #[test]
+    fn test_unlock_with_wrong_dek_fails_and_stays_locked() {
+        let (m, _) = setup_unlocked_vault();
+        let vault_bytes = m.api_lock().expect("Failed to lock");
+        m.api_load_vault(vault_bytes, String::new())
+            .expect("Failed to load vault");
+
+        use base64::Engine;
+        let wrong = base64::engine::general_purpose::STANDARD.encode([7u8; 32]);
+        assert!(m.api_unlock_with_dek(wrong).is_err());
+        assert!(m.api_unlock_with_dek("not base64!".to_string()).is_err());
+        assert!(m.api_unlock_with_dek(String::new()).is_err());
+        assert!(!m.api_is_unlocked());
+
+        // 失敗後も vault はロック状態のまま残り、パスワードでアンロックできる
+        m.api_unlock(TEST_PASSWORD.to_string())
+            .expect("Failed to unlock after DEK failure");
+    }
+
+    #[test]
+    fn test_exported_dek_changes_on_rotation() {
+        let (m, _) = setup_unlocked_vault();
+        let before = m.api_export_dek().unwrap();
+        m.api_rotate_dek(TEST_PASSWORD.to_string())
+            .expect("Failed to rotate DEK");
+        let after = m.api_export_dek().unwrap();
+        assert_ne!(before, after);
+
+        let vault_bytes = m.api_lock().expect("Failed to lock");
+        m.api_load_vault(vault_bytes, String::new()).unwrap();
+        assert!(m.api_unlock_with_dek(before).is_err());
+        m.api_unlock_with_dek(after)
+            .expect("Failed to unlock with rotated DEK");
+    }
+
+    #[test]
     fn test_wrong_password_fails() {
         let m = VaultManager::new();
         m.api_create_new_vault(TEST_PASSWORD.to_string())

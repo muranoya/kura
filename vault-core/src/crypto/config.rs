@@ -59,6 +59,20 @@ pub fn decrypt_config(
     }
 }
 
+/// アンラップ済みの DEK で設定を復号する（パスワード不要）。
+/// 旧形式はパスワード由来の KEK で暗号化しているため復号できず、エラーを返す
+pub fn decrypt_config_with_dek(
+    meta: &VaultMeta,
+    dek: &super::Dek,
+    encrypted: &str,
+) -> Result<SecretBytes> {
+    let sealed = encrypted.strip_prefix(CONFIG_V2_PREFIX).ok_or_else(|| {
+        VaultError::DecryptionError("Legacy config requires the master password".to_string())
+    })?;
+    let mut plaintext = super::ConfigKey::derive(dek).open(&meta.vault_uuid, sealed)?;
+    Ok(SecretBytes::from_vec(std::mem::take(&mut *plaintext)))
+}
+
 /// 旧形式で暗号化された設定かどうか（現行形式で暗号化し直す必要があるか）
 pub fn is_legacy_config(encrypted: &str) -> bool {
     !encrypted.starts_with(CONFIG_V2_PREFIX)
@@ -211,5 +225,27 @@ mod tests {
         assert!(is_legacy_config(&legacy));
         let decrypted = decrypt_config(&vault.meta, &mp("password-1"), &legacy).unwrap();
         assert_eq!(decrypted.as_slice(), b"config");
+    }
+    #[test]
+    fn test_decrypt_config_with_dek() {
+        let vault = unlocked_vault("password-1");
+        let encrypted = encrypt_config(&vault.meta, &mp("password-1"), b"config").unwrap();
+        let decrypted = decrypt_config_with_dek(&vault.meta, &vault.dek, &encrypted).unwrap();
+        assert_eq!(decrypted.as_slice(), b"config");
+
+        let other = crate::crypto::Dek::generate();
+        assert!(decrypt_config_with_dek(&vault.meta, &other, &encrypted).is_err());
+    }
+
+    #[test]
+    fn test_decrypt_config_with_dek_rejects_legacy_config() {
+        let vault = unlocked_vault("password-1");
+        let kek = crate::crypto::kdf::derive_kek_from_master_password(
+            &mp("password-1"),
+            &vault.meta.argon2_params,
+        )
+        .unwrap();
+        let legacy = encrypt_with_kek(b"config", &kek).unwrap();
+        assert!(decrypt_config_with_dek(&vault.meta, &vault.dek, &legacy).is_err());
     }
 }
