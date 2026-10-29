@@ -29,6 +29,15 @@ default: help
 @_cargo-packager:
 	command -v cargo-packager >/dev/null || cargo install cargo-packager --locked
 
+# cargo-about がなければ入れる（サードパーティライセンス一覧の生成に使う）
+@_cargo-about:
+	command -v cargo-about >/dev/null || cargo install cargo-about --locked --features cli
+
+# Desktop app - About 画面のサードパーティライセンス一覧（desktop/third-party-licenses.json）を作り直す
+@desktop-licenses: _cargo-about
+	echo "📜 Generating desktop third-party licenses..."
+	cargo about generate --format json -m {{DESKTOP_DIR}}/Cargo.toml -c {{DESKTOP_DIR}}/about.toml --locked --fail | node scripts/desktop-licenses.mjs
+
 # Desktop app - Development
 @dev-desktop: _sync-version _desktop-icons
 	echo ""
@@ -41,7 +50,7 @@ default: help
 	cargo run -p kura-desktop
 
 # Desktop app - Linux (AppImage + deb)
-@release-desktop-linux: _sync-version _desktop-icons _cargo-packager
+@release-desktop-linux: _sync-version _desktop-icons desktop-licenses _cargo-packager
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building desktop app for Linux (AppImage + deb)..."
@@ -54,7 +63,7 @@ default: help
 	echo "  - Output: target/packager/"
 
 # Desktop app - macOS (DMG, Apple Silicon / arm64 only, ad-hoc signed)
-@release-desktop-macos: _sync-version _desktop-icons _cargo-packager
+@release-desktop-macos: _sync-version _desktop-icons desktop-licenses _cargo-packager
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building desktop app for macOS arm64 (DMG, ad-hoc signed)..."
@@ -67,7 +76,7 @@ default: help
 	echo "  - Output: target/packager/"
 
 # Desktop app - Windows (NSIS installer)
-@release-desktop-windows: _sync-version _desktop-icons _cargo-packager
+@release-desktop-windows: _sync-version _desktop-icons desktop-licenses _cargo-packager
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building desktop app for Windows (NSIS)..."
@@ -479,6 +488,7 @@ test-manual-autofill:
 	echo "    just release-desktop-linux    - Build Linux AppImage + deb"
 	echo "    just release-desktop-macos    - Build macOS DMG"
 	echo "    just release-desktop-windows  - Build Windows NSIS installer"
+	echo "    just desktop-licenses         - Regenerate third-party licenses for About screen"
 	echo ""
 	echo "  🔌 Extension:"
 	echo "    just dev-extension            - Start extension in dev mode (HMR)"

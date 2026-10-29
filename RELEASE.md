@@ -21,6 +21,7 @@ GitHub の **Actions → Release → Run workflow** からワークフローを�
 
 CI が自動で行うこと：
 - デスクトップアプリのビルド（Linux AppImage / `.deb`、macOS DMG、Windows NSIS インストーラー）
+  - ビルド前に About 画面のサードパーティライセンス一覧（`desktop/third-party-licenses.json`）を `just desktop-licenses` で作り直す。採用できないライセンスの依存が増えているとここで失敗する
 - Chrome 拡張 ZIP のビルド → GitHub Release に添付（`kura-chrome-extension-*.zip`）
 - Firefox 拡張のビルド → AMO に unlisted（ストア非公開）で提出して署名 → 署名済み xpi を GitHub Release に添付（`kura-firefox-extension-*.xpi`）
 - Android APK のビルド

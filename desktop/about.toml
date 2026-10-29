@@ -1,0 +1,26 @@
+# サードパーティライセンス一覧（third-party-licenses.json）の生成設定。`just desktop-licenses` で使う
+# 配布するバイナリに含まれるものだけを対象にする
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+    "aarch64-apple-darwin",
+]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+# 選べるライセンスが複数ある場合は、この並びで先にあるものを採用する
+accepted = [
+    "Apache-2.0",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    "Unicode-3.0",
+    "BSL-1.0",
+    "MPL-2.0",
+    "Unlicense",
+    "CC0-1.0",
+    "LicenseRef-Slint-Royalty-free-2.0",
+]
+
