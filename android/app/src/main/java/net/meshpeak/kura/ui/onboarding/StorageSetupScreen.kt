@@ -6,6 +6,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -13,9 +15,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import net.meshpeak.kura.R
 import net.meshpeak.kura.viewmodel.AppViewModel
+import net.meshpeak.kura.ui.components.SecretKeyboardOptions
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 
@@ -32,6 +36,7 @@ fun StorageSetupScreen(
     var key by remember { mutableStateOf("vault.json") }
     var accessKeyId by remember { mutableStateOf("") }
     var secretAccessKey by remember { mutableStateOf("") }
+    var secretAccessKeyVisible by remember { mutableStateOf(false) }
     var endpoint by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -112,6 +117,7 @@ fun StorageSetupScreen(
                             placeholder = { Text(stringResource(R.string.storage_transfer_password_placeholder)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
+                            keyboardOptions = SecretKeyboardOptions,
                             visualTransformation = PasswordVisualTransformation(),
                             enabled = !isLoading
                         )
@@ -191,7 +197,14 @@ fun StorageSetupScreen(
             OutlinedTextField(
                 value = secretAccessKey, onValueChange = { secretAccessKey = it; error = "" },
                 label = { Text(stringResource(R.string.storage_secret_key_required)) },
-                modifier = Modifier.fillMaxWidth().testTag("secret_key_input"), singleLine = true
+                modifier = Modifier.fillMaxWidth().testTag("secret_key_input"), singleLine = true,
+                keyboardOptions = SecretKeyboardOptions,
+                visualTransformation = if (secretAccessKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { secretAccessKeyVisible = !secretAccessKeyVisible }) {
+                        Icon(if (secretAccessKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = null)
+                    }
+                }
             )
             OutlinedTextField(
                 value = endpoint, onValueChange = { endpoint = it },

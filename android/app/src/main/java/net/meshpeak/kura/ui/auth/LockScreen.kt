@@ -27,6 +27,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import net.meshpeak.kura.R
 import net.meshpeak.kura.ui.components.ConfirmDialog
+import net.meshpeak.kura.ui.components.SecretKeyboardOptions
 import net.meshpeak.kura.viewmodel.AppViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -173,7 +174,7 @@ fun LockScreen(
             label = { Text(if (usePasscode) stringResource(R.string.lock_passcode_label) else stringResource(R.string.lock_password_label)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            keyboardOptions = if (usePasscode) KeyboardOptions(keyboardType = KeyboardType.NumberPassword) else KeyboardOptions.Default,
+            keyboardOptions = if (usePasscode) KeyboardOptions(keyboardType = KeyboardType.NumberPassword) else SecretKeyboardOptions,
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {

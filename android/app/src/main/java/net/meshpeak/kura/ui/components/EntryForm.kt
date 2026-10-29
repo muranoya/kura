@@ -130,7 +130,8 @@ fun EntryForm(
                     FlatTextField(
                         value = typedValues["account_number"] ?: "",
                         onValueChange = { onTypedValueChange("account_number", it) },
-                        label = stringResource(R.string.field_account_number)
+                        label = stringResource(R.string.field_account_number),
+                        isSecret = true
                     )
                     SectionDivider()
                     PasswordField(
@@ -147,7 +148,8 @@ fun EntryForm(
                         label = stringResource(R.string.field_private_key),
                         minLines = 3,
                         maxLines = 8,
-                        singleLine = false
+                        singleLine = false,
+                        isSecret = true
                     )
                 }
                 "secure_note" -> {
@@ -171,7 +173,8 @@ fun EntryForm(
                         value = typedValues["number"] ?: "",
                         onValueChange = { onTypedValueChange("number", it) },
                         label = stringResource(R.string.field_number),
-                        keyboardType = KeyboardType.Number
+                        keyboardType = KeyboardType.Number,
+                        isSecret = true
                     )
                     SectionDivider()
                     FlatTextField(
@@ -216,7 +219,8 @@ fun EntryForm(
                         label = stringResource(R.string.field_license_key),
                         minLines = 2,
                         maxLines = 6,
-                        singleLine = false
+                        singleLine = false,
+                        isSecret = true
                     )
                 }
             }
@@ -488,7 +492,8 @@ private fun FlatTextField(
     keyboardType: KeyboardType = KeyboardType.Text,
     singleLine: Boolean = true,
     minLines: Int = 1,
-    maxLines: Int = 1
+    maxLines: Int = 1,
+    isSecret: Boolean = false
 ) {
     TextField(
         value = value,
@@ -498,7 +503,15 @@ private fun FlatTextField(
         singleLine = singleLine,
         minLines = minLines,
         maxLines = maxLines,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        keyboardOptions = if (isSecret) {
+            // 予測変換・学習をさせない。数字欄は数字キーボードのまま秘密扱いにする
+            KeyboardOptions(
+                keyboardType = if (keyboardType == KeyboardType.Number) KeyboardType.NumberPassword else KeyboardType.Password,
+                autoCorrectEnabled = false
+            )
+        } else {
+            KeyboardOptions(keyboardType = keyboardType)
+        },
         colors = TextFieldDefaults.colors(
             unfocusedContainerColor = Color.Transparent,
             focusedContainerColor = Color.Transparent,
@@ -539,6 +552,7 @@ fun PasswordField(
         label = { Text(label) },
         modifier = Modifier.fillMaxWidth().onFocusChanged { isFocused = it.isFocused },
         singleLine = true,
+        keyboardOptions = SecretKeyboardOptions,
         visualTransformation = if (isFocused) VisualTransformation.None else PasswordVisualTransformation(),
         trailingIcon = {
             Row {
@@ -814,6 +828,7 @@ fun CustomFieldEditor(
                 modifier = Modifier.fillMaxWidth().onFocusChanged { isValueFocused = it.isFocused },
                 singleLine = true,
                 placeholder = { Text(if (field.fieldType == "totp") stringResource(R.string.field_totp_placeholder) else stringResource(R.string.field_value_placeholder)) },
+                keyboardOptions = if (isSecret) SecretKeyboardOptions else KeyboardOptions.Default,
                 visualTransformation = if (!isValueFocused && isSecret) PasswordVisualTransformation() else VisualTransformation.None,
                 trailingIcon = when {
                     showGenerateButton -> {

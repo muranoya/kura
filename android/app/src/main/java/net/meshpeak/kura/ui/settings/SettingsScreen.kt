@@ -37,6 +37,7 @@ import net.meshpeak.kura.data.model.S3Config
 import net.meshpeak.kura.ui.components.ConfirmDialog
 import net.meshpeak.kura.util.ClipboardUtil
 import net.meshpeak.kura.viewmodel.AppViewModel
+import net.meshpeak.kura.ui.components.SecretKeyboardOptions
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -698,17 +699,17 @@ fun PasswordChangeDialog(
                 OutlinedTextField(
                     value = oldPassword, onValueChange = { oldPassword = it; error = "" },
                     label = { Text(stringResource(R.string.password_change_current)) },
-                    singleLine = true, visualTransformation = PasswordVisualTransformation()
+                    singleLine = true, keyboardOptions = SecretKeyboardOptions, visualTransformation = PasswordVisualTransformation()
                 )
                 OutlinedTextField(
                     value = newPassword, onValueChange = { newPassword = it; error = "" },
                     label = { Text(stringResource(R.string.password_change_new)) },
-                    singleLine = true, visualTransformation = PasswordVisualTransformation()
+                    singleLine = true, keyboardOptions = SecretKeyboardOptions, visualTransformation = PasswordVisualTransformation()
                 )
                 OutlinedTextField(
                     value = confirmPassword, onValueChange = { confirmPassword = it; error = "" },
                     label = { Text(stringResource(R.string.password_change_confirm)) },
-                    singleLine = true, visualTransformation = PasswordVisualTransformation()
+                    singleLine = true, keyboardOptions = SecretKeyboardOptions, visualTransformation = PasswordVisualTransformation()
                 )
             }
         },
@@ -777,6 +778,7 @@ fun PasscodeSetupDialog(
                     onValueChange = { masterPassword = it; error = "" },
                     label = { Text(stringResource(R.string.single_password_label)) },
                     singleLine = true,
+                    keyboardOptions = SecretKeyboardOptions,
                     visualTransformation = PasswordVisualTransformation()
                 )
                 OutlinedTextField(
@@ -857,7 +859,7 @@ fun SinglePasswordDialog(
                 OutlinedTextField(
                     value = password, onValueChange = { password = it; error = "" },
                     label = { Text(stringResource(R.string.single_password_label)) },
-                    singleLine = true, visualTransformation = PasswordVisualTransformation()
+                    singleLine = true, keyboardOptions = SecretKeyboardOptions, visualTransformation = PasswordVisualTransformation()
                 )
             }
         },
@@ -938,7 +940,7 @@ fun TransferConfigDialog(
                         value = password, onValueChange = { password = it; error = "" },
                         label = { Text(stringResource(R.string.transfer_dialog_password)) },
                         placeholder = { Text(stringResource(R.string.transfer_config_password_placeholder)) },
-                        singleLine = true, visualTransformation = PasswordVisualTransformation()
+                        singleLine = true, keyboardOptions = SecretKeyboardOptions, visualTransformation = PasswordVisualTransformation()
                     )
                 }
             }

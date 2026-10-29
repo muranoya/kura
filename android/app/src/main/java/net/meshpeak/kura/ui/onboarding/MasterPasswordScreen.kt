@@ -18,6 +18,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import net.meshpeak.kura.R
 import net.meshpeak.kura.viewmodel.AppViewModel
+import net.meshpeak.kura.ui.components.SecretKeyboardOptions
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,6 +84,7 @@ fun MasterPasswordScreen(
                 label = { Text(stringResource(R.string.master_password_label)) },
                 modifier = Modifier.fillMaxWidth().testTag("master_password_input"),
                 singleLine = true,
+                keyboardOptions = SecretKeyboardOptions,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -96,6 +98,7 @@ fun MasterPasswordScreen(
                 label = { Text(stringResource(R.string.master_password_confirm_label)) },
                 modifier = Modifier.fillMaxWidth().testTag("confirm_password_input"),
                 singleLine = true,
+                keyboardOptions = SecretKeyboardOptions,
                 visualTransformation = PasswordVisualTransformation()
             )
 
