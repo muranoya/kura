@@ -54,7 +54,7 @@ fun RecoveryKeyScreen(
 
             OutlinedButton(
                 onClick = {
-                    ClipboardUtil.copyToClipboard(context, "recovery_key", recoveryKey, clipboardClearSeconds, scope)
+                    ClipboardUtil.copyToClipboard(context, "recovery_key", recoveryKey, clipboardClearSeconds)
                     copied = true
                     scope.launch {
                         delay(2000)

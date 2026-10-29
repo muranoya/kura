@@ -456,7 +456,7 @@ fun DetailField(
                             context.startActivity(intent)
                         } else {
                             val copyValue = if (isSecret && !visible) value else value
-                            ClipboardUtil.copyToClipboard(context, label, copyValue, clipboardClearSeconds, scope)
+                            ClipboardUtil.copyToClipboard(context, label, copyValue, clipboardClearSeconds)
                             copied = true
                             scope.launch { delay(1500); copied = false }
                         }
@@ -514,7 +514,7 @@ fun DetailField(
             }
             if (isUrl && !isEmpty) {
                 IconButton(onClick = {
-                    ClipboardUtil.copyToClipboard(context, label, value, clipboardClearSeconds, scope)
+                    ClipboardUtil.copyToClipboard(context, label, value, clipboardClearSeconds)
                     copied = true
                     scope.launch { delay(1500); copied = false }
                 }, modifier = Modifier.size(32.dp)) {
@@ -581,7 +581,7 @@ fun TotpField(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple()
             ) {
-                ClipboardUtil.copyToClipboard(context, "totp", totpCode, clipboardClearSeconds, scope)
+                ClipboardUtil.copyToClipboard(context, "totp", totpCode, clipboardClearSeconds)
                 copied = true
                 scope.launch { delay(1500); copied = false }
             }

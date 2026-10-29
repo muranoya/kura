@@ -556,7 +556,7 @@ fun SettingsScreen(
                     }
                     OutlinedButton(
                         onClick = {
-                            ClipboardUtil.copyToClipboard(context, "recovery_key", recoveryKeyValue, clipboardClearSeconds, scope)
+                            ClipboardUtil.copyToClipboard(context, "recovery_key", recoveryKeyValue, clipboardClearSeconds)
                             copied = true
                             scope.launch { delay(2000); copied = false }
                         },
@@ -919,7 +919,7 @@ fun TransferConfigDialog(
                     }
                     OutlinedButton(
                         onClick = {
-                            ClipboardUtil.copyToClipboard(context, "transfer_config", transferString, clipboardClearSeconds, scope)
+                            ClipboardUtil.copyToClipboard(context, "transfer_config", transferString, clipboardClearSeconds)
                             copied = true
                             scope.launch { delay(2000); copied = false }
                         },
