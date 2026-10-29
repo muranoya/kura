@@ -118,7 +118,7 @@
     <string name="lock_biometric_disabled">生体認証が無効になりました。設定から再度有効にしてください</string>
     <string name="lock_unlock_with_recovery">リカバリーキーでアンロック</string>
     <string name="lock_logout_confirm_title">ログアウト</string>
-    <string name="lock_logout_confirm_description">次回起動時にマスターパスワードでアンロックが必要になります。続行しますか？</string>
+    <string name="lock_logout_confirm_description">この端末からvaultのデータ、S3の設定、生体認証とパスコードの設定を削除します。S3上のvaultは削除されません。再び使うにはS3の設定を入力し直す必要があります。</string>
     <string name="lock_password_required">パスワードを入力してください</string>
     <string name="lock_passcode_required">パスコードを入力してください</string>
     <string name="lock_unlock_failed">アンロックに失敗しました</string>
@@ -329,7 +329,7 @@
     <string name="settings_transfer_card_description">S3設定を暗号化した転送コードを生成</string>
     <string name="settings_about_version">バージョン</string>
     <string name="settings_logout_title">ログアウト</string>
-    <string name="settings_logout_description">ログアウトするとローカルキャッシュとS3設定がクリアされます。再度ログインには設定の再入力が必要になります。</string>
+    <string name="settings_logout_description">この端末からvaultのデータ、S3の設定、生体認証とパスコードの設定を削除します。S3上のvaultは削除されません。再び使うにはS3の設定を入力し直す必要があります。</string>
     <string name="settings_logout_description_short">ローカルキャッシュとS3設定をクリア</string>
 
     <!-- Password change dialog -->

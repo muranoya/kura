@@ -70,6 +70,7 @@ class FakeVaultRepository : IVaultRepository {
     override suspend fun lock(): ByteArray = byteArrayOf()
     override suspend fun getVaultBytes(): ByteArray = getVaultBytesResult
     override suspend fun isUnlocked(): Boolean = isUnlockedResult
+    override suspend fun unloadVault() {}
 
     override suspend fun listEntries(
         searchQuery: String?,

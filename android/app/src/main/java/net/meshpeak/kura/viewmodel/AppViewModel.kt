@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewModelScope
+import net.meshpeak.kura.autofill.log.AutofillLogStore
 import net.meshpeak.kura.data.auth.BiometricHelper
 import net.meshpeak.kura.data.auth.PasscodeHelper
 import net.meshpeak.kura.data.preferences.IPreferencesManager
@@ -14,11 +15,14 @@ import net.meshpeak.kura.data.preferences.SecureStorage
 import net.meshpeak.kura.data.repository.IVaultRepository
 import net.meshpeak.kura.data.repository.VaultRepository
 import net.meshpeak.kura.data.session.VaultSession
+import net.meshpeak.kura.util.ClipboardUtil
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class AppState {
     LOADING, ONBOARDING, LOCKED, UNLOCKED
@@ -106,6 +110,32 @@ class AppViewModel(
             _syncVersion.value++
         }
         return result.synced
+    }
+
+    /**
+     * ログアウト。メモリ上のDEKを破棄し、端末上のvault・S3認証情報・生体認証/パスコードの鍵と
+     * データ・設定・オートフィルログをすべて削除する。S3上のvaultには触れない。
+     */
+    suspend fun logout() {
+        withContext(NonCancellable) {
+            try {
+                if (repository.isUnlocked()) repository.lock()
+            } catch (_: Exception) {
+                // 破棄で消えるので続行する
+            }
+            try {
+                repository.unloadVault()
+            } catch (_: Exception) {
+                // 端末上のデータ削除は続行する
+            }
+            biometricHelper.clearAll()
+            passcodeHelper.clearAll()
+            preferences.clearAll()
+            repository.deleteVaultFile()
+            AutofillLogStore.clearAll(getApplication())
+            ClipboardUtil.clearPendingNow(getApplication())
+            _appState.value = AppState.ONBOARDING
+        }
     }
 
     /** 「今すぐロック」。ロック後の画面切り替えは[VaultSession.lockEvents]経由で行われる */

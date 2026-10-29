@@ -277,8 +277,7 @@ fun LockScreen(
             isDangerous = true,
             onConfirm = {
                 scope.launch {
-                    appViewModel.preferences.clearAll()
-                    appViewModel.repository.deleteVaultFile()
+                    appViewModel.logout()
                     onLogout()
                 }
             },

@@ -27,6 +27,8 @@ interface IVaultRepository {
     suspend fun lock(): ByteArray
     suspend fun getVaultBytes(): ByteArray
     suspend fun isUnlocked(): Boolean
+    /** メモリ上のvault（vault-coreのVaultManager）を破棄する。端末のファイルやS3には触れない */
+    suspend fun unloadVault()
 
     // Entry operations
     suspend fun listEntries(
@@ -180,6 +182,10 @@ class VaultRepository(private val context: Context) : IVaultRepository {
 
     override suspend fun isUnlocked(): Boolean = withContext(Dispatchers.IO) {
         VaultBridge.isUnlocked(DEFAULT_VAULT_ID)
+    }
+
+    override suspend fun unloadVault() = withContext(Dispatchers.IO) {
+        VaultBridge.destroyVault(DEFAULT_VAULT_ID)
     }
 
     // ========================================================================
