@@ -108,10 +108,12 @@ impl StorageBackend for S3Storage {
                 .key(&self.key)
                 .body(aws_sdk_s3::primitives::ByteStream::from(data.to_vec()));
 
-            if let Some(expected_etag) = etag {
-                if !expected_etag.is_empty() {
-                    put_request = put_request.if_match(expected_etag);
-                }
+            // ETag が空なのは、このセッションでリモートの vault をまだ取得していないとき
+            // （起動時にローカルの vault を読み込んだだけ、またはリモートに存在しない）。
+            // 条件なしで書くと他の端末の変更を上書きしうるので、新規作成としてだけ書き込む
+            match etag.filter(|e| !e.is_empty()) {
+                Some(expected_etag) => put_request = put_request.if_match(expected_etag),
+                None => put_request = put_request.if_none_match("*"),
             }
 
             match put_request.send().await {
@@ -122,7 +124,10 @@ impl StorageBackend for S3Storage {
                 }
                 Err(e) => {
                     if let aws_sdk_s3::error::SdkError::ServiceError(service_err) = &e {
-                        if let Some("PreconditionFailed") = service_err.err().code() {
+                        // ConditionalRequestConflict（409）は、条件付き書き込みが同時に走ったときに AWS が返す
+                        if let Some("PreconditionFailed" | "ConditionalRequestConflict") =
+                            service_err.err().code()
+                        {
                             return Err(VaultError::ConflictDetected);
                         }
                     }
