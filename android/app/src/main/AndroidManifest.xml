@@ -5,6 +5,16 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!-- オートフィルでwebDomainを信用するブラウザの署名証明書を検証するため（TrustedBrowsers）。
+         QUERY_ALL_PACKAGESを使わず、https URLを開けるアプリにだけ可視性を得る -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+
     <application
         android:name=".KuraApplication"
         android:allowBackup="false"

@@ -38,7 +38,7 @@ AndroidのAutofillFrameworkに対応する`AutofillService`を実装し、**他�
 
 ## 1-3. マッチング方式（パッケージ名ベース）
 
-**本セクションはネイティブアプリ由来リクエスト（`structure.getWebDomain()`が全ノードでnullの場合）にのみ適用される。** ブラウザ由来リクエストは`getWebDomain()`から直接ドメインが取得できるため、本セクションのパッケージ名⇔ドメインマッピングファイルは不要であり、別の方式を取る。
+**本セクションはネイティブアプリ由来リクエスト（`structure.getWebDomain()`が全ノードでnull、またはリクエスト元が署名検証済みのブラウザではない場合。Section 3-1-2）にのみ適用される。** ブラウザ由来リクエストは`getWebDomain()`から直接ドメインが取得できるため、本セクションのパッケージ名⇔ドメインマッピングファイルは不要であり、別の方式を取る。
 
 ネイティブアプリからのリクエストでは、`AssistStructure.getActivityComponent().getPackageName()`からリクエスト元のパッケージ名が分かる。
 
@@ -189,7 +189,7 @@ vault IDは既存実装同様、固定値を用いる。複数vault対応は現�
 
 ## 2-3. データフロー・セキュリティ
 
-「クレデンシャルの最小露出」原則を維持する。候補リスト取得の時点ではパスワードを含まない情報（URL・ユーザー名等）のみを扱う。マッチング対象のドメイン文字列自体の解決（ネイティブアプリはパッケージ名⇔ドメインマッピングファイル。ブラウザは`webDomain`の直接一致）はAndroidアプリ内で行うが、解決したドメインに対する実際のエントリ絞り込みはvault-core側の`api_list_login_candidates(domain, strict_subdomain)`（PSL/eTLD+1ベース）に委ねる。拡張機能も同一のvault-core関数を経由するため、Android・拡張機能で候補マッチングの挙動が一致する。実際にマッチしたエントリについてのみ個別に復号する。マッチ対象となるURLは エントリのログインURL（`typed_value.url`）に加え、URL型カスタムフィールド（`field_type == "url"`）の値も含まれるため、1つのエントリに複数サイトを紐付けられる。
+「クレデンシャルの最小露出」原則を維持する。候補リスト取得の時点ではパスワードを含まない情報（URL・ユーザー名等）のみを扱う。マッチング対象のドメイン文字列自体の解決（ネイティブアプリはパッケージ名⇔ドメインマッピングファイル。署名検証済みのブラウザは`webDomain`の直接一致）はAndroidアプリ内で行うが、解決したドメインに対する実際のエントリ絞り込みはvault-core側の`api_list_login_candidates(domain, strict_subdomain)`（PSL/eTLD+1ベース）に委ねる。拡張機能も同一のvault-core関数を経由するため、Android・拡張機能で候補マッチングの挙動が一致する。実際にマッチしたエントリについてのみ個別に復号する。マッチ対象となるURLは エントリのログインURL（`typed_value.url`）に加え、URL型カスタムフィールド（`field_type == "url"`）の値も含まれるため、1つのエントリに複数サイトを紐付けられる。
 
 Autofillフレームワークの`Dataset`はフィールド値を`onFillRequest`のレスポンス構築時点で確定させる必要があり、ブラウザ拡張のように「候補表示後、選択された1件のみ復号する」という二段階を素朴には実現できない（`Dataset`ごとに個別の認証を設定し、選択時に値を確定させることも可能だが、都度認証を要求するとUXが悪化する）。そのため、**vaultアンロック済みの場合は候補提示の時点で全マッチ候補のパスワードをまとめて復号し`Dataset`に埋め込む方式を採用した**（ドメインベースの絞り込みで該当件数は通常少数のため許容）。選択時に個別復号する方式は、都度認証によるUX悪化を避けるため採用しなかった。
 
@@ -213,8 +213,15 @@ extension側の重み付きシグナル方式と同じ**考え方**（複数シ�
 
 ### 3-1-2. リクエスト元の判定
 
-- `structure.getWebDomain()`（`ViewNode`単位、いずれかのノードで取得できればブラウザ由来と判定）が非nullの場合、ブラウザ由来リクエストとしてSection 1-6-2のフィールド検出方針に進む
-- 取得できない場合（ネイティブアプリ由来）は`structure.getActivityComponent().getPackageName()`でパッケージ名を取得し、Section 1-3のマッチングに進む
+- `structure.getWebDomain()`（`ViewNode`単位、いずれかのノードで取得できればよい）が非nullで、かつリクエスト元パッケージが署名検証済みのブラウザ（後述）の場合、ブラウザ由来リクエストとして`webDomain`をマッチングに使う
+- それ以外（ネイティブアプリ由来）は`structure.getActivityComponent().getPackageName()`でパッケージ名を取得し、Section 1-3のマッチングに進む
+
+`webDomain`はブラウザ以外のアプリでも`ViewStructure.setWebDomain()`の呼び出しやWebViewの埋め込みで任意に設定できる。`webDomain`の有無だけでブラウザ由来と判定すると、悪意あるアプリが正規サイトのドメインを名乗るだけで、Section 1-3の「未登録パッケージには候補を出さない」を迂回してそのサイトのクレデンシャルを取得できてしまう。そこで`TrustedBrowsers.kt`が、リクエスト元パッケージの署名証明書（`PackageManager.GET_SIGNING_CERTIFICATES`）のSHA-256フィンガープリントを許可リストと照合する。
+
+- 許可リストはPasskeyで使うGPM特権アプリリスト（`assets/gpm_privileged_allowlist.json`、`docs/android-passkey.md`）を流用する。Googleがフィンガープリントを含めて保守しているため、Section 1-3で断念した「アプリ更新への追従」をKura側で行う必要がない
+- 署名情報を取得するためのパッケージ可視性は、Manifestの`<queries>`に「https URLを`BROWSABLE`で開けるアプリ」のintentを宣言して得る（`QUERY_ALL_PACKAGES`は使わない）
+- 許可リストにないブラウザ、WebViewを埋め込んだアプリは`webDomain`を持っていてもネイティブアプリとして扱う。`package_domains.json`に登録がなければ自動候補は出さず、手動検索（Section 1-4-1）のみとなる
+- フィールド検出は信用判定と独立に、`webDomain`を持つ（HTML要素で構成された）構造であればブラウザ向けロジックを使う。どのドメインの候補を出すかには影響しないため安全側の問題はない
 
 `AssistStructureParser.parse()`は、祖先ノードでは`webDomain`が空/nullになるケースがある実態（1-6-1(d)）を踏まえ、木構造の走査中にブラウザ由来と判明した時点で打ち切るのではなく、全ノードを収集してから判定する2段階方式で実装している。ネイティブアプリ向け（`FieldClassifier`, Section 3-1-1）とブラウザ向け（`BrowserFieldClassifier`, Section 1-6-2, 1-5）は別クラスとして独立実装されている。
 
