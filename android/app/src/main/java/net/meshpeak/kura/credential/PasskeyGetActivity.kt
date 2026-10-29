@@ -5,7 +5,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
+import net.meshpeak.kura.SecureActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -56,7 +56,7 @@ private sealed interface GetUiState {
  *    システムは実際の候補一覧を含む選択UIを再表示し、ユーザーが選ぶと経路1として
  *    このActivityが改めて起動される。
  */
-class PasskeyGetActivity : AppCompatActivity() {
+class PasskeyGetActivity : SecureActivity() {
 
     private val appViewModel: AppViewModel by viewModels { AppViewModel.Factory }
     private var uiState by mutableStateOf<GetUiState>(GetUiState.Auth)

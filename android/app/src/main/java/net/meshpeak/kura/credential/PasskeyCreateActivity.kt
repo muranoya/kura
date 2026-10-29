@@ -4,7 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
+import net.meshpeak.kura.SecureActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -38,7 +38,7 @@ private sealed interface CreateActivityState {
  * →ユーザー確認→`webauthnCreateCredential`呼び出し、という一連の流れをここで行う
  * （docs/android-passkey.md 3-1、6-1）。
  */
-class PasskeyCreateActivity : AppCompatActivity() {
+class PasskeyCreateActivity : SecureActivity() {
 
     private val appViewModel: AppViewModel by viewModels { AppViewModel.Factory }
     private var uiState by mutableStateOf<CreateActivityState>(CreateActivityState.Auth)

@@ -8,7 +8,7 @@ import android.view.autofill.AutofillManager
 import android.view.autofill.AutofillValue
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
+import net.meshpeak.kura.SecureActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -31,7 +31,7 @@ private const val TAG = "KuraAutofill"
  * 選択までの間にvaultが自動ロックされている可能性があるため、[AutofillUnlockActivity] と
  * 同様に [AutofillAuthScreen] を経由して認証を挟む。
  */
-class AutofillTotpResolveActivity : AppCompatActivity() {
+class AutofillTotpResolveActivity : SecureActivity() {
 
     private val appViewModel: AppViewModel by viewModels { AppViewModel.Factory }
 
