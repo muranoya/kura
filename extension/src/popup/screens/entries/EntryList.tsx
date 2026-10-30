@@ -406,7 +406,7 @@ export default function EntryList() {
       <div className="flex-1 min-h-0 flex flex-col twopane:flex-row overflow-hidden">
         <div
           ref={listPaneRef}
-          className={`w-full min-h-0 flex flex-col twopane:w-60 twopane:flex-none twopane:border-r border-border bg-sidebar ${
+          className={`w-full min-h-0 flex flex-col twopane:w-60 twopane:flex-none twopane:border-r border-border ${
             showDetail ? 'basis-2/5 shrink-0' : 'flex-1'
           }`}
         >
