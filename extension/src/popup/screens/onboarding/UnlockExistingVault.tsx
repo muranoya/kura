@@ -24,7 +24,7 @@ export default function UnlockExistingVault() {
   const [error, setError] = useState('')
 
   const handleBack = async () => {
-    await removeFromStorage(STORAGE_KEYS.VAULT_BYTES)
+    await removeFromStorage(STORAGE_KEYS.PENDING_VAULT)
     navigate('/onb/storage')
   }
 
