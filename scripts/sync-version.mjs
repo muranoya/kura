@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -29,5 +30,9 @@ for (const rel of tomlTargets) {
   const content = readFileSync(path, 'utf-8')
   writeFileSync(path, content.replace(/^version\s*=\s*"[^"]*"/m, `version = "${version}"`))
 }
+
+// Cargo.lock には workspace メンバー自身のバージョンも記録されるため、
+// Cargo.toml だけ書き換えると `--locked` 付きのコマンド（cargo about 等）が失敗する
+execFileSync('cargo', ['update', '--workspace', '--offline', '--quiet'], { cwd: root, stdio: 'inherit' })
 
 console.log(`[sync-version] ${version}`)
