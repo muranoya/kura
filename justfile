@@ -115,12 +115,14 @@ default: help
 	cd {{EXTENSION_DIR}} && pnpm run build
 	echo ""
 	echo "📦 Packaging Chrome extension..."
+	rm -f {{EXTENSION_DIR}}/kura-extension-chrome.zip
 	cd {{EXTENSION_DIR}}/dist && zip -r ../kura-extension-chrome.zip .
 	echo ""
 	echo "🏗️  Building Firefox extension..."
 	cd {{EXTENSION_DIR}} && pnpm run build:firefox
 	echo ""
 	echo "📦 Packaging Firefox extension..."
+	rm -f {{EXTENSION_DIR}}/kura-extension-firefox.zip
 	cd {{EXTENSION_DIR}}/dist && zip -r ../kura-extension-firefox.zip .
 	echo ""
 	echo "✅ Extension build completed!"
