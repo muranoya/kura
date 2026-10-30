@@ -80,11 +80,15 @@
     <string name="storage_required_all">すべての必須フィールドを入力してください</string>
     <string name="storage_access_failed">ストレージへのアクセスに失敗しました: %1$s</string>
     <string name="storage_transfer_import_title">別の端末から設定を転送</string>
-    <string name="storage_transfer_import_description">設定済みの端末で生成した転送コードと転送パスワードを入力してください。</string>
+    <string name="storage_transfer_import_description">設定済みの端末に表示された転送コードのQRコードをスキャンするか転送コードを貼り付け、転送パスワードを入力してください。</string>
     <string name="storage_transfer_code_placeholder">kura-config-v1$…</string>
     <string name="storage_transfer_password_placeholder">転送コード生成時に設定したパスワード</string>
     <string name="storage_transfer_load">設定を読み込む</string>
     <string name="storage_transfer_import_button">別の端末から設定を転送</string>
+    <string name="storage_transfer_scan_qr">QRコードをスキャン</string>
+    <string name="storage_transfer_scan_title">転送コードをスキャン</string>
+    <string name="storage_transfer_camera_rationale">転送コードのQRコードを読み取るにはカメラへのアクセスを許可してください</string>
+    <string name="storage_transfer_qr_invalid">kura の転送コードではありません</string>
     <string name="storage_transfer_decrypt_failed">転送コードの復号に失敗しました: %1$s</string>
 
     <!-- Master password screen -->
