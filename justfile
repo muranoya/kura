@@ -476,7 +476,7 @@ test-manual-autofill:
 	echo "  - Vault-core..."
 	rm -rf {{VAULT_CORE_DIR}}/pkg/
 	echo "  - Android..."
-	cd {{ANDROID_DIR}} && rm -rf app/build/ app/src/main/jniLibs/ .gradle/ build/ app/src/main/assets/legal/
+	cd {{ANDROID_DIR}} && rm -rf app/build/ app/src/main/jniLibs/ .gradle/ build/
 	find {{ANDROID_DIR}}/app/src/main/res/ -path '*/mipmap-*/ic_launcher.png' -delete -o -path '*/mipmap-*/ic_launcher_foreground.png' -delete 2>/dev/null || true
 	echo "✅ Cleanup completed!"
 

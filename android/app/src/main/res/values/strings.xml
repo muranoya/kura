@@ -54,9 +54,7 @@
     <string name="welcome_title">kura</string>
     <string name="welcome_subtitle">パスワードマネージャー</string>
     <string name="welcome_tagline">サーバ不要、自分一人のための\nパスワードマネージャー</string>
-    <string name="welcome_terms_prefix"></string>
-    <string name="welcome_terms_link">利用規約</string>
-    <string name="welcome_terms_suffix">に同意する</string>
+    <string name="welcome_disclaimer">本ソフトウェアは Apache License 2.0 のもとで「現状有姿（AS IS）」で提供され、いかなる保証もありません。適用法令で許容される範囲で、本ソフトウェアの使用に起因するデータの損失やセキュリティ上の問題などの損害について、開発者は責任を負いません。</string>
     <string name="welcome_get_started">始める</string>
 
     <!-- Storage setup -->

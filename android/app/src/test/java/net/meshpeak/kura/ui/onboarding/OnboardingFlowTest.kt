@@ -80,13 +80,10 @@ class OnboardingFlowTest {
     }
 
     @Test
-    fun `start button is disabled until terms checkbox is checked`() {
+    fun `welcome screen shows disclaimer and start button is enabled`() {
         launchOnboarding()
 
-        composeTestRule.onNodeWithTag("start_button").assertIsNotEnabled()
-
-        composeTestRule.onNodeWithTag("terms_checkbox").performClick()
-
+        composeTestRule.onNodeWithTag("welcome_disclaimer").assertIsDisplayed()
         composeTestRule.onNodeWithTag("start_button").assertIsEnabled()
     }
 
@@ -94,7 +91,6 @@ class OnboardingFlowTest {
     fun `clicking start navigates to storage setup`() {
         launchOnboarding()
 
-        composeTestRule.onNodeWithTag("terms_checkbox").performClick()
         composeTestRule.onNodeWithTag("start_button").performClick()
 
         composeTestRule.onNodeWithText("ストレージ設定").assertIsDisplayed()
@@ -106,7 +102,6 @@ class OnboardingFlowTest {
 
     private fun navigateToStorageSetup() {
         launchOnboarding()
-        composeTestRule.onNodeWithTag("terms_checkbox").performClick()
         composeTestRule.onNodeWithTag("start_button").performClick()
         composeTestRule.waitForIdle()
     }
@@ -357,7 +352,6 @@ class OnboardingFlowTest {
         launchOnboarding()
 
         // Welcome
-        composeTestRule.onNodeWithTag("terms_checkbox").performClick()
         composeTestRule.onNodeWithTag("start_button").performClick()
         composeTestRule.waitForIdle()
 
@@ -384,7 +378,6 @@ class OnboardingFlowTest {
         launchOnboarding()
 
         // Welcome
-        composeTestRule.onNodeWithTag("terms_checkbox").performClick()
         composeTestRule.onNodeWithTag("start_button").performClick()
         composeTestRule.waitForIdle()
 
