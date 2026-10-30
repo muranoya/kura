@@ -215,6 +215,7 @@ fn row_item(row: &EntryRow) -> EntryRowItem {
                 .map(|name| SharedString::from(name.as_str()))
                 .collect::<Vec<_>>(),
         )),
+        is_favorite: row.is_favorite,
     }
 }
 

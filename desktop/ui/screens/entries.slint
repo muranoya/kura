@@ -72,6 +72,13 @@ component EntryCard inherits Rectangle {
                 }
             }
         }
+
+        if root.entry.is-favorite: Icon {
+            y: (parent.height - self.height) / 2;
+            source: Icons.star-filled;
+            size: 16px;
+            color: Theme.warning;
+        }
     }
 
     Rectangle {

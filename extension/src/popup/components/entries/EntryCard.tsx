@@ -6,6 +6,7 @@ import {
   Lock,
   RotateCw,
   ScrollText,
+  Star,
   Terminal,
   Trash2,
 } from 'lucide-react'
@@ -98,6 +99,13 @@ export default function EntryCard(props: EntryCardProps) {
                 </Badge>
               ))}
             </div>
+          )}
+          {props.entry.isFavorite && (
+            <Star
+              size={14}
+              aria-label={t('entries.actions.favorite')}
+              className="flex-shrink-0 fill-[#D97706] text-[#D97706]"
+            />
           )}
         </div>
       </button>
