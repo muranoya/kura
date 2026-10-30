@@ -6,6 +6,7 @@
 import { DEFAULT_VAULT_ID, STORAGE_KEYS } from '../shared/constants'
 import { isValidRpId } from '../shared/etld'
 import { broadcastToExtensionPages } from '../shared/messages'
+import { isPotentiallyTrustworthy } from '../shared/secure-origin'
 import { getFromStorage } from '../shared/storage'
 import type {
   WebauthnRitualContext,
@@ -129,22 +130,6 @@ function originFromSender(
   if (origin === 'null' || origin !== url.origin) return null
   if (!isPotentiallyTrustworthy(url)) return null
   return { origin, hostname: url.hostname }
-}
-
-/**
- * Secure-context origins as browsers define them for WebAuthn: https, or
- * loopback hosts (used during local development).
- */
-function isPotentiallyTrustworthy(url: URL): boolean {
-  if (url.protocol === 'https:') return true
-  if (url.protocol !== 'http:') return false
-  const host = url.hostname
-  return (
-    host === 'localhost' ||
-    host.endsWith('.localhost') ||
-    host === '[::1]' ||
-    /^127(\.\d{1,3}){3}$/.test(host)
-  )
 }
 
 function finishRitual(requestId: string, decision: WebauthnRitualDecision) {
