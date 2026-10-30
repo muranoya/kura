@@ -9,7 +9,7 @@ component EntryCard inherits Rectangle {
     in property <EntryRowItem> entry;
     in property <bool> selected;
     callback clicked();
-    height: root.entry.label-names.length > 0 ? 74px : 52px;
+    height: 52px;
     background: selected ? Theme.accent-subtle : touch.has-hover ? Theme.bg-elevated : transparent;
     Rectangle {
         x: 0;
@@ -35,6 +35,7 @@ component EntryCard inherits Rectangle {
         }
 
         VerticalLayout {
+            horizontal-stretch: 1;
             alignment: center;
             spacing: 2px;
             Text {
@@ -52,19 +53,22 @@ component EntryCard inherits Rectangle {
                 overflow: elide;
             }
 
-            // Slint には折り返すレイアウトがないため、1行に収まらないラベルは切り詰める
-            if root.entry.label-names.length > 0: Rectangle {
-                height: 18px;
-                clip: true;
-                HorizontalLayout {
-                    x: 0;
-                    width: self.preferred-width;
-                    spacing: 4px;
-                    for name in root.entry.label-names: Badge {
-                        height: 18px;
-                        text: name;
-                        variant: root.selected ? "primary" : "secondary";
-                    }
+        }
+
+        // 名前の表示幅を確保するため、収まらないラベルは切り詰める
+        if root.entry.label-names.length > 0: Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: min(label-row.preferred-width, 110px);
+            height: 18px;
+            clip: true;
+            label-row := HorizontalLayout {
+                x: 0;
+                width: self.preferred-width;
+                spacing: 4px;
+                for name in root.entry.label-names: Badge {
+                    height: 18px;
+                    text: name;
+                    variant: root.selected ? "primary" : "secondary";
                 }
             }
         }

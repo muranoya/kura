@@ -84,21 +84,21 @@ export default function EntryCard(props: EntryCardProps) {
               {props.entry.subtitle && (
                 <p className="text-xs text-text-muted truncate mt-0.5">{props.entry.subtitle}</p>
               )}
-              {props.entry.labelNames.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {props.entry.labelNames.map((name) => (
-                    <Badge
-                      key={name}
-                      variant={isSelected ? 'primary' : 'secondary'}
-                      className="max-w-full px-1.5 py-0 text-[10px] font-medium"
-                    >
-                      <span className="truncate">{name}</span>
-                    </Badge>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
+          {props.entry.labelNames.length > 0 && (
+            <div className="flex justify-end gap-1 min-w-0 max-w-[40%] flex-shrink-0">
+              {props.entry.labelNames.map((name) => (
+                <Badge
+                  key={name}
+                  variant={isSelected ? 'primary' : 'secondary'}
+                  className="min-w-0 px-1.5 py-0 text-[10px] font-medium"
+                >
+                  <span className="truncate">{name}</span>
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
       </button>
     )
