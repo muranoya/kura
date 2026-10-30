@@ -23,10 +23,7 @@
   "onboarding": {
     "welcome": {
       "subtitle": "サーバ不要、自分一人のためのパスワードマネージャー",
-      "termsLink": "利用規約",
-      "agreePrefix": "",
-      "agreeSuffix": "に同意する",
-      "termsDialogTitle": "利用規約",
+      "disclaimer": "本ソフトウェアは Apache License 2.0 のもとで「現状有姿（AS IS）」で提供され、いかなる保証もありません。適用法令で許容される範囲で、本ソフトウェアの使用に起因するデータの損失やセキュリティ上の問題などの損害について、開発者は責任を負いません。",
       "startButton": "始める"
     },
     "storage": {

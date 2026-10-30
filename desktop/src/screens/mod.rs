@@ -232,7 +232,6 @@ pub fn open_confirm(
 // ---------------------------------------------------------------------------
 
 fn initial_state(app: &AppWindow) {
-    onboarding::load_terms(app);
     if let Some(e) = shared().store.take_load_error() {
         ctx::push_error(app, e, Some("settings-load"));
     }

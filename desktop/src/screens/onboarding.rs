@@ -7,9 +7,7 @@ use zeroize::Zeroizing;
 use super::navigate;
 use crate::ctx::{self, shared};
 use crate::store::keys;
-use crate::{markdown, vault, AppWindow, Onboarding, Page};
-
-const TERMS: &str = include_str!("../../../assets/legal/terms.md");
+use crate::{vault, AppWindow, Onboarding, Page};
 
 /// 保存形式は旧版と同じ camelCase の JSON（vault_core::api::parse_s3_config が読む）
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -27,11 +25,6 @@ struct S3ConfigForm {
     secret_access_key: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     endpoint: Option<String>,
-}
-
-pub fn load_terms(app: &AppWindow) {
-    app.global::<Onboarding>()
-        .set_terms(markdown::render(TERMS));
 }
 
 pub fn setup(app: &AppWindow) {
@@ -80,8 +73,6 @@ pub fn enter_storage_setup(app: &AppWindow) {
 pub fn reset(app: &AppWindow) {
     let ob = app.global::<Onboarding>();
     clear_storage_fields(app);
-    ob.set_agreed(false);
-    ob.set_terms_open(false);
     ob.set_show_transfer(false);
     ob.set_transfer_string("".into());
     ob.set_transfer_password("".into());

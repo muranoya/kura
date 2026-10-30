@@ -1,33 +1,20 @@
 package net.meshpeak.kura.ui.onboarding
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import net.meshpeak.kura.R
-import net.meshpeak.kura.ui.components.MarkdownText
 
 @Composable
 fun WelcomeScreen(onStart: () -> Unit) {
-    val context = LocalContext.current
-    var agreed by remember { mutableStateOf(false) }
-    var showTermsDialog by remember { mutableStateOf(false) }
-
-    val termsText = remember {
-        runCatching { context.assets.open("legal/terms.md").bufferedReader().readText() }
-            .getOrDefault("")
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -62,77 +49,21 @@ fun WelcomeScreen(onStart: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(24.dp))
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(vertical = 8.dp)
-        ) {
-            Checkbox(
-                checked = agreed,
-                onCheckedChange = { agreed = it },
-                modifier = Modifier.testTag("terms_checkbox")
-            )
-            val prefix = stringResource(R.string.welcome_terms_prefix)
-            if (prefix.isNotEmpty()) {
-                Text(
-                    text = prefix,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            TextButton(onClick = { showTermsDialog = true }) {
-                Text(
-                    text = stringResource(R.string.welcome_terms_link),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            val suffix = stringResource(R.string.welcome_terms_suffix)
-            if (suffix.isNotEmpty()) {
-                Text(
-                    text = suffix,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+        Text(
+            text = stringResource(R.string.welcome_disclaimer),
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag("welcome_disclaimer")
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = onStart,
-            modifier = Modifier.fillMaxWidth().testTag("start_button"),
-            enabled = agreed
+            modifier = Modifier.fillMaxWidth().testTag("start_button")
         ) {
             Text(stringResource(R.string.welcome_get_started))
         }
-    }
-
-    if (showTermsDialog) {
-        AlertDialog(
-            onDismissRequest = { showTermsDialog = false },
-            title = {
-                Text(
-                    text = stringResource(R.string.welcome_terms_link),
-                    style = MaterialTheme.typography.titleLarge
-                )
-            },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 400.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    MarkdownText(
-                        text = termsText,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showTermsDialog = false }) {
-                    Text(stringResource(R.string.action_close))
-                }
-            }
-        )
     }
 }

@@ -124,18 +124,6 @@ export component IconButton {
     }
 }
 
-export component LinkButton inherits Text {
-    callback clicked();
-    color: touch.has-hover ? Theme.accent-hover : Theme.accent;
-    font-size: Theme.text-sm;
-    touch := TouchArea {
-        mouse-cursor: pointer;
-        clicked => {
-            root.clicked();
-        }
-    }
-}
-
 export component Card inherits Rectangle {
     in property <string> title;
     in property <length> pad: 12px;

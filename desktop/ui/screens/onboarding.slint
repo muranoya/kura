@@ -1,7 +1,7 @@
-import { CheckBox, LineEdit, TextEdit, ScrollView } from "std-widgets.slint";
+import { LineEdit, TextEdit } from "std-widgets.slint";
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { AppButton, Card, CodeBlock, Dialog, DialogFooter, ErrorBanner, FieldLabel, HelpText, Icon, LinkButton, MarkdownView, PageHeader, PasswordInput, ScrollPage } from "../widgets.slint";
+import { AppButton, Card, CodeBlock, ErrorBanner, FieldLabel, HelpText, Icon, PageHeader, PasswordInput, ScrollPage } from "../widgets.slint";
 import { Nav, Onboarding, Page, Util } from "../state.slint";
 
 export component WelcomeScreen inherits Rectangle {
@@ -51,69 +51,25 @@ export component WelcomeScreen inherits Rectangle {
                     horizontal-alignment: center;
                 }
 
-                HorizontalLayout {
-                    alignment: center;
+                VerticalLayout {
                     padding-top: 24px;
                     padding-bottom: 16px;
-                    spacing: 2px;
-                    CheckBox {
-                        checked <=> Onboarding.agreed;
-                    }
-
-                    LinkButton {
-                        text: "利用規約";
-                        vertical-alignment: center;
-                        clicked => {
-                            Onboarding.terms-open = true;
-                        }
-                    }
-
                     Text {
-                        text: "に同意する";
-                        font-size: Theme.text-sm;
+                        text: "本ソフトウェアは Apache License 2.0 のもとで「現状有姿（AS IS）」で提供され、いかなる保証もありません。適用法令で許容される範囲で、本ソフトウェアの使用に起因するデータの損失やセキュリティ上の問題などの損害について、開発者は責任を負いません。";
+                        font-size: Theme.text-xs;
                         color: Theme.text-secondary;
-                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
                     }
                 }
 
                 AppButton {
                     text: "始める";
                     size: "lg";
-                    enabled: Onboarding.agreed;
                     clicked => {
                         Nav.navigate(Page.storage-setup);
                     }
                 }
-            }
-        }
-    }
-}
-
-export component TermsDialog inherits Dialog {
-    title: "利用規約";
-    dialog-width: 672px;
-    dismissed => {
-        Onboarding.terms-open = false;
-    }
-    ScrollView {
-        min-height: 200px;
-        preferred-height: 2000px;
-        content-height: md.preferred-height;
-        md := MarkdownView {
-            width: parent.visible-width - 12px;
-            blocks: Onboarding.terms;
-            link-clicked(url) => {
-                Util.open-url(url);
-            }
-        }
-    }
-
-    DialogFooter {
-        AppButton {
-            text: "閉じる";
-            variant: "secondary";
-            clicked => {
-                Onboarding.terms-open = false;
             }
         }
     }

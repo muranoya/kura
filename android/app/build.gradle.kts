@@ -153,12 +153,3 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.+")
     testImplementation("androidx.test:core:1.+")
 }
-
-tasks.register<Sync>("copyLegalAssets") {
-    from("${rootProject.projectDir}/../assets/legal")
-    into("${projectDir}/src/main/assets/legal")
-}
-
-tasks.named("preBuild") {
-    dependsOn("copyLegalAssets")
-}
