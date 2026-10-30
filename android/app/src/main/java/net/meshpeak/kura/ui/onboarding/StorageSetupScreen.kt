@@ -17,6 +17,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import net.meshpeak.kura.BuildConfig
 import net.meshpeak.kura.R
 import net.meshpeak.kura.viewmodel.AppViewModel
 import net.meshpeak.kura.ui.components.SecretKeyboardOptions
@@ -251,7 +252,7 @@ fun StorageSetupScreen(
                                 endpoint = ""
                                 if (exists) onExistingVault() else onNewVault()
                             } catch (e: Exception) {
-                                Log.e("StorageSetup", "S3 access failed", e)
+                                if (BuildConfig.DEBUG) Log.e("StorageSetup", "S3 access failed", e)
                                 error = context.getString(R.string.storage_access_failed, e.message ?: e.toString())
                             } finally {
                                 isLoading = false

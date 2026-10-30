@@ -49,6 +49,8 @@ class AutofillPickerActivity : SecureActivity() {
             if (showPicker) {
                 AutofillPickerScreen(
                     appViewModel = appViewModel,
+                    target = if (parsed.isBrowserRequest) parsed.webDomain else parsed.packageName,
+                    isBrowserRequest = parsed.isBrowserRequest,
                     errorMessage = errorMessage,
                     onSelect = { entryId ->
                         errorMessage = null

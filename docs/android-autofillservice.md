@@ -74,6 +74,7 @@ TOTPフィールドを含む候補は、username/password用の`Dataset`とは**
 - 実現方式はTOTPと同じ**Dataset単位認証**（`FillResponseBuilder.buildManualSearchDataset`）。選択されると`AutofillPickerActivity`（トランポリンActivity）が起動し、`AutofillPickerScreen`（`EntryListScreen`のUIパターンを踏襲した読み取り専用ピッカー）で検索・選択させる
 - 選択したエントリからusername/passwordを取り出しDatasetを構築するロジックは`FillResponseBuilder.buildLoginDataset`として通常の候補生成（`buildDatasetForCandidate`）と共通化している
 - 選択エントリにusername/passwordどちらも無くDataset構築に失敗した場合は、画面を閉じずにエラー表示のうえ選び直せるようにする（デッドエンドを避ける）
+- 手動検索は`package_domains.json`未登録のアプリにも出るため、ピッカー上部に入力先（署名検証済みブラウザなら`webDomain`、それ以外はリクエスト元のパッケージ名）を表示する。ネイティブアプリはパッケージ名を名乗れるだけで本物かどうかをkuraが確認できないため、警告色で「入力先が正しいことを確かめてから選択する」よう促す（偽アプリに任意のエントリを流し込ませないため）
 - 通常候補が1件でも出せた場合は手動検索候補を混ぜない
 
 ## 1-5. TOTPオートフィルの詳細

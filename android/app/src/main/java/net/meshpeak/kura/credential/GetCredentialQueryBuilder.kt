@@ -67,7 +67,7 @@ object GetCredentialQueryBuilder {
             val candidates = resolved.findCredentialsAcrossDomains(repository, allowIds, extraRpId)
             candidates.forEach { entries += buildEntry(context, option, it) }
         }
-        Log.d(TAG, "onBeginGetCredentialRequest: returning ${entries.size} credentialEntries")
+        if (BuildConfig.DEBUG) Log.d(TAG, "onBeginGetCredentialRequest: returning ${entries.size} credentialEntries")
         return BeginGetCredentialResponse(credentialEntries = entries)
     }
 

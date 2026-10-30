@@ -69,7 +69,7 @@ class PasskeyGetActivity : SecureActivity() {
         super.onCreate(savedInstanceState)
 
         val selection = intent.getPasskeyGetSelection()
-        Log.d(TAG, "onCreate: hasSelection=${selection != null}")
+        if (BuildConfig.DEBUG) Log.d(TAG, "onCreate: hasSelection=${selection != null}")
 
         setContent {
             when (uiState) {
@@ -120,7 +120,35 @@ class PasskeyGetActivity : SecureActivity() {
             return
         }
         resolvedOrigin = resolved
+        if (!isSelectionAllowedFor(request, resolved, selection)) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "proceedWithSelection: selected credential does not belong to resolved rp_ids -> cancel")
+            finishCanceled()
+            return
+        }
         finishWithAssertion(selection)
+    }
+
+    /**
+     * 選択された認証情報が、呼び出し元から解決したrp_idのPasskeyであることを署名の直前に確かめる。
+     * selectionはQuery時に自分で作ったPendingIntentのextraで、現状は改ざんの経路がないが、
+     * 別のrp_idのPasskeyで署名してしまう事故を防ぐ最後の砦として、Query時と同じ条件で検索し直す。
+     */
+    private suspend fun isSelectionAllowedFor(
+        request: ProviderGetCredentialRequest,
+        resolved: OriginResolver.Resolved,
+        selection: PasskeyGetSelection
+    ): Boolean {
+        val pkOption = request.credentialOptions.filterIsInstance<GetPublicKeyCredentialOption>().firstOrNull()
+            ?: return false
+        val claimedRpId = ClientDataJsonBuilder.extractRpId(pkOption.requestJson)
+        val extraRpId = resolved.validateClaimedRpId(appViewModel.repository, claimedRpId)
+        val allowIds = ClientDataJsonBuilder.parseCredentialIds(pkOption.requestJson, "allowCredentials")
+        return resolved.findCredentialsAcrossDomains(appViewModel.repository, allowIds, extraRpId)
+            .any {
+                it.entryId == selection.entryId &&
+                    it.customFieldId == selection.customFieldId &&
+                    it.credentialId == selection.credentialId
+            }
     }
 
     /**
@@ -144,7 +172,7 @@ class PasskeyGetActivity : SecureActivity() {
             finishCanceled()
             return
         }
-        Log.d(TAG, "proceedFromAuthenticationAction: rebuilt ${response.credentialEntries.size} credentialEntries -> handing back to system")
+        if (BuildConfig.DEBUG) Log.d(TAG, "proceedFromAuthenticationAction: rebuilt ${response.credentialEntries.size} credentialEntries -> handing back to system")
         val resultIntent = Intent()
         PendingIntentHandler.setBeginGetCredentialResponse(resultIntent, response)
         setResult(RESULT_OK, resultIntent)
@@ -178,7 +206,7 @@ class PasskeyGetActivity : SecureActivity() {
                 finishCanceled()
                 return@launch
             }
-            Log.d(TAG, "finishWithAssertion: assertion built successfully -> RESULT_OK")
+            if (BuildConfig.DEBUG) Log.d(TAG, "finishWithAssertion: assertion built successfully -> RESULT_OK")
             val (assertion, clientDataJsonForResponse) = result
 
             val responseJson = buildAuthenticationResponseJson(
@@ -212,7 +240,7 @@ class PasskeyGetActivity : SecureActivity() {
         } else {
             val challenge = ClientDataJsonBuilder.extractChallenge(pkOption.requestJson)
                 ?: throw IllegalStateException("requestJson has no challenge")
-            val clientDataJson = ClientDataJsonBuilder.buildForGet(challenge, resolved.rpId)
+            val clientDataJson = ClientDataJsonBuilder.buildForGet(challenge, resolved.clientDataOrigin)
             val assertion = appViewModel.repository.webauthnGetAssertion(
                 selection.entryId, selection.customFieldId, clientDataJson, userVerified
             )
@@ -249,7 +277,7 @@ class PasskeyGetActivity : SecureActivity() {
     }.toString()
 
     private fun finishCanceled() {
-        Log.d(TAG, "finishCanceled: returning RESULT_CANCELED")
+        if (BuildConfig.DEBUG) Log.d(TAG, "finishCanceled: returning RESULT_CANCELED")
         setResult(RESULT_CANCELED)
         finish()
     }

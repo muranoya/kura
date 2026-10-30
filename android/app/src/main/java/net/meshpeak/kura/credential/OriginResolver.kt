@@ -36,8 +36,11 @@ object OriginResolver {
         /** 新規作成時に使う代表rp_id。BROWSERは検証済みorigin由来、NATIVE_APPは[allRpIds]の先頭。 */
         val rpId: String,
         val source: Source,
-        /** BROWSERの場合のみ非null。"https://example.com" 形式。clientDataJSON組み立てに使う。 */
-        val webOrigin: String?,
+        /**
+         * clientDataJSONの`origin`。BROWSERは検証済みWebオリジン（"https://example.com" 形式）、
+         * NATIVE_APPは呼び出し元の署名証明書から算出した`android:apk-key-hash:...`。
+         */
+        val clientDataOrigin: String,
         /**
          * このアプリに紐づく全てのrp_id候補。BROWSERの場合は[rpId]のみを含む1要素のリスト。
          * NATIVE_APPの場合、package_domains.jsonで1パッケージに複数ドメインが登録されている
@@ -94,7 +97,7 @@ object OriginResolver {
                 return@withContext Resolved(
                     rpId = rpId,
                     source = Source.BROWSER,
-                    webOrigin = origin,
+                    clientDataOrigin = origin,
                     allRpIds = listOf(rpId)
                 )
             }
@@ -104,8 +107,20 @@ object OriginResolver {
                 if (BuildConfig.DEBUG) Log.d(TAG, "resolve: no origin and no package_domains.json entry for package=${callingAppInfo.packageName} -> null")
                 return@withContext null
             }
+            val signingCert = runCatching {
+                callingAppInfo.signingInfo.apkContentsSigners.firstOrNull()?.toByteArray()
+            }.getOrNull()
+            if (signingCert == null) {
+                if (BuildConfig.DEBUG) Log.d(TAG, "resolve: no signing certificate for package=${callingAppInfo.packageName} -> null")
+                return@withContext null
+            }
             val rpIds = domains.map { it.lowercase() }
-            Resolved(rpId = rpIds.first(), source = Source.NATIVE_APP, webOrigin = null, allRpIds = rpIds)
+            Resolved(
+                rpId = rpIds.first(),
+                source = Source.NATIVE_APP,
+                clientDataOrigin = ClientDataJsonBuilder.apkKeyHashOrigin(signingCert),
+                allRpIds = rpIds
+            )
         }
 }
 

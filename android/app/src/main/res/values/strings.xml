@@ -418,6 +418,10 @@
     <string name="autofill_manual_search_label">kura内でアイテムを探す…</string>
     <string name="autofill_picker_title">アイテムを選択</string>
     <string name="autofill_picker_no_value">選択したアイテムにはユーザー名もパスワードもありません</string>
+    <string name="autofill_picker_target_web">入力先のサイト: %1$s</string>
+    <string name="autofill_picker_target_app">入力先のアプリ: %1$s</string>
+    <string name="autofill_picker_target_unknown">入力先: 不明</string>
+    <string name="autofill_picker_target_app_warning">kuraはこのアプリが本物かどうかを確認できません。入力先が正しいことを確かめてから選択してください。</string>
     <string name="settings_autofill_log">オートフィル動作ログ</string>
     <string name="settings_autofill_log_description">オートフィル候補が出た/出なかった理由を確認できます</string>
     <string name="autofill_log_title">オートフィル動作ログ</string>

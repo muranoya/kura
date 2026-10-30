@@ -26,11 +26,17 @@ import net.meshpeak.kura.viewmodel.AppViewModel
  * 手動検索フォールバック（[AutofillPickerActivity]）用の読み取り専用エントリピッカー。
  * `EntryListScreen`のUIパターン（検索バー+フィルタチップ+`LazyColumn`+`EntryCard`）を踏襲するが、
  * 削除・お気に入り・並び替え・新規作成は不要なため専用に組む。
+ *
+ * 手動検索はpackage_domains.json未登録のアプリにも出るため、ユーザーが入力先を確かめられるよう
+ * [target]（署名検証済みブラウザのwebDomain、またはリクエスト元のパッケージ名）を表示する。
+ * ネイティブアプリはパッケージ名を名乗れるだけで本物かどうか確認できないため、警告を添える。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AutofillPickerScreen(
     appViewModel: AppViewModel,
+    target: String?,
+    isBrowserRequest: Boolean,
     errorMessage: String?,
     onSelect: (String) -> Unit,
     onCancel: () -> Unit
@@ -77,6 +83,8 @@ fun AutofillPickerScreen(
                 }
             ) { padding ->
                 Column(modifier = Modifier.padding(padding)) {
+                    AutofillTargetBanner(target = target, isBrowserRequest = isBrowserRequest)
+
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
@@ -137,6 +145,39 @@ fun AutofillPickerScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AutofillTargetBanner(target: String?, isBrowserRequest: Boolean) {
+    // 署名検証済みブラウザ以外（ネイティブアプリ・入力先不明）は警告色にする
+    val verified = isBrowserRequest && target != null
+    val containerColor = if (verified) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.errorContainer
+    val contentColor = if (verified) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onErrorContainer
+    Surface(
+        color = containerColor,
+        contentColor = contentColor,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = when {
+                    target == null -> stringResource(R.string.autofill_picker_target_unknown)
+                    isBrowserRequest -> stringResource(R.string.autofill_picker_target_web, target)
+                    else -> stringResource(R.string.autofill_picker_target_app, target)
+                },
+                style = MaterialTheme.typography.titleSmall
+            )
+            if (!verified) {
+                Text(
+                    text = stringResource(R.string.autofill_picker_target_app_warning),
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }

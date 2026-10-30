@@ -28,7 +28,7 @@ class ClientDataJsonBuilderTest {
 
     @Test
     fun `buildForGetはtype challenge originを含むJSONを組み立てる`() {
-        val json = ClientDataJsonBuilder.buildForGet("Y2hhbGxlbmdl", "example.com")
+        val json = ClientDataJsonBuilder.buildForGet("Y2hhbGxlbmdl", "https://example.com")
         val obj = Json.parseToJsonElement(json).jsonObject
 
         assertEquals("webauthn.get", obj["type"]?.jsonPrimitive?.content)
@@ -38,11 +38,20 @@ class ClientDataJsonBuilderTest {
 
     @Test
     fun `buildForCreateはtypeがwebauthn_createになる`() {
-        val json = ClientDataJsonBuilder.buildForCreate("Y2hhbGxlbmdl", "example.com")
+        val json = ClientDataJsonBuilder.buildForCreate("Y2hhbGxlbmdl", "android:apk-key-hash:abc")
         val obj = Json.parseToJsonElement(json).jsonObject
 
         assertEquals("webauthn.create", obj["type"]?.jsonPrimitive?.content)
-        assertEquals("https://example.com", obj["origin"]?.jsonPrimitive?.content)
+        assertEquals("android:apk-key-hash:abc", obj["origin"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `apkKeyHashOriginは署名証明書のSHA-256をbase64url(パディングなし)で表す`() {
+        // SHA-256("") = e3b0c442...b855
+        assertEquals(
+            "android:apk-key-hash:47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+            ClientDataJsonBuilder.apkKeyHashOrigin(ByteArray(0))
+        )
     }
 
     @Test
