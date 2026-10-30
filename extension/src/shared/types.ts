@@ -67,10 +67,11 @@ export interface EntryRow {
   createdAt: number
   updatedAt: number
   deletedAt: number | null
+  labelNames: string[]
 }
 
 // Entry with full details
-export interface Entry extends EntryRow {
+export interface Entry extends Omit<EntryRow, 'labelNames'> {
   createdAt: number
   notes: string | null
   typedValue: Record<string, unknown>

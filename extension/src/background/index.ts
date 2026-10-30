@@ -315,6 +315,7 @@ function normalizeEntry(raw: Record<string, unknown>): Record<string, unknown> {
     notes: raw.notes ?? null,
     typedValue: raw.typed_value ?? {},
     labels: raw.labels ?? raw.label_ids ?? [],
+    labelNames: raw.label_names ?? [],
     secretFieldKeys: raw.secret_field_keys ?? [],
     customFields: ((raw.custom_fields as Record<string, unknown>[] | undefined) ?? []).map(
       (f: Record<string, unknown>) => {

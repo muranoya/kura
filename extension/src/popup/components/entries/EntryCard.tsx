@@ -12,6 +12,7 @@ import {
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import type { EntryRow } from '../../../shared/types'
+import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 
 const getEntryIcon = (type: string) => {
@@ -82,6 +83,19 @@ export default function EntryCard(props: EntryCardProps) {
               </h3>
               {props.entry.subtitle && (
                 <p className="text-xs text-text-muted truncate mt-0.5">{props.entry.subtitle}</p>
+              )}
+              {props.entry.labelNames.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {props.entry.labelNames.map((name) => (
+                    <Badge
+                      key={name}
+                      variant={isSelected ? 'primary' : 'secondary'}
+                      className="max-w-full px-1.5 py-0 text-[10px] font-medium"
+                    >
+                      <span className="truncate">{name}</span>
+                    </Badge>
+                  ))}
+                </div>
               )}
             </div>
           </div>
