@@ -8,11 +8,6 @@ import StorageSetup from '../popup/screens/onboarding/StorageSetup'
 import UnlockExistingVault from '../popup/screens/onboarding/UnlockExistingVault'
 import Welcome from '../popup/screens/onboarding/Welcome'
 
-// Mock useTerms hook (imports .md?raw which doesn't work in jsdom)
-vi.mock('../popup/hooks/useTerms', () => ({
-  useTerms: () => '# 利用規約\nテスト用の利用規約です。',
-}))
-
 // Helper: configure chrome.runtime.sendMessage responses by message type
 function mockChromeMessages(handlers: Record<string, (msg: Record<string, unknown>) => unknown>) {
   vi.mocked(chrome.runtime.sendMessage).mockImplementation(
@@ -78,14 +73,17 @@ describe('Welcome', () => {
     expect(screen.getByRole('button', { name: '始める' })).toBeInTheDocument()
   })
 
-  it('should navigate to storage setup when terms agreed and start clicked', async () => {
+  it('should display no-warranty disclaimer without requiring agreement', () => {
+    renderOnboarding('/')
+    expect(screen.getByText(/いかなる保証もありません/)).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '始める' })).toBeEnabled()
+  })
+
+  it('should navigate to storage setup when start clicked', async () => {
     const user = userEvent.setup()
     renderOnboarding('/')
 
-    // Start button should be disabled before agreeing to terms
-    expect(screen.getByRole('button', { name: '始める' })).toBeDisabled()
-
-    await user.click(screen.getByRole('checkbox'))
     await user.click(screen.getByRole('button', { name: '始める' }))
 
     await waitFor(() => {
@@ -415,8 +413,7 @@ describe('Full onboarding flow - new vault', () => {
     const user = userEvent.setup()
     renderOnboarding('/')
 
-    // Step 1: Welcome -> agree to terms -> start
-    await user.click(screen.getByRole('checkbox'))
+    // Step 1: Welcome -> start
     await user.click(screen.getByRole('button', { name: '始める' }))
     await waitFor(() => {
       expect(screen.getByText('ストレージ設定')).toBeInTheDocument()
@@ -461,8 +458,7 @@ describe('Full onboarding flow - existing vault', () => {
     const user = userEvent.setup()
     renderOnboarding('/')
 
-    // Step 1: Welcome -> agree to terms -> start
-    await user.click(screen.getByRole('checkbox'))
+    // Step 1: Welcome -> start
     await user.click(screen.getByRole('button', { name: '始める' }))
     await waitFor(() => {
       expect(screen.getByText('ストレージ設定')).toBeInTheDocument()
