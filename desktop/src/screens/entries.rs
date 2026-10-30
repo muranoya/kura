@@ -209,6 +209,12 @@ fn row_item(row: &EntryRow) -> EntryRowItem {
             .map(|ts| ctx::format_timestamp(ts, true))
             .unwrap_or_else(|| "-".into())
             .into(),
+        label_names: ModelRc::new(VecModel::from(
+            row.label_names
+                .iter()
+                .map(|name| SharedString::from(name.as_str()))
+                .collect::<Vec<_>>(),
+        )),
     }
 }
 
@@ -221,6 +227,8 @@ fn entries_changed(prev: &[EntryRow], next: &[EntryRow]) -> bool {
                 || a.is_favorite != b.is_favorite
                 || a.deleted_at != b.deleted_at
                 || a.name != b.name
+                // ラベルの改名・削除ではエントリの updated_at が変わらない
+                || a.label_names != b.label_names
         })
 }
 
@@ -737,6 +745,10 @@ mod tests {
         assert!(!entries_changed(&a, &a.clone()));
         assert!(entries_changed(&a, &[row("a", 1)]));
         assert!(entries_changed(&a, &[row("a", 2), row("b", 1)]));
+
+        let mut renamed = a.clone();
+        renamed[0].label_names = vec!["Work".into()];
+        assert!(entries_changed(&a, &renamed));
     }
 
     #[test]
