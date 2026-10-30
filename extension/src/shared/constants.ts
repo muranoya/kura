@@ -23,6 +23,9 @@ export const DEFAULT_SETTINGS = {
 export const STORAGE_KEYS = {
   VAULT_BYTES: 'vaultBytes',
   VAULT_ETAG: 'vaultETag',
+  // 初期設定でダウンロードした、まだアンロックしていない既存 Vault（{ bytes, etag }）。
+  // VAULT_BYTES があると App は初期設定の完了とみなすため、アンロック成功まで分けて置く
+  PENDING_VAULT: 'pendingVault',
   S3_CONFIG: 's3Config',
   APP_SETTINGS: 'appSettings',
   // 旧バージョンが平文のS3認証情報を保存していたキー。削除のためだけに残している
