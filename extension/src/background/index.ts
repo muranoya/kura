@@ -217,6 +217,11 @@ function setupMessageHandlers() {
 setupMessageHandlers()
 initSidebar()
 
+// 旧バージョンのオンボーディングが平文で残したS3認証情報を、更新時に消す
+chrome.runtime.onInstalled.addListener(() => {
+  removeFromStorage(STORAGE_KEYS.LEGACY_ONBOARDING_DRAFT)
+})
+
 // オートロックは「拡張機能UIでの最後の操作」からの経過時間で判定する。
 // サイドバーは開いたままになるため、接続の有無ではなく操作（USER_ACTIVITY）で
 // タイマーを延長する。
