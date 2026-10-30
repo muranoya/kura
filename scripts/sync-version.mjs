@@ -35,11 +35,12 @@ for (const rel of tomlTargets) {
 // Cargo.lock には workspace メンバー自身のバージョンも記録されるため、
 // Cargo.toml だけ書き換えると `--locked` 付きのコマンド（cargo about 等）が失敗する。
 // `cargo update --offline` は crates.io index のキャッシュがない CI で失敗するので直接書き換える。
-// workspace メンバーのエントリには `source` 行がないことで外部クレートと区別する
+// workspace メンバーのエントリには `source` 行がないことで外部クレートと区別する。
+// Windows の CI では autocrlf で CRLF になるため改行は \r?\n で受ける
 const lockPath = resolve(root, 'Cargo.lock')
 let lock = readFileSync(lockPath, 'utf-8')
 for (const name of crateNames) {
-  const pattern = new RegExp(`^(name = "${name}"\\nversion = )"[^"]*"(?!\\nsource)`, 'm')
+  const pattern = new RegExp(`^(name = "${name}"\\r?\\nversion = )"[^"]*"(?!\\r?\\nsource)`, 'm')
   if (!pattern.test(lock)) throw new Error(`[sync-version] ${name} not found in Cargo.lock`)
   lock = lock.replace(pattern, `$1"${version}"`)
 }
