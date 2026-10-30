@@ -1,7 +1,7 @@
 import { Theme } from "theme.slint";
 import { AppButton, Dialog, DialogFooter } from "widgets.slint";
 import { About, Confirm, LargeText, Nav, Onboarding, Page, EntryForm, Settings } from "state.slint";
-import { MasterPasswordScreen, RecoveryKeyScreen, StorageSetupScreen, TermsDialog, UnlockExistingScreen, WelcomeScreen } from "screens/onboarding.slint";
+import { MasterPasswordScreen, RecoveryKeyScreen, StorageSetupScreen, UnlockExistingScreen, WelcomeScreen } from "screens/onboarding.slint";
 import { LockScreen, RecoveryScreen } from "screens/auth.slint";
 import { ErrorBar, Sidebar } from "screens/layout.slint";
 import { EntryListScreen, TrashScreen } from "screens/entries.slint";
@@ -144,7 +144,6 @@ export component AppWindow inherits Window {
     // モーダル（ウィンドウ全体を覆う）
     if Nav.page == Page.settings && Settings.dialog != "": SettingsDialogs { }
     if Nav.page == Page.about && About.dialog-open: LicenseDialog { }
-    if Onboarding.terms-open: TermsDialog { }
     if Nav.page == Page.entry-create && EntryForm.type-dialog-open: TypeSelectDialog { }
     if LargeText.open: LargeTextDialog { }
     if Confirm.open: ConfirmDialog { }
