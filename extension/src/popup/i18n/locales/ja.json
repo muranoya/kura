@@ -78,9 +78,7 @@
       "title": "リカバリーキー",
       "cardTitle": "あなたのリカバリーキー",
       "copyKey": "リカバリーキーをコピー",
-      "completing": "確認中...",
-      "completeButton": "完了",
-      "errorPrefix": "エラー"
+      "completeButton": "完了"
     },
     "unlockExisting": {
       "title": "既存のVaultを使用",

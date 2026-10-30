@@ -1,14 +1,17 @@
 import { Check, X } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import type { S3Config } from '../../../shared/types'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Label } from '../../components/ui/label'
 import { PasswordInput } from '../../components/ui/password-input'
-import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
+import {
+  isOnboardingDraftComplete,
+  useOnboardingDraft,
+} from '../../contexts/OnboardingDraftContext'
 
 export default function MasterPassword() {
   const { t } = useTranslation()
@@ -70,6 +73,11 @@ export default function MasterPassword() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // サイドバーをリロードするとメモリ上のS3設定が消えるため、入力し直してもらう
+  if (!isOnboardingDraftComplete(draft)) {
+    return <Navigate to="/onb/storage" replace state={{ fromOnboarding: true }} />
   }
 
   const passwordsMatch = confirmPassword && password === confirmPassword
