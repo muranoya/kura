@@ -128,6 +128,8 @@ pub struct EntrySummary {
     /// カスタムフィールド（field_type == "url"）から抽出したURLのリスト。
     /// オートフィル候補抽出時にlogin_urlとともにマッチ対象となる。
     pub additional_urls: Vec<String>,
+    /// 設定されているラベルの名前（一覧表示用）。名前順で、削除済みのラベルと重複する名前は含まない
+    pub label_names: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default)]

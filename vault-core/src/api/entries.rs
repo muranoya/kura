@@ -83,6 +83,7 @@ impl VaultManager {
                     created_at: entry.created_at,
                     updated_at: entry.updated_at,
                     deleted_at: entry.deleted_at,
+                    label_names: entry.label_names,
                 })
                 .collect())
         })

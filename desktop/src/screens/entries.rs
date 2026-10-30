@@ -727,6 +727,7 @@ mod tests {
             created_at: 0,
             updated_at,
             deleted_at: None,
+            label_names: Vec::new(),
         }
     }
 
