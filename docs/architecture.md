@@ -54,6 +54,8 @@ Android向けJNIの活用先の一つであるAutofillService（システム標�
 - **状態変化の反映**: Service Worker 側で起きた変化は `chrome.runtime.sendMessage` で拡張機能ページにブロードキャストする（`ExtensionPageBroadcast`）。オートロックや儀式ウィンドウでのアンロックは `VAULT_LOCK_STATE_CHANGED` として送り、サイドバーはロック画面と一覧を切り替える。ピッカー・TOTP QR スキャン・既存エントリへの Passkey 登録の結果は `ENTRY_UPDATED_IN_BACKGROUND` として送り、開いている編集画面に反映する（SW が書き換えた属性だけを差し替え、編集中の他の内容は保持する）
 - **Service Worker 再起動時のセッション復元**: Service Worker はアイドルで停止し、メモリ上のアンロック状態を失う。アンロック中は DEK（base64）を `chrome.storage.session`（メモリのみ・content script からは読めない）に置き、再起動後はそれで Argon2 を通さずにアンロックし直す（`api_unlock_with_dek`）。マスターパスワード自体は他サービスとの使い回しまで漏れうるため保存しない。DEK ローテーション時は差し替え、ロック時に削除する
 - **クリップボードの自動消去**: パスワード等をコピーすると `clipboard-clear` アラームを設定し、設定時間後に「クリップボードがまだ kura のコピーした値のままなら」消去する。照合用の値は Service Worker のアイドル停止で消えないよう `chrome.storage.session` に置き、平文ではなく SHA-256 だけを置く。Chrome は Service Worker からクリップボードを扱えないため offscreen document を作って処理し、終わったら閉じる（1つしか作れないため）。offscreen document はフォーカスを持たず非同期 Clipboard API が使えないので、`document.execCommand('paste' / 'copy')` で読み書きする
+- **初期設定中の入力値**: ストレージ設定（S3 認証情報を含む）は React の Context だけで保持し、`chrome.storage` には保存しない。サイドバーは開いたままになるので、コピー&ペーストの間に入力値が消える心配がないため。サイドバーを閉じるかリロードすると入力し直しになる。暗号化された S3 設定として保存するのは、マスターパスワードが確定した時点（Vault 作成・既存 Vault のアンロック）
+- **初期設定中の既存 Vault**: ダウンロードした Vault は `pendingVault` に置き、アンロックに成功してから `vaultBytes` に移す。サイドバーは `vaultBytes` があると初期設定の完了とみなしてロック画面を出すので、途中で閉じたりリロードしたりしても S3 設定のない Vault が残らないようにするため
 - **現在のタブへの追従**: 「このサイト」のエントリは、タブの切り替えや遷移（`tabs.onActivated` / `tabs.onUpdated`）に応じて再計算する
 - **幅への対応**: サイドバーの幅は可変なので、35rem 以上では一覧と詳細を左右に並べ、それより狭ければ1カラム表示にする。1カラム表示ではエントリを選択すると一覧の下に詳細を表示し、閉じるボタンで一覧のみの表示に戻す
 

@@ -217,6 +217,11 @@ function setupMessageHandlers() {
 setupMessageHandlers()
 initSidebar()
 
+// 旧バージョンのオンボーディングが平文で残したS3認証情報を、更新時に消す
+chrome.runtime.onInstalled.addListener(() => {
+  removeFromStorage(STORAGE_KEYS.LEGACY_ONBOARDING_DRAFT)
+})
+
 // オートロックは「拡張機能UIでの最後の操作」からの経過時間で判定する。
 // サイドバーは開いたままになるため、接続の有無ではなく操作（USER_ACTIVITY）で
 // タイマーを延長する。
@@ -757,13 +762,14 @@ async function handleMessage(
           break
         }
         try {
-          const vaultBytes = await getFromStorage<number[]>(STORAGE_KEYS.VAULT_BYTES)
-          const etag = await getFromStorage<string>(STORAGE_KEYS.VAULT_ETAG)
-          if (!vaultBytes) {
+          const pending = await getFromStorage<{ bytes: number[]; etag: string }>(
+            STORAGE_KEYS.PENDING_VAULT,
+          )
+          if (!pending) {
             sendResponse({ success: false, error: 'Vault not found' })
             break
           }
-          vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
+          vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(pending.bytes), pending.etag)
           vault.api_unlock(DEFAULT_VAULT_ID, message.password)
           // オンボーディング時のS3設定暗号化保存
           if (message.s3Config) {
@@ -779,6 +785,12 @@ async function handleMessage(
             // 通常のアンロック: 暗号化S3設定を復号
             await loadS3Config(message.password)
           }
+          // S3設定を保存した後に VAULT_BYTES を書き、設定のない Vault を残さない
+          await saveItemsToStorage({
+            [STORAGE_KEYS.VAULT_BYTES]: pending.bytes,
+            [STORAGE_KEYS.VAULT_ETAG]: pending.etag,
+          })
+          await removeFromStorage(STORAGE_KEYS.PENDING_VAULT)
           unlocked = true
           updateExtensionIcon(true)
           await saveSessionDek()
@@ -1305,8 +1317,13 @@ async function handleMessage(
             if (remote) {
               vault.api_load_vault(DEFAULT_VAULT_ID, remote.bytes, remote.etag)
               const vaultBytes = vault.api_get_vault_bytes(DEFAULT_VAULT_ID)
-              await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
-              await saveToStorage(STORAGE_KEYS.VAULT_ETAG, remote.etag)
+              await saveToStorage(STORAGE_KEYS.PENDING_VAULT, {
+                bytes: Array.from(vaultBytes),
+                etag: remote.etag,
+              })
+            } else {
+              // 入力し直す前のバケットの Vault を残さない
+              await removeFromStorage(STORAGE_KEYS.PENDING_VAULT)
             }
             sendResponse({ success: true, vaultExists: !!remote })
           } finally {

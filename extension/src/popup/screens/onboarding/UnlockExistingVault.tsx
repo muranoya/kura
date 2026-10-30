@@ -1,7 +1,7 @@
 import { Lock } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { STORAGE_KEYS } from '../../../shared/constants'
 import { removeFromStorage } from '../../../shared/storage'
 import type { S3Config } from '../../../shared/types'
@@ -10,7 +10,10 @@ import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
 import { Label } from '../../components/ui/label'
 import { PasswordInput } from '../../components/ui/password-input'
-import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
+import {
+  isOnboardingDraftComplete,
+  useOnboardingDraft,
+} from '../../contexts/OnboardingDraftContext'
 
 export default function UnlockExistingVault() {
   const { t } = useTranslation()
@@ -21,7 +24,7 @@ export default function UnlockExistingVault() {
   const [error, setError] = useState('')
 
   const handleBack = async () => {
-    await removeFromStorage(STORAGE_KEYS.VAULT_BYTES)
+    await removeFromStorage(STORAGE_KEYS.PENDING_VAULT)
     navigate('/onb/storage')
   }
 
@@ -60,13 +63,17 @@ export default function UnlockExistingVault() {
         throw new Error(response?.error || t('onboarding.unlockExisting.unlockFailed'))
       }
 
-      await removeFromStorage(STORAGE_KEYS.ONBOARDING_DRAFT)
       setPassword('')
       navigate('/entries')
     } catch (err) {
       setError(String(err) || t('onboarding.unlockExisting.invalidPassword'))
       setLoading(false)
     }
+  }
+
+  // サイドバーをリロードするとメモリ上のS3設定が消えるため、入力し直してもらう
+  if (!isOnboardingDraftComplete(draft)) {
+    return <Navigate to="/onb/storage" replace state={{ fromOnboarding: true }} />
   }
 
   return (
