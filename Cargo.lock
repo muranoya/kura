@@ -3893,7 +3893,7 @@ dependencies = [
 
 [[package]]
 name = "kura-desktop"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "arboard",
  "async-trait",
@@ -7024,7 +7024,7 @@ dependencies = [
 
 [[package]]
 name = "vault_core"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -7053,7 +7053,7 @@ dependencies = [
 
 [[package]]
 name = "vault_jni"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "jni 0.21.1",
  "serde_json",
@@ -7202,7 +7202,7 @@ dependencies = [
 
 [[package]]
 name = "wasm-bridge"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "console_error_panic_hook",
  "serde_json",
