@@ -14,13 +14,13 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
-class TotpQrImageDecoderTest {
+class QrImageDecoderTest {
 
     @Test
     fun decodeWithZxing_readsOtpauthUriFromGeneratedQr() {
         val payload = "otpauth://totp/Example:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Example"
         val bitmap = renderQr(payload, size = 320)
-        val decoded = TotpQrImageDecoder.decodeWithZxing(bitmap)
+        val decoded = QrImageDecoder.decodeWithZxing(bitmap)
         assertNotNull(decoded)
         assertEquals(payload, decoded)
     }
@@ -29,7 +29,7 @@ class TotpQrImageDecoderTest {
     fun decodeWithZxing_readsBase32Secret() {
         val payload = "JBSWY3DPEHPK3PXP"
         val bitmap = renderQr(payload, size = 256)
-        val decoded = TotpQrImageDecoder.decodeWithZxing(bitmap)
+        val decoded = QrImageDecoder.decodeWithZxing(bitmap)
         assertNotNull(decoded)
         assertEquals(payload, decoded)
     }
@@ -39,7 +39,7 @@ class TotpQrImageDecoderTest {
         val payload = "otpauth://totp/Demo:a@b.c?secret=MFRGGZDFMZTWQ2LK&issuer=Demo"
         val normal = renderQr(payload, size = 280)
         val inverted = invert(normal)
-        val decoded = TotpQrImageDecoder.decodeWithZxing(inverted)
+        val decoded = QrImageDecoder.decodeWithZxing(inverted)
         assertNotNull(decoded)
         assertEquals(payload, decoded)
     }
