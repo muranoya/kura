@@ -133,6 +133,17 @@ class OnboardingFlowTest {
         composeTestRule.onNodeWithText("ストレージへのアクセスに失敗しました", substring = true).assertExists()
     }
 
+    @Test
+    fun `transfer import offers QR scan and opens scanner`() {
+        navigateToStorageSetup()
+
+        composeTestRule.onNodeWithText("別の端末から設定を転送").performClick()
+        composeTestRule.onNodeWithTag("transfer_scan_qr_button").assertIsDisplayed().performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText("転送コードをスキャン").assertExists()
+    }
+
     // ========================================================================
     // StorageSetup画面 - 分岐
     // ========================================================================

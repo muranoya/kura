@@ -80,11 +80,15 @@
     <string name="storage_required_all">すべての必須フィールドを入力してください</string>
     <string name="storage_access_failed">ストレージへのアクセスに失敗しました: %1$s</string>
     <string name="storage_transfer_import_title">別の端末から設定を転送</string>
-    <string name="storage_transfer_import_description">設定済みの端末で生成した転送コードと転送パスワードを入力してください。</string>
+    <string name="storage_transfer_import_description">設定済みの端末に表示された転送コードのQRコードをスキャンするか転送コードを貼り付け、転送パスワードを入力してください。</string>
     <string name="storage_transfer_code_placeholder">kura-config-v1$…</string>
     <string name="storage_transfer_password_placeholder">転送コード生成時に設定したパスワード</string>
     <string name="storage_transfer_load">設定を読み込む</string>
     <string name="storage_transfer_import_button">別の端末から設定を転送</string>
+    <string name="storage_transfer_scan_qr">QRコードをスキャン</string>
+    <string name="storage_transfer_scan_title">転送コードをスキャン</string>
+    <string name="storage_transfer_camera_rationale">転送コードのQRコードを読み取るにはカメラへのアクセスを許可してください</string>
+    <string name="storage_transfer_qr_invalid">kura の転送コードではありません</string>
     <string name="storage_transfer_decrypt_failed">転送コードの復号に失敗しました: %1$s</string>
 
     <!-- Master password screen -->
@@ -244,13 +248,13 @@
     <string name="totp_qr_scan_title">TOTP QRをスキャン</string>
     <string name="totp_qr_source_title">TOTP QRを読み取る</string>
     <string name="totp_qr_use_camera">カメラでスキャン</string>
-    <string name="totp_qr_from_gallery">画像を選択</string>
-    <string name="totp_qr_processing">QRコードを読み取り中…</string>
+    <string name="qr_from_gallery">画像を選択</string>
+    <string name="qr_processing">QRコードを読み取り中…</string>
     <string name="totp_qr_camera_rationale">TOTPのQRコードを読み取るにはカメラへのアクセスを許可してください</string>
-    <string name="totp_qr_camera_denied">カメラ権限が拒否されました。画像から読み取ることもできます。</string>
-    <string name="totp_qr_request_camera">カメラを許可</string>
-    <string name="totp_qr_error_no_qr">画像からQRコードを検出できませんでした</string>
-    <string name="totp_qr_error_empty">QRコードが空でした</string>
+    <string name="qr_camera_denied">カメラ権限が拒否されました。画像から読み取ることもできます。</string>
+    <string name="qr_request_camera">カメラを許可</string>
+    <string name="qr_error_no_qr">画像からQRコードを検出できませんでした</string>
+    <string name="qr_error_empty">QRコードが空でした</string>
     <string name="totp_qr_error_invalid">TOTPシークレットまたは otpauth URI ではありません</string>
     <string name="cd_scan_totp_qr">TOTP QRコードをスキャン</string>
 

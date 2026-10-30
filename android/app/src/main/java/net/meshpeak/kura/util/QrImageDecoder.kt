@@ -20,7 +20,7 @@ import com.google.zxing.common.HybridBinarizer
  * PNG / JPEG / WebP など ContentResolver が読める静止画を対象とする。
  * （カメラのライブスキャンは ML Kit のまま）
  */
-object TotpQrImageDecoder {
+object QrImageDecoder {
     private const val MAX_EDGE = 2048
 
     fun decode(context: Context, uri: Uri): String? {

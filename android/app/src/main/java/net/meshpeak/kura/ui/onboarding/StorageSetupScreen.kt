@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -20,7 +21,9 @@ import androidx.compose.ui.unit.dp
 import net.meshpeak.kura.BuildConfig
 import net.meshpeak.kura.R
 import net.meshpeak.kura.viewmodel.AppViewModel
+import net.meshpeak.kura.ui.components.QrScanDialog
 import net.meshpeak.kura.ui.components.SecretKeyboardOptions
+import net.meshpeak.kura.util.TransferCode
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 
@@ -44,9 +47,27 @@ fun StorageSetupScreen(
     var showTransfer by remember { mutableStateOf(false) }
     var transferString by remember { mutableStateOf("") }
     var transferPassword by remember { mutableStateOf("") }
+    var showTransferQrScan by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val context = LocalContext.current
+
+    if (showTransferQrScan) {
+        QrScanDialog(
+            title = stringResource(R.string.storage_transfer_scan_title),
+            cameraRationale = stringResource(R.string.storage_transfer_camera_rationale),
+            validate = { value ->
+                if (TransferCode.isTransferCode(value)) null else R.string.storage_transfer_qr_invalid
+            },
+            onResult = { value ->
+                transferString = value
+                error = ""
+                showTransferQrScan = false
+            },
+            onDismiss = { showTransferQrScan = false }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -101,6 +122,15 @@ fun StorageSetupScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        OutlinedButton(
+                            onClick = { showTransferQrScan = true },
+                            modifier = Modifier.fillMaxWidth().testTag("transfer_scan_qr_button"),
+                            enabled = !isLoading
+                        ) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.storage_transfer_scan_qr))
+                        }
                         OutlinedTextField(
                             value = transferString,
                             onValueChange = { transferString = it },

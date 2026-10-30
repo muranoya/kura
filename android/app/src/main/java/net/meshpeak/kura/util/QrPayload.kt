@@ -1,10 +1,10 @@
 package net.meshpeak.kura.util
 
 /**
- * Helpers for TOTP QR payloads (otpauth URI or Base32 secret).
- * Final acceptance still goes through vault-core generateTotpFromValue.
+ * Helpers for raw QR payloads (TOTP secret / otpauth URI, transfer code, ...).
+ * Content-specific validation is done by each caller.
  */
-object TotpQrPayload {
+object QrPayload {
     fun normalize(raw: String): String = raw.trim()
 
     fun isEmpty(raw: String): Boolean = normalize(raw).isEmpty()
