@@ -334,6 +334,11 @@ fun MainNavHost(appViewModel: AppViewModel) {
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
 
+                // 設定の誤タップでロックされないよう、ドロワーの最下部に離して配置する
+                Spacer(modifier = Modifier.weight(1f))
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Lock, contentDescription = null) },
                     label = { Text(stringResource(R.string.nav_lock_now)) },
@@ -344,6 +349,8 @@ fun MainNavHost(appViewModel: AppViewModel) {
                     },
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
+
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
     ) {
