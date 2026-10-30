@@ -1,6 +1,7 @@
 // Service Worker エントリーポイント
 // WASM の初期化とメッセージハンドラーのセットアップ
 
+import { hashClipboardText } from '../shared/clipboard-hash'
 import { DEFAULT_VAULT_ID, STORAGE_KEYS } from '../shared/constants'
 import { ConflictError, VaultS3Client } from '../shared/s3-client'
 import {
@@ -506,8 +507,6 @@ interface AppSettings {
   clipboardClearSeconds: number
   theme: string
 }
-
-let lastCopiedText: string | null = null
 
 async function loadSettings(): Promise<AppSettings> {
   const settings = await getFromStorage<AppSettings>(STORAGE_KEYS.APP_SETTINGS)
@@ -1429,7 +1428,15 @@ async function handleMessage(
       case 'CLIPBOARD_COPIED': {
         try {
           const settings = await loadSettings()
-          lastCopiedText = message.text ?? null
+          if (typeof message.text !== 'string') {
+            sendResponse({ success: false, error: 'text required' })
+            break
+          }
+          // SW がアイドル停止しても消去時に照合できるよう、ハッシュをセッションに置く
+          await saveToSessionStorage(
+            STORAGE_KEYS.CLIPBOARD_HASH,
+            await hashClipboardText(message.text),
+          )
           if (settings.clipboardClearSeconds > 0) {
             const minutes = settings.clipboardClearSeconds / 60
             chrome.alarms.create('clipboard-clear', { delayInMinutes: minutes })
@@ -1480,25 +1487,17 @@ async function handleAutolockAlarm() {
 }
 
 async function handleClipboardClearAlarm() {
-  const expectedText = lastCopiedText
-  lastCopiedText = null
+  const expectedHash = await getFromSessionStorage<string>(STORAGE_KEYS.CLIPBOARD_HASH)
+  await removeFromSessionStorage(STORAGE_KEYS.CLIPBOARD_HASH)
+  if (!expectedHash) return
   try {
     if (typeof chrome.offscreen !== 'undefined') {
-      // Chrome: offscreen document 経由でクリップボードを確認＆クリア
-      await chrome.offscreen.createDocument({
-        url: chrome.runtime.getURL('src/background/offscreen.html'),
-        reasons: ['CLIPBOARD' as chrome.offscreen.Reason],
-        justification: 'Check and clear clipboard after copy timeout',
-      })
-      chrome.runtime.sendMessage({
-        type: 'CHECK_AND_CLEAR_CLIPBOARD',
-        expectedText,
-      })
+      await clearClipboardViaOffscreen(expectedHash)
     } else {
       // Firefox: background page から直接クリップボードを確認＆クリア
       try {
         const current = await navigator.clipboard.readText()
-        if (current === expectedText) {
+        if ((await hashClipboardText(current)) === expectedHash) {
           await navigator.clipboard.writeText('')
         }
       } catch {
@@ -1508,6 +1507,33 @@ async function handleClipboardClearAlarm() {
     }
   } catch (err) {
     console.error('[SW] Clipboard clear failed:', err)
+  }
+}
+
+// Chrome: offscreen document 経由でクリップボードを確認＆クリア。
+// offscreen document は1つしか作れないため、使い終わったら必ず閉じる
+// （残っていると次回の createDocument が失敗し、以降は消去されなくなる）
+async function clearClipboardViaOffscreen(expectedHash: string) {
+  try {
+    await chrome.offscreen.createDocument({
+      url: chrome.runtime.getURL('src/background/offscreen.html'),
+      reasons: ['CLIPBOARD' as chrome.offscreen.Reason],
+      justification: 'Check and clear clipboard after copy timeout',
+    })
+  } catch (err) {
+    // 前回閉じ損ねた document が残っていれば、そのまま使う
+    console.warn('[SW] Offscreen document not created:', err)
+  }
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'CHECK_AND_CLEAR_CLIPBOARD',
+      expectedHash,
+    })
+    if (!response?.success) {
+      console.error('[SW] Clipboard clear failed in offscreen document:', response?.error)
+    }
+  } finally {
+    await chrome.offscreen.closeDocument().catch(() => {})
   }
 }
 

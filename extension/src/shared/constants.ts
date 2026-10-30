@@ -37,4 +37,6 @@ export const STORAGE_KEYS = {
   FAVORITES_FILTER: 'entryFavoritesFilter',
   // アンロック中の DEK（base64）。SW 再起動時のセッション復元用（マスターパスワードは保存しない）
   SESSION_DEK: 'sessionDek',
+  // 自動消去の対象としてコピーした値の SHA-256（平文は置かない）
+  CLIPBOARD_HASH: 'clipboardHash',
 }
