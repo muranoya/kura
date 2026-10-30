@@ -6,12 +6,14 @@ import {
   Lock,
   RotateCw,
   ScrollText,
+  Star,
   Terminal,
   Trash2,
 } from 'lucide-react'
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import type { EntryRow } from '../../../shared/types'
+import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 
 const getEntryIcon = (type: string) => {
@@ -86,6 +88,26 @@ export default function EntryCard(props: EntryCardProps) {
               )}
             </div>
           </div>
+          {props.entry.labelNames.length > 0 && (
+            <div className="flex justify-end gap-1 min-w-0 max-w-[40%] flex-shrink-0">
+              {props.entry.labelNames.map((name) => (
+                <Badge
+                  key={name}
+                  variant={isSelected ? 'primary' : 'secondary'}
+                  className="min-w-0 px-1.5 py-0 text-[10px] font-medium"
+                >
+                  <span className="truncate">{name}</span>
+                </Badge>
+              ))}
+            </div>
+          )}
+          {props.entry.isFavorite && (
+            <Star
+              size={14}
+              aria-label={t('entries.actions.favorite')}
+              className="flex-shrink-0 fill-[#D97706] text-[#D97706]"
+            />
+          )}
         </div>
       </button>
     )

@@ -29,6 +29,9 @@ pub struct EntryRow {
     pub created_at: i64,
     pub updated_at: i64,
     pub deleted_at: Option<i64>,
+    /// 設定されているラベルの名前（ID ではない）。一覧表示用に名前順で返す
+    #[serde(default)]
+    pub label_names: Vec<String>,
 }
 
 /// 詳細エントリデータ

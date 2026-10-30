@@ -14,7 +14,8 @@ data class EntryRow(
     @SerialName("is_favorite") val isFavorite: Boolean,
     @SerialName("created_at") val createdAt: Long = 0,
     @SerialName("updated_at") val updatedAt: Long,
-    @SerialName("deleted_at") val deletedAt: Long? = null
+    @SerialName("deleted_at") val deletedAt: Long? = null,
+    @SerialName("label_names") val labelNames: List<String> = emptyList()
 )
 
 @Serializable

@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use zeroize::Zeroizing;
 
 use crate::error::{Result, VaultError};
 use crate::models::{Entry, EntryData, EntryFilter, EntrySummary, SortField, SortOrder};
 use crate::secret::PublicString;
 use crate::store::layout::{combine_entry_data, split_custom_fields, split_typed_value};
-use crate::store::{EntrySecret, VaultEntry};
+use crate::store::{EntrySecret, LabelValue, VaultEntry};
 
 use super::secrets::new_secret_rev;
 use super::UnlockedVault;
@@ -23,7 +25,7 @@ impl UnlockedVault {
             .entries
             .iter()
             .filter(|(_, e)| filter.matches(e))
-            .map(|(id, e)| vault_entry_to_summary(id.clone(), e))
+            .map(|(id, e)| vault_entry_to_summary(id.clone(), e, &self.index.labels))
             .collect();
         sort_by_filter(&mut result, filter);
         result
@@ -377,7 +379,11 @@ fn public_text(e: &VaultEntry, key: &str) -> Option<String> {
 }
 
 /// VaultEntry（index 行）から一覧表示用の軽量サマリを作る。secret は復号しない。
-pub(crate) fn vault_entry_to_summary(id: String, e: &VaultEntry) -> EntrySummary {
+pub(crate) fn vault_entry_to_summary(
+    id: String,
+    e: &VaultEntry,
+    labels: &HashMap<String, LabelValue>,
+) -> EntrySummary {
     // エントリタイプごとの非秘匿な代表フィールド
     let subtitle = match e.entry_type.as_str() {
         "login" | "password" => public_text(e, "username"),
@@ -401,6 +407,16 @@ pub(crate) fn vault_entry_to_summary(id: String, e: &VaultEntry) -> EntrySummary
         .map(|s| s.to_string())
         .collect();
 
+    let mut label_names: Vec<String> = e
+        .label_ids
+        .iter()
+        .filter_map(|label_id| labels.get(label_id))
+        .filter(|label| label.deleted_at.is_none())
+        .map(|label| label.name.clone())
+        .collect();
+    label_names.sort();
+    label_names.dedup();
+
     EntrySummary {
         id,
         name: e.name.to_string(),
@@ -412,6 +428,7 @@ pub(crate) fn vault_entry_to_summary(id: String, e: &VaultEntry) -> EntrySummary
         subtitle,
         login_url,
         additional_urls,
+        label_names,
     }
 }
 
@@ -1297,6 +1314,32 @@ mod tests {
         let entries = vault.list_entry_summaries(&filter);
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].name, "WithLabel");
+    }
+
+    #[test]
+    fn test_list_entry_summaries_label_names() {
+        let mut vault = make_vault();
+        insert_entry(&mut vault, "e1", "Entry", 1000);
+        let mut add_label = |id: &str, name: &str, deleted_at: Option<i64>| {
+            vault.index.labels.insert(
+                id.into(),
+                LabelValue {
+                    name: name.into(),
+                    created_at: 0,
+                    deleted_at,
+                },
+            );
+        };
+        add_label("l1", "Work", None);
+        add_label("l2", "Bank", None);
+        add_label("l3", "Deleted", Some(1));
+        add_label("l4", "Work", None);
+        vault.index.entries.get_mut("e1").unwrap().label_ids = ["l1", "l2", "l3", "l4", "missing"]
+            .map(String::from)
+            .to_vec();
+
+        let entries = vault.list_entry_summaries(&EntryFilter::new());
+        assert_eq!(entries[0].label_names, ["Bank", "Work"]);
     }
 
     #[test]
