@@ -71,6 +71,25 @@ URL: https://www.example.co.jp/login
 
 用途: `app.example.com`と`admin.example.com`で異なるクレデンシャルを持つユーザー向け。
 
+### 1-3.3 HTTPページでの照合（ダウングレード対策）
+
+ホスト名だけで照合すると、`https://bank.example` 用に保存したパスワードが `http://bank.example` にも候補として出る。平文の HTTP は通信経路で改ざんできるため、改ざんされたページに充填させてパスワードを抜き取れてしまう。そのため、ページが HTTP の場合は**エントリのURLが明示的に `http://` のものだけ**を照合の対象にする。
+
+| ページ | エントリURL | マッチ |
+|--------|------------|--------|
+| `https://example.com` | `https://example.com` / `http://example.com` / `example.com` | Yes |
+| `http://example.com` | `http://example.com` | Yes |
+| `http://example.com` | `https://example.com` | No |
+| `http://example.com` | `example.com`（スキームなし） | No（HTTPS とみなす） |
+| `http://localhost:3000` | `localhost:3000` | Yes（ループバックは HTTP でも安全なページとして扱う） |
+
+- ルーターや NAS の管理画面など HTTP しかないサイトは、エントリのURLを `http://` で保存すれば使える
+- ループバック（`localhost` / `127.0.0.0/8` / `[::1]`）は通信がネットワークに出ず改ざんされないため、HTTPS と同じ扱いにする（ブラウザの potentially trustworthy と同じ範囲。`extension/src/shared/secure-origin.ts`）
+- ログインURLとURL型カスタムフィールドのそれぞれに適用する。例えばログインURLが `https://` でも、カスタムフィールドに `http://` のURLがあれば、そのURLで一致する HTTP ページには候補として出る
+- `http:` / `https:` 以外のスキームのページでは候補を出さない
+- 候補の表示だけでなく、充填要求（`AUTOFILL_FILL_REQUEST`）の検証も同じ照合を通るため、HTTP ページから HTTPS のエントリを要求しても拒否される
+- HTTP ページでは引き続きドロップダウンに警告バナーを表示する
+
 ## 1-4. オートフィルUI
 
 inputフィールドにフォーカスが当たり、かつ該当ドメインのクレデンシャルが存在する場合、フィールド直下にドロップダウンパネルを表示する。
@@ -322,7 +341,7 @@ SPA遷移後に新しいフォームが出現した場合も、ユーザーが�
 
 [Public Suffix List](https://publicsuffix.org/list/public_suffix_list.dat)（PSL）を使用する。リポジトリの`assets/public_suffix_list.dat`にPSLを配置しておき、`just update-assets`（`scripts/update-assets.mjs`）で手動更新する。最長一致で判定し、該当しない場合はデフォルト（最後のラベルがTLD）として処理する。
 
-**ログイン候補（vaultエントリ）のマッチングはvault-core（Rust）側で行う。** `vault-core/src/domain_match.rs`が同じ`assets/public_suffix_list.dat`を`include_str!`でビルド時に埋め込み、実行時に一度だけパースしてeTLD+1判定を行う。`api_list_login_candidates(vault_id, page_hostname, strict_subdomain)`がマッチ済みの候補のみを返すため、拡張機能側（`extension/src/background/autofill.ts`の`getCredentialsForUrl`）はこのAPIの呼び出し結果をそのまま使うだけでよい。Android版も同一のvault-core関数を経由するため、両プラットフォームでマッチング挙動が一致する（詳細は[`docs/android-autofillservice.md`](android-autofillservice.md) 2-3節を参照）。
+**ログイン候補（vaultエントリ）のマッチングはvault-core（Rust）側で行う。** `vault-core/src/domain_match.rs`が同じ`assets/public_suffix_list.dat`を`include_str!`でビルド時に埋め込み、実行時に一度だけパースしてeTLD+1判定を行う。`api_list_login_candidates(vault_id, page_hostname, strict_subdomain, insecure_page)`がマッチ済みの候補のみを返すため、拡張機能側（`extension/src/background/autofill.ts`の`getCredentialsForUrl`）はこのAPIの呼び出し結果をそのまま使うだけでよい。Android版も同一のvault-core関数を経由するため、両プラットフォームでマッチング挙動が一致する（詳細は[`docs/android-autofillservice.md`](android-autofillservice.md) 2-3節を参照）。
 
 **マッチ対象となるURLは エントリの `typed_value.url`（ログインURL）に加え、URL型カスタムフィールド（`field_type == "url"`）の値も含まれる。** これにより、1つのログインエントリに複数のサイトURLを紐付けることができる（例: メインURLとは別に、リカバリ用URLや関連サービスのURLをカスタムフィールドに登録すれば、それらのサイトでも同じエントリが候補に出る）。マッチング処理は`vault-core/src/api/entries.rs`の`api_list_login_candidates`で一元化されている。
 

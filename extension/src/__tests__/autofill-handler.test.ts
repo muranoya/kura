@@ -28,13 +28,15 @@ function createMockVaultApi(entries: MockEntry[]): VaultApi {
   return {
     // Domain matching is performed inside vault-core in production. This mock
     // stands in for the FFI boundary, so it replicates that matching here
-    // (eTLD+1 by default, exact hostname when strictSubdomain is set) to keep
-    // these tests exercising the same end-to-end behavior.
+    // (eTLD+1 by default, exact hostname when strictSubdomain is set, only
+    // explicit http:// URLs on insecure pages) to keep these tests exercising
+    // the same end-to-end behavior.
     api_list_login_candidates: vi.fn(
-      (_vaultId: string, pageHostname: string, strictSubdomain: boolean) => {
+      (_vaultId: string, pageHostname: string, strictSubdomain: boolean, insecurePage: boolean) => {
         const pageETld = extractETldPlus1(pageHostname)
         const loginEntries = entries
           .filter((e) => e.entry_type === 'login' && e.url)
+          .filter((e) => !insecurePage || /^http:\/\//i.test(e.url as string))
           .filter((e) => {
             const url = e.url as string
             let entryHostname: string
@@ -324,6 +326,106 @@ describe('handleAutofillMessage', () => {
       for (const credential of result.credentials) {
         expect(credential).not.toHaveProperty('password')
       }
+    })
+  })
+
+  // ========== Plain-HTTP pages (downgrade protection) ==========
+
+  describe('on plain-HTTP pages', () => {
+    const entries: MockEntry[] = [
+      {
+        id: 'https-entry',
+        name: 'HTTPS',
+        entry_type: 'login',
+        url: 'https://router.example',
+        typed_value: { username: 'u', password: 'https-pw' },
+      },
+      {
+        id: 'no-scheme-entry',
+        name: 'No scheme',
+        entry_type: 'login',
+        url: 'router.example',
+        typed_value: { username: 'u', password: 'no-scheme-pw' },
+      },
+      {
+        id: 'http-entry',
+        name: 'HTTP',
+        entry_type: 'login',
+        url: 'http://router.example/admin',
+        typed_value: { username: 'u', password: 'http-pw' },
+      },
+    ]
+
+    beforeEach(() => {
+      initAutofill(
+        createMockVaultApi(entries),
+        () => unlocked,
+        async () => {},
+        async () => {},
+      )
+    })
+
+    it('offers only entries saved with an explicit http:// URL', async () => {
+      const result = (await callHandler({
+        type: 'AUTOFILL_GET_CREDENTIALS',
+        url: 'http://router.example/login',
+      })) as { credentials: { entryId: string }[] }
+      expect(result.credentials.map((c) => c.entryId)).toEqual(['http-entry'])
+    })
+
+    it('still offers every matching entry on HTTPS pages', async () => {
+      const result = (await callHandler({
+        type: 'AUTOFILL_GET_CREDENTIALS',
+        url: 'https://router.example/login',
+      })) as { credentials: { entryId: string }[] }
+      expect(result.credentials.map((c) => c.entryId).sort()).toEqual([
+        'http-entry',
+        'https-entry',
+        'no-scheme-entry',
+      ])
+    })
+
+    it('refuses to fill an HTTPS (or scheme-less) entry into an HTTP page', async () => {
+      for (const entryId of ['https-entry', 'no-scheme-entry']) {
+        const result = await callHandler({
+          type: 'AUTOFILL_FILL_REQUEST',
+          url: 'http://router.example/login',
+          entryId,
+        })
+        expect(result).toEqual({ success: false, error: 'Entry not found' })
+      }
+    })
+
+    it('fills an http:// entry into an HTTP page', async () => {
+      const result = (await callHandler({
+        type: 'AUTOFILL_FILL_REQUEST',
+        url: 'http://router.example/login',
+        entryId: 'http-entry',
+      })) as { success: boolean; fillData: { password: string } }
+      expect(result.success).toBe(true)
+      expect(result.fillData.password).toBe('http-pw')
+    })
+
+    it('treats loopback HTTP pages as secure', async () => {
+      initAutofill(
+        createMockVaultApi([{ ...entries[1], id: 'localhost-entry', url: 'localhost:3000' }]),
+        () => unlocked,
+        async () => {},
+        async () => {},
+      )
+      const result = (await callHandler({
+        type: 'AUTOFILL_GET_CREDENTIALS',
+        url: 'http://localhost:3000/login',
+      })) as { credentials: { entryId: string }[] }
+      expect(result.credentials.map((c) => c.entryId)).toEqual(['localhost-entry'])
+    })
+
+    it('offers nothing on pages with other schemes', async () => {
+      const result = (await callHandler({
+        type: 'AUTOFILL_GET_CREDENTIALS',
+        url: 'ftp://router.example/',
+      })) as { credentials: unknown[] }
+      expect(result.credentials).toEqual([])
     })
   })
 

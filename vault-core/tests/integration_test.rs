@@ -633,6 +633,54 @@ mod vault_manager_api {
     }
 
     #[test]
+    fn test_login_candidates_on_insecure_page_require_http_url() {
+        let (m, _) = setup_unlocked_vault();
+        let create = |name: &str, url: &str, custom_fields: Option<&str>| {
+            m.api_create_entry(
+                "login".to_string(),
+                name.to_string(),
+                None,
+                format!(r#"{{"url":"{url}","username":"u","password":"p"}}"#),
+                vec![],
+                custom_fields.map(str::to_string),
+            )
+            .expect("Failed to create entry")
+        };
+        let https = create("https", "https://example.com/login", None);
+        let http = create("http", "http://example.com/login", None);
+        let no_scheme = create("no scheme", "example.com", None);
+        let http_custom = create(
+            "http custom field",
+            "https://example.com",
+            Some(
+                r#"[{"id":"cf1","name":"Admin","field_type":"url","value":"http://admin.example.com"}]"#,
+            ),
+        );
+
+        let ids = |insecure: bool| {
+            let mut ids: Vec<String> = m
+                .api_list_login_candidates("www.example.com", false, insecure)
+                .unwrap()
+                .into_iter()
+                .map(|c| c.id)
+                .collect();
+            ids.sort();
+            ids
+        };
+        let sorted = |mut v: Vec<String>| {
+            v.sort();
+            v
+        };
+
+        assert_eq!(
+            ids(false),
+            sorted(vec![https, http.clone(), no_scheme, http_custom.clone()])
+        );
+        // HTTP ページには、明示的に http:// で保存したURLで一致したエントリだけを出す
+        assert_eq!(ids(true), sorted(vec![http, http_custom]));
+    }
+
+    #[test]
     fn test_unlock_with_exported_dek() {
         let (m, _) = setup_unlocked_vault();
         let id = m

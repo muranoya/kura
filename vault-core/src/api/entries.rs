@@ -258,10 +258,14 @@ impl VaultManager {
     /// - `strict_subdomain = true`: ホスト名の完全一致のみをマッチとする。
     ///   どのサイトで厳密一致が必要かはvault-coreの関知するところではなく、
     ///   呼び出し側（拡張機能のサイト別パターンDB等）が判断してこの引数に渡す。
+    /// - `insecure_page = true`: ページが平文の HTTP。明示的に `http://` で保存した
+    ///   URLだけを照合する。HTTPS 用に保存したパスワードを、改ざんされうるページに
+    ///   出さないため（ダウングレード対策）。スキームのないURLは HTTPS とみなす。
     pub fn api_list_login_candidates(
         &self,
         page_hostname: &str,
         strict_subdomain: bool,
+        insecure_page: bool,
     ) -> Result<Vec<AutofillCandidate>, String> {
         self.with_unlocked(|unlocked| {
             let filter = EntryFilter::new().with_type("login".to_string());
@@ -273,9 +277,17 @@ impl VaultManager {
             Ok(entries
                 .into_iter()
                 .filter_map(|entry| {
+                    let allowed = |url: &str| !insecure_page || is_http_url(url);
+                    let login_url = entry.login_url.as_deref().filter(|u| allowed(u));
+                    let additional_urls: Vec<String> = entry
+                        .additional_urls
+                        .iter()
+                        .filter(|u| allowed(u))
+                        .cloned()
+                        .collect();
                     let url = match_autofill_url(
-                        entry.login_url.as_deref(),
-                        &entry.additional_urls,
+                        login_url,
+                        &additional_urls,
                         &page_hostname_lower,
                         strict_subdomain,
                     )?;
@@ -310,6 +322,13 @@ impl VaultManager {
                 .collect())
         })
     }
+}
+
+/// 明示的に `http://` スキームのURLか（大文字小文字は区別しない）
+fn is_http_url(url: &str) -> bool {
+    url.trim()
+        .get(..7)
+        .is_some_and(|scheme| scheme.eq_ignore_ascii_case("http://"))
 }
 
 /// オートフィル候補のURLマッチングを行う。
@@ -364,7 +383,17 @@ fn match_autofill_url(
 
 #[cfg(test)]
 mod tests {
-    use super::{match_autofill_url, parse_custom_fields};
+    use super::{is_http_url, match_autofill_url, parse_custom_fields};
+
+    #[test]
+    fn test_is_http_url() {
+        assert!(is_http_url("http://192.168.1.1/"));
+        assert!(is_http_url("  HTTP://router.local"));
+        assert!(!is_http_url("https://example.com"));
+        assert!(!is_http_url("example.com"));
+        assert!(!is_http_url("http:/broken"));
+        assert!(!is_http_url(""));
+    }
 
     #[test]
     fn test_parse_custom_fields_rejects_new_unknown_type() {

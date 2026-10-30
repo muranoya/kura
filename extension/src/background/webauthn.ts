@@ -45,7 +45,12 @@ export interface WebauthnVaultApi {
     clientDataJson: string,
     userVerified: boolean,
   ): string
-  api_list_login_candidates(vaultId: string, pageHostname: string, strictSubdomain: boolean): string
+  api_list_login_candidates(
+    vaultId: string,
+    pageHostname: string,
+    strictSubdomain: boolean,
+    insecurePage: boolean,
+  ): string
   /** Throws if the password is wrong */
   api_verify_password(vaultId: string, password: string): void
 }
@@ -484,7 +489,8 @@ async function computeCreateContext(
 
   let matchingEntries: { id: string; name: string; username: string | null }[] = []
   try {
-    const json = vaultApi.api_list_login_candidates(DEFAULT_VAULT_ID, req.hostname, false)
+    // 要求元は originFromSender で https か loopback に限っているので、安全なページとして扱う
+    const json = vaultApi.api_list_login_candidates(DEFAULT_VAULT_ID, req.hostname, false, false)
     const raw: RawLoginCandidate[] = JSON.parse(json)
     matchingEntries = raw.map((e) => ({ id: e.id, name: e.name, username: e.username }))
   } catch (err) {

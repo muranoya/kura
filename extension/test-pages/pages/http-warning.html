@@ -32,6 +32,13 @@
       <li>Dropdown top に <strong>HTTP warning banner</strong> が表示される</li>
       <li>Must be served over HTTP (not HTTPS) to trigger the warning</li>
       <li>Fill behavior is same as standard login</li>
+      <li><code>http://localhost</code> はループバックなので HTTPS と同じ扱い（スキームなし・<code>https://</code> のエントリも候補に出る）</li>
+      <li>ダウングレード対策の確認: LAN の IP アドレス（例: <code>http://192.168.x.x:PORT/pages/http-warning.html</code>）で開く。
+        <ul>
+          <li>URL が <code>https://192.168.x.x</code> やスキームなしの <code>192.168.x.x</code> のエントリは<strong>候補に出ない</strong></li>
+          <li>URL が <code>http://192.168.x.x</code> のエントリだけが候補に出て、充填できる</li>
+        </ul>
+      </li>
     </ul>
   </details>
 

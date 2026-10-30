@@ -246,9 +246,10 @@ pub fn api_list_login_candidates(
     vault_id: String,
     page_hostname: String,
     strict_subdomain: bool,
+    insecure_page: bool,
 ) -> Result<String, JsValue> {
     let candidates = with_manager(&vault_id, |m| {
-        m.api_list_login_candidates(&page_hostname, strict_subdomain)
+        m.api_list_login_candidates(&page_hostname, strict_subdomain, insecure_page)
     })
     .map_err(to_js_err)?;
     serde_json::to_string(&candidates).map_err(|e| to_js_err(format!("Serialization error: {}", e)))

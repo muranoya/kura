@@ -314,8 +314,11 @@ pub extern "system" fn Java_net_meshpeak_kura_bridge_VaultBridge_listLoginCandid
         let vid = get_string(env, &vault_id)?;
         let domain = get_string(env, &domain)?;
         let strict = strict_subdomain != JNI_FALSE;
-        let candidates = with_manager(&vid, |m| m.api_list_login_candidates(&domain, strict))
-            .map_err(|e| format!("Failed to list login candidates: {}", e))?;
+        // AutofillService はページのスキーム（webScheme）を取得していないため、スキームでは絞り込まない
+        let candidates = with_manager(&vid, |m| {
+            m.api_list_login_candidates(&domain, strict, false)
+        })
+        .map_err(|e| format!("Failed to list login candidates: {}", e))?;
         let json = serde_json::to_string(&candidates).unwrap_or_else(|_| "[]".to_string());
         new_jstring(env, &json)
     })
