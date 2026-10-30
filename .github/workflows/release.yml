@@ -98,7 +98,12 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
+      # rust-cache のキーには OS 名（Linux）しか入らず Ubuntu のバージョンが区別されない。
+      # 新しい Ubuntu でビルドされた ~/.cargo/bin（cargo-about 等）や build script が
+      # 復元されると glibc 不足で実行できないため、イメージごとにキャッシュを分ける
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ubuntu-22.04
 
       - name: Install system dependencies
         run: |
