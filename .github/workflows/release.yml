@@ -91,7 +91,9 @@ jobs:
     name: Desktop (Linux)
     needs: prepare
     if: needs.prepare.outputs.build_desktop == 'true'
-    runs-on: ubuntu-latest
+    # バイナリはビルド環境の glibc 以上を要求するため、古めの LTS でビルドして
+    # 配布先の互換範囲を広げる（ubuntu-latest だと新しい glibc に依存してしまう）
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6
 
