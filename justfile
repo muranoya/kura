@@ -17,7 +17,7 @@ EMULATOR := ANDROID_HOME / "emulator/emulator"
 default: help
 
 # VERSION ファイルの内容を各ターゲット（package.json / Cargo.toml 等）に反映
-@_sync-version:
+@sync-version:
 	node scripts/sync-version.mjs
 
 # Desktop app - Generate icons from SVG（ウィンドウ・トレイ・インストーラ用の PNG）
@@ -44,7 +44,7 @@ default: help
 	node scripts/update-assets.mjs
 
 # Desktop app - Development
-@dev-desktop: _sync-version _desktop-icons
+@dev-desktop: sync-version _desktop-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🚀 Starting desktop app in development mode..."
@@ -55,7 +55,7 @@ default: help
 	cargo run -p kura-desktop
 
 # Desktop app - Linux (AppImage + deb)
-@release-desktop-linux: _sync-version _desktop-icons desktop-licenses _cargo-packager
+@release-desktop-linux: sync-version _desktop-icons desktop-licenses _cargo-packager
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building desktop app for Linux (AppImage + deb)..."
@@ -68,7 +68,7 @@ default: help
 	echo "  - Output: target/packager/"
 
 # Desktop app - macOS (DMG, Apple Silicon / arm64 only, ad-hoc signed)
-@release-desktop-macos: _sync-version _desktop-icons desktop-licenses _cargo-packager
+@release-desktop-macos: sync-version _desktop-icons desktop-licenses _cargo-packager
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building desktop app for macOS arm64 (DMG, ad-hoc signed)..."
@@ -81,7 +81,7 @@ default: help
 	echo "  - Output: target/packager/"
 
 # Desktop app - Windows (NSIS installer)
-@release-desktop-windows: _sync-version _desktop-icons desktop-licenses _cargo-packager
+@release-desktop-windows: sync-version _desktop-icons desktop-licenses _cargo-packager
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building desktop app for Windows (NSIS)..."
@@ -99,7 +99,7 @@ default: help
 	bash assets/icons/convert2png.sh
 
 # Browser extension (Chrome + Firefox)
-@release-extension: _sync-version _extension-icons
+@release-extension: sync-version _extension-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🔨 Building browser extensions (Chrome + Firefox)..."
@@ -140,7 +140,7 @@ default: help
 
 
 # Browser extension - Development (HMR付き)
-@dev-extension: _sync-version _extension-icons
+@dev-extension: sync-version _extension-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🚀 Starting extension in development mode..."
@@ -161,7 +161,7 @@ default: help
 	bash assets/icons/convert2png.sh
 
 # Android app - Build native libraries (Rust → .so)
-@build-android-jni: _sync-version _android-icons
+@build-android-jni: sync-version _android-icons
 	echo ""
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	echo "🦀 Building vault_jni native libraries for Android..."
@@ -519,6 +519,7 @@ test-manual-autofill:
 	echo "    just check-all            - Run all lint & format checks"
 	echo ""
 	echo "  🔧 Utilities:"
+	echo "    just sync-version          - Sync version"
 	echo "    just release-all          - Build all apps for release"
 	echo "    just update-assets        - Update bundled PSL & Passkey privileged allowlist"
 	echo "    just clean                - Clean build artifacts"
