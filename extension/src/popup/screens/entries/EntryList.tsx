@@ -450,7 +450,7 @@ export default function EntryList() {
         </div>
 
         <div
-          className={`flex-1 min-h-0 bg-bg-surface overflow-y-auto border-t border-border twopane:border-t-0 ${showDetail ? '' : 'hidden twopane:block'}`}
+          className={`flex-1 min-h-0 bg-bg-base twopane:bg-bg-surface overflow-y-auto border-t border-border-strong twopane:border-t-0 ${showDetail ? '' : 'hidden twopane:block'}`}
         >
           {selectedId && selectedEntry ? (
             <EntryDetailPane
