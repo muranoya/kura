@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -25,14 +24,25 @@ for (const rel of jsonTargets) {
   writeFileSync(path, content.replace(/"version":\s*"[^"]*"/, `"version": "${version}"`))
 }
 
+const crateNames = []
 for (const rel of tomlTargets) {
   const path = resolve(root, rel)
   const content = readFileSync(path, 'utf-8')
   writeFileSync(path, content.replace(/^version\s*=\s*"[^"]*"/m, `version = "${version}"`))
+  crateNames.push(content.match(/^name\s*=\s*"([^"]*)"/m)[1])
 }
 
 // Cargo.lock には workspace メンバー自身のバージョンも記録されるため、
-// Cargo.toml だけ書き換えると `--locked` 付きのコマンド（cargo about 等）が失敗する
-execFileSync('cargo', ['update', '--workspace', '--offline', '--quiet'], { cwd: root, stdio: 'inherit' })
+// Cargo.toml だけ書き換えると `--locked` 付きのコマンド（cargo about 等）が失敗する。
+// `cargo update --offline` は crates.io index のキャッシュがない CI で失敗するので直接書き換える。
+// workspace メンバーのエントリには `source` 行がないことで外部クレートと区別する
+const lockPath = resolve(root, 'Cargo.lock')
+let lock = readFileSync(lockPath, 'utf-8')
+for (const name of crateNames) {
+  const pattern = new RegExp(`^(name = "${name}"\\nversion = )"[^"]*"(?!\\nsource)`, 'm')
+  if (!pattern.test(lock)) throw new Error(`[sync-version] ${name} not found in Cargo.lock`)
+  lock = lock.replace(pattern, `$1"${version}"`)
+}
+writeFileSync(lockPath, lock)
 
 console.log(`[sync-version] ${version}`)
