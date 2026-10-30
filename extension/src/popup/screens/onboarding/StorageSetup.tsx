@@ -9,12 +9,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { PasswordInput } from '../../components/ui/password-input'
-import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
+import {
+  isOnboardingDraftComplete,
+  useOnboardingDraft,
+} from '../../contexts/OnboardingDraftContext'
 
 export default function StorageSetup() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { draft, setDraft, draftLoaded } = useOnboardingDraft()
+  const { draft, setDraft } = useOnboardingDraft()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showTransfer, setShowTransfer] = useState(false)
@@ -22,10 +25,6 @@ export default function StorageSetup() {
   const [transferPassword, setTransferPassword] = useState('')
 
   const { region, bucket, key, accessKeyId, secretAccessKey, endpoint } = draft
-
-  const isFormValid = () => {
-    return region && bucket && key && accessKeyId && secretAccessKey
-  }
 
   const handleNext = async () => {
     setLoading(true)
@@ -97,10 +96,6 @@ export default function StorageSetup() {
 
   const handleBack = () => {
     navigate(-1)
-  }
-
-  if (!draftLoaded) {
-    return null
   }
 
   return (
@@ -304,7 +299,7 @@ export default function StorageSetup() {
           </Button>
           <Button
             onClick={handleNext}
-            disabled={loading || !isFormValid()}
+            disabled={loading || !isOnboardingDraftComplete(draft)}
             className="flex-1 text-sm"
             size="sm"
           >

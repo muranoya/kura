@@ -2,11 +2,13 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { OnboardingDraftProvider } from '../popup/contexts/OnboardingDraftContext'
 import MasterPassword from '../popup/screens/onboarding/MasterPassword'
 import RecoveryKey from '../popup/screens/onboarding/RecoveryKey'
 import StorageSetup from '../popup/screens/onboarding/StorageSetup'
 import UnlockExistingVault from '../popup/screens/onboarding/UnlockExistingVault'
 import Welcome from '../popup/screens/onboarding/Welcome'
+import type { OnboardingDraft } from '../shared/types'
 
 // Helper: configure chrome.runtime.sendMessage responses by message type
 function mockChromeMessages(handlers: Record<string, (msg: Record<string, unknown>) => unknown>) {
@@ -29,24 +31,39 @@ function mockChromeMessages(handlers: Record<string, (msg: Record<string, unknow
   )
 }
 
+const FILLED_DRAFT: OnboardingDraft = {
+  storageType: 's3',
+  endpoint: '',
+  bucket: 'kura-test',
+  region: 'us-east-1',
+  key: 'vault.json',
+  accessKeyId: 'AKIATEST',
+  secretAccessKey: 'secret123',
+}
+
 // Helper: render onboarding flow with all routes
-function renderOnboarding(initialRoute: string | { pathname: string; state?: unknown } = '/') {
+function renderOnboarding(
+  initialRoute: string | { pathname: string; state?: unknown } = '/',
+  initialDraft?: OnboardingDraft,
+) {
   const entries = typeof initialRoute === 'string' ? [initialRoute] : [initialRoute]
   return render(
     <MemoryRouter initialEntries={entries}>
-      <Routes>
-        <Route path="/" element={<Welcome />} />
-        <Route path="/onb/storage" element={<StorageSetup />} />
-        <Route path="/onb/password" element={<MasterPassword />} />
-        <Route path="/onb/recovery" element={<RecoveryKey />} />
-        <Route path="/onb/unlock-existing" element={<UnlockExistingVault />} />
-        <Route path="/entries" element={<div>Entries Page</div>} />
-      </Routes>
+      <OnboardingDraftProvider initialDraft={initialDraft}>
+        <Routes>
+          <Route path="/" element={<Welcome />} />
+          <Route path="/onb/storage" element={<StorageSetup />} />
+          <Route path="/onb/password" element={<MasterPassword />} />
+          <Route path="/onb/recovery" element={<RecoveryKey />} />
+          <Route path="/onb/unlock-existing" element={<UnlockExistingVault />} />
+          <Route path="/entries" element={<div>Entries Page</div>} />
+        </Routes>
+      </OnboardingDraftProvider>
     </MemoryRouter>,
   )
 }
 
-// Helper: fill S3 storage form (waits for draft to load first)
+// Helper: fill S3 storage form
 async function fillStorageForm(user: ReturnType<typeof userEvent.setup>) {
   await waitFor(() => {
     expect(screen.getByLabelText(/リージョン/)).toBeInTheDocument()
@@ -175,7 +192,7 @@ describe('StorageSetup - S3 connection', () => {
 describe('MasterPassword - validation', () => {
   it('should show mismatch indicator when passwords differ', async () => {
     const user = userEvent.setup()
-    renderOnboarding('/onb/password')
+    renderOnboarding('/onb/password', FILLED_DRAFT)
 
     await waitFor(() => {
       expect(screen.getByLabelText(/マスターパスワード$/)).toBeInTheDocument()
@@ -189,7 +206,7 @@ describe('MasterPassword - validation', () => {
 
   it('should show match indicator when passwords match', async () => {
     const user = userEvent.setup()
-    renderOnboarding('/onb/password')
+    renderOnboarding('/onb/password', FILLED_DRAFT)
 
     await waitFor(() => {
       expect(screen.getByLabelText(/マスターパスワード$/)).toBeInTheDocument()
@@ -213,7 +230,7 @@ describe('MasterPassword - vault creation', () => {
       UNLOCK: () => ({ success: true }),
     })
     const user = userEvent.setup()
-    renderOnboarding('/onb/password')
+    renderOnboarding('/onb/password', FILLED_DRAFT)
 
     await waitFor(() => {
       expect(screen.getByLabelText(/マスターパスワード$/)).toBeInTheDocument()
@@ -234,7 +251,7 @@ describe('MasterPassword - vault creation', () => {
       CREATE_VAULT: () => ({ success: false, error: 'Vault作成に失敗しました' }),
     })
     const user = userEvent.setup()
-    renderOnboarding('/onb/password')
+    renderOnboarding('/onb/password', FILLED_DRAFT)
 
     await waitFor(() => {
       expect(screen.getByLabelText(/マスターパスワード$/)).toBeInTheDocument()
@@ -277,10 +294,6 @@ describe('RecoveryKey', () => {
     await waitFor(() => {
       expect(screen.getByText('Entries Page')).toBeInTheDocument()
     })
-    expect(chrome.storage.local.remove).toHaveBeenCalledWith(
-      ['onboardingDraft'],
-      expect.any(Function),
-    )
   })
 
   // リカバリーキーを書き写している間にオートロックされても先へ進める
@@ -310,7 +323,7 @@ describe('RecoveryKey', () => {
 describe('UnlockExistingVault', () => {
   it('should show error for empty password submission', async () => {
     const user = userEvent.setup()
-    renderOnboarding('/onb/unlock-existing')
+    renderOnboarding('/onb/unlock-existing', FILLED_DRAFT)
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'このVaultを使う' })).toBeInTheDocument()
@@ -331,7 +344,7 @@ describe('UnlockExistingVault', () => {
       UNLOCK_EXISTING: () => ({ success: false, error: 'パスワードが違います' }),
     })
     const user = userEvent.setup()
-    renderOnboarding('/onb/unlock-existing')
+    renderOnboarding('/onb/unlock-existing', FILLED_DRAFT)
 
     await waitFor(() => {
       expect(screen.getByLabelText(/マスターパスワード/)).toBeInTheDocument()
@@ -350,7 +363,7 @@ describe('UnlockExistingVault', () => {
       UNLOCK_EXISTING: () => ({ success: true }),
     })
     const user = userEvent.setup()
-    renderOnboarding('/onb/unlock-existing')
+    renderOnboarding('/onb/unlock-existing', FILLED_DRAFT)
 
     await waitFor(() => {
       expect(screen.getByLabelText(/マスターパスワード/)).toBeInTheDocument()
@@ -362,10 +375,6 @@ describe('UnlockExistingVault', () => {
     await waitFor(() => {
       expect(screen.getByText('Entries Page')).toBeInTheDocument()
     })
-    expect(chrome.storage.local.remove).toHaveBeenCalledWith(
-      ['onboardingDraft'],
-      expect.any(Function),
-    )
   })
 })
 
@@ -379,10 +388,12 @@ describe('Back navigation', () => {
     // Render with history so back navigation works
     render(
       <MemoryRouter initialEntries={['/onb/storage', '/onb/password']} initialIndex={1}>
-        <Routes>
-          <Route path="/onb/storage" element={<StorageSetup />} />
-          <Route path="/onb/password" element={<MasterPassword />} />
-        </Routes>
+        <OnboardingDraftProvider initialDraft={FILLED_DRAFT}>
+          <Routes>
+            <Route path="/onb/storage" element={<StorageSetup />} />
+            <Route path="/onb/password" element={<MasterPassword />} />
+          </Routes>
+        </OnboardingDraftProvider>
       </MemoryRouter>,
     )
 
@@ -391,6 +402,80 @@ describe('Back navigation', () => {
     })
 
     await user.click(screen.getByRole('button', { name: '戻る' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('ストレージ設定')).toBeInTheDocument()
+    })
+  })
+
+  it('should keep storage form values when returning from master password', async () => {
+    mockChromeMessages({
+      DOWNLOAD_VAULT: () => ({ success: true, vaultExists: false }),
+    })
+    const user = userEvent.setup()
+    renderOnboarding('/onb/storage')
+
+    await fillStorageForm(user)
+    await user.click(screen.getByRole('button', { name: '次へ' }))
+    await waitFor(() => {
+      expect(screen.getByText('マスターパスワード設定')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: '戻る' }))
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/シークレットアクセスキー/)).toHaveValue('secret123')
+    })
+    expect(screen.getByLabelText(/リージョン/)).toHaveValue('us-east-1')
+  })
+})
+
+// ============================================================================
+// Draft handling
+// ============================================================================
+
+describe('Onboarding draft', () => {
+  it('should send the entered storage settings without persisting them', async () => {
+    let createVaultMessage: Record<string, unknown> | undefined
+    mockChromeMessages({
+      DOWNLOAD_VAULT: () => ({ success: true, vaultExists: false }),
+      CREATE_VAULT: (msg) => {
+        createVaultMessage = msg
+        return { success: true, recoveryKey: 'recovery-key' }
+      },
+      UNLOCK: () => ({ success: true }),
+    })
+    const user = userEvent.setup()
+    renderOnboarding('/onb/storage')
+
+    await fillStorageForm(user)
+    await user.click(screen.getByRole('button', { name: '次へ' }))
+    await waitFor(() => {
+      expect(screen.getByText('マスターパスワード設定')).toBeInTheDocument()
+    })
+    await user.type(screen.getByLabelText(/マスターパスワード$/), 'my-secure-password')
+    await user.type(screen.getByLabelText(/パスワード確認/), 'my-secure-password')
+    await user.click(screen.getByRole('button', { name: '作成' }))
+    await waitFor(() => {
+      expect(screen.getByText('あなたのリカバリーキー')).toBeInTheDocument()
+    })
+
+    expect(createVaultMessage?.s3Config).toEqual({
+      region: 'us-east-1',
+      bucket: 'kura-test',
+      key: 'vault.json',
+      accessKeyId: 'AKIATEST',
+      secretAccessKey: 'secret123',
+    })
+    expect(chrome.storage.local.set).not.toHaveBeenCalled()
+  })
+
+  // サイドバーのリロードでメモリ上の下書きが消えた場合、空のS3設定で先へ進ませない
+  it.each([
+    '/onb/password',
+    '/onb/unlock-existing',
+  ])('should redirect %s to storage setup when the draft is empty', async (route) => {
+    renderOnboarding(route)
 
     await waitFor(() => {
       expect(screen.getByText('ストレージ設定')).toBeInTheDocument()
