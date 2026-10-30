@@ -52,6 +52,8 @@ Android向けJNIの活用先の一つであるAutofillService（システム標�
 
 - **オートロック**: 「拡張機能UIでの最後の操作」から設定時間が経つとロックする。サイドバーはクリック・キー入力・スクロールがあると `USER_ACTIVITY` を Service Worker に送り（15秒間隔に間引く）、Service Worker はそのたびに `autolock` アラームを張り直す。サイドバーを開いていても、操作しなければロックされる
 - **状態変化の反映**: Service Worker 側で起きた変化は `chrome.runtime.sendMessage` で拡張機能ページにブロードキャストする（`ExtensionPageBroadcast`）。オートロックや儀式ウィンドウでのアンロックは `VAULT_LOCK_STATE_CHANGED` として送り、サイドバーはロック画面と一覧を切り替える。ピッカー・TOTP QR スキャン・既存エントリへの Passkey 登録の結果は `ENTRY_UPDATED_IN_BACKGROUND` として送り、開いている編集画面に反映する（SW が書き換えた属性だけを差し替え、編集中の他の内容は保持する）
+- **Service Worker 再起動時のセッション復元**: Service Worker はアイドルで停止し、メモリ上のアンロック状態を失う。アンロック中は DEK（base64）を `chrome.storage.session`（メモリのみ・content script からは読めない）に置き、再起動後はそれで Argon2 を通さずにアンロックし直す（`api_unlock_with_dek`）。マスターパスワード自体は他サービスとの使い回しまで漏れうるため保存しない。DEK ローテーション時は差し替え、ロック時に削除する
+- **クリップボードの自動消去**: パスワード等をコピーすると `clipboard-clear` アラームを設定し、設定時間後に「クリップボードがまだ kura のコピーした値のままなら」消去する。照合用の値は Service Worker のアイドル停止で消えないよう `chrome.storage.session` に置き、平文ではなく SHA-256 だけを置く。Chrome は Service Worker からクリップボードを扱えないため offscreen document を作って処理し、終わったら閉じる（1つしか作れないため）。offscreen document はフォーカスを持たず非同期 Clipboard API が使えないので、`document.execCommand('paste' / 'copy')` で読み書きする
 - **現在のタブへの追従**: 「このサイト」のエントリは、タブの切り替えや遷移（`tabs.onActivated` / `tabs.onUpdated`）に応じて再計算する
 - **幅への対応**: サイドバーの幅は可変なので、35rem 以上では一覧と詳細を左右に並べ、それより狭ければ一覧と詳細を切り替える1カラム表示にする
 
@@ -288,6 +290,7 @@ config_key
 | アンロック時 | DEK をアンラップ → S3設定を復号 → メモリに保持（旧形式なら暗号化し直す） |
 | ロック時 | メモリ上のS3設定をクリア |
 | マスターパスワード変更時 | 何もしない（DEK が変わらないため） |
+| 拡張機能の Service Worker 再起動時 | セッションストレージの DEK で S3 設定を復号 → メモリに保持（`api_decrypt_config_with_dek`。旧形式はアンロック時に暗号化し直し済み） |
 | リカバリーキーでの復旧時 | マスターパスワードを再設定した後、新しいパスワードで S3 設定を復号 → メモリに保持 |
 | DEK ローテーション時 | 新しい DEK でS3設定を暗号化し直す |
 

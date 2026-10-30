@@ -113,7 +113,7 @@ dependencies {
 
 ## 2-4. Passkey作成・認証時のドメインマッチングとの整合
 
-`docs/android-autofillservice.md` 2-3にある通り、vaultエントリのドメインマッチングは常に`api_list_login_candidates(domain, strict_subdomain)`に一元化されている。Part 4で述べるOrigin検証で得られた`rp_id`は、`api_webauthn_find_credentials(rp_id, ...)`に渡す際は完全一致（`docs/webauthn-passkey.md` 2-2の`rp_id`フィールドと同じセマンティクス）であり、オートフィルのeTLD+1サブドメイン許容マッチングとは別ロジックである点に注意する（`vault-core/src/vault/webauthn.rs`の`find_passkey_credentials`は`data.rp_id != rp_id`で完全一致のみを見ている）。
+`docs/android-autofillservice.md` 2-3にある通り、vaultエントリのドメインマッチングは常に`api_list_login_candidates(domain, strict_subdomain, insecure_page)`に一元化されている。Part 4で述べるOrigin検証で得られた`rp_id`は、`api_webauthn_find_credentials(rp_id, ...)`に渡す際は完全一致（`docs/webauthn-passkey.md` 2-2の`rp_id`フィールドと同じセマンティクス）であり、オートフィルのeTLD+1サブドメイン許容マッチングとは別ロジックである点に注意する（`vault-core/src/vault/webauthn.rs`の`find_passkey_credentials`は`data.rp_id != rp_id`で完全一致のみを見ている）。
 
 # Part 3: リクエストフロー設計
 

@@ -2,6 +2,7 @@
 
 import { DEFAULT_VAULT_ID } from '../shared/constants'
 import { broadcastToExtensionPages } from '../shared/messages'
+import { isPotentiallyTrustworthy } from '../shared/secure-origin'
 import { queryActiveBrowserTab } from '../shared/tabs'
 import type {
   AutofillCredentialCandidate,
@@ -16,7 +17,12 @@ let vaultApi: VaultApi | null = null
 let isUnlocked: () => boolean = () => false
 
 export interface VaultApi {
-  api_list_login_candidates(vaultId: string, pageHostname: string, strictSubdomain: boolean): string
+  api_list_login_candidates(
+    vaultId: string,
+    pageHostname: string,
+    strictSubdomain: boolean,
+    insecurePage: boolean,
+  ): string
   api_get_entry(vaultId: string, id: string): string
   api_get_totp_code(vaultId: string, id: string): string | null
   api_list_totp_periods(vaultId: string, ids: string[]): string
@@ -64,19 +70,24 @@ function getCredentialsForUrl(
     return []
   }
 
-  let pageHostname: string
+  let page: URL
   try {
-    pageHostname = new URL(url).hostname
+    page = new URL(url)
   } catch {
     return []
   }
+  if (page.protocol !== 'https:' && page.protocol !== 'http:') return []
 
   // Domain matching (eTLD+1 based by default, exact match when strictSubdomain)
   // is done in vault-core so Android and the extension share identical behavior.
+  // On plain-HTTP pages (other than loopback) only entries saved with an
+  // explicit http:// URL match, so credentials saved for HTTPS are never
+  // offered to a page that can be tampered with in transit (downgrade).
   const result = vaultApi.api_list_login_candidates(
     DEFAULT_VAULT_ID,
-    pageHostname,
+    page.hostname,
     strictSubdomain ?? false,
+    !isPotentiallyTrustworthy(page),
   )
   const rawCandidates: RawAutofillCandidate[] = JSON.parse(result)
 

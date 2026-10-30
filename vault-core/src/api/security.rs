@@ -49,6 +49,21 @@ impl VaultManager {
             .map_err(|e| format!("Decrypted config is not valid UTF-8: {}", e))
     }
 
+    /// アンロック中の DEK で `api_encrypt_config` の暗号文を復号する（パスワード不要）。
+    /// `api_unlock_with_dek` でのセッション復元時に使う。旧形式は復号できない
+    pub fn api_decrypt_config_with_dek(&self, encrypted_b64: String) -> Result<String, String> {
+        self.with_unlocked(|unlocked| {
+            let decrypted_bytes = crypto::config::decrypt_config_with_dek(
+                &unlocked.meta,
+                &unlocked.dek,
+                &encrypted_b64,
+            )
+            .map_err(|e| format!("Failed to decrypt config: {}", e))?;
+            String::from_utf8(decrypted_bytes.to_vec())
+                .map_err(|e| format!("Decrypted config is not valid UTF-8: {}", e))
+        })
+    }
+
     /// マスターパスワードの検証（KEK導出→DEK復号を試みる）
     pub fn api_verify_password(&self, password: String) -> Result<(), String> {
         let password = MasterPassword::from_string(password);

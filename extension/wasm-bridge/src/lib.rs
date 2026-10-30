@@ -80,6 +80,17 @@ pub fn api_unlock_with_recovery_key(vault_id: String, recovery_key: String) -> R
     with_manager(&vault_id, |m| m.api_unlock_with_recovery_key(recovery_key)).map_err(to_js_err)
 }
 
+/// アンロック中の DEK を base64 で書き出す（Service Worker 再起動時のセッション復元用）
+#[wasm_bindgen]
+pub fn api_export_dek(vault_id: String) -> Result<String, JsValue> {
+    with_manager(&vault_id, |m| m.api_export_dek()).map_err(to_js_err)
+}
+
+#[wasm_bindgen]
+pub fn api_unlock_with_dek(vault_id: String, dek_b64: String) -> Result<(), JsValue> {
+    with_manager(&vault_id, |m| m.api_unlock_with_dek(dek_b64)).map_err(to_js_err)
+}
+
 #[wasm_bindgen]
 pub fn api_lock(vault_id: String) -> Result<Vec<u8>, JsValue> {
     with_manager(&vault_id, |m| m.api_lock()).map_err(to_js_err)
@@ -235,9 +246,10 @@ pub fn api_list_login_candidates(
     vault_id: String,
     page_hostname: String,
     strict_subdomain: bool,
+    insecure_page: bool,
 ) -> Result<String, JsValue> {
     let candidates = with_manager(&vault_id, |m| {
-        m.api_list_login_candidates(&page_hostname, strict_subdomain)
+        m.api_list_login_candidates(&page_hostname, strict_subdomain, insecure_page)
     })
     .map_err(to_js_err)?;
     serde_json::to_string(&candidates).map_err(|e| to_js_err(format!("Serialization error: {}", e)))
@@ -340,6 +352,15 @@ pub fn api_decrypt_config(
     encrypted_b64: String,
 ) -> Result<String, JsValue> {
     with_manager(&vault_id, |m| m.api_decrypt_config(password, encrypted_b64)).map_err(to_js_err)
+}
+
+/// アンロック中の DEK で設定を復号（パスワード不要。旧形式は復号できない）
+#[wasm_bindgen]
+pub fn api_decrypt_config_with_dek(
+    vault_id: String,
+    encrypted_b64: String,
+) -> Result<String, JsValue> {
+    with_manager(&vault_id, |m| m.api_decrypt_config_with_dek(encrypted_b64)).map_err(to_js_err)
 }
 
 /// 暗号化された設定が旧形式で、暗号化し直す必要があるか（VaultManager不要）

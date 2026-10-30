@@ -6,6 +6,7 @@
 import { DEFAULT_VAULT_ID, STORAGE_KEYS } from '../shared/constants'
 import { isValidRpId } from '../shared/etld'
 import { broadcastToExtensionPages } from '../shared/messages'
+import { isPotentiallyTrustworthy } from '../shared/secure-origin'
 import { getFromStorage } from '../shared/storage'
 import type {
   WebauthnRitualContext,
@@ -44,7 +45,12 @@ export interface WebauthnVaultApi {
     clientDataJson: string,
     userVerified: boolean,
   ): string
-  api_list_login_candidates(vaultId: string, pageHostname: string, strictSubdomain: boolean): string
+  api_list_login_candidates(
+    vaultId: string,
+    pageHostname: string,
+    strictSubdomain: boolean,
+    insecurePage: boolean,
+  ): string
   /** Throws if the password is wrong */
   api_verify_password(vaultId: string, password: string): void
 }
@@ -129,22 +135,6 @@ function originFromSender(
   if (origin === 'null' || origin !== url.origin) return null
   if (!isPotentiallyTrustworthy(url)) return null
   return { origin, hostname: url.hostname }
-}
-
-/**
- * Secure-context origins as browsers define them for WebAuthn: https, or
- * loopback hosts (used during local development).
- */
-function isPotentiallyTrustworthy(url: URL): boolean {
-  if (url.protocol === 'https:') return true
-  if (url.protocol !== 'http:') return false
-  const host = url.hostname
-  return (
-    host === 'localhost' ||
-    host.endsWith('.localhost') ||
-    host === '[::1]' ||
-    /^127(\.\d{1,3}){3}$/.test(host)
-  )
 }
 
 function finishRitual(requestId: string, decision: WebauthnRitualDecision) {
@@ -499,7 +489,8 @@ async function computeCreateContext(
 
   let matchingEntries: { id: string; name: string; username: string | null }[] = []
   try {
-    const json = vaultApi.api_list_login_candidates(DEFAULT_VAULT_ID, req.hostname, false)
+    // 要求元は originFromSender で https か loopback に限っているので、安全なページとして扱う
+    const json = vaultApi.api_list_login_candidates(DEFAULT_VAULT_ID, req.hostname, false, false)
     const raw: RawLoginCandidate[] = JSON.parse(json)
     matchingEntries = raw.map((e) => ({ id: e.id, name: e.name, username: e.username }))
   } catch (err) {

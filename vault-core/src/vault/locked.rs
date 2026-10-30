@@ -104,7 +104,12 @@ impl LockedVault {
             VaultError::DecryptionError(format!("Invalid base64 in {}", field_name))
         })?;
         let dek = Dek::unwrap(&encrypted_dek_bytes, kek)?;
+        self.unlock_with_dek(dek)
+    }
 
+    /// アンラップ済みの DEK でアンロックする（拡張機能の Service Worker 再起動時の
+    /// セッション復元用）。DEK が誤っていれば index（v1 は vault 全体）の AEAD 復号で失敗する
+    pub fn unlock_with_dek(self, dek: Dek) -> Result<UnlockedVault> {
         match self.vault_file {
             StoredVault::V2(file) => UnlockedVault::from_vault_file(file, dek, self.etag),
             StoredVault::V1(file) => UnlockedVault::from_v1_file(file, dek, self.etag),

@@ -1,6 +1,7 @@
 // Service Worker エントリーポイント
 // WASM の初期化とメッセージハンドラーのセットアップ
 
+import { hashClipboardText } from '../shared/clipboard-hash'
 import { DEFAULT_VAULT_ID, STORAGE_KEYS } from '../shared/constants'
 import { ConflictError, VaultS3Client } from '../shared/s3-client'
 import {
@@ -35,6 +36,8 @@ interface WasmApi {
   api_load_vault(vaultId: string, vaultBytes: Uint8Array, etag: string): void
   api_unlock(vaultId: string, masterPassword: string): boolean
   api_unlock_with_recovery_key(vaultId: string, recoveryKey: string): void
+  api_export_dek(vaultId: string): string
+  api_unlock_with_dek(vaultId: string, dekB64: string): void
   api_lock(vaultId: string): Uint8Array
   api_get_vault_bytes(vaultId: string): Uint8Array
   api_get_vault_etag(vaultId: string): string | null
@@ -74,7 +77,12 @@ interface WasmApi {
   api_restore_entry(vaultId: string, id: string): void
   api_purge_entry(vaultId: string, id: string): void
   api_set_favorite(vaultId: string, id: string, isFavorite: boolean): void
-  api_list_login_candidates(vaultId: string, pageHostname: string, strictSubdomain: boolean): string
+  api_list_login_candidates(
+    vaultId: string,
+    pageHostname: string,
+    strictSubdomain: boolean,
+    insecurePage: boolean,
+  ): string
   api_get_totp_code(vaultId: string, id: string): string | null
   api_list_totp_periods(vaultId: string, ids: string[]): string
   api_list_labels(vaultId: string): string
@@ -103,6 +111,7 @@ interface WasmApi {
   api_regenerate_recovery_key(vaultId: string, password: string): string
   api_encrypt_config(vaultId: string, password: string, plaintext: string): string
   api_decrypt_config(vaultId: string, password: string, encryptedB64: string): string
+  api_decrypt_config_with_dek(vaultId: string, encryptedB64: string): string
   api_config_needs_upgrade(encryptedB64: string): boolean
   api_encrypt_transfer_config(password: string, configJson: string): string
   api_decrypt_transfer_config(password: string, transferString: string): string
@@ -222,8 +231,8 @@ async function resetAutolockAlarm() {
 
 async function handleUserActivity() {
   // SW再起動直後はメモリ上 unlocked=false でもセッションは残っている（アラームも残る）。
-  // セッションの有無だけで判定し、Vaultの復元（Argon2）は行わない
-  if (unlocked || (await getFromSessionStorage<string>(STORAGE_KEYS.SESSION_PASSWORD))) {
+  // セッションの有無だけで判定し、Vaultの復元は行わない
+  if (unlocked || (await getFromSessionStorage<string>(STORAGE_KEYS.SESSION_DEK))) {
     await resetAutolockAlarm()
   }
 }
@@ -504,8 +513,6 @@ interface AppSettings {
   theme: string
 }
 
-let lastCopiedText: string | null = null
-
 async function loadSettings(): Promise<AppSettings> {
   const settings = await getFromStorage<AppSettings>(STORAGE_KEYS.APP_SETTINGS)
   return (
@@ -525,7 +532,7 @@ async function enterLockedState() {
   unlocked = false
   updateExtensionIcon(false)
   decryptedS3Config = null
-  await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
+  await removeFromSessionStorage(STORAGE_KEYS.SESSION_DEK)
   chrome.alarms.clear('autolock')
   chrome.alarms.clear('autosync')
   // オートフィル: 全タブに通知してContent Scriptを無効化
@@ -555,11 +562,30 @@ async function loadS3Config(password: string): Promise<void> {
 
 // ========== セッション復元 ==========
 
+// SW 再起動時の復元用に、アンロック中の DEK をセッションストレージ（メモリのみ）に置く。
+// マスターパスワードは他サービスとの使い回しまで漏れうるため保存しない
+async function saveSessionDek(): Promise<void> {
+  await saveToSessionStorage(STORAGE_KEYS.SESSION_DEK, vault.api_export_dek(DEFAULT_VAULT_ID))
+}
+
+// セッション復元時に S3 設定を復号する（パスワードがないため DEK で復号する）。
+// 旧形式はアンロック時に現行形式へ暗号化し直しているので、ここでは扱わない
+function loadS3ConfigWithDek(encryptedConfig: string | undefined): void {
+  if (!encryptedConfig) return
+  try {
+    decryptedS3Config = JSON.parse(
+      vault.api_decrypt_config_with_dek(DEFAULT_VAULT_ID, encryptedConfig),
+    )
+  } catch (e) {
+    console.error('[SW] Failed to decrypt S3 config:', e)
+  }
+}
+
 let restoreSessionPromise: Promise<boolean> | null = null
 
 /**
  * セッションが残っていればアンロック状態まで復元する。
- * 並行して呼ばれても復元（Argon2）は1回だけ行う。
+ * 並行して呼ばれても復元は1回だけ行う。
  */
 function tryRestoreSession(): Promise<boolean> {
   if (unlocked) return Promise.resolve(true)
@@ -572,29 +598,28 @@ function tryRestoreSession(): Promise<boolean> {
 }
 
 async function restoreSession(): Promise<boolean> {
-  const password = await getFromSessionStorage<string>(STORAGE_KEYS.SESSION_PASSWORD)
-  if (!password) return false
+  const dek = await getFromSessionStorage<string>(STORAGE_KEYS.SESSION_DEK)
+  if (!dek) return false
 
   try {
     await initWasm()
     const vaultBytes = await getFromStorage<number[]>(STORAGE_KEYS.VAULT_BYTES)
     const etag = await getFromStorage<string>(STORAGE_KEYS.VAULT_ETAG)
+    const encryptedConfig = await getFromStorage<string>(STORAGE_KEYS.S3_CONFIG)
     if (!vaultBytes) return false
     // await 中に UNLOCK 等でアンロックされていれば、ロード済みのセッションを壊さない
     if (unlocked || vault.api_is_unlocked(DEFAULT_VAULT_ID)) return unlocked
 
     vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(vaultBytes), etag || '')
-    vault.api_unlock(DEFAULT_VAULT_ID, password)
-
-    // S3設定の復号
-    await loadS3Config(password)
+    vault.api_unlock_with_dek(DEFAULT_VAULT_ID, dek)
+    loadS3ConfigWithDek(encryptedConfig)
 
     unlocked = true
     updateExtensionIcon(true)
     return true
   } catch (e) {
     console.error('[SW] Session restore failed:', e)
-    await removeFromSessionStorage(STORAGE_KEYS.SESSION_PASSWORD)
+    await removeFromSessionStorage(STORAGE_KEYS.SESSION_DEK)
     return false
   }
 }
@@ -707,7 +732,7 @@ async function handleMessage(
           await loadS3Config(message.password)
           unlocked = true
           updateExtensionIcon(true)
-          await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.password)
+          await saveSessionDek()
           await resetAutolockAlarm()
           // 定期同期アラームを設定
           chrome.alarms.create('autosync', { periodInMinutes: 1 })
@@ -755,7 +780,7 @@ async function handleMessage(
           }
           unlocked = true
           updateExtensionIcon(true)
-          await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.password)
+          await saveSessionDek()
           await resetAutolockAlarm()
           // 定期同期アラームを設定
           chrome.alarms.create('autosync', { periodInMinutes: 1 })
@@ -825,8 +850,8 @@ async function handleMessage(
             await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
             decryptedS3Config = message.s3Config
           }
+          // WASM 側はまだ Locked（DEK を持たない）。セッションは直後の UNLOCK で保存される
           unlocked = true
-          await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.masterPassword)
           await resetAutolockAlarm()
           sendResponse({ success: true, recoveryKey })
         } catch (err) {
@@ -854,7 +879,7 @@ async function handleMessage(
           await loadS3Config(message.newPassword)
           unlocked = true
           updateExtensionIcon(true)
-          await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.newPassword)
+          await saveSessionDek()
           await resetAutolockAlarm()
           chrome.alarms.create('autosync', { periodInMinutes: 1 })
           // 通常のアンロックと同様に、待機中のPasskeyリチュアル・他の画面・各タブへ通知する
@@ -1195,8 +1220,7 @@ async function handleMessage(
             message.oldPassword,
             message.newPassword,
           )
-          // S3設定は DEK 由来の鍵で暗号化しているので、パスワード変更では暗号化し直さなくてよい
-          await saveToSessionStorage(STORAGE_KEYS.SESSION_PASSWORD, message.newPassword)
+          // S3設定・セッションの DEK はパスワード変更で変わらないので、保存し直さなくてよい
           await autoSync()
           sendResponse({ success: true })
         } catch (err) {
@@ -1226,6 +1250,8 @@ async function handleMessage(
             )
           }
           await saveItemsToStorage(items)
+          // 新しい DEK の vault を保存した後に差し替える（SW 再起動時の復元用）
+          await saveSessionDek()
           if (decryptedS3Config) {
             try {
               await pushAfterDekRotation(decryptedS3Config)
@@ -1407,7 +1433,15 @@ async function handleMessage(
       case 'CLIPBOARD_COPIED': {
         try {
           const settings = await loadSettings()
-          lastCopiedText = message.text ?? null
+          if (typeof message.text !== 'string') {
+            sendResponse({ success: false, error: 'text required' })
+            break
+          }
+          // SW がアイドル停止しても消去時に照合できるよう、ハッシュをセッションに置く
+          await saveToSessionStorage(
+            STORAGE_KEYS.CLIPBOARD_HASH,
+            await hashClipboardText(message.text),
+          )
           if (settings.clipboardClearSeconds > 0) {
             const minutes = settings.clipboardClearSeconds / 60
             chrome.alarms.create('clipboard-clear', { delayInMinutes: minutes })
@@ -1458,25 +1492,17 @@ async function handleAutolockAlarm() {
 }
 
 async function handleClipboardClearAlarm() {
-  const expectedText = lastCopiedText
-  lastCopiedText = null
+  const expectedHash = await getFromSessionStorage<string>(STORAGE_KEYS.CLIPBOARD_HASH)
+  await removeFromSessionStorage(STORAGE_KEYS.CLIPBOARD_HASH)
+  if (!expectedHash) return
   try {
     if (typeof chrome.offscreen !== 'undefined') {
-      // Chrome: offscreen document 経由でクリップボードを確認＆クリア
-      await chrome.offscreen.createDocument({
-        url: chrome.runtime.getURL('src/background/offscreen.html'),
-        reasons: ['CLIPBOARD' as chrome.offscreen.Reason],
-        justification: 'Check and clear clipboard after copy timeout',
-      })
-      chrome.runtime.sendMessage({
-        type: 'CHECK_AND_CLEAR_CLIPBOARD',
-        expectedText,
-      })
+      await clearClipboardViaOffscreen(expectedHash)
     } else {
       // Firefox: background page から直接クリップボードを確認＆クリア
       try {
         const current = await navigator.clipboard.readText()
-        if (current === expectedText) {
+        if ((await hashClipboardText(current)) === expectedHash) {
           await navigator.clipboard.writeText('')
         }
       } catch {
@@ -1486,6 +1512,33 @@ async function handleClipboardClearAlarm() {
     }
   } catch (err) {
     console.error('[SW] Clipboard clear failed:', err)
+  }
+}
+
+// Chrome: offscreen document 経由でクリップボードを確認＆クリア。
+// offscreen document は1つしか作れないため、使い終わったら必ず閉じる
+// （残っていると次回の createDocument が失敗し、以降は消去されなくなる）
+async function clearClipboardViaOffscreen(expectedHash: string) {
+  try {
+    await chrome.offscreen.createDocument({
+      url: chrome.runtime.getURL('src/background/offscreen.html'),
+      reasons: ['CLIPBOARD' as chrome.offscreen.Reason],
+      justification: 'Check and clear clipboard after copy timeout',
+    })
+  } catch (err) {
+    // 前回閉じ損ねた document が残っていれば、そのまま使う
+    console.warn('[SW] Offscreen document not created:', err)
+  }
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'CHECK_AND_CLEAR_CLIPBOARD',
+      expectedHash,
+    })
+    if (!response?.success) {
+      console.error('[SW] Clipboard clear failed in offscreen document:', response?.error)
+    }
+  } finally {
+    await chrome.offscreen.closeDocument().catch(() => {})
   }
 }
 

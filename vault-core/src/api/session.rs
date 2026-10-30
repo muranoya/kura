@@ -1,3 +1,4 @@
+use crate::crypto::Dek;
 use crate::secret::{MasterPassword, RecoveryKeyInput};
 use crate::sync::engine::SessionState;
 use crate::vault::LockedVault;
@@ -76,6 +77,59 @@ impl VaultManager {
             Err(e) => {
                 *session = Some(SessionState::Locked(backup));
                 Err(format!("Failed to unlock with recovery key: {}", e))
+            }
+        }
+    }
+
+    /// アンロック中の DEK を base64 で書き出す。
+    ///
+    /// ブラウザ拡張の Service Worker は再起動でメモリ上のセッションを失うため、復元用の値を
+    /// セッションストレージ（メモリのみ）に置く必要がある。マスターパスワードそのものを置くと
+    /// 他サービスとの使い回しまで漏れうるため、代わりにこの値を置く（`api_unlock_with_dek`）
+    pub fn api_export_dek(&self) -> Result<String, String> {
+        use base64::Engine;
+        self.with_unlocked(|unlocked| {
+            Ok(base64::engine::general_purpose::STANDARD.encode(unlocked.dek.as_bytes()))
+        })
+    }
+
+    /// `api_export_dek` で書き出した DEK でアンロック（Argon2 を通さない）
+    pub fn api_unlock_with_dek(&self, dek_b64: String) -> Result<(), String> {
+        use base64::Engine;
+        use zeroize::{Zeroize, Zeroizing};
+
+        let dek_b64 = Zeroizing::new(dek_b64);
+        let decoded = Zeroizing::new(
+            base64::engine::general_purpose::STANDARD
+                .decode(dek_b64.as_bytes())
+                .map_err(|_| "Invalid DEK encoding".to_string())?,
+        );
+        if decoded.len() != 32 {
+            return Err("Invalid DEK length".to_string());
+        }
+        let mut bytes = [0u8; 32];
+        bytes.copy_from_slice(&decoded);
+        let dek = Dek::from_bytes(bytes);
+        bytes.zeroize();
+
+        let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
+
+        let locked = match session.take() {
+            Some(SessionState::Locked(v)) => v,
+            Some(SessionState::Unlocked(_)) => return Err("Already unlocked".to_string()),
+            None => return Err("No vault loaded".to_string()),
+        };
+
+        // Clone as backup for rollback on unlock failure (ciphertext only).
+        let backup = locked.clone();
+        match locked.unlock_with_dek(dek) {
+            Ok(unlocked) => {
+                *session = Some(SessionState::Unlocked(unlocked));
+                Ok(())
+            }
+            Err(e) => {
+                *session = Some(SessionState::Locked(backup));
+                Err(format!("Failed to unlock with DEK: {}", e))
             }
         }
     }
