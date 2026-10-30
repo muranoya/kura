@@ -61,6 +61,7 @@ export default function EntryCard(props: EntryCardProps) {
     return (
       <button
         type="button"
+        aria-current={isSelected || undefined}
         className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer group ${
           isSelected
             ? 'bg-accent-subtle border-l-2 border-l-accent'
