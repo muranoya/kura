@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   Check,
   Copy,
   Crosshair,
@@ -135,7 +134,7 @@ export default function EntryList() {
     () => (location.state as { selectedId?: string } | null)?.selectedId ?? null,
   )
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId)
-  // 狭いサイドバー（1カラム）で詳細を表示中か。前回の選択の復元では一覧のまま開き、
+  // 狭いサイドバー（1カラム）で一覧の下に詳細を表示中か。前回の選択の復元では一覧のみで開き、
   // ユーザーが選択したとき・編集画面から戻ったときだけ詳細を表示する
   const [showDetail, setShowDetail] = useState(initialSelectedId !== null)
 
@@ -149,6 +148,16 @@ export default function EntryList() {
       if (saved) setSelectedId((prev) => prev ?? saved)
     })
   }, [initialSelectedId])
+
+  const listPaneRef = useRef<HTMLDivElement>(null)
+
+  // 1カラム表示では詳細を開くと一覧が縮むため、選択した行が詳細の裏に隠れないようにする
+  useEffect(() => {
+    if (!showDetail || !selectedId || loading) return
+    listPaneRef.current
+      ?.querySelector('[aria-current="true"]')
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [showDetail, selectedId, loading])
 
   const clearSelection = useCallback(() => {
     setSelectedId(null)
@@ -394,10 +403,11 @@ export default function EntryList() {
         <SyncActions onSyncComplete={loadEntries} />
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col twopane:flex-row overflow-hidden">
         <div
-          className={`w-full twopane:w-60 twopane:border-r border-border bg-sidebar flex-col ${
-            showDetail ? 'hidden twopane:flex' : 'flex'
+          ref={listPaneRef}
+          className={`w-full min-h-0 flex flex-col twopane:w-60 twopane:flex-none twopane:border-r border-border ${
+            showDetail ? 'basis-2/5 shrink-0' : 'flex-1'
           }`}
         >
           {error && (
@@ -440,7 +450,7 @@ export default function EntryList() {
         </div>
 
         <div
-          className={`flex-1 bg-bg-surface overflow-y-auto ${showDetail ? '' : 'hidden twopane:block'}`}
+          className={`flex-1 min-h-0 bg-bg-base twopane:bg-bg-surface overflow-y-auto border-t border-border-strong twopane:border-t-0 ${showDetail ? '' : 'hidden twopane:block'}`}
         >
           {selectedId && selectedEntry ? (
             <EntryDetailPane
@@ -452,7 +462,7 @@ export default function EntryList() {
               onEdit={() => navigate(`/entries/${selectedId}/edit`)}
               onDelete={() => handleDelete(selectedId)}
               onFavorite={() => handleFavorite(selectedId, selectedEntry.isFavorite)}
-              onBack={() => setShowDetail(false)}
+              onClose={() => setShowDetail(false)}
             />
           ) : selectedId && selectedError ? (
             <div className="h-full flex flex-col">
@@ -461,9 +471,9 @@ export default function EntryList() {
                   type="button"
                   onClick={() => setShowDetail(false)}
                   className="p-1 -ml-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors"
-                  title={t('common.back')}
+                  title={t('common.close')}
                 >
-                  <ArrowLeft size={14} />
+                  <X size={14} />
                 </button>
               </div>
               <div className="flex-1 flex items-center justify-center">
@@ -490,8 +500,8 @@ interface EntryDetailPaneProps {
   onEdit: () => void
   onDelete: () => void
   onFavorite: () => void
-  /** 1カラム表示時に一覧へ戻る */
-  onBack: () => void
+  /** 1カラム表示時に詳細を閉じる */
+  onClose: () => void
 }
 
 function PaneFieldDisplay({
@@ -638,7 +648,7 @@ function EntryDetailPane({
   onEdit,
   onDelete,
   onFavorite,
-  onBack,
+  onClose,
 }: EntryDetailPaneProps) {
   const { t } = useTranslation()
 
@@ -712,11 +722,11 @@ function EntryDetailPane({
       <div className="flex items-start justify-between gap-2 mb-1">
         <button
           type="button"
-          onClick={onBack}
+          onClick={onClose}
           className="twopane:hidden p-1 -ml-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors shrink-0"
-          title={t('common.back')}
+          title={t('common.close')}
         >
-          <ArrowLeft size={14} />
+          <X size={14} />
         </button>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-bold text-text-primary truncate">{entry.name}</h2>
