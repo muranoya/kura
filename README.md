@@ -153,7 +153,6 @@ aws iam put-user-policy \
 
 - 公式サイト: https://github.com/muranoya/kura
 - プライバシーポリシー: [assets/legal/privacy.md](assets/legal/privacy.md)
-- 利用規約: [assets/legal/terms.md](assets/legal/terms.md)
 - セキュリティ報告: [SECURITY.md](SECURITY.md) を参照
 - 連絡先: daisuke.muraoka.jp@gmail.com
 - Issues: https://github.com/muranoya/kura/issues
