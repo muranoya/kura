@@ -25,7 +25,8 @@ export const STORAGE_KEYS = {
   VAULT_ETAG: 'vaultETag',
   S3_CONFIG: 's3Config',
   APP_SETTINGS: 'appSettings',
-  ONBOARDING_DRAFT: 'onboardingDraft',
+  // 旧バージョンが平文のS3認証情報を保存していたキー。削除のためだけに残している
+  LEGACY_ONBOARDING_DRAFT: 'onboardingDraft',
   ONBOARDING_FLOW: 'onboardingFlow',
   LAST_SYNC_TIME: 'lastSyncTime',
   LAST_ERROR: 'lastError',
