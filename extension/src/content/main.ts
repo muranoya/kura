@@ -171,15 +171,16 @@ async function handleInputFocus(input: HTMLInputElement) {
     return
   }
 
-  // Split login: the entry picked on the username step is suggested first
-  // (and preselected) on the password / TOTP step. It is still only filled
-  // after the user confirms it — never automatically on focus.
+  // Split login: the entry picked on the username step is preselected on the
+  // password / TOTP step, keeping its place so the list order matches the
+  // username step. It is still only filled after the user confirms it — never
+  // automatically on focus.
   const pending =
     form.formType === 'TOTP' || form.formType === 'LOGIN_PASSWORD' ? await queryPendingFlow() : null
 
   // === TOTP: dropdown selection ===
   if (form.formType === 'TOTP') {
-    const candidates = prioritizePending(await requestTotpCandidates(), pending)
+    const candidates = await requestTotpCandidates()
     if (candidates.length === 0) {
       hideDropdown()
       return
@@ -200,7 +201,7 @@ async function handleInputFocus(input: HTMLInputElement) {
           }
         },
         window.location.protocol,
-        pending !== null && candidates[0]?.entryId === pending.entryId,
+        findPendingIndex(candidates, pending),
       )
     }
     showInlineIcon(input, showTotpDropdown)
@@ -235,7 +236,7 @@ async function handleInputFocus(input: HTMLInputElement) {
     return
   }
 
-  const candidates = prioritizePending(result.credentials, pending)
+  const candidates = result.credentials
 
   if (candidates.length === 0) {
     hideDropdown()
@@ -250,7 +251,7 @@ async function handleInputFocus(input: HTMLInputElement) {
         onCandidateSelected(candidate, form)
       },
       window.location.protocol,
-      pending !== null && candidates[0]?.entryId === pending.entryId,
+      findPendingIndex(candidates, pending),
     )
   }
   showInlineIcon(input, showLoginDropdown)
@@ -260,18 +261,15 @@ async function handleInputFocus(input: HTMLInputElement) {
 }
 
 /**
- * Move the split-login pending entry to the front of the candidate list.
- * Returns the list unchanged when there is no pending flow or the pending
- * entry is not among the candidates.
+ * Index of the split-login pending entry in the candidate list, or -1 when
+ * there is no pending flow or the pending entry is not among the candidates.
  */
-function prioritizePending(
+function findPendingIndex(
   candidates: AutofillCredentialCandidate[],
   pending: PendingFlowResult | null,
-): AutofillCredentialCandidate[] {
-  if (!pending) return candidates
-  const index = candidates.findIndex((c) => c.entryId === pending.entryId)
-  if (index <= 0) return candidates
-  return [candidates[index], ...candidates.slice(0, index), ...candidates.slice(index + 1)]
+): number {
+  if (!pending) return -1
+  return candidates.findIndex((c) => c.entryId === pending.entryId)
 }
 
 /**

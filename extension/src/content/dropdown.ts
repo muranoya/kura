@@ -455,7 +455,7 @@ export function showDropdown(
   candidates: AutofillCredentialCandidate[],
   onSelect: (candidate: AutofillCredentialCandidate) => void,
   pageProtocol?: string,
-  preselectFirst = false,
+  preselectedIndex = -1,
 ) {
   if (candidates.length === 0) {
     hideDropdown()
@@ -465,7 +465,7 @@ export function showDropdown(
   const root = ensureShadowHost()
   currentAnchor = anchor
   currentCandidates = candidates
-  selectedIndex = preselectFirst ? 0 : -1
+  selectedIndex = preselectedIndex
   onSelectCallback = onSelect
   currentPageProtocol = pageProtocol || null
 
@@ -480,6 +480,8 @@ export function showDropdown(
 
   renderItems()
   positionDropdown(anchor)
+  // The preselected entry keeps its place in the list, so it may start out of view
+  if (selectedIndex >= 0) updateSelection()
   bringHostToFront()
   trackVisibility(dropdownEl)
   markShown()
