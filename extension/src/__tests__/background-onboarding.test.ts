@@ -58,6 +58,8 @@ const S3_CONFIG = {
   secretAccessKey: 'secret123',
 }
 
+const PENDING = { bytes: [1, 2, 3], etag: 'etag-a', bucket: 'kura-test', key: 'vault.json' }
+
 type Listener = (
   message: unknown,
   sender: chrome.runtime.MessageSender,
@@ -109,10 +111,7 @@ describe('初期設定中の既存Vault', () => {
 
     expect(response).toEqual({ success: true, vaultExists: true })
     expect(await getFromStorage(STORAGE_KEYS.VAULT_BYTES)).toBeUndefined()
-    expect(await getFromStorage(STORAGE_KEYS.PENDING_VAULT)).toEqual({
-      bytes: [1, 2, 3],
-      etag: 'etag-a',
-    })
+    expect(await getFromStorage(STORAGE_KEYS.PENDING_VAULT)).toEqual(PENDING)
   })
 
   it('Vaultを保存できなかったときは成功を返さない', async () => {
@@ -131,7 +130,7 @@ describe('初期設定中の既存Vault', () => {
   })
 
   it('Vaultのないバケットを入力し直すと、前のバケットのVaultを消す', async () => {
-    await saveToStorage(STORAGE_KEYS.PENDING_VAULT, { bytes: [1, 2, 3], etag: 'etag-a' })
+    await saveToStorage(STORAGE_KEYS.PENDING_VAULT, PENDING)
     download.mockResolvedValue(null)
     const send = await loadBackground()
 
@@ -143,7 +142,7 @@ describe('初期設定中の既存Vault', () => {
   })
 
   it('アンロックに失敗してもやり直せるようにし、VAULT_BYTES には書かない', async () => {
-    await saveToStorage(STORAGE_KEYS.PENDING_VAULT, { bytes: [1, 2, 3], etag: 'etag-a' })
+    await saveToStorage(STORAGE_KEYS.PENDING_VAULT, PENDING)
     api_unlock.mockImplementation(() => {
       throw new Error('wrong password')
     })
@@ -162,7 +161,7 @@ describe('初期設定中の既存Vault', () => {
   })
 
   it('アンロックに成功すると Vault を S3 設定とともに確定する', async () => {
-    await saveToStorage(STORAGE_KEYS.PENDING_VAULT, { bytes: [1, 2, 3], etag: 'etag-a' })
+    await saveToStorage(STORAGE_KEYS.PENDING_VAULT, PENDING)
     download.mockResolvedValue(null)
     const send = await loadBackground()
 
@@ -179,9 +178,30 @@ describe('初期設定中の既存Vault', () => {
     expect(await getFromStorage(STORAGE_KEYS.PENDING_VAULT)).toBeUndefined()
   })
 
+  it.each([
+    ['バケット', { bucket: 'other-bucket' }],
+    ['キー', { key: 'other.json' }],
+    ['エンドポイント', { endpoint: 'https://other.example.com' }],
+  ])('ダウンロード後に%sを変えた S3 設定では確定しない', async (_name, change) => {
+    await saveToStorage(STORAGE_KEYS.PENDING_VAULT, PENDING)
+    const send = await loadBackground()
+
+    const response = await send({
+      type: 'UNLOCK_EXISTING',
+      password: 'correct',
+      s3Config: { ...S3_CONFIG, ...change },
+    })
+
+    expect(response.success).toBe(false)
+    expect(api_unlock).not.toHaveBeenCalled()
+    expect(await getFromStorage(STORAGE_KEYS.VAULT_BYTES)).toBeUndefined()
+    expect(await getFromStorage(STORAGE_KEYS.S3_CONFIG)).toBeUndefined()
+    expect(await getFromStorage(STORAGE_KEYS.PENDING_VAULT)).toBeDefined()
+  })
+
   // 2つのコピーを同時に持つと、Chrome の quota（10MiB）で保存できる Vault の上限が半減する
   it('VAULT_BYTES を書く前に PENDING_VAULT を消す', async () => {
-    await saveToStorage(STORAGE_KEYS.PENDING_VAULT, { bytes: [1, 2, 3], etag: 'etag-a' })
+    await saveToStorage(STORAGE_KEYS.PENDING_VAULT, PENDING)
     download.mockResolvedValue(null)
     const send = await loadBackground()
     let pendingAtVaultWrite: unknown = 'not written'
@@ -208,7 +228,7 @@ describe('初期設定中の既存Vault', () => {
   })
 
   it('Vaultを保存できなければアンロック成功を返さず、WASMセッションも残さない', async () => {
-    await saveToStorage(STORAGE_KEYS.PENDING_VAULT, { bytes: [1, 2, 3], etag: 'etag-a' })
+    await saveToStorage(STORAGE_KEYS.PENDING_VAULT, PENDING)
     const send = await loadBackground()
     vi.mocked(chrome.storage.local.set).mockImplementationOnce((_items, callback) => {
       Object.assign(chrome.runtime, { lastError: { message: 'quota exceeded' } })

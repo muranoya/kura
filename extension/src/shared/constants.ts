@@ -23,7 +23,7 @@ export const DEFAULT_SETTINGS = {
 export const STORAGE_KEYS = {
   VAULT_BYTES: 'vaultBytes',
   VAULT_ETAG: 'vaultETag',
-  // 初期設定でダウンロードした、まだアンロックしていない既存 Vault（{ bytes, etag }）。
+  // 初期設定でダウンロードした、まだアンロックしていない既存 Vault（{ bytes, etag, 取得元 }）。
   // VAULT_BYTES があると App は初期設定の完了とみなすため、アンロック成功まで分けて置く
   PENDING_VAULT: 'pendingVault',
   S3_CONFIG: 's3Config',

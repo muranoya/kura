@@ -566,6 +566,25 @@ async function loadS3Config(password: string): Promise<void> {
   }
 }
 
+// ========== 初期設定中の既存 Vault ==========
+
+// 取得元も持ち、入力し直した別のバケットの S3 設定と組み合わせて確定しないようにする
+interface PendingVault {
+  bytes: number[]
+  etag: string
+  bucket: string
+  key: string
+  endpoint?: string
+}
+
+function isPendingVaultFrom(pending: PendingVault, s3Config: S3Config): boolean {
+  return (
+    pending.bucket === s3Config.bucket &&
+    pending.key === s3Config.key &&
+    pending.endpoint === s3Config.endpoint
+  )
+}
+
 // ========== セッション復元 ==========
 
 // SW 再起動時の復元用に、アンロック中の DEK をセッションストレージ（メモリのみ）に置く。
@@ -762,11 +781,16 @@ async function handleMessage(
           break
         }
         try {
-          const pending = await getFromStorage<{ bytes: number[]; etag: string }>(
-            STORAGE_KEYS.PENDING_VAULT,
-          )
+          const pending = await getFromStorage<PendingVault>(STORAGE_KEYS.PENDING_VAULT)
           if (!pending) {
             sendResponse({ success: false, error: 'Vault not found' })
+            break
+          }
+          if (!message.s3Config || !isPendingVaultFrom(pending, message.s3Config)) {
+            sendResponse({
+              success: false,
+              error: 'S3 settings do not match the downloaded vault',
+            })
             break
           }
           vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(pending.bytes), pending.etag)
@@ -1323,7 +1347,10 @@ async function handleMessage(
               await saveToStorage(STORAGE_KEYS.PENDING_VAULT, {
                 bytes: Array.from(vaultBytes),
                 etag: remote.etag,
-              })
+                bucket: s3Config.bucket,
+                key: s3Config.key,
+                endpoint: s3Config.endpoint,
+              } satisfies PendingVault)
             } else {
               // 入力し直す前のバケットの Vault を残さない
               await removeFromStorage(STORAGE_KEYS.PENDING_VAULT)
