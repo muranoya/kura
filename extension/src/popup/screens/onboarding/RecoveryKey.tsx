@@ -2,8 +2,6 @@ import { Check, Copy } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { STORAGE_KEYS } from '../../../shared/constants'
-import { removeFromStorage } from '../../../shared/storage'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
@@ -16,7 +14,6 @@ export default function RecoveryKey() {
   const passedRecoveryKey = (location.state as { recoveryKey?: string })?.recoveryKey
   const [recoveryKey] = useState(passedRecoveryKey || 'XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX')
   const [copied, setCopied] = useState(false)
-  const [completing, setCompleting] = useState(false)
 
   const handleCopy = () => {
     copySensitive(recoveryKey)
@@ -24,19 +21,10 @@ export default function RecoveryKey() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleComplete = async () => {
-    setCompleting(true)
-    try {
-      await removeFromStorage(STORAGE_KEYS.ONBOARDING_DRAFT)
-      // リカバリーキーを書き写している間にオートロックされていることがある。
-      // 遷移すると App がロック状態を確認し直し、ロック中ならロック画面を表示する
-      navigate('/entries')
-    } catch (err) {
-      console.error('[RecoveryKey] Error:', err)
-      alert(`${t('onboarding.recoveryKey.errorPrefix')}: ${String(err)}`)
-    } finally {
-      setCompleting(false)
-    }
+  const handleComplete = () => {
+    // リカバリーキーを書き写している間にオートロックされていることがある。
+    // 遷移すると App がロック状態を確認し直し、ロック中ならロック画面を表示する
+    navigate('/entries')
   }
 
   return (
@@ -73,10 +61,8 @@ export default function RecoveryKey() {
           </CardContent>
         </Card>
 
-        <Button onClick={handleComplete} disabled={completing} className="w-full text-sm" size="sm">
-          {completing
-            ? t('onboarding.recoveryKey.completing')
-            : t('onboarding.recoveryKey.completeButton')}
+        <Button onClick={handleComplete} className="w-full text-sm" size="sm">
+          {t('onboarding.recoveryKey.completeButton')}
         </Button>
       </div>
     </div>

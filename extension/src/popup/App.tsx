@@ -1,10 +1,11 @@
 import { Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { HashRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import type { ExtensionPageBroadcast } from '../shared/messages'
 import { BottomNav } from './components/BottomNav'
 import ErrorBar from './components/layout/ErrorBar'
 import { ErrorProvider } from './contexts/ErrorContext'
+import { OnboardingDraftProvider } from './contexts/OnboardingDraftContext'
 import { useUserActivity } from './hooks/useUserActivity'
 import Lock from './screens/auth/Lock'
 import Recovery from './screens/auth/Recovery'
@@ -15,6 +16,7 @@ import PasswordGenerator from './screens/entries/PasswordGenerator'
 import Trash from './screens/entries/Trash'
 import LabelManager from './screens/labels/LabelManager'
 import MasterPassword from './screens/onboarding/MasterPassword'
+import RecoverExistingVault from './screens/onboarding/RecoverExistingVault'
 import RecoveryKey from './screens/onboarding/RecoveryKey'
 import StorageSetup from './screens/onboarding/StorageSetup'
 import UnlockExistingVault from './screens/onboarding/UnlockExistingVault'
@@ -131,14 +133,21 @@ function AppContent() {
         <Routes>
           {/* Onboarding */}
           {appState === 'onboarding' && (
-            <>
+            <Route
+              element={
+                <OnboardingDraftProvider>
+                  <Outlet />
+                </OnboardingDraftProvider>
+              }
+            >
               <Route path="/" element={<Welcome />} />
               <Route path="/onb/storage" element={<StorageSetup />} />
               <Route path="/onb/unlock-existing" element={<UnlockExistingVault />} />
+              <Route path="/onb/recover-existing" element={<RecoverExistingVault />} />
               <Route path="/onb/password" element={<MasterPassword />} />
               <Route path="/onb/recovery" element={<RecoveryKey />} />
               <Route path="*" element={<Navigate to="/" replace />} />
-            </>
+            </Route>
           )}
 
           {/* Auth */}

@@ -73,8 +73,12 @@ export class VaultS3Client {
         Body: data,
       }
 
+      // ETag が空なのは、リモートの vault をまだ取得していないとき。
+      // 条件なしで書くと別の vault や他の端末の変更を上書きしうるので、新規作成としてだけ書き込む
       if (etag) {
         params.IfMatch = etag
+      } else {
+        params.IfNoneMatch = '*'
       }
 
       const response = await this.client.send(new PutObjectCommand(params))
