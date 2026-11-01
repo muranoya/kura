@@ -771,26 +771,21 @@ async function handleMessage(
           }
           vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(pending.bytes), pending.etag)
           vault.api_unlock(DEFAULT_VAULT_ID, message.password)
-          // オンボーディング時のS3設定暗号化保存
-          if (message.s3Config) {
-            const configJson = JSON.stringify(message.s3Config)
-            const encrypted = vault.api_encrypt_config(
-              DEFAULT_VAULT_ID,
-              message.password,
-              configJson,
-            )
-            await saveToStorage(STORAGE_KEYS.S3_CONFIG, encrypted)
-            decryptedS3Config = message.s3Config
-          } else {
-            // 通常のアンロック: 暗号化S3設定を復号
-            await loadS3Config(message.password)
-          }
-          // S3設定を保存した後に VAULT_BYTES を書き、設定のない Vault を残さない
+          const encrypted = vault.api_encrypt_config(
+            DEFAULT_VAULT_ID,
+            message.password,
+            JSON.stringify(message.s3Config),
+          )
+          // 同じ Vault の2つのコピーで quota を圧迫しないよう、先に pending を消す。
+          // 書き込めなくても S3 に Vault が残っているので、ダウンロードからやり直せる
+          await removeFromStorage(STORAGE_KEYS.PENDING_VAULT)
+          // 1 回の set で書き、S3 設定のない Vault を残さない
           await saveItemsToStorage({
             [STORAGE_KEYS.VAULT_BYTES]: pending.bytes,
             [STORAGE_KEYS.VAULT_ETAG]: pending.etag,
+            [STORAGE_KEYS.S3_CONFIG]: encrypted,
           })
-          await removeFromStorage(STORAGE_KEYS.PENDING_VAULT)
+          decryptedS3Config = message.s3Config
           unlocked = true
           updateExtensionIcon(true)
           await saveSessionDek()
@@ -804,6 +799,10 @@ async function handleMessage(
           // アンロック後に同期（バックグラウンド）
           autoSync().catch((e) => console.error('[SW] Post-unlock sync failed:', e))
         } catch (err) {
+          // SW側はロック状態のままなので、WASMセッションだけアンロック済みで残さない
+          if (!unlocked && vault.api_is_unlocked(DEFAULT_VAULT_ID)) {
+            vault.api_lock(DEFAULT_VAULT_ID)
+          }
           sendResponse({ success: false, error: String(err) })
         }
         break

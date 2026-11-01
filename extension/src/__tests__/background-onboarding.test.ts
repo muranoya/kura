@@ -4,15 +4,18 @@ import { getFromStorage, saveToStorage } from '../shared/storage'
 
 const download = vi.fn()
 const api_unlock = vi.fn()
+const api_lock = vi.fn()
+const api_is_unlocked = vi.fn(() => false)
 
 vi.mock('../background/wasm-init', () => ({
   initWasmManual: async () => ({
     api_load_vault: vi.fn(),
     api_unlock,
+    api_lock,
     api_get_vault_bytes: () => new Uint8Array([1, 2, 3]),
     api_encrypt_config: () => 'encrypted-config',
     api_export_dek: () => 'dek',
-    api_is_unlocked: () => false,
+    api_is_unlocked,
   }),
 }))
 vi.mock('../shared/s3-client', () => ({
@@ -81,6 +84,9 @@ async function loadBackground() {
 beforeEach(() => {
   download.mockReset()
   api_unlock.mockReset()
+  api_lock.mockReset()
+  api_is_unlocked.mockReset()
+  api_is_unlocked.mockReturnValue(false)
   const event = { addListener: vi.fn() }
   Object.assign(chrome, {
     action: { setIcon: vi.fn() },
@@ -171,5 +177,56 @@ describe('初期設定中の既存Vault', () => {
     expect(await getFromStorage(STORAGE_KEYS.VAULT_ETAG)).toBe('etag-a')
     expect(await getFromStorage(STORAGE_KEYS.S3_CONFIG)).toBe('encrypted-config')
     expect(await getFromStorage(STORAGE_KEYS.PENDING_VAULT)).toBeUndefined()
+  })
+
+  // 2つのコピーを同時に持つと、Chrome の quota（10MiB）で保存できる Vault の上限が半減する
+  it('VAULT_BYTES を書く前に PENDING_VAULT を消す', async () => {
+    await saveToStorage(STORAGE_KEYS.PENDING_VAULT, { bytes: [1, 2, 3], etag: 'etag-a' })
+    download.mockResolvedValue(null)
+    const send = await loadBackground()
+    let pendingAtVaultWrite: unknown = 'not written'
+    const set = vi.mocked(chrome.storage.local.set)
+    const originalSet = set.getMockImplementation()
+    set.mockImplementation((items, callback) => {
+      if (STORAGE_KEYS.VAULT_BYTES in items) {
+        chrome.storage.local.get([STORAGE_KEYS.PENDING_VAULT], (result) => {
+          pendingAtVaultWrite = result[STORAGE_KEYS.PENDING_VAULT]
+        })
+      }
+      originalSet?.(items, callback)
+    })
+
+    const response = await send({
+      type: 'UNLOCK_EXISTING',
+      password: 'correct',
+      s3Config: S3_CONFIG,
+    })
+    set.mockImplementation(originalSet as never)
+
+    expect(response).toEqual({ success: true })
+    expect(pendingAtVaultWrite).toBeUndefined()
+  })
+
+  it('Vaultを保存できなければアンロック成功を返さず、WASMセッションも残さない', async () => {
+    await saveToStorage(STORAGE_KEYS.PENDING_VAULT, { bytes: [1, 2, 3], etag: 'etag-a' })
+    const send = await loadBackground()
+    vi.mocked(chrome.storage.local.set).mockImplementationOnce((_items, callback) => {
+      Object.assign(chrome.runtime, { lastError: { message: 'quota exceeded' } })
+      callback?.()
+      Object.assign(chrome.runtime, { lastError: undefined })
+    })
+    api_is_unlocked.mockReturnValue(true)
+
+    const response = await send({
+      type: 'UNLOCK_EXISTING',
+      password: 'correct',
+      s3Config: S3_CONFIG,
+    })
+
+    expect(response.success).toBe(false)
+    expect(await getFromStorage(STORAGE_KEYS.VAULT_BYTES)).toBeUndefined()
+    expect(api_lock).toHaveBeenCalled()
+    const unlockedResponse = await send({ type: 'IS_UNLOCKED' })
+    expect(unlockedResponse.unlocked).toBe(false)
   })
 })
