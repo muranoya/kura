@@ -479,6 +479,28 @@ describe('Back navigation', () => {
     })
   })
 
+  // 履歴を戻ると、入力し直したバケットでは確認していないパスワード設定画面などへ進めてしまう
+  it('should go to welcome from storage setup instead of popping history', async () => {
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter initialEntries={['/', '/onb/password', '/onb/storage']} initialIndex={2}>
+        <OnboardingDraftProvider initialDraft={FILLED_DRAFT}>
+          <Routes>
+            <Route path="/" element={<Welcome />} />
+            <Route path="/onb/storage" element={<StorageSetup />} />
+            <Route path="/onb/password" element={<MasterPassword />} />
+          </Routes>
+        </OnboardingDraftProvider>
+      </MemoryRouter>,
+    )
+
+    await user.click(screen.getByRole('button', { name: '戻る' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '始める' })).toBeInTheDocument()
+    })
+  })
+
   it('should keep storage form values when returning from master password', async () => {
     mockChromeMessages({
       DOWNLOAD_VAULT: () => ({ success: true, vaultExists: false }),
