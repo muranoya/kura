@@ -109,6 +109,21 @@ describe('初期設定中の既存Vault', () => {
     })
   })
 
+  it('Vaultを保存できなかったときは成功を返さない', async () => {
+    download.mockResolvedValue({ bytes: new Uint8Array([1, 2, 3]), etag: 'etag-a' })
+    const send = await loadBackground()
+    vi.mocked(chrome.storage.local.set).mockImplementationOnce((_items, callback) => {
+      Object.assign(chrome.runtime, { lastError: { message: 'quota exceeded' } })
+      callback?.()
+      Object.assign(chrome.runtime, { lastError: undefined })
+    })
+
+    const response = await send({ type: 'DOWNLOAD_VAULT', s3Config: S3_CONFIG })
+
+    expect(response.success).toBe(false)
+    expect(String(response.error)).toContain('quota exceeded')
+  })
+
   it('Vaultのないバケットを入力し直すと、前のバケットのVaultを消す', async () => {
     await saveToStorage(STORAGE_KEYS.PENDING_VAULT, { bytes: [1, 2, 3], etag: 'etag-a' })
     download.mockResolvedValue(null)

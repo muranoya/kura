@@ -8,19 +8,20 @@ export async function getFromStorage<T = unknown>(key: string): Promise<T | unde
   })
 }
 
+// quota 超過などで書き込めなかったときは reject する（lastError はコールバックでしか取れない）
 export async function saveToStorage(key: string, value: unknown): Promise<void> {
-  return new Promise((resolve) => {
-    chrome.storage.local.set({ [key]: value }, () => {
-      resolve()
-    })
-  })
+  return saveItemsToStorage({ [key]: value })
 }
 
 /** 複数のキーを 1 回の set で保存する（一方だけが書かれた状態を残さないため） */
 export async function saveItemsToStorage(items: Record<string, unknown>): Promise<void> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     chrome.storage.local.set(items, () => {
-      resolve()
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message))
+      } else {
+        resolve()
+      }
     })
   })
 }

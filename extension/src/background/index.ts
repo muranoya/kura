@@ -812,8 +812,12 @@ async function handleMessage(
       case 'LOCK': {
         try {
           const vaultBytes = vault.api_lock(DEFAULT_VAULT_ID)
-          await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
-          await enterLockedState()
+          // WASM 側はもうロック済みなので、保存に失敗してもロック状態へ遷移する
+          try {
+            await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
+          } finally {
+            await enterLockedState()
+          }
           sendResponse({ success: true })
         } catch (err) {
           sendResponse({ success: false, error: String(err) })
@@ -1502,8 +1506,12 @@ async function handleAutolockAlarm() {
   if (!unlocked) return
   try {
     const vaultBytes = vault.api_lock(DEFAULT_VAULT_ID)
-    await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
-    await enterLockedState()
+    // WASM 側はもうロック済みなので、保存に失敗してもロック状態へ遷移する
+    try {
+      await saveToStorage(STORAGE_KEYS.VAULT_BYTES, Array.from(vaultBytes))
+    } finally {
+      await enterLockedState()
+    }
   } catch (err) {
     console.error('[SW] Autolock failed:', err)
   }
