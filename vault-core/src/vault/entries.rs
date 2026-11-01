@@ -339,6 +339,7 @@ impl UnlockedVault {
 }
 
 fn sort_by_filter(items: &mut [EntrySummary], filter: &EntryFilter) {
+    // ソートキーが同値の場合に HashMap の走査順が結果に漏れないよう、id で順序を確定させる
     items.sort_by(|a, b| {
         let cmp = match filter.sort_field {
             SortField::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
@@ -349,6 +350,7 @@ fn sort_by_filter(items: &mut [EntrySummary], filter: &EntryFilter) {
             SortOrder::Asc => cmp,
             SortOrder::Desc => cmp.reverse(),
         }
+        .then_with(|| a.id.cmp(&b.id))
     });
 }
 
@@ -607,6 +609,28 @@ mod tests {
         assert_eq!(entries[0].id, "new");
         assert_eq!(entries[1].id, "mid");
         assert_eq!(entries[2].id, "old");
+    }
+
+    #[test]
+    fn test_list_entry_summaries_breaks_ties_by_id() {
+        let mut vault = make_vault();
+        for id in ["d", "b", "e", "a", "c"] {
+            insert_entry(&mut vault, id, "Same", 1000);
+        }
+
+        let filters = [
+            EntryFilter::new(),
+            EntryFilter::new().with_sort(SortField::CreatedAt, SortOrder::Asc),
+            EntryFilter::new().with_sort(SortField::Name, SortOrder::Desc),
+        ];
+        for filter in &filters {
+            let ids: Vec<_> = vault
+                .list_entry_summaries(filter)
+                .into_iter()
+                .map(|e| e.id)
+                .collect();
+            assert_eq!(ids, ["a", "b", "c", "d", "e"]);
+        }
     }
 
     #[test]

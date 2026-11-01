@@ -379,7 +379,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 1. LOGIN_USERNAMEフォームを検出し、ユーザーが候補を選択してkuraがusernameを入力
 2. Service WorkerのメモリにtabIdをキーとして `pendingLoginFlows.set(tabId, { origin, frameId, entryId, username, timestamp })` を保存。`origin`/`frameId`は`sender`から取る
 3. 次のページ/DOM状態でLOGIN_PASSWORD/TOTPフォームを検出した場合、`pendingLoginFlows`を参照する。`origin`と`frameId`が保存時と一致する場合のみ同一フローとして扱う
-4. 同一フローなら、引き継いだエントリを候補の先頭に置き、選択済みの状態でドロップダウンを表示する。入力はユーザーがクリックまたはEnterで確定した場合のみ行う（フォーカスだけで自動入力はしない）
+4. 同一フローなら、候補の並び順は変えずに、引き継いだエントリを選択済みの状態でドロップダウンを表示する（画面間で候補の並びが変わらないようにするため）。入力はユーザーがクリックまたはEnterで確定した場合のみ行う（フォーカスだけで自動入力はしない）
 5. タイムアウト（5分）経過後、またはタブクローズ時（`chrome.tabs.onRemoved`）に`pendingLoginFlows`から削除する
 
 **セキュリティ上の判断：** 以前はeTLD+1単位で照合し、パスワード欄へのフォーカスだけでパスワードを自動入力していた。この方式では、同じタブで同一eTLD+1の別サブドメイン（ユーザー投稿コンテンツを置くサブドメインやXSSのあるページ）に遷移した場合や、同一サイトのiframeから、スクリプトが`focus()`を呼ぶだけでパスワードを取得できた。そのため照合を厳密なoriginとframeIdに絞り、問い合わせ結果にパスワードを含めず、入力にはユーザーの確定操作を必須にした。
