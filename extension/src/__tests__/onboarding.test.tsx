@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OnboardingDraftProvider } from '../popup/contexts/OnboardingDraftContext'
 import MasterPassword from '../popup/screens/onboarding/MasterPassword'
+import RecoverExistingVault from '../popup/screens/onboarding/RecoverExistingVault'
 import RecoveryKey from '../popup/screens/onboarding/RecoveryKey'
 import StorageSetup from '../popup/screens/onboarding/StorageSetup'
 import UnlockExistingVault from '../popup/screens/onboarding/UnlockExistingVault'
@@ -56,6 +57,7 @@ function renderOnboarding(
           <Route path="/onb/password" element={<MasterPassword />} />
           <Route path="/onb/recovery" element={<RecoveryKey />} />
           <Route path="/onb/unlock-existing" element={<UnlockExistingVault />} />
+          <Route path="/onb/recover-existing" element={<RecoverExistingVault />} />
           <Route path="/entries" element={<div>Entries Page</div>} />
         </Routes>
       </OnboardingDraftProvider>
@@ -374,6 +376,75 @@ describe('UnlockExistingVault', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Entries Page')).toBeInTheDocument()
+    })
+  })
+})
+
+// ============================================================================
+// RecoverExistingVault
+// ============================================================================
+
+describe('RecoverExistingVault', () => {
+  it('should recover with the draft S3 config and navigate to entries', async () => {
+    let recoverMessage: Record<string, unknown> | undefined
+    mockChromeMessages({
+      RECOVER_EXISTING: (msg) => {
+        recoverMessage = msg
+        return { success: true }
+      },
+    })
+    const user = userEvent.setup()
+    renderOnboarding('/onb/unlock-existing', FILLED_DRAFT)
+
+    await user.click(screen.getByRole('button', { name: 'マスターパスワードを忘れた場合' }))
+    await user.type(screen.getByLabelText('リカバリーキー'), 'recovery-key')
+    await user.type(screen.getByLabelText('新しいマスターパスワード'), 'new-password')
+    await user.type(screen.getByLabelText('新しいマスターパスワード（確認）'), 'new-password')
+    await user.click(screen.getByRole('button', { name: '復旧を実行' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Entries Page')).toBeInTheDocument()
+    })
+    expect(recoverMessage).toMatchObject({
+      recoveryKey: 'recovery-key',
+      newPassword: 'new-password',
+      s3Config: { bucket: 'kura-test', key: 'vault.json' },
+    })
+  })
+
+  it('should show error and stay when recovery fails', async () => {
+    mockChromeMessages({
+      RECOVER_EXISTING: () => ({ success: false, error: 'invalid recovery key' }),
+    })
+    const user = userEvent.setup()
+    renderOnboarding('/onb/recover-existing', FILLED_DRAFT)
+
+    await user.type(screen.getByLabelText('リカバリーキー'), 'wrong')
+    await user.type(screen.getByLabelText('新しいマスターパスワード'), 'new-password')
+    await user.type(screen.getByLabelText('新しいマスターパスワード（確認）'), 'new-password')
+    await user.click(screen.getByRole('button', { name: '復旧を実行' }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/invalid recovery key/)).toBeInTheDocument()
+    })
+  })
+
+  it('should return to the unlock screen on back', async () => {
+    const user = userEvent.setup()
+    renderOnboarding('/onb/recover-existing', FILLED_DRAFT)
+
+    await user.click(screen.getByRole('button', { name: '戻る' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('既存のVaultを使用')).toBeInTheDocument()
+    })
+  })
+
+  it('should redirect to storage setup when the draft is empty', async () => {
+    renderOnboarding('/onb/recover-existing')
+
+    await waitFor(() => {
+      expect(screen.getByText('ストレージ設定')).toBeInTheDocument()
     })
   })
 })

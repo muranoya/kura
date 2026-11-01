@@ -5,7 +5,7 @@
 
 import type { MessageResponse } from '../../shared/messages'
 import { sendMessage } from '../../shared/messages'
-import type { AppSettings, Entry, EntryFilter, EntryRow, Label } from '../../shared/types'
+import type { AppSettings, Entry, EntryFilter, EntryRow, Label, S3Config } from '../../shared/types'
 
 // Helper to access optional fields on MessageResponse without `any` casts
 function field<K extends string, V>(res: MessageResponse, key: K): V | undefined {
@@ -28,6 +28,15 @@ export async function recoverWithRecoveryKey(
   newPassword: string,
 ): Promise<void> {
   const res = await sendMessage({ type: 'RECOVER', recoveryKey, newPassword })
+  if (!res.success) throw new Error(field<'error', string>(res, 'error'))
+}
+
+export async function recoverExistingVault(
+  recoveryKey: string,
+  newPassword: string,
+  s3Config: S3Config,
+): Promise<void> {
+  const res = await sendMessage({ type: 'RECOVER_EXISTING', recoveryKey, newPassword, s3Config })
   if (!res.success) throw new Error(field<'error', string>(res, 'error'))
 }
 

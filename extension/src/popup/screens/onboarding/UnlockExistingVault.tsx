@@ -140,6 +140,16 @@ export default function UnlockExistingVault() {
                 </Button>
               </div>
             </form>
+
+            <Button
+              variant="secondary"
+              onClick={() => navigate('/onb/recover-existing', { state: { fromOnboarding: true } })}
+              disabled={loading}
+              className="w-full text-sm"
+              size="sm"
+            >
+              {t('auth.lock.forgotPassword')}
+            </Button>
           </CardContent>
         </Card>
       </div>

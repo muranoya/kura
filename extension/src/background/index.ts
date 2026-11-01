@@ -585,6 +585,61 @@ function isPendingVaultFrom(pending: PendingVault, s3Config: S3Config): boolean 
   )
 }
 
+/**
+ * ダウンロード済みの Vault を unlockVault で開き、S3 設定とともに確定してアンロック状態にする。
+ * password は確定後の Vault を開けるマスターパスワード（S3 設定の暗号化に使う）
+ */
+async function openPendingVault(
+  s3Config: S3Config | undefined,
+  password: string,
+  sendResponse: (response: { success: boolean; error?: string }) => void,
+  unlockVault: () => void,
+): Promise<void> {
+  try {
+    const pending = await getFromStorage<PendingVault>(STORAGE_KEYS.PENDING_VAULT)
+    if (!pending) {
+      sendResponse({ success: false, error: 'Vault not found' })
+      return
+    }
+    if (!s3Config || !isPendingVaultFrom(pending, s3Config)) {
+      sendResponse({ success: false, error: 'S3 settings do not match the downloaded vault' })
+      return
+    }
+    vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(pending.bytes), pending.etag)
+    unlockVault()
+    const encrypted = vault.api_encrypt_config(DEFAULT_VAULT_ID, password, JSON.stringify(s3Config))
+    // 同じ Vault の2つのコピーで quota を圧迫しないよう、先に pending を消す。
+    // 書き込めなくても S3 に Vault が残っているので、ダウンロードからやり直せる
+    await removeFromStorage(STORAGE_KEYS.PENDING_VAULT)
+    // 1 回の set で書き、S3 設定のない Vault を残さない。
+    // ETag は取得したリモートの版を指したままにする（リカバリーの変更は次の同期でマージする）
+    await saveItemsToStorage({
+      [STORAGE_KEYS.VAULT_BYTES]: Array.from(vault.api_get_vault_bytes(DEFAULT_VAULT_ID)),
+      [STORAGE_KEYS.VAULT_ETAG]: pending.etag,
+      [STORAGE_KEYS.S3_CONFIG]: encrypted,
+    })
+    decryptedS3Config = s3Config
+    unlocked = true
+    updateExtensionIcon(true)
+    await saveSessionDek()
+    await resetAutolockAlarm()
+    // 定期同期アラームを設定
+    chrome.alarms.create('autosync', { periodInMinutes: 1 })
+    await resumeLockedWebauthnRituals()
+    sendResponse({ success: true })
+    // オートフィル: アクティブタブにContent Script注入
+    onVaultUnlocked()
+    // アンロック後に同期（バックグラウンド）
+    autoSync().catch((e) => console.error('[SW] Post-unlock sync failed:', e))
+  } catch (err) {
+    // SW側はロック状態のままなので、WASMセッションだけアンロック済みで残さない
+    if (!unlocked && vault.api_is_unlocked(DEFAULT_VAULT_ID)) {
+      vault.api_lock(DEFAULT_VAULT_ID)
+    }
+    sendResponse({ success: false, error: String(err) })
+  }
+}
+
 // ========== セッション復元 ==========
 
 // SW 再起動時の復元用に、アンロック中の DEK をセッションストレージ（メモリのみ）に置く。
@@ -780,55 +835,25 @@ async function handleMessage(
           sendResponse({ success: false, error: 'Password required' })
           break
         }
-        try {
-          const pending = await getFromStorage<PendingVault>(STORAGE_KEYS.PENDING_VAULT)
-          if (!pending) {
-            sendResponse({ success: false, error: 'Vault not found' })
-            break
-          }
-          if (!message.s3Config || !isPendingVaultFrom(pending, message.s3Config)) {
-            sendResponse({
-              success: false,
-              error: 'S3 settings do not match the downloaded vault',
-            })
-            break
-          }
-          vault.api_load_vault(DEFAULT_VAULT_ID, new Uint8Array(pending.bytes), pending.etag)
+        await openPendingVault(message.s3Config, message.password, sendResponse, () => {
           vault.api_unlock(DEFAULT_VAULT_ID, message.password)
-          const encrypted = vault.api_encrypt_config(
-            DEFAULT_VAULT_ID,
-            message.password,
-            JSON.stringify(message.s3Config),
-          )
-          // 同じ Vault の2つのコピーで quota を圧迫しないよう、先に pending を消す。
-          // 書き込めなくても S3 に Vault が残っているので、ダウンロードからやり直せる
-          await removeFromStorage(STORAGE_KEYS.PENDING_VAULT)
-          // 1 回の set で書き、S3 設定のない Vault を残さない
-          await saveItemsToStorage({
-            [STORAGE_KEYS.VAULT_BYTES]: pending.bytes,
-            [STORAGE_KEYS.VAULT_ETAG]: pending.etag,
-            [STORAGE_KEYS.S3_CONFIG]: encrypted,
-          })
-          decryptedS3Config = message.s3Config
-          unlocked = true
-          updateExtensionIcon(true)
-          await saveSessionDek()
-          await resetAutolockAlarm()
-          // 定期同期アラームを設定
-          chrome.alarms.create('autosync', { periodInMinutes: 1 })
-          await resumeLockedWebauthnRituals()
-          sendResponse({ success: true })
-          // オートフィル: アクティブタブにContent Script注入
-          onVaultUnlocked()
-          // アンロック後に同期（バックグラウンド）
-          autoSync().catch((e) => console.error('[SW] Post-unlock sync failed:', e))
-        } catch (err) {
-          // SW側はロック状態のままなので、WASMセッションだけアンロック済みで残さない
-          if (!unlocked && vault.api_is_unlocked(DEFAULT_VAULT_ID)) {
-            vault.api_lock(DEFAULT_VAULT_ID)
-          }
-          sendResponse({ success: false, error: String(err) })
+        })
+        break
+      }
+
+      case 'RECOVER_EXISTING': {
+        if (!message.recoveryKey || !message.newPassword) {
+          sendResponse({ success: false, error: 'Recovery key and password required' })
+          break
         }
+        await openPendingVault(message.s3Config, message.newPassword, sendResponse, () => {
+          vault.api_unlock_with_recovery_key(DEFAULT_VAULT_ID, message.recoveryKey)
+          vault.api_reset_master_password_with_recovery_key(
+            DEFAULT_VAULT_ID,
+            message.recoveryKey,
+            message.newPassword,
+          )
+        })
         break
       }
 

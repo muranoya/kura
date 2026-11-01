@@ -7,6 +7,7 @@ import type {
   EntryFilter,
   EntryRow,
   Label,
+  S3Config,
   SyncConflict,
 } from './types'
 
@@ -16,6 +17,8 @@ export type Message =
   | { type: 'UNLOCK'; password: string }
   | { type: 'UNLOCK_EXISTING'; password: string }
   | { type: 'RECOVER'; recoveryKey: string; newPassword: string }
+  // 初期設定でダウンロードした既存 Vault をリカバリーキーで開く
+  | { type: 'RECOVER_EXISTING'; recoveryKey: string; newPassword: string; s3Config: S3Config }
   | { type: 'LOCK' }
   // ロックしたうえで拡張機能の全データを消去する
   | { type: 'LOGOUT' }

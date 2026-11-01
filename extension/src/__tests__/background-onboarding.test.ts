@@ -5,6 +5,8 @@ import { getFromStorage, saveToStorage } from '../shared/storage'
 const download = vi.fn()
 const api_unlock = vi.fn()
 const api_lock = vi.fn()
+const api_unlock_with_recovery_key = vi.fn()
+const api_reset_master_password_with_recovery_key = vi.fn()
 const api_is_unlocked = vi.fn(() => false)
 
 vi.mock('../background/wasm-init', () => ({
@@ -12,6 +14,8 @@ vi.mock('../background/wasm-init', () => ({
     api_load_vault: vi.fn(),
     api_unlock,
     api_lock,
+    api_unlock_with_recovery_key,
+    api_reset_master_password_with_recovery_key,
     api_get_vault_bytes: () => new Uint8Array([1, 2, 3]),
     api_encrypt_config: () => 'encrypted-config',
     api_export_dek: () => 'dek',
@@ -87,6 +91,8 @@ beforeEach(() => {
   download.mockReset()
   api_unlock.mockReset()
   api_lock.mockReset()
+  api_unlock_with_recovery_key.mockReset()
+  api_reset_master_password_with_recovery_key.mockReset()
   api_is_unlocked.mockReset()
   api_is_unlocked.mockReturnValue(false)
   const event = { addListener: vi.fn() }
@@ -248,5 +254,48 @@ describe('初期設定中の既存Vault', () => {
     expect(api_lock).toHaveBeenCalled()
     const unlockedResponse = await send({ type: 'IS_UNLOCKED' })
     expect(unlockedResponse.unlocked).toBe(false)
+  })
+
+  it('リカバリーキーで開くと新しいパスワードを設定して確定する', async () => {
+    await saveToStorage(STORAGE_KEYS.PENDING_VAULT, PENDING)
+    download.mockResolvedValue(null)
+    const send = await loadBackground()
+
+    const response = await send({
+      type: 'RECOVER_EXISTING',
+      recoveryKey: 'recovery-key',
+      newPassword: 'new-password',
+      s3Config: S3_CONFIG,
+    })
+
+    expect(response).toEqual({ success: true })
+    expect(api_reset_master_password_with_recovery_key).toHaveBeenCalledWith(
+      expect.anything(),
+      'recovery-key',
+      'new-password',
+    )
+    expect(await getFromStorage(STORAGE_KEYS.VAULT_BYTES)).toEqual([1, 2, 3])
+    expect(await getFromStorage(STORAGE_KEYS.S3_CONFIG)).toBe('encrypted-config')
+    expect(await getFromStorage(STORAGE_KEYS.PENDING_VAULT)).toBeUndefined()
+    expect((await send({ type: 'IS_UNLOCKED' })).unlocked).toBe(true)
+  })
+
+  it('リカバリーキーが違えばやり直せるようにし、確定しない', async () => {
+    await saveToStorage(STORAGE_KEYS.PENDING_VAULT, PENDING)
+    api_unlock_with_recovery_key.mockImplementation(() => {
+      throw new Error('invalid recovery key')
+    })
+    const send = await loadBackground()
+
+    const response = await send({
+      type: 'RECOVER_EXISTING',
+      recoveryKey: 'wrong',
+      newPassword: 'new-password',
+      s3Config: S3_CONFIG,
+    })
+
+    expect(response.success).toBe(false)
+    expect(await getFromStorage(STORAGE_KEYS.VAULT_BYTES)).toBeUndefined()
+    expect(await getFromStorage(STORAGE_KEYS.PENDING_VAULT)).toBeDefined()
   })
 })
